@@ -1,0 +1,303 @@
+/* 模态框遮罩层 */
+.quick-action-edit-modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1100;
+	padding: 20px;
+}
+
+/* 模态框容器 */
+.quick-action-edit-modal {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	max-width: 520px;
+	max-height: 90vh;
+	background: var(--background-primary);
+	border-radius: 12px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+	overflow: hidden;
+}
+
+/* 头部 */
+.quick-action-edit-modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 20px 24px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.quick-action-edit-modal-title {
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.quick-action-edit-modal-close {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.quick-action-edit-modal-close:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* 表单内容 */
+.quick-action-edit-modal-body {
+	flex: 1;
+	overflow-y: auto;
+	padding: 20px 24px;
+}
+
+/* 表单字段 */
+.quick-action-edit-field {
+	margin-bottom: 20px;
+}
+
+.quick-action-edit-field:last-child {
+	margin-bottom: 0;
+}
+
+.quick-action-edit-label {
+	display: block;
+	margin-bottom: 8px;
+	font-size: var(--font-ui-small);
+	font-weight: 500;
+	color: var(--text-normal);
+}
+
+.quick-action-edit-required {
+	color: var(--text-error);
+	margin-left: 2px;
+}
+
+/* 名称输入行 */
+.quick-action-edit-name-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.quick-action-edit-input {
+	flex: 1;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quick-action-edit-input:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+.quick-action-edit-input-error {
+	border-color: var(--text-error);
+}
+
+.quick-action-edit-input-error:focus {
+	box-shadow: 0 0 0 2px rgba(var(--text-error-rgb), 0.2);
+}
+
+.quick-action-edit-name-counter {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+.quick-action-edit-icon-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-primary);
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.quick-action-edit-icon-btn:hover {
+	border-color: var(--interactive-accent);
+	color: var(--interactive-accent);
+}
+
+/* 提示词提示 */
+.quick-action-edit-prompt-hint {
+	margin-bottom: 8px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.quick-action-edit-link-btn {
+	padding: 0;
+	margin-left: 8px;
+	border: none;
+	background: transparent;
+	color: var(--interactive-accent);
+	font-size: var(--font-ui-smaller);
+	cursor: pointer;
+	text-decoration: underline;
+}
+
+.quick-action-edit-link-btn:hover {
+	color: var(--interactive-accent-hover);
+}
+
+/* 文本域 */
+.quick-action-edit-textarea {
+	width: 100%;
+	padding: 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	font-family: var(--font-text);
+	line-height: 1.5;
+	resize: vertical;
+	min-height: 150px;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quick-action-edit-textarea:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+.quick-action-edit-textarea::placeholder {
+	color: var(--text-muted);
+}
+
+/* 错误提示 */
+.quick-action-edit-error {
+	display: block;
+	margin-top: 4px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-error);
+}
+
+/* 底部操作栏 */
+.quick-action-edit-modal-footer {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 12px;
+	padding: 16px 24px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* 按钮样式 */
+.quick-action-edit-btn {
+	padding: 10px 20px;
+	border: none;
+	border-radius: 8px;
+	font-size: var(--font-ui-small);
+	font-weight: 500;
+	cursor: pointer;
+	transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.quick-action-edit-btn-secondary {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.quick-action-edit-btn-secondary:hover {
+	background: var(--background-modifier-active-hover);
+}
+
+.quick-action-edit-btn-primary {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.quick-action-edit-btn-primary:hover {
+	background: var(--interactive-accent-hover);
+}
+
+/* 响应式调整 */
+@media (max-width: 600px) {
+	.quick-action-edit-modal {
+		max-width: 100%;
+		border-radius: 8px;
+	}
+
+	.quick-action-edit-modal-header,
+	.quick-action-edit-modal-body,
+	.quick-action-edit-modal-footer {
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+}
+
+/* 复选框行样式 */
+.quick-action-edit-checkbox-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.quick-action-edit-checkbox {
+	width: 16px;
+	height: 16px;
+	cursor: pointer;
+	accent-color: var(--interactive-accent);
+}
+
+.quick-action-edit-checkbox-label {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+/* 模型选择器样式 */
+.quick-action-edit-select {
+	width: 100%;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	cursor: pointer;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quick-action-edit-select:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+.quick-action-edit-model-hint {
+	margin-top: 6px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}

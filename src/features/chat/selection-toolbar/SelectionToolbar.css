@@ -1,0 +1,199 @@
+/* 选区工具栏容器 */
+.selection-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 0;
+	padding: 4px;
+	background: var(--background-primary);
+	border: none;
+	border-radius: 8px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	z-index: 1000;
+	font-size: var(--font-ui-small);
+}
+
+/* 工具栏按钮基础样式 - 使用 !important 强制覆盖 Obsidian 默认样式 */
+button.selection-toolbar-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	padding: 6px 3px;
+	border: none !important;
+	border-radius: 6px;
+	background: transparent !important;
+	-webkit-appearance: none !important;
+	appearance: none !important;
+	box-shadow: none !important;
+	outline: none !important;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	cursor: pointer;
+	white-space: nowrap;
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+button.selection-toolbar-btn:hover {
+	background: var(--background-modifier-hover);
+	border: none !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+}
+
+button.selection-toolbar-btn:focus,
+button.selection-toolbar-btn:focus-visible {
+	border: none !important;
+	box-shadow: none !important;
+	outline: none !important;
+}
+
+button.selection-toolbar-btn:active {
+	background: var(--background-modifier-active-hover);
+}
+
+/* AI Chat 主按钮样式 */
+button.selection-toolbar-btn-primary {
+	font-weight: normal;
+}
+
+button.selection-toolbar-btn-primary:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* 更多按钮样式 */
+button.selection-toolbar-btn-more {
+	padding: 6px 8px;
+}
+
+/* 操作组按钮样式（文字 + 箭头标识） */
+button.selection-toolbar-btn-group {
+	padding-right: 0;
+}
+
+.selection-toolbar-btn-group-triangle {
+	position: absolute;
+	right: 3px;
+	bottom: 2px;
+	font-size: 0.5em;
+	line-height: 1;
+	color: var(--text-muted);
+}
+
+button.selection-toolbar-btn-group:hover .selection-toolbar-btn-group-triangle {
+	color: var(--text-normal);
+}
+
+/* 分隔线 */
+.selection-toolbar-divider {
+	width: 1px;
+	height: 20px;
+	background: transparent;
+	margin: 0 1px;
+}
+
+/* 下拉菜单容器 */
+.selection-toolbar-dropdown {
+	position: relative;
+}
+
+/* 下拉菜单 */
+.selection-toolbar-dropdown-menu {
+	position: absolute;
+	top: 100%;
+	right: 0;
+	margin-top: 4px;
+	min-width: 120px;
+	max-width: 200px;
+	max-height: 240px;
+	overflow-y: auto;
+	padding: 4px;
+	background: var(--background-primary);
+	border: none;
+	border-radius: 8px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	z-index: 1001;
+}
+
+/* 向上展开 */
+.selection-toolbar-dropdown-menu-up {
+	top: auto;
+	bottom: 100%;
+	margin-top: 0;
+	margin-bottom: 4px;
+}
+
+/* 操作组级联子菜单：独立浮层（不嵌在父菜单内容流里） */
+.selection-toolbar-dropdown-menu-submenu {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: auto;
+	margin-top: 0;
+}
+
+/* 下拉菜单项 */
+.selection-toolbar-dropdown-item {
+	padding: 8px 12px;
+	border-radius: 4px;
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	transition: background-color 0.15s ease;
+}
+
+.selection-toolbar-dropdown-item:hover {
+	background: var(--background-modifier-hover);
+}
+
+/* 操作组列表项：右侧折叠箭头 */
+.selection-toolbar-dropdown-item-group {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.selection-toolbar-dropdown-item-submenu-arrow {
+	display: flex;
+	align-items: center;
+	color: var(--text-muted);
+	transform: rotate(-90deg);
+}
+
+.selection-toolbar-dropdown-item-group-arrow {
+	display: flex;
+	align-items: center;
+	color: var(--text-muted);
+	transition: transform 0.15s ease;
+}
+
+/* 下拉菜单空状态 */
+.selection-toolbar-dropdown-empty {
+	padding: 12px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	text-align: center;
+}
+
+/* 响应式调整 */
+@media (max-width: 600px) {
+	.selection-toolbar {
+		gap: 0.5px;
+		padding: 3px;
+	}
+	
+	.selection-toolbar-btn {
+		padding: 5px 8px;
+		font-size: var(--font-ui-smaller);
+	}
+	
+	.selection-toolbar-btn span {
+		max-width: 60px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+}

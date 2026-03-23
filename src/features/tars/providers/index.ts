@@ -1,0 +1,128 @@
+import { EmbedCache } from 'obsidian'
+import type { McpToolAnnotations } from '../mcp/types'
+import type {
+	GetToolsFn,
+	ToolDefinition,
+	ToolExecutionRecord,
+	ToolExecutor,
+} from '../agent-loop/types'
+
+export type MsgRole = 'user' | 'assistant' | 'system'
+
+export interface SaveAttachment {
+	(fileName: string, data: ArrayBuffer): Promise<void>
+}
+
+export interface ResolveEmbedAsBinary {
+	(embed: EmbedCache): Promise<ArrayBuffer>
+}
+
+export interface CreatePlainText {
+	(filePath: string, text: string): Promise<void>
+}
+
+export interface Message {
+	readonly role: MsgRole
+	readonly content: string
+	readonly embeds?: EmbedCache[]
+	readonly prefix?: boolean
+	/** DeepSeek 推理模式下的推理内容（仅用于 assistant 消息） */
+	readonly reasoning_content?: string
+}
+
+export type SendRequest = (
+	messages: readonly Message[],
+	controller: AbortController,
+	resolveEmbedAsBinary: ResolveEmbedAsBinary,
+	saveAttachment?: SaveAttachment
+) => AsyncGenerator<string, void, unknown>
+
+export type Capability =
+	| 'Text Generation'
+	| 'Image Vision'
+	| 'PDF Vision'
+	| 'Image Generation'
+	| 'Image Editing'
+	| 'Web Search'
+	| 'Reasoning'
+	| 'Structured Output'
+
+export interface Vendor {
+	readonly name: string
+	readonly defaultOptions: BaseOptions
+	readonly sendRequestFunc: (options: BaseOptions) => SendRequest
+	readonly models: string[]
+	readonly websiteToObtainKey: string
+	readonly capabilities: Capability[]
+}
+
+export interface BaseOptions {
+	apiKey: string
+	baseURL: string
+	model: string
+	parameters: Record<string, unknown>
+	enableWebSearch?: boolean
+	/** 模型上下文长度（tokens），用于上下文管理 */
+	contextLength?: number
+
+	/** 通用工具定义列表（由 ChatService 注入，来源可以是 MCP 或其他工具后端） */
+	tools?: ToolDefinition[]
+	/** 通用工具执行器（由 ChatService 注入，如 McpToolExecutor） */
+	toolExecutor?: ToolExecutor
+	/** 工具调用循环最大次数（可选，默认 10） */
+	maxToolCallLoops?: number
+	/** 动态工具集解析函数（可选，支持按轮次动态刷新工具集） */
+	getTools?: GetToolsFn
+	/** 工具执行完成后的回调，用于回填结构化 toolCalls */
+	onToolCallResult?: (record: ToolExecutionRecord) => void
+
+	/**
+	 * @deprecated 使用 tools 代替。保留用于向后兼容过渡期
+	 */
+	mcpTools?: McpToolDefinitionForProvider[]
+	/**
+	 * @deprecated 使用 getTools 代替。保留用于向后兼容过渡期
+	 */
+	mcpGetTools?: McpGetToolsFnForProvider
+	/**
+	 * @deprecated 使用 toolExecutor 代替。保留用于向后兼容过渡期
+	 */
+	mcpCallTool?: McpCallToolFnForProvider
+	/**
+	 * @deprecated 使用 maxToolCallLoops 代替。保留用于向后兼容过渡期
+	 */
+	mcpMaxToolCallLoops?: number
+}
+
+/** MCP 工具定义（Provider 使用的精简格式） */
+export interface McpToolDefinitionForProvider {
+	readonly name: string
+	readonly title?: string
+	readonly description: string
+	readonly inputSchema: Record<string, unknown>
+	readonly outputSchema?: Record<string, unknown>
+	readonly annotations?: McpToolAnnotations
+	readonly serverId: string
+}
+
+/** MCP 工具调用函数（Provider 使用） */
+export type McpCallToolFnForProvider = (
+	serverId: string,
+	toolName: string,
+	args: Record<string, unknown>,
+) => Promise<string>
+
+/** MCP 当前工具集解析函数（Provider 使用） */
+export type McpGetToolsFnForProvider = () => Promise<McpToolDefinitionForProvider[]>
+
+export interface ProviderSettings {
+	tag: string
+	readonly vendor: string
+	options: BaseOptions
+}
+
+export interface Optional {
+	apiSecret: string
+	endpoint: string
+	apiVersion: string
+}

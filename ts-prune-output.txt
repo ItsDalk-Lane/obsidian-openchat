@@ -1,0 +1,390 @@
+\src\builtin-mcp\constants.ts:11 - BUILTIN_SKILLS_SERVER_VERSION
+\src\builtin-mcp\constants.ts:12 - BUILTIN_SKILLS_CLIENT_NAME
+\src\builtin-mcp\constants.ts:15 - DEFAULT_QUERY_TIMEOUT_MS
+\src\builtin-mcp\constants.ts:20 - DEFAULT_SEARCH_CONTEXT_LINES
+\src\builtin-mcp\core-tools-mcp-server.ts:134 - createCoreToolsBuiltinClient
+\src\builtin-mcp\core-tools-mcp-server.ts:30 - BuiltinToolInfo (used in module)
+\src\builtin-mcp\filesystem-mcp-server.ts:2168 - createFilesystemBuiltinClient
+\src\builtin-mcp\filesystem-mcp-server.ts:52 - BuiltinToolInfo (used in module)
+\src\builtin-mcp\skills-mcp-server.ts:12 - BuiltinToolInfo (used in module)
+\src\builtin-mcp\skills-mcp-server.ts:22 - SkillsBuiltinRuntime (used in module)
+\src\builtin-mcp\skills-mcp-server.ts:66 - buildSkillToolDescription (used in module)
+\src\builtin-mcp\skills-mcp-server.ts:126 - createSkillsToolResultHint
+\src\builtin-mcp\skills-mcp-server.ts:130 - normalizeSkillToolPath
+\src\context\LoopContext.tsx:50 - withLoopContext
+\src\context\LoopContext.tsx:7 - LoopContextValue (used in module)
+\src\context\LoopContext.tsx:28 - LoopProviderProps (used in module)
+\src\hooks\useSortable.tsx:10 - SortableContextProps (used in module)
+\src\i18n\locals.ts:8 - Locals (used in module)
+\src\i18n\week.ts:17 - weeks
+\src\i18n\week.ts:32 - month (used in module)
+\src\i18n\week.ts:3 - ZH_FULL_WEEK (used in module)
+\src\i18n\week.ts:4 - ZH_MEDIUM_WEEK (used in module)
+\src\i18n\week.ts:5 - ZH_SHORT_WEEK (used in module)
+\src\i18n\week.ts:7 - EN_FULL_WEEK (used in module)
+\src\i18n\week.ts:8 - EN_MEDIUM_WEEK (used in module)
+\src\i18n\week.ts:9 - EN_SHORT_WEEK (used in module)
+\src\i18n\week.ts:11 - ZH_FULL_MONTH (used in module)
+\src\i18n\week.ts:12 - ZH_SHORT_MONTH (used in module)
+\src\i18n\week.ts:14 - EN_FULL_MONTH (used in module)
+\src\i18n\week.ts:15 - EN_SHORT_MONTH (used in module)
+\src\model\FormImport.ts:20 - PartialImportConfig (used in module)
+\src\service\FileOperationService.ts:13 - FileConflictStrategy (used in module)
+\src\service\FileOperationService.ts:22 - OpenFileMode (used in module)
+\src\service\FileOperationService.ts:32 - WriteFileOptions (used in module)
+\src\service\FileOperationService.ts:45 - WriteFileResult (used in module)
+\src\service\FileOperationService.ts:54 - DeleteFileOptions (used in module)
+\src\service\FileOperationService.ts:63 - DeleteFileResult (used in module)
+\src\service\FileOperationService.ts:71 - MoveFileOptions (used in module)
+\src\service\FileOperationService.ts:81 - MoveFileResult (used in module)
+\src\service\FileOperationService.ts:88 - OpenFileOptions (used in module)
+\src\service\FileOperationService.ts:96 - OpenFileResult (used in module)
+\src\service\FormValues.ts:1 - FormFieldId (used in module)
+\src\service\FormValues.ts:7 - FormFieldLabel (used in module)
+\src\service\PathResolverService.ts:8 - PathResolutionOptions (used in module)
+\src\service\PathResolverService.ts:24 - PathResolutionResult (used in module)
+\src\service\PromptBuilder.ts:8 - DEFAULT_HISTORY_ROUNDS (used in module)
+\src\service\PromptBuilder.ts:24 - PromptBuilderChatContext (used in module)
+\src\service\ScriptExecutionService.ts:8 - ScriptSource (used in module)
+\src\service\ScriptExecutionService.ts:10 - ScriptExecutionOptions (used in module)
+\src\service\ScriptExecutionService.ts:20 - ScriptExecutionResult (used in module)
+\src\settings\PluginSettings.ts:6 - TarsFeatureConfig (used in module)
+\src\settings\PluginSettings.ts:10 - TestingFeatureConfig (used in module)
+\src\testing\obsidianMock.ts:38 - createObsidianMock
+\src\types\variable.ts:19 - VariableLocation (used in module)
+\src\utils\ActionDependencyAnalyzer.ts:11 - DependencyValidationResult (used in module)
+\src\utils\AIPathManager.ts:3 - AI_PROMPTS_SUBFOLDER (used in module)
+\src\utils\AIPathManager.ts:4 - AI_CHAT_HISTORY_SUBFOLDER (used in module)
+\src\utils\AIPathManager.ts:5 - AI_QUICK_ACTIONS_SUBFOLDER (used in module)
+\src\utils\AIPathManager.ts:6 - AI_SYSTEM_PROMPTS_SUBFOLDER (used in module)
+\src\utils\AIPathManager.ts:7 - AI_MCP_SERVERS_SUBFOLDER (used in module)
+\src\utils\AIPathManager.ts:8 - AI_MULTI_MODEL_SUBFOLDER (used in module)
+\src\utils\AIPathManager.ts:9 - AI_SKILLS_SUBFOLDER (used in module)
+\src\utils\AIPathManager.ts:10 - AI_AGENTS_SUBFOLDER (used in module)
+\src\utils\ConditionVariableResolver.ts:9 - ConditionVariableContext (used in module)
+\src\utils\convertFrontmatterValue.ts:305 - convertFrontmatterValues
+\src\utils\createFileByText.ts:265 - createFileByTextLegacy
+\src\utils\createFileByText.ts:15 - TypeConversionWarning (used in module)
+\src\utils\expandTargetPaths.ts:3 - ExpandTargetPathsOptions (used in module)
+\src\utils\fetchStream.ts:102 - fetchStream (used in module)
+\src\utils\fetchStream.ts:104 - FetchStreamOptions (used in module)
+\src\utils\fetchStream.ts:105 - ChunkProcessor (used in module)
+\src\utils\fetchStream.ts:106 - JsonStreamOptions (used in module)
+\src\utils\fetchStream.ts:107 - ParsedDataProcessor (used in module)
+\src\utils\getAllProperties.ts:4 - Property (used in module)
+\src\utils\getFieldDefaultValue.ts:11 - OBSIDIAN_DATETIME_YAML_VALUE_FORMAT (used in module)
+\src\utils\LoopVariableScope.ts:13 - LoopScopeInfo (used in module)
+\src\utils\templates.ts:14 - processObTemplateInContext (used in module)
+\src\builtin-mcp\runtime\plan-state.ts:3 - PlanTaskInput (used in module)
+\src\builtin-mcp\runtime\plan-state.ts:10 - PlanTask (used in module)
+\src\builtin-mcp\runtime\plan-state.ts:30 - PlanUpdateInput (used in module)
+\src\builtin-mcp\runtime\script-runtime.ts:29 - ScriptRuntimeDependencies (used in module)
+\src\builtin-mcp\runtime\tool-registry.ts:3 - BuiltinToolHandler (used in module)
+\src\builtin-mcp\runtime\tool-result.ts:3 - McpToolResultContentItem (used in module)
+\src\builtin-mcp\runtime\tool-result.ts:9 - McpToolResultLike (used in module)
+\src\builtin-mcp\runtime\tool-result.ts:53 - truncateToolResultText (used in module)
+\src\builtin-mcp\tools\time-utils.ts:3 - TimeResult (used in module)
+\src\builtin-mcp\tools\time-utils.ts:13 - TimeConversionResult (used in module)
+\src\component\dropdown\index.tsx:5 - DropdownMenuItem (used in module)
+\src\component\extension-editor\ExtensionEditor.tsx:7 - ExtensionEditorProps (used in module)
+\src\component\filter\ExtendedConditionEditor.tsx:33 - getTimeConditionSubTypeOptions (used in module)
+\src\component\filter\ExtendedConditionEditor.tsx:53 - getFileConditionSubTypeOptions (used in module)
+\src\component\filter\ExtendedConditionEditor.tsx:234 - TimeConditionEditor (used in module)
+\src\component\filter\ExtendedConditionEditor.tsx:349 - FileConditionEditor (used in module)
+\src\component\filter\ExtendedConditionEditor.tsx:601 - ScriptConditionEditor (used in module)
+\src\component\filter\FilterItem.tsx:134 - FilterRule (used in module)
+\src\component\filter\FilterItem.tsx:13 - FilternProps (used in module)
+\src\component\filter\FilterItem.tsx:39 - FilterGroup (used in module)
+\src\component\filter\FilterRoot.tsx:15 - FilterComponentProps (used in module)
+\src\component\interactive-list\InteractiveList.tsx:10 - WithId (used in module)
+\src\component\interactive-list\InteractiveList.tsx:20 - InteractiveListProps (used in module)
+\src\component\interactive-list\InteractiveList.tsx:146 - InteractiveListItemProps (used in module)
+\src\component\modal\MultiSubmitFormsModal.tsx:27 - MultiSubmitFormsModalResult (used in module)
+\src\component\popup\SelectionPopup.tsx:8 - PupupOptions
+\src\component\radio\RadioSelect.tsx:4 - RadioOption (used in module)
+\src\component\tab\Tab.tsx:11 - TabProps (used in module)
+\src\component\toast\PromiseToast.tsx:5 - PromiseToastView (used in module)
+\src\component\toast\PromiseToast.tsx:48 - PromiseToast (used in module)
+\src\component\toast\Toast.tsx:7 - ToastProps (used in module)
+\src\component\toast\ToastView.tsx:12 - getToastIcon (used in module)
+\src\component\toggle\Toggle.tsx:3 - ToggleOption (used in module)
+\src\component\toggle-switch\ToggleSwitch.tsx:3 - ToggleSwitchProps (used in module)
+\src\features\chat\index.ts:5 - ChatPersistentModal
+\src\features\chat\index.ts:87 - PreparedChatRequest
+\src\features\chat\index.ts:98 - GenerateAssistantOptions
+\src\features\chat\index.ts:164 - ChatService
+\src\features\chat\index.ts:19 - ChatHistoryEntry
+\src\features\chat\index.ts:36 - HistoryService
+\src\features\chat\index.ts:6 - ChatRole
+\src\features\chat\index.ts:15 - FileRole
+\src\features\chat\index.ts:24 - FileIntentAnalysis
+\src\features\chat\index.ts:33 - SelectedFile
+\src\features\chat\index.ts:42 - SelectedFolder
+\src\features\chat\index.ts:49 - SelectedItem
+\src\features\chat\index.ts:51 - ChatMessageMetadata
+\src\features\chat\index.ts:62 - ChatMessage
+\src\features\chat\index.ts:83 - isPinnedChatMessage
+\src\features\chat\index.ts:87 - ChatContextCompactionRange
+\src\features\chat\index.ts:93 - ChatContextCompactionState
+\src\features\chat\index.ts:107 - ChatRequestTokenState
+\src\features\chat\index.ts:115 - ChatSession
+\src\features\chat\index.ts:137 - ChatOpenMode
+\src\features\chat\index.ts:142 - QuickActionPromptSource
+\src\features\chat\index.ts:150 - QuickActionType
+\src\features\chat\index.ts:156 - QuickAction
+\src\features\chat\index.ts:230 - MessageManagementSettings
+\src\features\chat\index.ts:244 - DEFAULT_MESSAGE_MANAGEMENT_SETTINGS
+\src\features\chat\index.ts:250 - normalizeMessageManagementSettings
+\src\features\chat\index.ts:270 - McpToolMode
+\src\features\chat\index.ts:272 - ChatState
+\src\features\skills\index.ts:1 - SkillMetadata
+\src\features\skills\index.ts:16 - SkillToolInput
+\src\features\skills\index.ts:21 - SkillScanError
+\src\features\skills\index.ts:13 - loadSkillContent
+\src\features\skills\index.ts:41 - stripSkillFrontmatter
+\src\features\skills\index.ts:49 - formatSkillToolResult
+\src\features\skills\index.ts:7 - LoadedSkillContent
+\src\features\sub-agents\index.ts:8 - SUB_AGENT_TOOL_PREFIX
+\src\features\sub-agents\index.ts:9 - DEFAULT_SUB_AGENT_MAX_TOKENS
+\src\features\sub-agents\index.ts:13 - SubAgentMetadata
+\src\features\sub-agents\index.ts:28 - SubAgentScanError
+\src\features\sub-agents\index.ts:48 - SubAgentStateUpdate
+\src\features\sub-agents\index.ts:56 - ToolRuntimeResolutionOptions
+\src\features\sub-agents\index.ts:71 - SubAgentChatServiceAdapter
+\src\features\sub-agents\index.ts:90 - requireNonEmptyString
+\src\features\sub-agents\index.ts:97 - normalizeStringArray
+\src\features\sub-agents\index.ts:106 - normalizeOptionalModel
+\src\features\sub-agents\index.ts:113 - normalizePositiveInteger
+\src\features\sub-agents\index.ts:120 - buildSubAgentToolName
+\src\features\sub-agents\index.ts:124 - parseSubAgentNameFromToolName
+\src\features\sub-agents\index.ts:5 - subAgentToToolDefinition
+\src\features\tars\editor.ts:27 - RunEnv (used in module)
+\src\features\tars\editor.ts:83 - buildRunEnv
+\src\features\tars\editor.ts:337 - extractConversationsTextOnly
+\src\features\tars\editor.ts:372 - getMsgPositionByLine
+\src\features\tars\editor.ts:422 - generate
+\src\features\tars\index.ts:2 - EditorStatus
+\src\features\tars\index.ts:3 - ProviderSettings
+\src\features\tars\index.ts:4 - DEFAULT_TARS_SETTINGS
+\src\features\tars\index.ts:4 - availableVendors
+\src\features\tars\index.ts:4 - APP_FOLDER
+\src\features\tars\index.ts:5 - encryptApiKey
+\src\features\tars\index.ts:5 - decryptApiKey
+\src\features\tars\index.ts:5 - maskApiKey
+\src\features\tars\index.ts:5 - generateDeviceFingerprint
+\src\features\tars\index.ts:9 - TabCompletionService
+\src\features\tars\index.ts:10 - createTabCompletionExtension
+\src\features\tars\index.ts:11 - getTabCompletionService
+\src\features\tars\index.ts:12 - updateTabCompletionSettings
+\src\features\tars\index.ts:13 - updateTabCompletionProviders
+\src\features\tars\index.ts:14 - disposeTabCompletionService
+\src\features\tars\index.ts:15 - DEFAULT_TAB_COMPLETION_SETTINGS
+\src\features\tars\index.ts:17 - TabCompletionSettings
+\src\features\tars\index.ts:17 - TabCompletionStateValue
+\src\features\tars\index.ts:17 - EditorContext
+\src\features\tars\settings.ts:29 - ToolExecutionSettings (used in module)
+\src\features\tars\settingTab.ts:61 - TarsSettingsContext (used in module)
+\src\features\tars\statusBarManager.ts:4 - StatusBarType (used in module)
+\src\features\tars\statusBarManager.ts:6 - StatusBarContent (used in module)
+\src\features\tars\statusBarManager.ts:11 - StatusBarState (used in module)
+\src\features\tars\statusBarManager.ts:28 - ErrorInfo (used in module)
+\src\model\action\AIFormActionConstants.ts:13 - AI_TEMPLATE_SELECT_ON_SUBMIT
+\src\model\action\RunScriptFormAction.ts:28 - Variable (used in module)
+\src\model\action\WaitFormAction.ts:30 - DEFAULT_WAIT_UNIT (used in module)
+\src\model\enums\CommandSourceMode.ts:17 - COMMAND_SELECT_ON_SUBMIT
+\src\model\startup-condition\StartupCondition.ts:256 - createCondition
+\src\model\startup-condition\StartupCondition.ts:269 - createConditionGroup
+\src\model\startup-condition\StartupCondition.ts:323 - getConditionPresets
+\src\model\startup-condition\StartupCondition.ts:201 - ConditionCategory (used in module)
+\src\model\startup-condition\StartupCondition.ts:313 - ConditionPreset (used in module)
+\src\service\command\ContextMenuService.ts:6 - ContextMenuItem (used in module)
+\src\service\command\StartupFormService.ts:11 - StartupFormService (used in module)
+\src\service\conflict\ConflictTypes.ts:1 - ConflictKind (used in module)
+\src\service\conflict\ConflictTypes.ts:3 - ConflictItem (used in module)
+\src\service\conflict\VariableConflictVaultScanner.ts:7 - VariableConflictScanResult (used in module)
+\src\service\extend\FormScript.ts:12 - Description (used in module)
+\src\service\startup-condition\StartupConditionService.ts:59 - IConditionEvaluator (used in module)
+\src\service\startup-condition\StartupConditionService.ts:100 - StartupConditionService (used in module)
+\src\service\validator\FormValidator.ts:10 - FieldValidationResult
+\src\service\variable\CommandIdConflictDetector.ts:4 - CommandIdConflict (used in module)
+\src\service\variable\CommandIdConflictDetector.ts:12 - CommandIdConflictResult (used in module)
+\src\component\filter\hooks\useFilterOperations.ts:6 - UseFilterOperationsResult (used in module)
+\src\features\chat\components\chatSettingsHelpers.ts:33 - BuiltinToolEntry (used in module)
+\src\features\chat\components\McpModeSelector.tsx:19 - McpModeSelector
+\src\features\chat\components\MultiModelSelector.tsx:6 - MultiModelSelectorProps (used in module)
+\src\features\chat\hooks\useSlashCommand.ts:50 - useSlashCommand
+\src\features\chat\hooks\useSlashCommand.ts:313 - UseSlashCommandReturn (used in module)
+\src\features\chat\selection-toolbar\FormQuickActionService.ts:21 - FormQuickActionExecutionResult (used in module)
+\src\features\chat\selection-toolbar\FormQuickActionService.ts:32 - FormQuickActionService (used in module)
+\src\features\chat\selection-toolbar\ModifyGhostTextExtension.ts:58 - getModifyGhostState
+\src\features\chat\selection-toolbar\ModifyGhostTextExtension.ts:31 - clearModifyGhostEffect (used in module)
+\src\features\chat\selection-toolbar\ModifyGhostTextExtension.ts:33 - modifyGhostStateField (used in module)
+\src\features\chat\selection-toolbar\ModifyTextModal.tsx:187 - default
+\src\features\chat\selection-toolbar\QuickActionEditModal.tsx:22 - QuickActionEditModal (used in module)
+\src\features\chat\selection-toolbar\QuickActionEditModal.tsx:316 - default
+\src\features\chat\selection-toolbar\QuickActionExecutionService.ts:15 - QuickActionExecutionResult (used in module)
+\src\features\chat\selection-toolbar\QuickActionResultModal.tsx:270 - default
+\src\features\chat\selection-toolbar\SelectionToolbar.tsx:773 - default
+\src\features\chat\selection-toolbar\SelectionToolbarExtension.ts:109 - isSelectionToolbarEnabled (used in module)
+\src\features\chat\selection-toolbar\SelectionToolbarExtension.ts:116 - getSelectionToolbarSettings
+\src\features\chat\selection-toolbar\SelectionToolbarExtension.ts:51 - SelectionToolbarCallbacks (used in module)
+\src\features\chat\services\FileContentService.ts:12 - FolderContent (used in module)
+\src\features\chat\services\MessageContextOptimizer.ts:33 - SummaryGenerationRequest (used in module)
+\src\features\chat\services\MessageContextOptimizer.ts:46 - MessageContextOptimizationResult (used in module)
+\src\features\chat\trigger\ChatTriggerExtension.ts:122 - isChatTriggerEnabled
+\src\features\chat\trigger\ChatTriggerExtension.ts:129 - getChatTriggerSettings
+\src\features\chat\trigger\ChatTriggerExtension.ts:10 - ChatTriggerCallbacks (used in module)
+\src\features\chat\utils\contextBudget.ts:3 - DEFAULT_CONTEXT_LENGTH (used in module)
+\src\features\chat\utils\contextBudget.ts:4 - DEFAULT_OUTPUT_RESERVE_RATIO (used in module)
+\src\features\chat\utils\contextBudget.ts:5 - MAX_OUTPUT_RESERVE_TOKENS (used in module)
+\src\features\chat\utils\contextBudget.ts:6 - AUTO_COMPACTION_TRIGGER_RATIO (used in module)
+\src\features\chat\utils\contextBudget.ts:7 - AUTO_COMPACTION_TARGET_RATIO (used in module)
+\src\features\chat\utils\contextBudget.ts:64 - resolveProviderContextLength (used in module)
+\src\features\chat\utils\markdown.ts:12 - ReasoningBlock (used in module)
+\src\features\chat\utils\markdown.ts:19 - TextBlock (used in module)
+\src\features\chat\utils\markdown.ts:24 - McpToolBlock (used in module)
+\src\features\chat\utils\markdown.ts:154 - hasReasoningBlock
+\src\features\chat\utils\token.ts:7 - EMBED_TOKEN_ESTIMATE (used in module)
+\src\features\chat\utils\token.ts:15 - RequestTokenEstimate (used in module)
+\src\features\chat\views\ChatModal.tsx:16 - ChatModalOptions (used in module)
+\src\features\chat\views\ChatPersistentModal.tsx:16 - ChatPersistentModalOptions (used in module)
+\src\features\chat\views\ChatView.tsx:16 - ChatViewMode (used in module)
+\src\features\file-expiry-monitor\model\index.ts:7 - MONITOR_DATA_VERSION
+\src\features\file-expiry-monitor\service\ExpiryCheckService.ts:19 - ExpiryCheckCallback (used in module)
+\src\features\tars\agent-loop\index.ts:9 - ToolDefinition
+\src\features\tars\agent-loop\index.ts:10 - ToolCallRequest
+\src\features\tars\agent-loop\index.ts:11 - ToolCallResult
+\src\features\tars\agent-loop\index.ts:12 - ToolExecutor
+\src\features\tars\agent-loop\index.ts:13 - GetToolsFn
+\src\features\tars\agent-loop\index.ts:24 - OpenAIToolCall
+\src\features\tars\agent-loop\index.ts:25 - ToolLoopMessage
+\src\features\tars\agent-loop\index.ts:26 - ContentPart
+\src\features\tars\agent-loop\index.ts:32 - toClaudeTools
+\src\features\tars\mcp\index.ts:9 - McpImportResult
+\src\features\tars\mcp\index.ts:17 - DEFAULT_BUILTIN_TIME_TIMEZONE
+\src\features\tars\mcp\index.ts:21 - McpServerStatus
+\src\features\tars\mcp\index.ts:23 - McpToolDefinition
+\src\features\tars\mcp\index.ts:24 - McpCallToolFn
+\src\features\tars\mcp\index.ts:25 - McpHealthResult
+\src\features\tars\mcp\index.ts:26 - McpConfigFile
+\src\features\tars\mcp\index.ts:27 - McpTransportType
+\src\features\tars\mcp\index.ts:31 - toOpenAITools
+\src\features\tars\mcp\index.ts:32 - toClaudeTools
+\src\features\tars\mcp\index.ts:33 - findToolServerId
+\src\features\tars\mcp\index.ts:34 - executeMcpToolCalls
+\src\features\tars\mcp\index.ts:35 - resolveCurrentMcpTools
+\src\features\tars\mcp\index.ts:38 - OpenAIToolDefinition
+\src\features\tars\mcp\index.ts:39 - OpenAIToolCall
+\src\features\tars\mcp\index.ts:40 - ToolLoopMessage
+\src\features\tars\mcp\index.ts:42 - McpToolExecutor
+\src\features\tars\mcp\index.ts:42 - mcpToolToToolDefinition
+\src\features\tars\mcp\McpClientManager.ts:39 - McpBuiltinRuntime (used in module)
+\src\features\tars\mcp\McpClientManager.ts:48 - McpBuiltinServerDescriptor (used in module)
+\src\features\tars\mcp\McpConfigModals.ts:336 - McpImportModalOptions (used in module)
+\src\features\tars\mcp\McpConfigModals.ts:401 - BuiltinMcpToolsModal
+\src\features\tars\mcp\mcpToolCallHandler.ts:37 - ContentPart (used in module)
+\src\features\tars\mcp\toolHints.ts:3 - ToolConditionalRule (used in module)
+\src\features\tars\mcp\toolHints.ts:11 - ToolHint (used in module)
+\src\features\tars\mcp\toolHints.ts:44 - BUILTIN_TOOL_HINTS (used in module)
+\src\features\tars\providers\azure.ts:14 - azureUseResponsesAPI (used in module)
+\src\features\tars\providers\azure.ts:15 - azureMapResponsesParams (used in module)
+\src\features\tars\providers\claude.ts:173 - CLAUDE_MODELS (used in module)
+\src\features\tars\providers\deepSeek.ts:168 - DEEPSEEK_MODELS (used in module)
+\src\features\tars\providers\doubao.ts:41 - doubaoUseResponsesAPI (used in module)
+\src\features\tars\providers\gemini.ts:10 - geminiNormalizeOpenAIBaseURL (used in module)
+\src\features\tars\providers\gemini.ts:18 - geminiBuildConfig (used in module)
+\src\features\tars\providers\gemini.ts:27 - geminiIsAuthError (used in module)
+\src\features\tars\providers\gemini.ts:88 - geminiBuildContents
+\src\features\tars\providers\gptImage.ts:10 - DEFAULT_GPT_IMAGE_OPTIONS (used in module)
+\src\features\tars\providers\grok.ts:13 - grokUseResponsesAPI (used in module)
+\src\features\tars\providers\grok.ts:14 - grokResolveEndpoint (used in module)
+\src\features\tars\providers\grok.ts:16 - grokMapResponsesParams (used in module)
+\src\features\tars\providers\index.ts:10 - MsgRole (used in module)
+\src\features\tars\providers\index.ts:116 - McpGetToolsFnForProvider (used in module)
+\src\features\tars\providers\modelCapability.ts:1 - ReasoningCapabilityState (used in module)
+\src\features\tars\providers\modelCapability.ts:2 - ReasoningCapabilitySource (used in module)
+\src\features\tars\providers\modelCapability.ts:17 - ResolveReasoningCapabilityInput (used in module)
+\src\features\tars\providers\modelCapability.ts:26 - ModelCapabilityProbeResult (used in module)
+\src\features\tars\providers\modelCapability.ts:164 - createUnknownReasoningCapability (used in module)
+\src\features\tars\providers\modelCapability.ts:180 - isReasoningCapabilityExpired (used in module)
+\src\features\tars\providers\modelCapability.ts:185 - readReasoningCapabilityCache (used in module)
+\src\features\tars\providers\modelCapability.ts:199 - pruneExpiredReasoningCapabilityCache (used in module)
+\src\features\tars\providers\ollama.ts:15 - StructuredOutputFormat (used in module)
+\src\features\tars\providers\ollama.ts:18 - OllamaOptions (used in module)
+\src\features\tars\providers\openAI.ts:18 - openAIUseResponsesAPI (used in module)
+\src\features\tars\providers\openAI.ts:19 - openAIMapResponsesParams (used in module)
+\src\features\tars\providers\openRouter.ts:11 - OpenRouterReasoningEffort (used in module)
+\src\features\tars\providers\openRouter.ts:14 - OPENROUTER_REASONING_EFFORT_OPTIONS
+\src\features\tars\providers\poe.ts:142 - normalizePoeBaseURL (used in module)
+\src\features\tars\providers\poe.ts:154 - poeResolveResponsesURL
+\src\features\tars\providers\poe.ts:155 - poeResolveChatCompletionsURL
+\src\features\tars\providers\poe.ts:157 - poeMapResponsesParams (used in module)
+\src\features\tars\providers\qianFan.ts:39 - qianFanShouldRetryStatus
+\src\features\tars\providers\qianFan.ts:40 - qianFanComputeTokenExp
+\src\features\tars\providers\qianFan.ts:41 - QIANFAN_DEFAULT_BASE_URL (used in module)
+\src\features\tars\providers\qianFan.ts:61 - qianFanBuildApiError
+\src\features\tars\providers\qianFan.ts:100 - qianFanNormalizeBaseURLForTest
+\src\features\tars\providers\qianFan.ts:105 - qianFanIsImageGenerationModel (used in module)
+\src\features\tars\providers\qianFan.ts:377 - QIANFAN_TEXT_MODELS (used in module)
+\src\features\tars\providers\qianFan.ts:385 - QIANFAN_VISION_MODELS (used in module)
+\src\features\tars\providers\qianFan.ts:392 - QIANFAN_REASONING_MODELS (used in module)
+\src\features\tars\providers\qianFan.ts:394 - QIANFAN_IMAGE_MODELS (used in module)
+\src\features\tars\providers\qianFan.ts:398 - QIANFAN_MODELS (used in module)
+\src\features\tars\providers\qwen.ts:26 - QWEN_MODELS (used in module)
+\src\features\tars\providers\siliconflow.ts:9 - SiliconFlowOptions (used in module)
+\src\features\tars\providers\sse.ts:12 - FeedChunkResult (used in module)
+\src\features\tars\providers\utils.ts:145 - getEnabledCapabilities (used in module)
+\src\features\tars\providers\utils.ts:318 - ProviderErrorType
+\src\features\tars\providers\utils.ts:318 - NormalizedProviderError
+\src\features\tars\providers\utils.ts:319 - normalizeProviderError
+\src\features\tars\providers\utils.ts:319 - shouldRetryNormalizedError
+\src\features\tars\providers\utils.ts:319 - isAbortLikeError
+\src\features\tars\providers\utils.ts:320 - withRetry
+\src\features\tars\providers\utils.ts:320 - RetryOptions
+\src\features\tars\providers\zhipu.ts:8 - ZhipuThinkingType (used in module)
+\src\features\tars\providers\zhipu.ts:108 - ZHIPU_MODELS (used in module)
+\src\features\tars\system-prompts\SystemPromptEditorModal.tsx:12 - SystemPromptEditorMode (used in module)
+\src\features\tars\system-prompts\SystemPromptManagerModal.tsx:15 - SystemPromptManagerModal
+\src\features\tars\tab-completion\ContextBuilder.ts:308 - extractListItemFormat (used in module)
+\src\features\tars\tab-completion\ContextBuilder.ts:58 - ListItemFormat (used in module)
+\src\features\tars\tab-completion\index.ts:11 - tabCompletionStateField
+\src\features\tars\tab-completion\index.ts:12 - getTabCompletionState
+\src\features\tars\tab-completion\index.ts:13 - setSuggestionEffect
+\src\features\tars\tab-completion\index.ts:14 - clearSuggestionEffect
+\src\features\tars\tab-completion\index.ts:15 - setLoadingEffect
+\src\features\tars\tab-completion\index.ts:16 - confirmSuggestionEffect
+\src\features\tars\tab-completion\index.ts:19 - buildEditorContext
+\src\features\tars\tab-completion\index.ts:19 - generateContextPrompt
+\src\features\tars\tab-completion\index.ts:19 - ContextType
+\src\features\tars\tab-completion\index.ts:20 - ContextBuilderOptions
+\src\features\tars\tab-completion\index.ts:21 - createTabCompletionKeymap
+\src\features\tars\tab-completion\index.ts:21 - createCancelHandlers
+\src\features\tars\tab-completion\index.ts:22 - ghostTextExtension
+\src\features\tars\tab-completion\index.ts:22 - ghostTextPlugin
+\src\features\tars\tab-completion\index.ts:22 - ghostTextStyle
+\src\features\tars\tab-completion\TabCompletionKeymap.ts:9 - TriggerCallback (used in module)
+\src\features\tars\tab-completion\TabCompletionKeymap.ts:14 - ConfirmCallback (used in module)
+\src\features\tars\tab-completion\TabCompletionKeymap.ts:19 - CancelCallback (used in module)
+\src\features\tars\tab-completion\TabCompletionState.ts:22 - defaultTabCompletionState (used in module)
+\src\view\preview\components\FormFieldList.tsx:47 - FormFieldListProps (used in module)
+\src\view\preview\components\FormSubmitButton.tsx:5 - FormSubmitButtonProps (used in module)
+\src\view\preview\hooks\useFormSubmission.ts:12 - FormSubmissionOptions (used in module)
+\src\view\shared\action-flow\ActionFlow.tsx:57 - ActionFlow (used in module)
+\src\view\shared\control\FileListControl.tsx:60 - extractContentFromEncodedValueLegacy
+\src\view\shared\control\FileListControl.tsx:108 - extractFrontmatter
+\src\view\shared\control\FileListControl.tsx:120 - hasFrontmatter
+\src\view\shared\select\FormTypeSelect.tsx:6 - TypeOption (used in module)
+\src\features\tars\mcp\transport\HttpTransport.ts:13 - HttpTransportConfig (used in module)
+\src\features\tars\mcp\transport\ITransport.ts:6 - JsonRpcRequest (used in module)
+\src\features\tars\mcp\transport\ITransport.ts:22 - JsonRpcNotification (used in module)
+\src\features\tars\mcp\transport\RemoteSseTransport.ts:15 - RemoteSseTransportConfig (used in module)
+\src\features\tars\mcp\transport\StdioTransport.ts:12 - StdioConfig (used in module)
+\src\features\tars\mcp\transport\WebSocketTransport.ts:11 - WebSocketConfig (used in module)
+\src\view\edit\setting\startup-condition\StartupConditionEditor.tsx:62 - UnifiedConditionSubType (used in module)
+\src\view\edit\setting\action\common\ActionTypeSelect.tsx:141 - formActionTypeOptions (used in module)
+\src\view\edit\setting\action\run-command\ObsidianCommandAutocomplete.tsx:12 - CommandInfo
+\src\view\edit\setting\field\common\FieldTypeSelect.tsx:20 - default
+\src\view\edit\setting\action\common\code-editor\FormVariableSuggest.ts:8 - formVariableCompletions (used in module)
+\src\view\edit\setting\action\common\code-editor\FormVariableSuggest.ts:159 - triggerVariableSuggest
+\src\view\edit\setting\action\common\code-editor\FormVariableSuggest.ts:190 - variableSuggestExtension
+\src\view\edit\setting\action\common\variable-quoter\InternalVariablePopover.tsx:7 - internalFieldNames (used in module)

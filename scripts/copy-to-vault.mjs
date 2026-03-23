@@ -1,0 +1,161 @@
+import { access, copyFile, mkdir, readFile, unlink, rename } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const pluginDir = resolve(scriptDir, "..");
+const repoRootDir = resolve(pluginDir, "..");
+const ENV_KEY = "OBSIDIAN_VAULT_PATH";
+const defaultBuildFiles = ["main.js", "styles.css", "manifest.json"];
+
+function loadEnvFiles() {
+	const envCandidates = [resolve(pluginDir, ".env"), resolve(repoRootDir, ".env")];
+
+	for (const envPath of envCandidates) {
+		if (existsSync(envPath)) {
+			dotenv.config({ path: envPath, quiet: true });
+		}
+	}
+}
+
+async function pathExists(filePath) {
+	try {
+		await access(filePath);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * 带重试机制的文件复制函数
+ * 在 Windows 上处理文件被锁定的问题（EBUSY 错误）
+ */
+async function copyFileWithRetry(sourcePath, targetPath, maxRetries = 5, delayMs = 200) {
+	for (let attempt = 0; attempt < maxRetries; attempt++) {
+		try {
+			// 先尝试删除目标文件（如果存在），避免覆盖时的锁定问题
+			try {
+				await unlink(targetPath);
+			} catch {
+				// 目标文件不存在或无法删除，继续尝试复制
+			}
+			// 使用临时文件进行复制
+			const tempPath = `${targetPath}.tmp`;
+			await copyFile(sourcePath, tempPath);
+			await rename(tempPath, targetPath);
+			return;
+		} catch (error) {
+			if (error.code === 'EBUSY' || error.code === 'EPERM') {
+				if (attempt < maxRetries - 1) {
+					// 等待后重试
+					await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
+					continue;
+				}
+			}
+			throw error;
+		}
+	}
+}
+
+async function resolveManifestPath() {
+	const candidates = [
+		resolve(pluginDir, "manifest.json"),
+		resolve(repoRootDir, "manifest.json")
+	];
+
+	for (const candidate of candidates) {
+		if (await pathExists(candidate)) {
+			return candidate;
+		}
+	}
+
+	throw new Error(
+		`[openchat] 未找到 manifest.json。已检查: ${candidates.join(", ")}`
+	);
+}
+
+
+async function readPluginId(manifestPath) {
+	const manifestContent = await readFile(manifestPath, "utf8");
+	const manifest = JSON.parse(manifestContent);
+	if (!manifest?.id || typeof manifest.id !== "string") {
+		throw new Error(`[openchat] manifest.json 缺少有效的 id 字段: ${manifestPath}`);
+	}
+	return manifest.id;
+}
+
+async function resolveFilesToCopy(sourceDir, fileNames) {
+	const files = [];
+
+	for (const name of fileNames) {
+		const sourcePath = resolve(sourceDir, name);
+		if (!(await pathExists(sourcePath))) {
+			throw new Error(`[openchat] 缺少构建产物: ${sourcePath}。请先运行构建命令。`);
+		}
+		files.push({ name, sourcePath });
+	}
+
+	return files;
+}
+
+export async function copyToVault(options = {}) {
+	loadEnvFiles();
+
+	const vaultPathFromEnv = process.env[ENV_KEY];
+	const vaultRoot = resolve(options.vaultPath ?? vaultPathFromEnv ?? "");
+	if (!vaultPathFromEnv && !options.vaultPath) {
+		throw new Error(
+			`[openchat] 未设置 ${ENV_KEY}。请在 plugin/.env 或仓库根 .env 中添加：${ENV_KEY}=/path/to/your/vault`
+		);
+	}
+
+	const sourceDir = resolve(options.sourceDir ?? pluginDir);
+	const manifestPath = resolve(sourceDir, "manifest.json");
+	if (!(await pathExists(manifestPath))) {
+		throw new Error(`[openchat] 未找到 manifest.json: ${manifestPath}`);
+	}
+
+	const pluginId = await readPluginId(manifestPath);
+	const targetPluginDir = resolve(vaultRoot, ".obsidian", "plugins", pluginId);
+	const fileNames = Array.isArray(options.fileNames) && options.fileNames.length > 0
+		? options.fileNames
+		: defaultBuildFiles;
+	const filesToCopy = await resolveFilesToCopy(sourceDir, fileNames);
+
+	await mkdir(targetPluginDir, { recursive: true });
+
+	const copiedFiles = [];
+	for (const file of filesToCopy) {
+		const targetPath = join(targetPluginDir, file.name);
+		await copyFileWithRetry(file.sourcePath, targetPath);
+		copiedFiles.push(file.name);
+	}
+
+	console.log(`[openchat] Source: ${sourceDir}`);
+	console.log(`[openchat] Vault: ${vaultRoot}`);
+	console.log(`[openchat] Plugin id: ${pluginId}`);
+	console.log(`[openchat] Target: ${targetPluginDir}`);
+	console.log(`[openchat] Copy: ${copiedFiles.join(", ")}`);
+
+	return {
+		pluginId,
+		sourceDir,
+		targetPluginDir,
+		copiedFiles
+	};
+}
+
+const isDirectRun =
+	process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+
+if (isDirectRun) {
+	try {
+		await copyToVault();
+	} catch (error) {
+		console.error(`[openchat] Copy failed: ${error.message}`);
+		process.exit(1);
+	}
+}

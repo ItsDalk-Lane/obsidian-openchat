@@ -1,0 +1,120 @@
+body {
+	--form-overlay-layer: 19;
+	--form--modal-layer: 99;
+	--form-shadow: rgba(15, 15, 15, 0.05) 0px 0px 0px 1px,
+		rgba(15, 15, 15, 0.1) 0px 3px 6px, rgba(15, 15, 15, 0.2) 0px 9px 24px;
+}
+
+.theme-dark {
+        --form-shadow: rgba(0, 0, 0, 0.2) 0px 12px 28px 0px,
+                rgba(0, 0, 0, 0.1) 0px 2px 4px 0px,
+                rgba(255, 255, 255, 0.05) 0px 0px 0px 1px inset;
+}
+
+/* 确保 Obsidian Notice 始终显示在 Modal 上层 */
+body > .notice-container {
+	z-index: 999;
+}
+
+/* Tars AI Provider Settings Styles */
+summary.tars-setting-h4 {
+        font-variant: var(--h4-variant);
+        line-height: var(--h4-line-height);
+        font-size: var(--h4-size);
+        color: var(--h4-color);
+        font-weight: var(--h4-weight);
+        font-family: var(--h4-font);
+        margin-block-start: calc(var(--p-spacing) / 3);
+        margin-block-end: calc(var(--p-spacing) / 3);
+        cursor: pointer;
+}
+
+/* Tars 区域描述文字样式 */
+.tars-section-desc {
+        font-size: var(--font-ui-smaller);
+        color: var(--text-muted);
+        margin-bottom: 12px;
+}
+
+/* AI Provider 按钮包装器 */
+.ai-provider-button-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+}
+
+/* 系统消息输入框样式 */
+.tars-system-message-input {
+        width: 100%;
+        min-height: 100px;
+        padding: 8px;
+        border: 1px solid var(--background-modifier-border);
+        border-radius: var(--radius-s);
+        background: var(--background-primary);
+        color: var(--text-normal);
+        font-family: var(--font-text);
+        font-size: var(--font-ui-small);
+        resize: vertical;
+}
+
+.tars-system-message-input:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+}
+
+/* Tab 补全 Ghost Text 样式 */
+.tars-ghost-text {
+        color: var(--text-muted);
+        opacity: 0.6;
+        font-style: italic;
+        pointer-events: none;
+        user-select: none;
+        white-space: pre-wrap;
+}
+
+.tars-ghost-text-loading {
+        color: var(--text-muted);
+        opacity: 0.5;
+        font-style: italic;
+        animation: tars-loading-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tars-loading-pulse {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 0.7; }
+}
+
+/* Tab 补全设置项分隔线 */
+.setting-item-separator {
+        border: none;
+        border-top: 1px solid var(--background-modifier-border);
+        margin: 16px 0;
+}
+
+/* 右键菜单：表单子菜单紧凑样式 */
+.menu .menu-item.tappable.form-flow--ContextMenuCompactItem {
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+        min-height: 24px !important;
+        height: 24px !important;
+}
+
+.menu .menu-item.tappable.form-flow--ContextMenuCompactItem .menu-item-icon,
+.menu .menu-item.tappable.form-flow--ContextMenuCompactItem .menu-item-icon svg {
+        width: 16px !important;
+        height: 16px !important;
+}
+
+.menu .menu-item.tappable.form-flow--ContextMenuCompactItem .menu-item-title {
+        line-height: 1.2;
+}
+
+.menu .menu-item.tappable.form-flow--ContextMenuCompactItem .form-flow--ContextMenuFormItemActions {
+        padding-right: 4px;
+}
+
+button.form-flow--ContextMenuFormItemMoreButton {
+        width: 18px;
+        height: 18px;
+        font-size: 14px;
+}
