@@ -2,7 +2,7 @@ import { Extension } from '@codemirror/state';
 import { EditorView, ViewUpdate } from '@codemirror/view';
 import { App, TFile } from 'obsidian';
 import type { ChatSettings } from '../types/chat';
-import { getTriggerSource, isToolbarVisibleGlobally } from '../selection-toolbar/SelectionToolbarExtension';
+import { getTriggerSource, isToolbarVisibleGlobally } from 'src/editor/selectionToolbar/SelectionToolbarExtension';
 
 /**
  * Chat 触发扩展的回调接口

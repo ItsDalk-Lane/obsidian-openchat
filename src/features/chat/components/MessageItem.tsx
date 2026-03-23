@@ -1,7 +1,7 @@
 import { Check, Copy, PenSquare, RotateCw, TextCursorInput, Trash2, X, Maximize2, Download, Highlighter, ChevronDown, ChevronRight, StopCircle, Pin } from 'lucide-react';
 import { Component } from 'obsidian';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useObsidianApp } from 'src/context/obsidianAppContext';
+import { useObsidianApp } from 'src/contexts/obsidianAppContext';
 import type { ChatMessage, ChatMessageMetadata } from '../types/chat';
 import { ChatService } from '../services/ChatService';
 import { MessageService } from '../services/MessageService';

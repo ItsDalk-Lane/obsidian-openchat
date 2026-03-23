@@ -1,7 +1,7 @@
 import { App, FuzzyMatch, FuzzySuggestModal, Modal, Setting, Notice, requestUrl } from 'obsidian'
 import { t } from 'tars/lang/helper'
 import { Vendor } from './providers'
-import { getCapabilityEmoji } from './providers/utils'
+import { getCapabilityEmoji } from 'src/LLMProviders/utils'
 
 export class SelectModelModal extends FuzzySuggestModal<string> {
 	models: string[]

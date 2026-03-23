@@ -1,5 +1,5 @@
 import type { ProviderSettings, Vendor } from 'src/features/tars/providers';
-import { getCapabilityDisplayText } from 'src/features/tars/providers/utils';
+import { getCapabilityDisplayText } from 'src/LLMProviders/utils';
 import { availableVendors } from 'src/features/tars/settings';
 import { ChevronDown } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';

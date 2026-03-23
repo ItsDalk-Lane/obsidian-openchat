@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type {
 	PlanSnapshot,
 	PlanTaskStatus,
-} from 'src/builtin-mcp/runtime/plan-state';
+} from 'src/mcp/builtin/runtime/plan-state';
 import { localInstance } from 'src/i18n/locals';
 
 type PlanFilter = 'all' | PlanTaskStatus;

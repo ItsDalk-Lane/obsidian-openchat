@@ -1,9 +1,9 @@
 import { MarkdownView, Notice, requestUrl, TFile, TFolder, normalizePath } from 'obsidian';
-import { normalizeBuiltinServerId } from 'src/builtin-mcp/constants';
+import { normalizeBuiltinServerId } from 'src/mcp/builtin/constants';
 import OpenChatPlugin from 'src/main';
 import {
 	type PlanSnapshot,
-} from 'src/builtin-mcp/runtime/plan-state';
+} from 'src/mcp/builtin/runtime/plan-state';
 import type { ProviderSettings, SaveAttachment } from 'src/features/tars/providers';
 import type { Message as ProviderMessage, ResolveEmbedAsBinary } from 'src/features/tars/providers';
 import type {
@@ -16,8 +16,8 @@ import {
 	syncToolExecutionSettings,
 	TarsSettings,
 } from 'src/features/tars/settings';
-import type { McpSettings } from 'src/features/tars/mcp';
-import { isImageGenerationModel } from 'src/features/tars/providers/openRouter';
+import type { McpSettings } from 'src/mcp/client';
+import { isImageGenerationModel } from 'src/LLMProviders/openRouter';
 import { MessageService } from './MessageService';
 import { HistoryService, ChatHistoryEntry } from './HistoryService';
 import { FileContentService, type FileContentOptions } from './FileContentService';
@@ -43,7 +43,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { ChatRuntimeDeps } from '../runtime/ChatRuntimeDeps';
 import { SystemPromptAssembler } from 'src/service/SystemPromptAssembler';
-import { arrayBufferToBase64, getMimeTypeFromFilename } from 'src/features/tars/providers/utils';
+import { arrayBufferToBase64, getMimeTypeFromFilename } from 'src/LLMProviders/utils';
 import type { ToolCall } from '../types/tools';
 import { getChatHistoryPath } from 'src/utils/AIPathManager';
 import type { MultiModelChatService } from './MultiModelChatService';
@@ -52,7 +52,7 @@ import {
 	buildSkillsSystemPromptBlock,
 	type SkillDefinition,
 	type SkillScanResult,
-} from 'src/features/skills';
+} from 'src/skills';
 import { filterMessagesForCompareModel } from '../utils/compareContext';
 import { buildEditedUserMessage, getEditableUserMessageContent } from '../utils/userMessageEditing';
 import { composeChatSystemPrompt } from 'src/service/PromptBuilder';
@@ -74,8 +74,8 @@ import {
 	SubAgentScannerService,
 	type SubAgentStateCallback,
 	SubAgentWatcherService,
-} from 'src/features/sub-agents';
-import { SKILL_TOOL_NAME } from 'src/builtin-mcp/tools/skill-tools';
+} from 'src/subAgents';
+import { SKILL_TOOL_NAME } from 'src/mcp/builtin/tools/skill-tools';
 import { ChatStateStore, type ChatStateSubscriber } from './ChatStateStore';
 import {
 	ChatAttachmentSelectionService,

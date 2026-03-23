@@ -2,9 +2,9 @@ import { App, DropdownComponent, Modal, Notice, requestUrl, Setting, TextCompone
 import { t } from './lang/helper'
 import { SelectModelModal, SelectVendorModal, ProviderSettingModal } from './modal'
 import { BaseOptions, Message, Optional, ProviderSettings, ResolveEmbedAsBinary, Vendor } from './providers'
-import { ClaudeOptions, claudeVendor } from './providers/claude'
+import { ClaudeOptions, claudeVendor } from 'src/LLMProviders/claude'
 import { DebugLogger } from '../../utils/DebugLogger'
-import { QuickActionDataService } from '../chat/selection-toolbar/QuickActionDataService'
+import { QuickActionDataService } from 'src/editor/selectionToolbar/QuickActionDataService'
 import {
 	DoubaoOptions,
 	doubaoVendor,
@@ -12,27 +12,27 @@ import {
 	DoubaoReasoningEffort,
 	DOUBAO_REASONING_EFFORT_OPTIONS,
 	DEFAULT_DOUBAO_THINKING_TYPE
-} from './providers/doubao'
+} from 'src/LLMProviders/doubao'
 import {
 	DoubaoImageOptions,
 	DOUBAO_IMAGE_SIZE_PRESETS,
 	DEFAULT_DOUBAO_IMAGE_OPTIONS,
 	isDoubaoImageGenerationModel
-} from './providers/doubaoImage'
-import { GptImageOptions, gptImageVendor } from './providers/gptImage'
-import { grokVendor, GrokOptions } from './providers/grok'
-import { kimiVendor, KimiOptions } from './providers/kimi'
-import { deepSeekVendor, DeepSeekOptions } from './providers/deepSeek'
-import { ollamaVendor } from './providers/ollama'
-import { OpenAIOptions, openAIVendor } from './providers/openAI'
-import { OpenRouterOptions, openRouterVendor, isImageGenerationModel } from './providers/openRouter'
-import { PoeOptions, poeVendor } from './providers/poe'
-import { AzureOptions, azureVendor } from './providers/azure'
-import { QianFanOptions, qianFanNormalizeBaseURL, qianFanVendor } from './providers/qianFan'
-import { qwenVendor, QwenOptions } from './providers/qwen'
-import { siliconFlowVendor } from './providers/siliconflow'
-import { zhipuVendor, ZhipuOptions, ZHIPU_THINKING_TYPE_OPTIONS, DEFAULT_ZHIPU_THINKING_TYPE } from './providers/zhipu'
-import { getCapabilityEmoji, getCapabilityDisplayText } from './providers/utils'
+} from 'src/LLMProviders/doubaoImage'
+import { GptImageOptions, gptImageVendor } from 'src/LLMProviders/gptImage'
+import { grokVendor, GrokOptions } from 'src/LLMProviders/grok'
+import { kimiVendor, KimiOptions } from 'src/LLMProviders/kimi'
+import { deepSeekVendor, DeepSeekOptions } from 'src/LLMProviders/deepSeek'
+import { ollamaVendor } from 'src/LLMProviders/ollama'
+import { OpenAIOptions, openAIVendor } from 'src/LLMProviders/openAI'
+import { OpenRouterOptions, openRouterVendor, isImageGenerationModel } from 'src/LLMProviders/openRouter'
+import { PoeOptions, poeVendor } from 'src/LLMProviders/poe'
+import { AzureOptions, azureVendor } from 'src/LLMProviders/azure'
+import { QianFanOptions, qianFanNormalizeBaseURL, qianFanVendor } from 'src/LLMProviders/qianFan'
+import { qwenVendor, QwenOptions } from 'src/LLMProviders/qwen'
+import { siliconFlowVendor } from 'src/LLMProviders/siliconflow'
+import { zhipuVendor, ZhipuOptions, ZHIPU_THINKING_TYPE_OPTIONS, DEFAULT_ZHIPU_THINKING_TYPE } from 'src/LLMProviders/zhipu'
+import { getCapabilityEmoji, getCapabilityDisplayText } from 'src/LLMProviders/utils'
 import {
 	type ModelCapabilityCache,
 	type ReasoningCapabilityRecord,
@@ -43,7 +43,7 @@ import {
 	inferReasoningCapabilityFromMetadata,
 	resolveReasoningCapability,
 	writeReasoningCapabilityCache
-} from './providers/modelCapability'
+} from 'src/LLMProviders/modelCapability'
 import {
 	availableVendors,
 	DEFAULT_TARS_SETTINGS,

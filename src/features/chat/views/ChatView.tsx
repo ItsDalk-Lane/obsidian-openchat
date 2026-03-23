@@ -2,7 +2,7 @@ import { ItemView, WorkspaceLeaf, App, TFile, MarkdownView } from 'obsidian';
 import { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import OpenChatPlugin from 'src/main';
-import { ObsidianAppContext } from 'src/context/obsidianAppContext';
+import { ObsidianAppContext } from 'src/contexts/obsidianAppContext';
 import { ChatService } from '../services/ChatService';
 import type { ChatState } from '../types/chat';
 import { ChatPlanPanel } from '../components/ChatPlanPanel';

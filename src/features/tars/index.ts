@@ -13,5 +13,5 @@ export {
     updateTabCompletionProviders,
     disposeTabCompletionService,
     DEFAULT_TAB_COMPLETION_SETTINGS
-} from './tab-completion'
-export type { TabCompletionSettings, TabCompletionStateValue, EditorContext } from './tab-completion'
+} from 'src/editor/tabCompletion'
+export type { TabCompletionSettings, TabCompletionStateValue, EditorContext } from 'src/editor/tabCompletion'

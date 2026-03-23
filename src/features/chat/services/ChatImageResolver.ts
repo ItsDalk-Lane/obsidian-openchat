@@ -4,7 +4,7 @@
  * 从 ChatService 中拆分出来，遵循单一职责原则
  */
 import { App, TFile, normalizePath, requestUrl } from 'obsidian';
-import { getMimeTypeFromFilename, arrayBufferToBase64 } from 'src/features/tars/providers/utils';
+import { getMimeTypeFromFilename, arrayBufferToBase64 } from 'src/LLMProviders/utils';
 
 export class ChatImageResolver {
 	constructor(private readonly app: App) {}

@@ -2,7 +2,7 @@ import { App, TFile, TFolder, stringifyYaml } from 'obsidian';
 import {
 	clonePlanSnapshot,
 	type PlanSnapshot,
-} from 'src/builtin-mcp/runtime/plan-state';
+} from 'src/mcp/builtin/runtime/plan-state';
 import type {
 	ChatMessage,
 	ChatSession,

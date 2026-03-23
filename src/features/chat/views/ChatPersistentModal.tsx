@@ -1,7 +1,7 @@
 import { App, EventRef, MarkdownView, Modal, TFile } from 'obsidian';
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot, Root } from 'react-dom/client';
-import { ObsidianAppContext } from 'src/context/obsidianAppContext';
+import { ObsidianAppContext } from 'src/contexts/obsidianAppContext';
 import { localInstance } from 'src/i18n/locals';
 import { ChatService } from '../services/ChatService';
 import type { ChatState } from '../types/chat';

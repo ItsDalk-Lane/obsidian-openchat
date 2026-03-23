@@ -1,7 +1,7 @@
 import { Setting } from "obsidian";
 import { useEffect, useRef, useState } from "react";
 import { localInstance } from "src/i18n/locals";
-import FolderSuggest from "src/component/combobox/FolderSuggest";
+import FolderSuggest from "src/components/combobox/FolderSuggest";
 import OpenChatPlugin from "src/main";
 import { DEFAULT_SETTINGS } from "./PluginSettings";
 import "./GeneralSettingTabItem.css";

@@ -3,8 +3,8 @@ import { PluginSettings, DEFAULT_SETTINGS } from './settings/PluginSettings';
 import { SettingsManager } from './settings/SettingsManager';
 import { FeatureCoordinator } from './features/FeatureCoordinator';
 import { PluginSettingTab } from './settings/PluginSettingTab';
-import './style/base.css'
-import './style/chat.css'
+import './styles/base.css'
+import './styles/chat.css'
 import { cloneTarsSettings } from './features/tars';
 import { DebugLogger } from './utils/DebugLogger';
 import { ensureAIDataFolders } from './utils/AIPathManager';

@@ -12,9 +12,9 @@ import {
     SkillScannerService,
     SkillWatcherService,
 	type SkillScanResult,
-} from './skills';
+} from 'src/skills';
 import { ToolExecutorRegistry } from './runtime/ToolExecutorRegistry';
-import { McpRuntimeCoordinator } from './tars/mcp/McpRuntimeCoordinator';
+import { McpRuntimeCoordinator } from 'src/mcp/client/McpRuntimeCoordinator';
 
 export class FeatureCoordinator {
     private tarsFeatureManager: TarsFeatureManager | null = null;

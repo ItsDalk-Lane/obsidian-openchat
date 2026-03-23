@@ -2,13 +2,13 @@ import { App, Modal, Notice } from 'obsidian';
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Copy, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
-import { ObsidianAppContext } from 'src/context/obsidianAppContext';
-import { Tab, type TabItem } from 'src/component/tab/Tab';
-import { ToggleSwitch } from 'src/component/toggle-switch/ToggleSwitch';
+import { ObsidianAppContext } from 'src/contexts/obsidianAppContext';
+import { Tab, type TabItem } from 'src/components/tab/Tab';
+import { ToggleSwitch } from 'src/components/toggle-switch/ToggleSwitch';
 import { localInstance } from 'src/i18n/locals';
-import type { SkillScanResult } from 'src/features/skills';
-import type { SubAgentScanResult } from 'src/features/sub-agents';
-import { BUILTIN_SERVER_ID } from 'src/builtin-mcp/constants';
+import type { SkillScanResult } from 'src/skills';
+import type { SubAgentScanResult } from 'src/subAgents';
+import { BUILTIN_SERVER_ID } from 'src/mcp/builtin/constants';
 import {
 	DEFAULT_MCP_SETTINGS,
 	McpConfigImporter,
@@ -16,13 +16,13 @@ import {
 	type McpServerState,
 	type McpSettings,
 	type McpToolInfo,
-} from 'src/features/tars/mcp';
+} from 'src/mcp/client';
 import {
 	McpImportModal,
 	McpServerEditModal,
-} from 'src/features/tars/mcp/McpConfigModals';
-import { summarizeToolDescriptionForUi } from 'src/features/tars/mcp/toolDescriptionSummary';
-import { SystemPromptManagerPanel } from 'src/features/tars/system-prompts/SystemPromptManagerModal';
+} from 'src/mcp/client/McpConfigModals';
+import { summarizeToolDescriptionForUi } from 'src/mcp/client/toolDescriptionSummary';
+import { SystemPromptManagerPanel } from 'src/systemPrompts/SystemPromptManagerModal';
 import type { TarsSettings } from 'src/features/tars/settings';
 import {
 	DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,

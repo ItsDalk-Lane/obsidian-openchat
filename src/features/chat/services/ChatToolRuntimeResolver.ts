@@ -2,26 +2,26 @@ import {
 	BUILTIN_SERVER_ID,
 	BUILTIN_SERVER_NAME,
 	normalizeBuiltinServerId,
-} from 'src/builtin-mcp/constants';
+} from 'src/mcp/builtin/constants';
 import {
 	createBuiltinToolsRuntime,
 	type BuiltinToolsRuntime,
-} from 'src/builtin-mcp/BuiltinToolsRuntime';
-import { BuiltinToolExecutor } from 'src/builtin-mcp/BuiltinToolExecutor';
+} from 'src/mcp/builtin/BuiltinToolsRuntime';
+import { BuiltinToolExecutor } from 'src/mcp/builtin/BuiltinToolExecutor';
 import type {
 	ResolvedToolRuntime,
 	SubAgentStateCallback,
 	SubAgentChatServiceAdapter,
-} from 'src/features/sub-agents';
+} from 'src/subAgents';
 import {
 	SubAgentScannerService,
 	SubAgentToolExecutor,
 	subAgentDefinitionsToTools,
-} from 'src/features/sub-agents';
-import { CompositeToolExecutor } from 'src/features/tars/agent-loop/CompositeToolExecutor';
-import type { ToolDefinition, ToolExecutor } from 'src/features/tars/agent-loop/types';
-import type { McpClientManager } from 'src/features/tars/mcp';
-import { McpToolExecutor, mcpToolToToolDefinition } from 'src/features/tars/mcp/McpToolExecutor';
+} from 'src/subAgents';
+import { CompositeToolExecutor } from 'src/agentLoop/CompositeToolExecutor';
+import type { ToolDefinition, ToolExecutor } from 'src/agentLoop/types';
+import type { McpClientManager } from 'src/mcp/client';
+import { McpToolExecutor, mcpToolToToolDefinition } from 'src/mcp/client/McpToolExecutor';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type OpenChatPlugin from 'src/main';
 import type { ChatRuntimeDeps } from '../runtime/ChatRuntimeDeps';

@@ -1,5 +1,5 @@
-import type { PlanSnapshot } from 'src/builtin-mcp/runtime/plan-state';
-import type { SubAgentExecutionState } from 'src/features/sub-agents';
+import type { PlanSnapshot } from 'src/mcp/builtin/runtime/plan-state';
+import type { SubAgentExecutionState } from 'src/subAgents';
 import type { ToolCall } from './tools';
 import type { LayoutMode, MultiModelMode, ParallelResponseGroup } from './multiModel';
 

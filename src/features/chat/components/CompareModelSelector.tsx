@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown, Settings } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import type { ProviderSettings, Vendor } from 'src/features/tars/providers';
-import { getCapabilityDisplayText } from 'src/features/tars/providers/utils';
+import { getCapabilityDisplayText } from 'src/LLMProviders/utils';
 import { availableVendors } from 'src/features/tars/settings';
 import type { CompareGroup } from '../types/multiModel';
 import { localInstance } from 'src/i18n/locals';

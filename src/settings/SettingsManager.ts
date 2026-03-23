@@ -2,10 +2,10 @@ import { Plugin } from 'obsidian';
 import { PluginSettings, DEFAULT_SETTINGS } from './PluginSettings';
 import { DEFAULT_CHAT_SETTINGS, type ChatSettings } from 'src/features/chat';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import { SystemPromptDataService } from 'src/features/tars/system-prompts/SystemPromptDataService';
-import { McpServerDataService } from 'src/features/tars/mcp/McpServerDataService';
-import type { McpSettings } from 'src/features/tars/mcp/types';
-import { DEFAULT_MCP_SETTINGS } from 'src/features/tars/mcp/types';
+import { SystemPromptDataService } from 'src/systemPrompts/SystemPromptDataService';
+import { McpServerDataService } from 'src/mcp/client/McpServerDataService';
+import type { McpSettings } from 'src/mcp/client/types';
+import { DEFAULT_MCP_SETTINGS } from 'src/mcp/client/types';
 import { SettingsSecretManager } from './SettingsSecretManager';
 import { SettingsMigrationService } from './SettingsMigrationService';
 

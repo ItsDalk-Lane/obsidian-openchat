@@ -1,11 +1,11 @@
 import type { Local } from 'src/i18n/local';
 import type { ProviderSettings } from 'src/features/tars/providers';
-import type { McpServerStatus } from 'src/features/tars/mcp/types';
+import type { McpServerStatus } from 'src/mcp/client/types';
 import {
 	BUILTIN_SERVER_ID,
 	BUILTIN_SERVER_NAME,
 	type McpSettings,
-} from 'src/features/tars/mcp';
+} from 'src/mcp/client';
 import type { ChatOpenMode } from '../types/chat';
 
 type OpenModeLocale = Pick<

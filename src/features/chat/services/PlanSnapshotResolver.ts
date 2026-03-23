@@ -2,7 +2,7 @@ import {
 	clonePlanSnapshot,
 	type PlanSnapshot,
 	type PlanTaskStatus,
-} from 'src/builtin-mcp/runtime/plan-state';
+} from 'src/mcp/builtin/runtime/plan-state';
 import type { ChatMessage } from '../types/chat';
 
 const PLAN_PROGRESS_RANK: Record<PlanTaskStatus, number> = {

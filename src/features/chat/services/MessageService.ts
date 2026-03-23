@@ -9,7 +9,7 @@ import {
 	PromptBuilder,
 	type PromptBuilderContextMessageParams,
 } from 'src/service/PromptBuilder';
-import { formatReasoningDuration } from 'src/features/tars/providers/utils';
+import { formatReasoningDuration } from 'src/LLMProviders/utils';
 
 export class MessageService {
 	constructor(private readonly app: any, private readonly fileContentService?: FileContentService) {}
@@ -551,8 +551,8 @@ export class MessageService {
 	 */
 	public parseSubAgentStatesFromHistory(
 		content: string
-	): { cleanedContent: string; subAgentStates: Record<string, import('src/features/sub-agents').SubAgentExecutionState> } {
-		const subAgentStates: Record<string, import('src/features/sub-agents').SubAgentExecutionState> = {};
+	): { cleanedContent: string; subAgentStates: Record<string, import('src/subAgents').SubAgentExecutionState> } {
+		const subAgentStates: Record<string, import('src/subAgents').SubAgentExecutionState> = {};
 
 		if (!content || !content.includes('> [!quote]- 🤖')) {
 			return { cleanedContent: content, subAgentStates };
@@ -713,7 +713,7 @@ export class MessageService {
 	 * 将子代理的内部消息序列化为可读的 callout 格式
 	 */
 	private formatSubAgentStatesForHistory(
-		subAgentStates: Record<string, import('src/features/sub-agents').SubAgentExecutionState>
+		subAgentStates: Record<string, import('src/subAgents').SubAgentExecutionState>
 	): string {
 		const entries = Object.entries(subAgentStates);
 		if (entries.length === 0) return '';

@@ -1,7 +1,7 @@
 import type { App, TFile } from 'obsidian';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import { SystemPromptDataService } from 'src/features/tars/system-prompts/SystemPromptDataService';
-import type { AiFeatureId, SystemPromptItem } from 'src/features/tars/system-prompts/types';
+import { SystemPromptDataService } from 'src/systemPrompts/SystemPromptDataService';
+import type { AiFeatureId, SystemPromptItem } from 'src/systemPrompts/types';
 
 export class SystemPromptAssembler {
 	constructor(private readonly app: App) {}

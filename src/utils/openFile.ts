@@ -1,5 +1,5 @@
 import { App, TFile, Platform } from "obsidian";
-import { FileModalWindow } from "src/component/modal/FileModalWIndow";
+import { FileModalWindow } from "src/components/modal/FileModalWindow";
 
 export function openFile(
     app: App,

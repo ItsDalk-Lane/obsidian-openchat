@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Trash2, Save } from 'lucide-react';
 import type { ProviderSettings } from 'src/features/tars/providers';
-import { getCapabilityDisplayText } from 'src/features/tars/providers/utils';
+import { getCapabilityDisplayText } from 'src/LLMProviders/utils';
 import { availableVendors } from 'src/features/tars/settings';
 import type { CompareGroup } from '../types/multiModel';
 import { ChatService } from '../services/ChatService';

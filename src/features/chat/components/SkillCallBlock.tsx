@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { TFile } from 'obsidian';
 import { useCallback, useEffect, useState } from 'react';
-import { useObsidianApp } from 'src/context/obsidianAppContext';
+import { useObsidianApp } from 'src/contexts/obsidianAppContext';
 
 interface SkillCallBlockProps {
 	skillName: string;

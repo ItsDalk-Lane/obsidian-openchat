@@ -18,17 +18,17 @@ import {
 	getContentWithoutFrontmatter,
 	setTriggerSource,
 	setToolbarVisible
-} from './selection-toolbar/SelectionToolbarExtension';
-import { QuickActionExecutionService } from './selection-toolbar/QuickActionExecutionService';
-import { QuickActionDataService } from './selection-toolbar/QuickActionDataService';
-import { SelectionToolbar } from './selection-toolbar/SelectionToolbar';
-import { QuickActionResultModal } from './selection-toolbar/QuickActionResultModal';
-import { ModifyTextModal } from './selection-toolbar/ModifyTextModal';
-import { createModifyGhostTextExtension, setModifyGhostEffect } from './selection-toolbar/ModifyGhostTextExtension';
+} from 'src/editor/selectionToolbar/SelectionToolbarExtension';
+import { QuickActionExecutionService } from 'src/editor/selectionToolbar/QuickActionExecutionService';
+import { QuickActionDataService } from 'src/editor/selectionToolbar/QuickActionDataService';
+import { SelectionToolbar } from 'src/editor/selectionToolbar/SelectionToolbar';
+import { QuickActionResultModal } from 'src/editor/selectionToolbar/QuickActionResultModal';
+import { ModifyTextModal } from 'src/editor/selectionToolbar/ModifyTextModal';
+import { createModifyGhostTextExtension, setModifyGhostEffect } from 'src/editor/selectionToolbar/ModifyGhostTextExtension';
 import type { ChatSettings, QuickAction } from './types/chat';
 import type { ProviderSettings } from '../tars/providers';
 import { availableVendors } from '../tars/settings';
-import { buildProviderOptionsWithReasoningDisabled } from '../tars/providers/utils';
+import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils';
 import type { ChatMessage } from './types/chat';
 import { PromptBuilder } from 'src/service/PromptBuilder';
 import { SystemPromptAssembler } from 'src/service/SystemPromptAssembler';

@@ -1,8 +1,8 @@
 import { PluginSettingTab as ObPluginSettingTab } from "obsidian";
 import { StrictMode } from "react";
 import { Root, createRoot } from "react-dom/client";
-import { Tab } from "src/component/tab/Tab";
-import { ObsidianAppContext } from "src/context/obsidianAppContext";
+import { Tab } from "src/components/tab/Tab";
+import { ObsidianAppContext } from "src/contexts/obsidianAppContext";
 import { localInstance } from "src/i18n/locals";
 import OpenChatPlugin from "src/main";
 import { GeneralSettingTabItem } from "./GeneralSettingTabItem";

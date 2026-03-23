@@ -11,7 +11,7 @@ import {
 	updateTabCompletionProviders,
 	disposeTabCompletionService,
 	TabCompletionSettings
-} from './tab-completion'
+} from 'src/editor/tabCompletion'
 
 export class TarsFeatureManager {
 	private statusBarManager: StatusBarManager | null = null

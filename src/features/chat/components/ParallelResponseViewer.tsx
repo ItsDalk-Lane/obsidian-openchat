@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { StopCircle, RotateCw, AlertTriangle } from 'lucide-react';
 import { Component } from 'obsidian';
-import { useObsidianApp } from 'src/context/obsidianAppContext';
+import { useObsidianApp } from 'src/contexts/obsidianAppContext';
 import type { ChatMessage } from '../types/chat';
 import type { LayoutMode, ParallelResponseGroup } from '../types/multiModel';
 import { ChatService } from '../services/ChatService';

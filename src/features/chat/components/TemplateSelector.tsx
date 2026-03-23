@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useObsidianApp } from 'src/context/obsidianAppContext';
+import { useObsidianApp } from 'src/contexts/obsidianAppContext';
 import { Notice } from 'obsidian';
 import { getPromptTemplatePath } from 'src/utils/AIPathManager';
 import './TemplateSelector.css';

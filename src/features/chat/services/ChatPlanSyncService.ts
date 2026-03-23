@@ -1,9 +1,9 @@
-import type { BuiltinToolsRuntime } from 'src/builtin-mcp/BuiltinToolsRuntime';
-import { clonePlanSnapshot, type PlanSnapshot } from 'src/builtin-mcp/runtime/plan-state';
+import type { BuiltinToolsRuntime } from 'src/mcp/builtin/BuiltinToolsRuntime';
+import { clonePlanSnapshot, type PlanSnapshot } from 'src/mcp/builtin/runtime/plan-state';
 import {
 	normalizeStructuredToolResult,
 	serializeMcpToolResult,
-} from 'src/builtin-mcp/runtime/tool-result';
+} from 'src/mcp/builtin/runtime/tool-result';
 import type { ChatSession } from '../types/chat';
 import { HistoryService } from './HistoryService';
 import { ChatStateStore } from './ChatStateStore';

@@ -1,5 +1,5 @@
-import type { SkillDefinition } from 'src/features/skills';
-import type { SubAgentDefinition } from 'src/features/sub-agents';
+import type { SkillDefinition } from 'src/skills';
+import type { SubAgentDefinition } from 'src/subAgents';
 
 export type SlashCommandType = 'skill' | 'agent';
 

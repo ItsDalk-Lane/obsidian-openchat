@@ -1,6 +1,6 @@
 import { App, TFile, normalizePath, Notice } from "obsidian";
 import { localInstance } from "src/i18n/locals";
-import { FileConflictResolution } from "src/model/enums/FileConflictResolution";
+import { FileConflictResolution } from "src/types/enums/FileConflictResolution";
 import { processObTemplate } from "./templates";
 import { generateUniqueFilePath } from "./generateUniqueFilePath";
 import { convertVariableToString, logTypeConversion, TypeConversionError } from "./typeSafety";

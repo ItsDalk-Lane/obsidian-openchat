@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { SlashCommandItem, SlashCommandType } from '../types/slashCommand';
-import type { SkillDefinition } from 'src/features/skills';
-import type { SubAgentDefinition } from 'src/features/sub-agents';
+import type { SkillDefinition } from 'src/skills';
+import type { SubAgentDefinition } from 'src/subAgents';
 import type { ChatService } from '../services/ChatService';
 
 interface UseSlashCommandOptions {

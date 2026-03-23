@@ -1,11 +1,11 @@
 import { App, normalizePath, TFile, TFolder } from "obsidian";
 import { FormTemplateProcessEngine, type TemplateState } from "./engine/FormTemplateProcessEngine";
 import { createFileByText, CreateFileOptions } from "src/utils/createFileByText";
-import { FileConflictResolution } from "src/model/enums/FileConflictResolution";
+import { FileConflictResolution } from "src/types/enums/FileConflictResolution";
 import { validateAndConvertToString, TypeConversionError, FormFieldValidationError } from "src/utils/typeSafety";
 import { Strings } from "src/utils/Strings";
 import { openFilePathDirectly } from "src/utils/openFilePathDirectly";
-import { OpenPageInType } from "src/model/enums/OpenPageInType";
+import { OpenPageInType } from "src/types/enums/OpenPageInType";
 import { localInstance } from "src/i18n/locals";
 import { PathResolverService } from "./PathResolverService";
 
