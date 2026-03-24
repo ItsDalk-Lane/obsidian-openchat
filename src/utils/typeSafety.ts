@@ -3,8 +3,6 @@
  * Provides consistent type conversion and validation across the application
  */
 
-import { localInstance } from "src/i18n/locals";
-
 /**
  * Converts any value to string with consistent behavior
  * Follows JavaScript String() conversion rules
@@ -82,8 +80,10 @@ export function isValidYamlValue(value: any, expectedType?: string): boolean {
         case 'date':
         case 'datetime':
             // Date strings should be parseable
-            const date = new Date(value);
-            return !isNaN(date.getTime());
+            {
+                const date = new Date(value);
+                return !isNaN(date.getTime());
+            }
 
         case 'tags':
         case 'multitext':
@@ -185,7 +185,7 @@ export function logTypeConversion(
     },
     originalValue: any,
     convertedValue: string,
-    success: boolean = true
+    success = true
 ): void {
     // intentionally noop: non-warning/error logs are disabled
 }

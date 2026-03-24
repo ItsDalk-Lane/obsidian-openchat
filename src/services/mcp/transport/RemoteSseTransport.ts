@@ -239,7 +239,7 @@ export class RemoteSseTransport implements ITransport {
 		}
 
 		const raw = event.data.trim()
-		if (!raw || !/^[\[{]/.test(raw)) return null
+		if (!raw || !/^[{[]/.test(raw)) return null
 
 		try {
 			const parsed = JSON.parse(raw) as unknown

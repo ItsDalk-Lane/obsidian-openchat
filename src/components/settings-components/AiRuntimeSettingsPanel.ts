@@ -1,4 +1,4 @@
-import { App, DropdownComponent, Modal, Notice, requestUrl, Setting, TextComponent } from 'obsidian'
+import { App, DropdownComponent, Modal, Notice, requestUrl, Setting } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { SelectModelModal, SelectVendorModal, ProviderSettingModal } from 'src/components/modals/AiRuntimeProviderModals'
 import { BaseOptions, Message, Optional, ProviderSettings, ResolveEmbedAsBinary, Vendor } from 'src/types/provider'
@@ -32,7 +32,7 @@ import { QianFanOptions, qianFanNormalizeBaseURL, qianFanVendor } from 'src/LLMP
 import { qwenVendor, QwenOptions } from 'src/LLMProviders/qwen'
 import { siliconFlowVendor } from 'src/LLMProviders/siliconflow'
 import { zhipuVendor, ZhipuOptions, ZHIPU_THINKING_TYPE_OPTIONS, DEFAULT_ZHIPU_THINKING_TYPE } from 'src/LLMProviders/zhipu'
-import { getCapabilityEmoji, getCapabilityDisplayText } from 'src/LLMProviders/utils'
+import { getCapabilityDisplayText } from 'src/LLMProviders/utils'
 import {
 	type ModelCapabilityCache,
 	type ReasoningCapabilityRecord,
@@ -46,7 +46,6 @@ import {
 } from 'src/LLMProviders/modelCapability'
 import {
 	availableVendors,
-	DEFAULT_AI_RUNTIME_SETTINGS,
 	resolveToolExecutionSettings,
 	syncToolExecutionSettings,
 } from 'src/settings/ai-runtime'
@@ -366,7 +365,7 @@ export class AiRuntimeSettingsPanel {
 		}
 	}
 
-	render(containerEl: HTMLElement, expandLastProvider = false, keepOpenIndex: number = -1): void {
+	render(containerEl: HTMLElement, expandLastProvider = false, keepOpenIndex = -1): void {
 		this.containerEl = containerEl
 		containerEl.empty()
 		this.syncAllProviderApiKeys()
@@ -3076,7 +3075,7 @@ export class AiRuntimeSettingsPanel {
 		}
 	}
 
-	createProviderSetting = (index: number, settings: ProviderSettings, isOpen: boolean = false) => {
+	createProviderSetting = (index: number, settings: ProviderSettings, isOpen = false) => {
 		const vendor = availableVendors.find((v) => v.name === settings.vendor)
 		if (!vendor) throw new Error('No vendor found ' + settings.vendor)
 		
@@ -3562,7 +3561,7 @@ export class AiRuntimeSettingsPanel {
 			})
 	}
 
-	addAPIkeySection = (details: HTMLElement, options: BaseOptions, desc: string = '') => {
+	addAPIkeySection = (details: HTMLElement, options: BaseOptions, desc = '') => {
 		let isPasswordVisible = false
 		let textInput: HTMLInputElement | null = null
 		let toggleButton: HTMLButtonElement | null = null
@@ -3606,7 +3605,7 @@ export class AiRuntimeSettingsPanel {
 	addAPISecretOptional = (
 		details: HTMLElement,
 		options: BaseOptions & Pick<Optional, 'apiSecret'>,
-		desc: string = ''
+		desc = ''
 	) => {
 		let isPasswordVisible = false
 		let textInput: HTMLInputElement | null = null
@@ -3665,7 +3664,7 @@ export class AiRuntimeSettingsPanel {
 		let textInputComponent: HTMLInputElement | null = null
 		let switchToCustomButtonEl: HTMLElement | null = null
 		let switchToSelectButtonEl: HTMLElement | null = null
-		let isShowingCustomInput = false
+		// isShowingCustomInput 变量未使用，已移除
 
 		// 创建选择按钮（用于从API获取模型列表）
 		setting.addButton((btn) => {
@@ -3774,7 +3773,6 @@ export class AiRuntimeSettingsPanel {
 				.setButtonText('✏️')
 				.setTooltip(t('Switch to custom input'))
 				.onClick(() => {
-					isShowingCustomInput = true
 					if (buttonComponent) {
 						buttonComponent.style.display = 'none'
 					}
@@ -3799,7 +3797,6 @@ export class AiRuntimeSettingsPanel {
 				.setButtonText('↩')
 				.setTooltip(t('Switch to model selection'))
 				.onClick(() => {
-					isShowingCustomInput = false
 					if (buttonComponent) {
 						buttonComponent.style.display = 'inline-block'
 					}

@@ -14,11 +14,11 @@ import { buildReasoningBlockEnd, buildReasoningBlockStart, convertEmbedToImageUr
 
 type ContentItem =
 	| {
-			type: 'image_url'
-			image_url: {
-				url: string
-			}
-	  }
+		type: 'image_url'
+		image_url: {
+			url: string
+		}
+	}
 	| { type: 'text'; text: string }
 
 export interface PoeOptions extends BaseOptions {
@@ -2070,7 +2070,6 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 
 					// 读取 SSE 流并处理推理 + 文本 + 工具调用事件
 					let completedResponse: any = null
-					let roundText = ''
 					let reasoningActive = false
 					let reasoningStartMs: number | null = null
 					let reading = true
@@ -2101,7 +2100,7 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 								yield buildReasoningBlockEnd(Date.now() - (reasoningStartMs ?? Date.now()))
 								reasoningStartMs = null
 							}
-							roundText += text
+							// roundText += text (未使用，已删除)
 							yield text
 							return
 						}
@@ -2583,12 +2582,8 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 								yield* smoothStream(wrapWithThinkTagDetection(runResponsesWithDesktopFetchSse(), enableReasoning))
 								return
 							} catch (desktopMcpStreamError) {
-								try {
-									yield* smoothStream(wrapWithThinkTagDetection(runResponsesWithDesktopRequestUrl(), enableReasoning))
-									return
-								} catch (desktopMcpError) {
-									throw desktopMcpError
-								}
+								yield* smoothStream(wrapWithThinkTagDetection(runResponsesWithDesktopRequestUrl(), enableReasoning))
+								return
 							}
 						}
 						throw error

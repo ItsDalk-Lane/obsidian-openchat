@@ -25,6 +25,7 @@ export function generateUniqueFilePath(app: App, originalPath: string): string {
     }
 
     let counter = 1;
+    // eslint-disable-next-line no-constant-condition -- 通过 return 退出循环
     while (true) {
         const candidate = extension
             ? `${pathWithoutExtension} ${counter}.${extension}`

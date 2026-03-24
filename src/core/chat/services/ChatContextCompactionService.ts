@@ -6,14 +6,11 @@
 import type { App } from 'obsidian';
 import type {
 	ChatSession,
-	ChatMessage,
 	MessageManagementSettings,
 	ChatContextCompactionState,
-	ChatRequestTokenState,
 } from '../types/chat';
 import type { ProviderSettings, Message as ProviderMessage } from 'src/types/provider';
 import { availableVendors } from 'src/settings/ai-runtime';
-import { normalizeMessageManagementSettings } from '../types/chat';
 import { estimateProviderMessagesTokens } from 'src/core/chat/utils/token';
 
 /**

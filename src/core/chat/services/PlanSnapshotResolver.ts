@@ -112,7 +112,7 @@ export class PlanSnapshotResolver {
 	arePlansComparable(
 		left: PlanSnapshot | null,
 		right: PlanSnapshot | null
-	): left is PlanSnapshot & {} {
+	): left is PlanSnapshot {
 		if (!left || !right) {
 			return false;
 		}

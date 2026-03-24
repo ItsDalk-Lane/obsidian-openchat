@@ -58,6 +58,7 @@ export const useSlashCommand = ({
 	const [filterText, setFilterText] = useState('');
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const [slashStartIndex, setSlashStartIndex] = useState<number | null>(null);
 
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);

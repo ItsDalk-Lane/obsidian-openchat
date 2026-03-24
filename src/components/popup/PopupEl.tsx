@@ -43,7 +43,6 @@ export default function PopupEl(props: Props) {
 					left: 16,
 				},
 			}),
-			,
 			offset(8),
 			size({
 				padding: 12,

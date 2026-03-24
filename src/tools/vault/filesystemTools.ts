@@ -30,24 +30,9 @@ import {
 	normalizeVaultPath,
 	resolveRegex,
 } from './helpers';
-
-const { createTwoFilesPatch } = require('diff') as {
-	createTwoFilesPatch: (
-		oldFileName: string,
-		newFileName: string,
-		oldStr: string,
-		newStr: string,
-		oldHeader?: string,
-		newHeader?: string
-	) => string;
-};
-const { minimatch } = require('minimatch') as {
-	minimatch: (
-		input: string,
-		pattern: string,
-		options?: { dot?: boolean; nocase?: boolean }
-	) => boolean;
-};
+import { createTwoFilesPatch } from 'diff';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { minimatch } from 'minimatch';
 
 export interface FilesystemBuiltinRuntime {
 	serverId: string;
@@ -91,16 +76,19 @@ interface PathSearchMatch {
 
 type BuiltinResponseFormat = 'json' | 'text';
 type ReadMode = 'full' | 'segment' | 'head' | 'tail';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type BatchReadMode = 'segment' | 'head';
 type QueryIndexDataSource = 'file' | 'property' | 'tag' | 'task';
 type QueryIndexScalar = string | number | boolean | null;
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface QueryIndexAggregate {
 	aggregate: 'count' | 'sum' | 'avg';
 	field?: string;
 	alias?: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface QueryIndexFilterCondition {
 	field: string;
 	operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'in' | 'matches';
@@ -128,6 +116,7 @@ const mutationToolAnnotations = {
 	idempotentHint: false,
 	openWorldHint: false,
 } as const;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const navigationToolAnnotations = {
 	readOnlyHint: false,
 	destructiveHint: false,
@@ -1965,6 +1954,7 @@ export function registerFilesystemBuiltinTools(
 		annotations: readOnlyToolAnnotations,
 		execute: async (args) => await readMediaHandler(args),
 	});
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	(server as any).registerTool(
 		'read_media',
 		{

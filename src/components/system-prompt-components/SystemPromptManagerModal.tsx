@@ -119,6 +119,7 @@ export function SystemPromptManagerPanel(props: { app: App; embedded?: boolean }
 			const prompts = await service.getSortedPrompts();
 			const md = await buildExportMarkdown(props.app, prompts);
 
+			// eslint-disable-next-line @typescript-eslint/no-var-requires -- Electron 特定代码
 			const { dialog } = require('@electron/remote');
 			const result = await dialog.showSaveDialog({
 				title: localInstance.system_prompt_export_dialog_title || '导出系统提示词',
@@ -131,6 +132,7 @@ export function SystemPromptManagerPanel(props: { app: App; embedded?: boolean }
 				return;
 			}
 
+			// eslint-disable-next-line @typescript-eslint/no-var-requires -- Electron 特定代码
 			const fs = require('fs/promises');
 			await fs.writeFile(result.filePath, md, 'utf8');
 			new Notice((localInstance.system_prompt_export_success || '导出成功') + `: ${result.filePath}`);

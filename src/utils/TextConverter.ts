@@ -108,9 +108,11 @@ export class TextConverter {
         // \u4e00-\u9fff: CJK统一表意文字
         // \u3400-\u4dbf: CJK扩展A
         // \uf900-\ufaff: CJK兼容表意文字
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 预留用于扩展
         const cjkRegex = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/;
-        
+
         // 英文字母和数字
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 预留用于扩展
         const alphanumericRegex = /[a-zA-Z0-9]/;
 
         // 在中文后面添加空格（如果后面紧跟英文/数字）

@@ -53,9 +53,9 @@ export class ChatHistoryParser {
 	parseTimestamp(value: unknown): number {
 		if (typeof value === 'number') return value;
 		if (typeof value === 'string' && value.trim()) {
-			const match = value.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+			const match = value.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})/);
 			if (match) {
-				const [_, year, month, day, hour, minute, second] = match.map(Number);
+				const [, year, month, day, hour, minute, second] = match.map(Number);
 				return new Date(year, month - 1, day, hour, minute, second).getTime();
 			}
 		}
@@ -175,6 +175,7 @@ export class ChatHistoryParser {
 	sanitizeTitle(text: string): string {
 		return text
 			.replace(/\s+/g, '_')
+			// eslint-disable-next-line no-control-regex -- 需要匹配控制字符以清理文件名
 			.replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_')
 			.replace(/_+/g, '_')
 			.replace(/^_|_$/g, '');
@@ -310,9 +311,9 @@ export class ChatHistoryParser {
 			let timestamp = Date.now();
 			if (currentHeader.timestampStr) {
 				try {
-					const dateMatch = currentHeader.timestampStr.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+					const dateMatch = currentHeader.timestampStr.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})/);
 					if (dateMatch) {
-						const [_, year, month, day, hour, minute, second] = dateMatch.map(Number);
+						const [, year, month, day, hour, minute, second] = dateMatch.map(Number);
 						timestamp = new Date(year, month - 1, day, hour, minute, second).getTime();
 					}
 				} catch (e) {
@@ -401,7 +402,7 @@ export class ChatHistoryParser {
 			const lines = body.split('\n');
 			let currentMessage = '';
 			let currentRole: ChatRole = 'user';
-			let currentTimestamp = Date.now();
+			const currentTimestamp = Date.now();
 			let currentModelTag: string | undefined;
 			let inMessage = false;
 

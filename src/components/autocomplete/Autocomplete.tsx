@@ -50,11 +50,6 @@ export function Autocomplete(props: Props) {
 		[props.onOpenChange]
 	);
 
-	const triggerHeight = useMemo(() => {
-		if (!open || !triggerRef.current) return 40;
-		return triggerRef.current.getBoundingClientRect().height;
-	}, [open]);
-
 	const handleSelect = useCallback(
 		(value: string) => {
 			props.onSelect(value);

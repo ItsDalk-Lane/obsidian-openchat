@@ -72,6 +72,7 @@ export async function createBuiltinToolsRuntime(
 	const registry = new BuiltinToolRegistry();
 	const planState = new PlanState();
 
+	// eslint-disable-next-line prefer-const -- context 与 scriptRuntime 存在循环依赖
 	let context!: ToolContext;
 	const scriptRuntime = new ScriptRuntime({
 		callTool: async (name, args) => await registry.call(name, args, context),

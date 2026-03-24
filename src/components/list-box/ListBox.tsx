@@ -26,7 +26,7 @@ type SelcetOption = {
 };
 
 export function ListBox(props: Props) {
-	const { value, onChange, options, name, renderOptionSuffix } = props;
+	const { value, onChange, options, renderOptionSuffix } = props;
 	const [open, setOpen] = useState(false);
 
 	const values = Array.isArray(value) ? value : value ? [value] : [];

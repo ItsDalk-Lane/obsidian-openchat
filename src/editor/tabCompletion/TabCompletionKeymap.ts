@@ -1,6 +1,4 @@
 import { EditorView, KeyBinding } from '@codemirror/view'
-import { Prec } from '@codemirror/state'
-import { keymap } from '@codemirror/view'
 import { getTabCompletionState, clearSuggestionEffect, confirmSuggestionEffect } from './TabCompletionState'
 
 /**
@@ -126,7 +124,7 @@ export function createTriggerKeyHandler(options: {
     onConfirm: ConfirmCallback
     onCancel: CancelCallback
 }) {
-    const { triggerKey, onTrigger, onConfirm, onCancel } = options
+    const { triggerKey, onTrigger, onConfirm } = options
     
     // 记录是否已经处理过 keydown（避免重复触发）
     let keydownHandled = false

@@ -1,8 +1,6 @@
 import { Extension } from '@codemirror/state'
 import { Notice, Plugin } from 'obsidian'
-import { RequestController } from 'src/types/ai-runtime'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { ProviderSettings } from 'src/types/provider'
 import { AiRuntimeSettings } from 'src/settings/ai-runtime'
 import { StatusBarManager } from './StatusBarManager'
 import {
@@ -18,7 +16,7 @@ export class AiRuntimeCommandManager {
 	private aborterInstance: AbortController | null = null
 	private registeredCommandIds: Set<string> = new Set()
 	private tabCompletionExtensions: Extension[] = []
-	private tabCompletionRegistered: boolean = false
+	private tabCompletionRegistered = false
 
 	constructor(
 		private readonly plugin: Plugin,
@@ -64,9 +62,6 @@ export class AiRuntimeCommandManager {
 	}
 
 	updateSettings(settings: AiRuntimeSettings) {
-		// 检测 provider 是否有实质性变化（API key、baseURL、model 等）
-		const hasProviderChanges = this.hasProviderConfigChanges(this.settings.providers, settings.providers)
-
 		// 检测 Tab 补全设置是否有变化
 		const hasTabCompletionChanges = this.hasTabCompletionChanges(this.settings, settings)
 
@@ -84,57 +79,14 @@ export class AiRuntimeCommandManager {
 		}
 	}
 
-	/**
-	 * 检测 provider 配置是否有实质性变化
-	 */
-	private hasProviderConfigChanges(oldProviders: ProviderSettings[], newProviders: ProviderSettings[]): boolean {
-		if (oldProviders.length !== newProviders.length) {
-			return true
-		}
-
-		for (let i = 0; i < oldProviders.length; i++) {
-			const oldProvider = oldProviders[i]
-			const newProvider = newProviders[i]
-
-			// 检查关键配置是否变化
-				if (
-					oldProvider.tag !== newProvider.tag ||
-					oldProvider.vendor !== newProvider.vendor ||
-				oldProvider.options.apiKey !== newProvider.options.apiKey ||
-				oldProvider.options.baseURL !== newProvider.options.baseURL ||
-					oldProvider.options.model !== newProvider.options.model ||
-					JSON.stringify(oldProvider.options.parameters) !== JSON.stringify(newProvider.options.parameters)
-				) {
-					return true
-				}
-		}
-
-		return false
-	}
-
 	private registerCommand(
 		id: string,
 		command: Parameters<Plugin['addCommand']>[0],
-		track: boolean = true
+		track = true
 	) {
 		this.plugin.addCommand(command)
 		if (track) {
 			this.registeredCommandIds.add(id)
-		}
-	}
-
-	private getRequestController(): RequestController {
-		return {
-			getController: () => {
-				if (!this.aborterInstance) {
-					this.aborterInstance = new AbortController()
-				}
-				return this.aborterInstance
-			},
-			cleanup: () => {
-				this.settings.editorStatus.isTextInserting = false
-				this.aborterInstance = null
-			}
 		}
 	}
 

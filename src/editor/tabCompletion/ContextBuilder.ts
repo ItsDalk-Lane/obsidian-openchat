@@ -520,7 +520,7 @@ function processBlockquoteFormat(text: string): string {
  * @param maxSentences 最大句子数
  * @returns 截断后的文本
  */
-export function limitSuggestionLength(text: string, maxSentences: number = 1): string {
+export function limitSuggestionLength(text: string, maxSentences = 1): string {
     if (maxSentences <= 0) {
         return text
     }

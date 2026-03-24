@@ -1,4 +1,4 @@
-import { App, EventRef, TAbstractFile, normalizePath } from 'obsidian';
+import { App, EventRef, normalizePath } from 'obsidian';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { SkillScanResult } from './types';
 import { SkillScannerService } from './SkillScannerService';

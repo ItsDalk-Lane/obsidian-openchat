@@ -9,7 +9,7 @@ import { ChatService } from 'src/core/chat/services/ChatService';
 import { ChatView, VIEW_TYPE_CHAT_SIDEBAR, VIEW_TYPE_CHAT_TAB } from 'src/components/chat-components/ChatView';
 import { ChatModal } from 'src/components/chat-components/ChatModal';
 import { ChatPersistentModal } from 'src/components/chat-components/ChatPersistentModal';
-import type { ChatOpenMode, ChatSettings } from 'src/types/chat';
+import type { ChatOpenMode } from 'src/types/chat';
 import { localInstance } from 'src/i18n/locals';
 
 export class ChatViewCoordinator {

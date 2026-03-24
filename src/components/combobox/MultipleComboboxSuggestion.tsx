@@ -34,6 +34,7 @@ export function MultipleComboboxSuggestion(props: {
 	const [isOpen, setIsOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const [activeIndex, setActiveIndex] = useState(-1);
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const [isComposing, setIsComposing] = useState(false);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);

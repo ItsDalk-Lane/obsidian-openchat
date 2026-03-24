@@ -60,7 +60,6 @@ const sendRequestFunc = (settings: ZhipuOptions): SendRequest =>
 		})
 
 		let reasoningActive = false
-		let blockStarted = false
 		let reasoningStartMs: number | null = null
 
 		for await (const part of stream as any) {
@@ -75,7 +74,6 @@ const sendRequestFunc = (settings: ZhipuOptions): SendRequest =>
 						reasoningActive = true
 						reasoningStartMs = Date.now()
 						yield buildReasoningBlockStart(reasoningStartMs)
-						blockStarted = true
 					}
 					yield reasoningText // 直接输出，不加任何前缀
 				}
@@ -90,7 +88,6 @@ const sendRequestFunc = (settings: ZhipuOptions): SendRequest =>
 					yield buildReasoningBlockEnd(durationMs)
 					reasoningActive = false
 					reasoningStartMs = null
-					blockStarted = false
 				}
 				yield text
 			}

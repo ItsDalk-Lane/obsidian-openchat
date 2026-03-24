@@ -72,11 +72,6 @@ export const QuickActionResultModal = ({
 		onInsert('append');
 	}, [onInsert]);
 
-	// 处理插入到光标位置
-	const handleInsertAtCursor = useCallback(() => {
-		onInsert('insert');
-	}, [onInsert]);
-
 	// 渲染 Markdown 内容（流式输出时也实时渲染）
 	useEffect(() => {
 		if (!contentRef.current || !result) {

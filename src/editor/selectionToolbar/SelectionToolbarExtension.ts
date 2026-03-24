@@ -1,5 +1,5 @@
-import { Extension, StateField, StateEffect } from '@codemirror/state';
-import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet } from '@codemirror/view';
+import { Extension } from '@codemirror/state';
+import { EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import { App, TFile, MarkdownView } from 'obsidian';
 import type { ChatSettings } from 'src/types/chat';
 

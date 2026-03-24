@@ -78,7 +78,7 @@ export const ChatMessages = ({ state, service }: ChatMessagesProps) => {
 	const findMessageElement = useCallback((messageId: string): HTMLElement | null => {
 		const container = scrollRef.current;
 		if (!container) return null;
-		const elements = container.querySelectorAll<HTMLElement>('[data-chat-message-id]');
+		const elements = Array.from(container.querySelectorAll<HTMLElement>('[data-chat-message-id]'));
 		for (const element of elements) {
 			if (element.dataset.chatMessageId === messageId) {
 				return element;
@@ -157,7 +157,7 @@ export const ChatMessages = ({ state, service }: ChatMessagesProps) => {
 	const availableModels = useMemo(() => {
 		const fromState = state.selectedModels ?? [];
 		const fromMessages = [...new Set(
-			displayMessages.filter(m => m.role === 'assistant' && m.modelTag).map(m => m.modelTag!)
+			displayMessages.filter(m => m.role === 'assistant' && m.modelTag != null).map(m => m.modelTag as string)
 		)];
 		return [...new Set([...fromState, ...fromMessages])];
 	}, [state.selectedModels, displayMessages]);
@@ -428,6 +428,7 @@ export const ChatMessages = ({ state, service }: ChatMessagesProps) => {
 	);
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const RelevantNotes = ({ notes }: { notes: string[] }) => {
 	if (!notes.length) return null;
 	return (

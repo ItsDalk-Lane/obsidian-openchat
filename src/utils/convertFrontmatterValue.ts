@@ -1,7 +1,6 @@
 import { App } from "obsidian";
 import getPropertyTypeByName from "./getPropertyTypeByName";
 import { isValidYamlValue, TypeConversionError, logTypeConversion } from "./typeSafety";
-import { localInstance } from "src/i18n/locals";
 
 export interface FrontmatterConversionOptions {
     strictMode?: boolean;

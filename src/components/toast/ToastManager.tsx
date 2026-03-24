@@ -1,27 +1,27 @@
 import { Toast } from "./Toast";
 
 export const ToastManager = {
-	show(content: React.ReactNode, duration: number = 3000): Toast {
+	show(content: React.ReactNode, duration = 3000): Toast {
 		return new Toast({ content, duration });
 	},
 
-	success(content: React.ReactNode, duration: number = 3000): Toast {
+	success(content: React.ReactNode, duration = 3000): Toast {
 		return new Toast({ content, duration }, "success");
 	},
 
-	error(content: React.ReactNode, duration: number = 0): Toast {
+	error(content: React.ReactNode, duration = 0): Toast {
 		return new Toast({ content, duration }, "error");
 	},
 
-	info(content: React.ReactNode, duration: number = 3000): Toast {
+	info(content: React.ReactNode, duration = 3000): Toast {
 		return new Toast({ content, duration }, "info");
 	},
 
-	warning(content: React.ReactNode, duration: number = 3000): Toast {
+	warning(content: React.ReactNode, duration = 3000): Toast {
 		return new Toast({ content, duration }, "warning");
 	},
 
-	loading(content: React.ReactNode, duration: number = 0): Toast {
+	loading(content: React.ReactNode, duration = 0): Toast {
 		return new Toast({ content, duration }, "loading");
 	},
 };

@@ -35,12 +35,10 @@ const extractImageUrls = (text: string | undefined): string[] => {
 		
 		// 如果 URL 包含图片扩展名，截断到扩展名之后
 		const lowerUrl = url.toLowerCase()
-		let foundExt = false
-		
+
 		for (const ext of IMAGE_EXTENSIONS) {
 			const extIndex = lowerUrl.lastIndexOf(ext)
 			if (extIndex !== -1) {
-				foundExt = true
 				// 截取到扩展名结束的位置
 				const afterExt = url.substring(extIndex + ext.length)
 				
@@ -109,17 +107,8 @@ export const DEFAULT_DOUBAO_IMAGE_OPTIONS = {
 	watermark: false,
 	sequential_image_generation: 'disabled',
 	stream: false,
-	optimize_prompt_mode: 'standard'
-} as const satisfies Pick<
-	DoubaoImageOptions,
-	'displayWidth'
-	| 'size'
-	| 'response_format'
-	| 'watermark'
-	| 'sequential_image_generation'
-	| 'stream'
-	| 'optimize_prompt_mode'
->
+	optimize_prompt_mode: 'standard',
+} as const;
 
 export interface DoubaoImageOptions extends BaseOptions {
 	displayWidth: number

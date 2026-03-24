@@ -9,7 +9,6 @@
     "allowSyntheticDefaultImports": true,
     "noImplicitAny": true,
     "moduleResolution": "node",
-    "ignoreDeprecations": "6.0",
     "importHelpers": true,
     "isolatedModules": true,
     "strictNullChecks": true,

@@ -1,4 +1,4 @@
-import { App, Notice, MarkdownView } from 'obsidian'
+import { App, Notice } from 'obsidian'
 import { EditorView } from '@codemirror/view'
 import { setSuggestionEffect, clearSuggestionEffect, setLoadingEffect } from './TabCompletionState'
 import {
@@ -10,7 +10,6 @@ import {
 } from './ContextBuilder'
 import { ProviderSettings, Message } from 'src/LLMProviders'
 import { availableVendors } from 'src/settings/ai-runtime'
-import { t } from 'src/i18n/ai-runtime/helper'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler'
 import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils'

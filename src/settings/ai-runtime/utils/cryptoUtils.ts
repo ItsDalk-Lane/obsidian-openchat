@@ -3,8 +3,6 @@
  * 使用 XOR 加密算法和设备指纹生成主密码
  */
 
-import { LEGACY_FALLBACK_FINGERPRINT_SEEDS } from '../../legacyCompatibility'
-
 const DEFAULT_FALLBACK_FINGERPRINT_SEED = 'obsidian-openchat-default-key'
 
 const buildFallbackFingerprintKey = (seed: string): string => simpleHash(seed)
@@ -13,9 +11,6 @@ const getCompatibleMasterKeys = (): string[] => {
 	const keys = new Set<string>()
 	keys.add(generateDeviceFingerprint())
 	keys.add(buildFallbackFingerprintKey(DEFAULT_FALLBACK_FINGERPRINT_SEED))
-	for (const seed of LEGACY_FALLBACK_FINGERPRINT_SEEDS) {
-		keys.add(buildFallbackFingerprintKey(seed))
-	}
 	return [...keys]
 }
 
@@ -133,13 +128,14 @@ function validateApiKey(key: string): boolean {
 	}
 
 	// 检查是否包含过多控制字符
+	// eslint-disable-next-line no-control-regex -- 需要检测控制字符
 	const controlChars = key.match(/[\x00-\x1F\x7F]/g)
 	if (controlChars && controlChars.length > key.length * 0.2) {
 		return false
 	}
 
 	// 检查是否为可打印字符
-	const printableChars = key.match(/[a-zA-Z0-9\-_\.]/g)
+	const printableChars = key.match(/[a-zA-Z0-9\-_.]/g)
 	if (!printableChars || printableChars.length < key.length * 0.5) {
 		return false
 	}
@@ -202,8 +198,6 @@ export function decryptApiKey(encryptedKey: string): string {
 	}
 
 	try {
-		const [masterKey] = getCompatibleMasterKeys()
-
 		// 检测加密格式
 		if (isHexString(encryptedKey)) {
 			// 十六进制格式 (XOR 加密)
@@ -273,7 +267,7 @@ export function decryptApiKey(encryptedKey: string): string {
  * @param visibleLength 显示的字符数（前后各显示的数量）
  * @returns 隐藏后的字符串
  */
-export function maskApiKey(apiKey: string, visibleLength: number = 4): string {
+export function maskApiKey(apiKey: string, visibleLength = 4): string {
 	if (!apiKey || apiKey.length <= visibleLength * 2) {
 		return apiKey.replace(/./g, '*')
 	}

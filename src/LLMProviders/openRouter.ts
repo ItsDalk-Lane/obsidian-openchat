@@ -1,5 +1,6 @@
 import { EmbedCache, Notice } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
+import { DebugLogger } from 'src/utils/DebugLogger'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
 import { arrayBufferToBase64, buildReasoningBlockStart, buildReasoningBlockEnd, getCapabilityEmoji, getMimeTypeFromFilename } from './utils'
 import { withToolMessageContext } from './messageFormat'
@@ -235,7 +236,7 @@ const sendRequestFunc = (settings: OpenRouterOptions): SendRequest =>
 		if (remainsObj.max_tokens) {
 			data.max_output_tokens = remainsObj.max_tokens
 			// 从 remains 中移除 max_tokens，避免参数冲突
-			const { max_tokens, ...otherParams } = remainsObj
+			const { ...otherParams } = remainsObj
 			Object.assign(data, otherParams)
 		} else {
 			// 设置默认的 max_output_tokens
@@ -333,9 +334,6 @@ const sendRequestFunc = (settings: OpenRouterOptions): SendRequest =>
 			const decoder = new TextDecoder()
 			let buffer = ''
 
-			// 用于累积图像数据
-			let hasGeneratedImages = false
-			
 			// 用于追踪推理过程状态
 			let reasoningActive = false
 			let reasoningStartMs: number | null = null
@@ -437,8 +435,6 @@ const sendRequestFunc = (settings: OpenRouterOptions): SendRequest =>
 									continue
 								}
 
-								hasGeneratedImages = true
-
 								// 如果配置为保存为附件
 								if (imageSaveAsAttachment && saveAttachment) {
 								try {
@@ -488,13 +484,12 @@ const sendRequestFunc = (settings: OpenRouterOptions): SendRequest =>
 									const annotations = parsed.choices[0].message.annotations
 									for (const annotation of annotations) {
 										if (annotation.type === 'url_citation') {
-											const citation = annotation.url_citation
 											// 可以选择在这里处理引用信息
 											// 例如：记录日志或在界面上显示
 											// DebugLogger.debug('Web search citation', {
-											// 	url: citation.url,
-											// 	title: citation.title,
-											// 	content: citation.content
+											// 	url: annotation.url_citation.url,
+											// 	title: annotation.url_citation.title,
+											// 	content: annotation.url_citation.content
 											// })
 										}
 									}
@@ -625,7 +620,7 @@ const sendRequestFunc = (settings: OpenRouterOptions): SendRequest =>
 										yield `⚠️ 检测到 URL 格式图片，但配置为保存附件。图片 URL：${imageUrl}\n\n`
 									}
 								} catch (error) {
-									const errorMsg = error instanceof Error ? error.message : String(error)
+									DebugLogger.error('[OpenRouter] 处理图片 URL 时出错', error);
 								}
 							} else {
 								// 直接输出 URL 或 base64
@@ -643,12 +638,11 @@ const sendRequestFunc = (settings: OpenRouterOptions): SendRequest =>
 						const annotations = message.annotations
 						for (const annotation of annotations) {
 							if (annotation.type === 'url_citation') {
-								const citation = annotation.url_citation
 								// 可以选择在这里处理引用信息
 								// DebugLogger.debug('Web search citation', {
-								// 	url: citation.url,
-								// 	title: citation.title,
-								// 	content: citation.content
+								// 	url: annotation.url_citation.url,
+								// 	title: annotation.url_citation.title,
+								// 	content: annotation.url_citation.content
 								// })
 							}
 						}
@@ -673,11 +667,11 @@ const sendRequestFunc = (settings: OpenRouterOptions): SendRequest =>
 
 type ContentItem =
 	| {
-			type: 'image_url'
-			image_url: {
-				url: string
-			}
-	  }
+		type: 'image_url'
+		image_url: {
+			url: string
+		}
+	}
 	| { type: 'text'; text: string }
 	| { type: 'input_text'; text: string }
 	| { type: 'file'; file: { filename: string; file_data: string } }

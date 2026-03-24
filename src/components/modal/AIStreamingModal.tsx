@@ -44,8 +44,8 @@ export class AIStreamingModal extends Modal {
     private cancelBtn!: HTMLButtonElement;
     
     // 更新控制
-    private updateBuffer: string = "";
-    private lastUpdateTime: number = 0;
+    private updateBuffer = "";
+    private lastUpdateTime = 0;
     private readonly UPDATE_INTERVAL = 100; // 毫秒
 
     constructor(app: App, options: AIStreamingModalOptions) {

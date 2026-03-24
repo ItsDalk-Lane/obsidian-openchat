@@ -52,7 +52,7 @@ const sendRequestFunc = (settings: GrokOptions): SendRequest =>
 										type: 'input_text',
 										text: String((part as any).text ?? '')
 									}
-					  )
+					)
 					: [{ type: 'input_text', text: String(message.content ?? '') }]
 			}))
 			const responseParams = grokMapResponsesParams(remains as Record<string, unknown>)
@@ -185,11 +185,11 @@ const sendRequestFunc = (settings: GrokOptions): SendRequest =>
 
 type ContentItem =
 	| {
-			type: 'image_url'
-			image_url: {
-				url: string
-			}
-	  }
+		type: 'image_url'
+		image_url: {
+			url: string
+		}
+	}
 	| { type: 'text'; text: string }
 
 const formatMsg = async (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinary) => {

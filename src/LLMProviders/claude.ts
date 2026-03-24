@@ -76,7 +76,6 @@ const sendRequestFuncBase = (settings: ClaudeOptions): SendRequest =>
 				baseURL: originalBaseURL,
 				model,
 				max_tokens,
-				enableWebSearch: _enableWebSearch = false,
 				enableThinking = false,
 				budget_tokens = 1600
 			} = options

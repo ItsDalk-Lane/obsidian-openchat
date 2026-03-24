@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, App, TFile, MarkdownView } from 'obsidian';
+import { ItemView, WorkspaceLeaf, App, MarkdownView } from 'obsidian';
 import { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import OpenChatPlugin from 'src/main';

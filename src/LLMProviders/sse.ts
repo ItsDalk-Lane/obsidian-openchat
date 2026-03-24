@@ -70,7 +70,7 @@ const parseEventFrame = (frame: string): ParsedSSEEvent | null => {
 		isDone
 	}
 
-	if (!isDone && trimmedData && /^[\[{]/.test(trimmedData)) {
+	if (!isDone && trimmedData && /^[{[]/.test(trimmedData)) {
 		try {
 			result.json = JSON.parse(trimmedData)
 		} catch (error) {

@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, requestUrl, TFile, TFolder, normalizePath } from 'obsidian';
+import { MarkdownView, Notice, requestUrl, TFile, TFolder } from 'obsidian';
 import { normalizeBuiltinServerId } from 'src/tools/runtime/constants';
 import OpenChatPlugin from 'src/main';
 import {
@@ -43,7 +43,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { ChatRuntimeDeps } from '../runtime/ChatRuntimeDeps';
 import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler';
-import { arrayBufferToBase64, getMimeTypeFromFilename } from 'src/LLMProviders/utils';
 import type { ToolCall } from '../types/tools';
 import { getChatHistoryPath } from 'src/utils/AIPathManager';
 import type { MultiModelChatService } from './MultiModelChatService';

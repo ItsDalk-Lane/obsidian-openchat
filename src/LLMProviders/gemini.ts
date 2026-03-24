@@ -88,11 +88,11 @@ const buildGeminiContents = async (messages: readonly Message[], resolveEmbedAsB
 
 type OpenAIMessagePart =
 	| {
-			type: 'image_url'
-			image_url: {
-				url: string
-			}
-	  }
+		type: 'image_url'
+		image_url: {
+			url: string
+		}
+	}
 	| { type: 'text'; text: string }
 
 const formatOpenAICompatibleMessage = async (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinary) => {

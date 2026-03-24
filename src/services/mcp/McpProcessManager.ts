@@ -61,13 +61,9 @@ export class McpProcessManager {
 
 		this.clients.set(config.id, client)
 
-		try {
-			await client.connect()
-			return client
-		} catch (err) {
-			// connect 失败时状态已通过回调更新
-			throw err
-		}
+		// connect 失败时状态已通过回调更新
+		await client.connect()
+		return client
 	}
 
 	/** 断开指定服务器连接 */

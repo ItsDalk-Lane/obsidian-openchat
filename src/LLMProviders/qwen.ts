@@ -9,19 +9,6 @@ export interface QwenOptions extends BaseOptions {
 	enableThinking?: boolean // 是否启用思考模式
 }
 
-// 已知支持思考模式的模型列表（根据官方文档，用于UI提示）
-const KNOWN_THINKING_MODELS = [
-	'qwen3-max-preview', // 通义千问Max系列（混合思考模式）
-	'qwen-plus',
-	'qwen-plus-latest',
-	'qwen-plus-2025-04-28',
-	'qwen-flash',
-	'qwen-flash-2025-07-28',
-	'qwen-turbo',
-	'qwen-turbo-latest',
-	'qwen-turbo-2025-04-28'
-]
-
 // 完整的模型列表（包含所有已知模型）
 export const QWEN_MODELS = [
 	'qwen-plus-latest',
@@ -36,11 +23,6 @@ export const QWEN_MODELS = [
 	'qwen-flash-2025-07-28',
 	'qwen-turbo-2025-04-28'
 ]
-
-// 检查模型是否已知支持思考模式
-const isKnownThinkingModel = (model: string): boolean => {
-	return KNOWN_THINKING_MODELS.includes(model)
-}
 
 const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
@@ -153,7 +135,7 @@ type ContentItem =
 			image_url: {
 				url: string
 			}
-	  }
+	}
 	| { type: 'text'; text: string }
 
 const formatMsg = async (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinary) => {

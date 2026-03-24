@@ -205,7 +205,7 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 				if (!fileSearchQuery) return true;
 				const query = fileSearchQuery.toLowerCase();
 				return file.name.toLowerCase().includes(query) ||
-					   file.path.toLowerCase().includes(query);
+					file.path.toLowerCase().includes(query);
 			})
 			.sort((a, b) => {
 				// 按照最近修改时间排序，最近修改的在前
@@ -221,7 +221,7 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 		const items: FolderItem[] = [];
 		const query = folderSearchQuery.toLowerCase().trim();
 
-		const collectFolders = (folder: TFolder, level: number = 0) => {
+		const collectFolders = (folder: TFolder, level = 0) => {
 			// 使用原始文件夹名进行搜索匹配（与菜单栏搜索保持一致）
 			const originalFolderName = folder.name.toLowerCase();
 			const isMatched = !query || originalFolderName.includes(query);

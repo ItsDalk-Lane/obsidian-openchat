@@ -2,7 +2,6 @@ import type { App } from 'obsidian';
 import { TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { ensureAIDataFolders, getSystemPromptsPath } from 'src/utils/AIPathManager';
-import { normalizeLegacySystemPromptFeatureId } from '../legacyCompatibility';
 import type { AiFeatureId, SystemPromptItem, SystemPromptsDataFile } from './types';
 import { SYSTEM_PROMPTS_DATA_VERSION } from './types';
 
@@ -14,7 +13,7 @@ const VALID_FEATURE_IDS: ReadonlySet<AiFeatureId> = new Set([
 	'selection_toolbar',
 ]);
 
-interface RawSystemPrompt extends Partial<SystemPromptItem> {}
+type RawSystemPrompt = Partial<SystemPromptItem>;
 
 interface OpenChatPluginLike {
 	loadData?: () => Promise<any>;
@@ -39,7 +38,7 @@ const toFeatureIdArray = (value: unknown): AiFeatureId[] => {
 		if (typeof item !== 'string') {
 			continue;
 		}
-		const normalized = normalizeLegacySystemPromptFeatureId(item) as AiFeatureId;
+		const normalized = item as AiFeatureId;
 		if (!VALID_FEATURE_IDS.has(normalized) || result.includes(normalized)) {
 			continue;
 		}
@@ -282,7 +281,9 @@ export class SystemPromptDataService {
 				const filePath = normalizePath(`${folderPath}/${prompt.id}.md`);
 				expectedPaths.add(filePath);
 
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars -- content 被 prompt.content 替代
 				const { content: _content, ...frontmatter } = prompt;
+				// _content 被排除，使用 prompt.sourceType 和 prompt.content 来确定 body
 				const body = prompt.sourceType === 'template' ? '' : (prompt.content ?? '');
 				const markdown = this.buildMarkdownRecord(frontmatter, body);
 

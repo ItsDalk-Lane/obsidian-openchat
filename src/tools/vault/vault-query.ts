@@ -887,7 +887,7 @@ const evaluateConditionNode = (
 		case 'array':
 			return node.items.map((item) => item.value);
 		case 'unary':
-			return !Boolean(evaluateConditionNode(node.operand, row));
+			return !evaluateConditionNode(node.operand, row);
 		case 'binary': {
 			if (node.operator === '&&') {
 				return Boolean(evaluateConditionNode(node.left, row))
@@ -907,12 +907,16 @@ const evaluateConditionNode = (
 				case '!=':
 					return left !== right;
 				case '>':
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 					return (left as any) > (right as any);
 				case '>=':
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 					return (left as any) >= (right as any);
 				case '<':
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 					return (left as any) < (right as any);
 				case '<=':
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 					return (left as any) <= (right as any);
 				case 'contains':
 					if (Array.isArray(left)) {
@@ -1007,6 +1011,7 @@ const getMarkdownFiles = (app: App): TFile[] => {
 const buildPropertyDataset = (app: App): VaultQueryDataset => {
 	const markdownFiles = getMarkdownFiles(app);
 	const stats = new Map<string, { type: string | null; usageCount: number }>();
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const metadataTypeManager = (app as any).metadataTypeManager as
 		| { getAllProperties?: () => Record<string, PropertyInfoLike> }
 		| undefined;
@@ -1102,6 +1107,7 @@ const buildTaskDataset = async (app: App): Promise<VaultQueryDataset> => {
 
 		const lines = (await app.vault.cachedRead(file)).split(/\r?\n/);
 		for (const item of taskItems) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const lineNumber = ((item as any).position?.start?.line ?? -1) as number;
 			if (lineNumber < 0 || lineNumber >= lines.length) {
 				continue;

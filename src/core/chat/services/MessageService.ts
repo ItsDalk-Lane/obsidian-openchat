@@ -277,7 +277,7 @@ export class MessageService {
 				// 如果有 message 字段，优先显示
 				if (parsed.message && typeof parsed.message === 'string') {
 					// 如果是空文件，添加标识
-					let message = parsed.message;
+					const message = parsed.message;
 					if (parsed.characterCount === 0) {
 						return message + ' (空文件)';
 					}
@@ -569,7 +569,6 @@ export class MessageService {
 		while ((match = calloutPattern.exec(content)) !== null) {
 			const name = match[1].trim();
 			const statusText = match[2].trim();
-			const quotedContent = match[3]; // 消息数量（暂不使用）
 			const blockContent = match[4];
 
 			// 解析状态
@@ -636,9 +635,9 @@ export class MessageService {
 				// 解析时间戳
 				const timestampStr = headerMatch[2].trim();
 				try {
-					const dateMatch = timestampStr.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+					const dateMatch = timestampStr.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})/);
 					if (dateMatch) {
-						const [_, year, month, day, hour, minute, second] = dateMatch.map(Number);
+						const [, year, month, day, hour, minute, second] = dateMatch.map(Number);
 						currentTimestamp = new Date(year, month - 1, day, hour, minute, second).getTime();
 					}
 				} catch {
@@ -720,7 +719,7 @@ export class MessageService {
 
 		const lines: string[] = [];
 
-		for (const [toolCallId, state] of entries) {
+		for (const [, state] of entries) {
 			const statusLabel: Record<string, string> = {
 				running: '执行中',
 				completed: '已完成',

@@ -35,7 +35,7 @@ const clampConfidence = (value: number) => Math.max(0, Math.min(1, value))
 
 const toLowerSafe = (value: unknown) => (typeof value === 'string' ? value.toLowerCase() : '')
 
-const normalizeKey = (value: string) => value.toLowerCase().replace(/[\s\-]+/g, '_')
+const normalizeKey = (value: string) => value.toLowerCase().replace(/[\s-]+/g, '_')
 
 const normalizeBaseURLForCache = (baseURL?: string) => {
 	const trimmed = (baseURL || '').trim()

@@ -40,6 +40,7 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 	const [slashCommandFilter, setSlashCommandFilter] = useState('');
 	const [slashCommandSelectedIndex, setSlashCommandSelectedIndex] = useState(0);
 	const [slashCommandPosition, setSlashCommandPosition] = useState({ top: 0, left: 0 });
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const [slashCommandStartIndex, setSlashCommandStartIndex] = useState<number | null>(null);
 	const slashCommandLoadingRef = useRef(false);
 

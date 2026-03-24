@@ -135,7 +135,7 @@ export const McpModeSelector = ({ mode, selectedServerIds, service }: McpModeSel
 	const isActive = mode !== 'disabled';
 	const isManualWithSelection = mode === 'manual' && selectedServerIds.length > 0;
 
-	let iconClass = 'tw-size-4';
+	const iconClass = 'tw-size-4';
 	let spanClass = 'tw-cursor-pointer tw-flex tw-items-center tw-justify-center';
 
 	if (!isActive) {

@@ -2,7 +2,7 @@ import { App } from "obsidian";
 import TemplateParser from "./TemplateParser";
 import { getEditorSelection, getCurrentFileContent } from "src/utils/getEditorSelection";
 import { processObTemplate } from "src/utils/templates";
-import { convertVariableToString, logTypeConversion, validateFormValues, TypeConversionError } from "src/utils/typeSafety";
+import { convertVariableToString, logTypeConversion, validateFormValues } from "src/utils/typeSafety";
 import { LoopVariableScope } from "src/utils/LoopVariableScope";
 
 export type TemplateState = {
@@ -27,7 +27,7 @@ export class FormTemplateProcessEngine {
         }
 
         // if exactly matches {{@variableName}} OR {{@output:variableName}}, return the value as string for consistency
-        const pureVariableMatch = text.match(/^{{\@([^}]+)}}$/);
+        const pureVariableMatch = text.match(/^{{@([^}]+)}}$/);
         if (pureVariableMatch) {
             const rawName = pureVariableMatch[1]?.trim();
             if (!rawName) {

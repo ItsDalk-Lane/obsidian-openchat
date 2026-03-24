@@ -427,8 +427,6 @@ export class FileOperationService {
                 };
             }
 
-            const file = resolveResult.file;
-
             const mode = this.normalizeOpenMode(options.mode);
             if (mode === "none") {
                 return {
@@ -438,13 +436,13 @@ export class FileOperationService {
                 };
             }
 
-	            const normalizedMode =
-	                mode === "new-tab"
-	                    ? "tab"
-	                    : mode === "new-window"
-	                        ? "window"
-	                        : mode;
-	            openFilePathDirectly(this.app, filePath, normalizedMode);
+            const normalizedMode =
+                mode === "new-tab"
+                    ? "tab"
+                    : mode === "new-window"
+                        ? "window"
+                        : mode;
+            openFilePathDirectly(this.app, filePath, normalizedMode);
             return {
                 success: true,
                 path: filePath,
@@ -585,9 +583,9 @@ export class FileOperationService {
         if (strategy === FileConflictResolution.AUTO_RENAME || strategy === "rename") {
             return FileConflictResolution.AUTO_RENAME;
         }
-	        if (strategy === FileConflictResolution.OVERWRITE) {
-	            return FileConflictResolution.OVERWRITE;
-	        }
+        if (strategy === FileConflictResolution.OVERWRITE) {
+            return FileConflictResolution.OVERWRITE;
+        }
         return FileConflictResolution.OVERWRITE;
     }
 

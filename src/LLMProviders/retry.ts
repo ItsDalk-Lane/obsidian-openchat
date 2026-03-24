@@ -61,6 +61,7 @@ export const withRetry = async <T>(operation: () => Promise<T>, options: RetryOp
 
 	let attempt = 0
 
+	// eslint-disable-next-line no-constant-condition -- Intentional infinite loop with break/return
 	while (true) {
 		if (signal?.aborted) {
 			throw normalizeProviderError(createAbortError())

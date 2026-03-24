@@ -23,7 +23,7 @@ export function PasswordInput(props: PasswordInputProps) {
 	const handleBlur = () => {
 		setIsFocused(false);
 	};
-	const { onChange, value, ...rest } = props;
+	const { ...rest } = props;
 
 	return (
 		<PasswordToggleField.Root>

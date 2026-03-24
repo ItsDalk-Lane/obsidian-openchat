@@ -1,4 +1,4 @@
-import { App, TFile, TFolder, TAbstractFile, Notice } from 'obsidian';
+import { App, TFile, TFolder } from 'obsidian';
 import type { SelectedFile, SelectedFolder } from '../types/chat';
 
 export interface FileContent {

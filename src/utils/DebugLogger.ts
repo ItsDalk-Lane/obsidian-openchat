@@ -3,10 +3,10 @@
  * 提供统一的日志输出控制
  */
 export class DebugLogger {
-	private static debugMode: boolean = false;
+	private static debugMode = false;
 	private static debugLevel: 'debug' | 'info' | 'warn' | 'error' = 'info';
-	private static llmConsoleLogEnabled: boolean = false;
-	private static llmResponsePreviewChars: number = 100;
+	private static llmConsoleLogEnabled = false;
+	private static llmResponsePreviewChars = 100;
 
 	/**
 	 * 设置调试模式

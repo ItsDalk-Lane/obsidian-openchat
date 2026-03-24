@@ -1,4 +1,3 @@
-import { requestUrl } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl, getMimeTypeFromFilename } from './utils'
@@ -388,7 +387,6 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 				enableWebSearch,
 				webSearchConfig,
 				thinkingType,
-				reasoningEffort,
 				...remains
 			} = options
 			if (!apiKey) throw new Error(t('API key is required'))
@@ -442,12 +440,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 
 			// 只添加通用的、非模型特定的参数
 			// 过滤掉可能不被所有模型支持的参数
-			const {
-				reasoningEffort: _,
-				thinkingType: __,
-				effort: ___, // 也过滤掉直接的 effort 参数
-				...generalParams
-			} = remains as any
+			const { ...generalParams } = remains as any
 			Object.assign(data, generalParams)
 
 			const isReasoningEnabled = enableReasoning === true

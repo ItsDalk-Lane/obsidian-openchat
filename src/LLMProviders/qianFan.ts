@@ -25,15 +25,15 @@ type QianFanAPIError = Error & {
 
 type ContentItem =
 	| {
-			type: 'image_url'
-			image_url: {
-				url: string
-			}
-	  }
+		type: 'image_url'
+		image_url: {
+			url: string
+		}
+	}
 	| {
-			type: 'text'
-			text: string
-	  }
+		type: 'text'
+		text: string
+	}
 
 export const QIANFAN_DEFAULT_BASE_URL = 'https://qianfan.baidubce.com/v2'
 
@@ -321,7 +321,6 @@ const sendRequestFunc = (settings: QianFanOptions): SendRequest =>
 			apiKey,
 			baseURL,
 			model,
-			apiSecret: _legacyApiSecret,
 			imageResponseFormat,
 			imageCount,
 			imageSize,

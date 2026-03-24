@@ -105,7 +105,6 @@ export const ChatHistoryPanel = ({ items, onSelect, onOpenFile, onClose, onRefre
 	const getPanelPosition = () => {
 		if (anchorRef?.current) {
 			const buttonRect = anchorRef.current.getBoundingClientRect();
-			const estimatedWidth = 320;
 			const estimatedHeight = 420;
 			const gap = 8;
 			const padding = 12;
@@ -117,7 +116,6 @@ export const ChatHistoryPanel = ({ items, onSelect, onOpenFile, onClose, onRefre
 			);
 
 			// 计算垂直方向可用空间
-			const spaceAbove = buttonRect.top;
 			const spaceBelow = window.innerHeight - buttonRect.bottom;
 			const canPlaceBelow = spaceBelow >= estimatedHeight + gap;
 

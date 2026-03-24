@@ -1,9 +1,8 @@
-import { App, TFile, Notice } from 'obsidian';
+import { App, TFile } from 'obsidian';
 import type { QuickAction } from 'src/types/chat';
 import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
 import { availableVendors } from 'src/settings/ai-runtime';
 import type { ProviderSettings, Message, Vendor } from 'src/types/provider';
-import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler';
 import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils';

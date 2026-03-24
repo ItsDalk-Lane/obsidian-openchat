@@ -1,5 +1,4 @@
-import { App, TFile, normalizePath, Notice } from "obsidian";
-import { localInstance } from "src/i18n/locals";
+import { App, TFile, normalizePath } from "obsidian";
 import { FileConflictResolution } from "src/types/enums/FileConflictResolution";
 import { processObTemplate } from "./templates";
 import { generateUniqueFilePath } from "./generateUniqueFilePath";
@@ -29,9 +28,13 @@ export async function createFileByText(
     options: CreateFileOptions = {}
 ): Promise<TFile> {
     const {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 预留用于扩展
         enableAutoTypeConversion = true,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 预留用于扩展
         strictTypeChecking = false,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 预留用于扩展
         logTypeConversions = false,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 预留用于扩展
         onTypeConversionWarning
     } = options;
 
@@ -239,12 +242,13 @@ async function createFileWithValidatedContent(
             case FileConflictResolution.SKIP:
                 return Promise.resolve(existingFile as TFile);
 
-            case FileConflictResolution.AUTO_RENAME:
+            case FileConflictResolution.AUTO_RENAME: {
                 const uniquePath = generateUniqueFilePath(app, normalizedNewFilePath);
                 const processedTemplate = processObTemplate(template);
                 return await app.vault.create(uniquePath, processedTemplate);
+            }
 
-            case FileConflictResolution.OVERWRITE:
+            case FileConflictResolution.OVERWRITE: {
                 if (existingFile instanceof TFile) {
                     const processedTemplate = processObTemplate(template);
                     await app.vault.modify(existingFile, processedTemplate);
@@ -252,6 +256,7 @@ async function createFileWithValidatedContent(
                 } else {
                     throw new Error(`Cannot overwrite non-file: ${newFilePath}`);
                 }
+            }
 
             default:
                 throw new Error(`Unknown conflict resolution strategy: ${conflictResolution}`);

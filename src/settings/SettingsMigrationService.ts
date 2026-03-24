@@ -8,11 +8,6 @@ import {
     getPromptTemplatePath,
     moveFolderFilesWithRenameOnConflict,
 } from 'src/utils/AIPathManager';
-import {
-    LEGACY_AI_RUNTIME_CONTAINER_KEY,
-    readLegacyAiRuntimeSettings,
-    removeLegacyAiRuntimeContainer,
-} from './legacyCompatibility';
 
 const LEGACY_QUICK_ACTIONS_DATA_FILE = '.obsidian/plugins/openchat/skills.json';
 const LEGACY_SYSTEM_PROMPTS_DATA_FILE = '.obsidian/plugins/openchat/system-prompts.json';
@@ -76,9 +71,8 @@ export class SettingsMigrationService {
 
         const nextData: Record<string, unknown> = { ...persisted };
         const nextChat: Record<string, unknown> = { ...(persisted?.chat ?? {}) };
-        const legacyPersistedAiRuntime = readLegacyAiRuntimeSettings(persisted) ?? {};
         const nextAiRuntime: Record<string, unknown> = {
-            ...((persisted?.aiRuntime ?? legacyPersistedAiRuntime ?? {}) as Record<string, unknown>),
+            ...((persisted?.aiRuntime ?? {}) as Record<string, unknown>),
         };
 
         if (Object.prototype.hasOwnProperty.call(nextChat, 'quickActions')) {
@@ -132,12 +126,6 @@ export class SettingsMigrationService {
                     changed = true;
                 }
             }
-        }
-
-        if (Object.prototype.hasOwnProperty.call(nextData, LEGACY_AI_RUNTIME_CONTAINER_KEY)) {
-            // 删除旧版兼容壳层，迁移后的持久化仅保留 `aiRuntime`
-            removeLegacyAiRuntimeContainer(nextData);
-            changed = true;
         }
 
         if (changed) {

@@ -48,7 +48,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 			const fimConfig = internalConfig.fim ?? {}
 			const fimPrompt = typeof fimConfig.prompt === 'string' ? fimConfig.prompt : messages[messages.length - 1]?.content ?? ''
 			const fimSuffix = typeof fimConfig.suffix === 'string' ? fimConfig.suffix : undefined
-			const { prompt: _prompt, suffix: _suffix, enabled: _enabled, ...fimRemains } = fimConfig
+			const { ...fimRemains } = fimConfig
 
 			const stream = await client.completions.create(
 				{

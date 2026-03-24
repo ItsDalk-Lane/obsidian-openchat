@@ -53,7 +53,9 @@ function normalizeQuickAction(
 	const actionType = resolveQuickActionType(raw);
 	const isActionGroup = raw.isActionGroup ?? raw.isSkillGroup ?? actionType === 'group';
 	const {
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- 排除旧字段
 		skillType: _legacySkillType,
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- 排除旧字段
 		isSkillGroup: _legacyIsSkillGroup,
 		...rawWithoutLegacyFields
 	} = raw;
@@ -571,6 +573,7 @@ export class QuickActionDataService {
 			const filePath = normalizePath(`${folderPath}/${quickAction.id}.md`);
 			expectedPaths.add(filePath);
 
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars -- prompt 被 quickAction.prompt 替代
 			const { prompt: _prompt, ...frontmatter } = quickAction as RawQuickAction;
 			const body = quickAction.promptSource === 'template' ? '' : (quickAction.prompt ?? '');
 			const content = this.buildMarkdownRecord(frontmatter, body);

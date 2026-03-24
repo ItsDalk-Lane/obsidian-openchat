@@ -1,4 +1,4 @@
-import { App, MarkdownView, TFile } from "obsidian";
+import { App, MarkdownView } from "obsidian";
 
 export function getEditorSelection(app: App) {
     const editor = app.workspace.getActiveViewOfType(MarkdownView)?.editor;

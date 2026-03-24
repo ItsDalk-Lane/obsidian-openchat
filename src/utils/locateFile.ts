@@ -8,4 +8,4 @@ export default function locateFile(folder: string, app: App) {
             app.internalPlugins.plugins["file-explorer"].instance;
         fileExplorer.revealInFolder(f);
     }
-};
+}

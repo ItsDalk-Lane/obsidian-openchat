@@ -33,6 +33,7 @@ async function fetchStream(
 
     const decoder = new TextDecoder("utf-8");
 
+    // eslint-disable-next-line no-constant-condition -- 通过 break 退出循环
     while (true) {
         const { done, value } = await reader.read();
         if (done) break;

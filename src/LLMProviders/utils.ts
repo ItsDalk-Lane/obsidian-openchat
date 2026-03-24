@@ -1,6 +1,6 @@
 import { EmbedCache } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Capability, ProviderSettings, ResolveEmbedAsBinary, Vendor } from '.'
+import { BaseOptions, Capability, ResolveEmbedAsBinary, Vendor } from '.'
 
 export const getMimeTypeFromFilename = (filename: string) => {
 	const extension = filename.split('.').pop()?.toLowerCase() || ''

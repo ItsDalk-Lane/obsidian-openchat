@@ -92,7 +92,7 @@ export class PathMatcher {
 		}
 
 		// 7. 分词匹配（将查询字符串按分隔符拆分后分别匹配）
-		const queryParts = query.split(/[\s\-_\/\\\.]/).filter(part => part.length > 0);
+		const queryParts = query.split(/[\s\-_/\\]/).filter(part => part.length > 0);
 		if (queryParts.length > 1) {
 			let matchedParts = 0;
 			for (const part of queryParts) {
