@@ -1,6 +1,7 @@
 # vscode
 .vscode 
 
+
 # Intellij
 *.iml
 .idea
@@ -21,3 +22,6 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# Claude Code
+.claude
