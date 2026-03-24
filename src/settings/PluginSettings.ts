@@ -1,24 +1,18 @@
-import { cloneTarsSettings } from "src/features/tars";
-import type { TarsSettings } from "src/features/tars";
-import type { ChatSettings } from "src/features/chat";
-import { DEFAULT_CHAT_SETTINGS } from "src/features/chat";
-
-export interface TarsFeatureConfig {
-    settings: TarsSettings;
-}
+import { cloneAiRuntimeSettings } from 'src/settings/ai-runtime';
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
+import type { ChatSettings } from 'src/types/chat';
+import { DEFAULT_CHAT_SETTINGS } from 'src/types/chat';
 
 export interface PluginSettings {
-    aiDataFolder: string;
+	aiDataFolder: string;
 
-    tars: TarsFeatureConfig;
+	aiRuntime: AiRuntimeSettings;
 
 	chat: ChatSettings;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
-    aiDataFolder: "System/AI Data",
-    tars: {
-        settings: cloneTarsSettings(),
-    },
+	aiDataFolder: 'System/AI Data',
+	aiRuntime: cloneAiRuntimeSettings(),
 	chat: DEFAULT_CHAT_SETTINGS,
 };

@@ -1,14 +1,14 @@
 import { Ollama } from 'ollama/browser'
 import type { EmbedCache } from 'obsidian'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { arrayBufferToBase64, getMimeTypeFromFilename, buildReasoningBlockStart, buildReasoningBlockEnd } from './utils'
 import {
 	toOpenAITools,
 	resolveCurrentTools,
-} from 'src/agentLoop'
-import type { ToolCallRequest } from 'src/agentLoop/types'
-import type { OpenAIToolCall } from 'src/agentLoop/OpenAILoopHandler'
+} from 'src/core/agents/loop'
+import type { ToolCallRequest } from 'src/core/agents/loop/types'
+import type { OpenAIToolCall } from 'src/core/agents/loop/OpenAILoopHandler'
 import { normalizeProviderError } from './errors'
 
 // Structured Output Format 类型
@@ -227,7 +227,7 @@ const normalizeToolResultContent = (content: unknown): string => {
 }
 
 const sendRequestFuncBase = (settings: BaseOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
+	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		try {
 			const { parameters, ...optionsExcludingParams } = settings
 			const options = { ...optionsExcludingParams, ...parameters } as OllamaOptions
@@ -438,7 +438,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 
 				for (const result of toolResults) {
 					yield `{{FF_MCP_TOOL_START}}:${result.name}:${result.content}{{FF_MCP_TOOL_END}}:`
-					loopMessages.push(result.message)
+					loopMessages.push(result.message as any)
 				}
 			}
 

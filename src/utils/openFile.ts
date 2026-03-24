@@ -24,7 +24,9 @@ export function openFile(
     if (openType === "none") {
         return;
     }
-    const currentView = app.workspace.getActiveFileView();
+    const currentView = (app.workspace as typeof app.workspace & {
+        getActiveFileView?: () => { leaf?: typeof app.workspace.activeLeaf } | null;
+    }).getActiveFileView?.();
 
     const currentLeaf = currentView?.leaf;
     let isPinned = false;

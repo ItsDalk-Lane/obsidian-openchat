@@ -1,29 +1,13 @@
-import { cloneTarsSettings } from 'src/features/tars';
-import type { TarsSettings } from 'src/features/tars';
-import { encryptApiKey, decryptApiKey, generateDeviceFingerprint } from 'src/features/tars/utils/cryptoUtils';
+import { cloneAiRuntimeSettings } from 'src/settings/ai-runtime';
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
+import { encryptApiKey, decryptApiKey, generateDeviceFingerprint } from 'src/settings/ai-runtime/utils/cryptoUtils';
+import type { BaseOptions, ProviderSettings } from 'src/types/provider';
 import { DebugLogger } from 'src/utils/DebugLogger';
-
-export interface BaseOptions {
-    apiKey: string;
-    baseURL: string;
-    model: string;
-    parameters: Record<string, unknown>;
-    enableWebSearch?: boolean;
-    apiSecret?: string;
-    [key: string]: unknown;
-}
-
-export interface ProviderConfig {
-    tag: string;
-    vendor: string;
-    options: BaseOptions;
-    [key: string]: any;
-}
 
 export type VendorApiKeysByDevice = Record<string, Record<string, string>>;
 
 /**
- * 负责 API 密钥与 TarsSettings 的加密 / 解密逻辑
+ * 负责 API 密钥与 AiRuntimeSettings 的加密 / 解密逻辑
  */
 export class SettingsSecretManager {
     readonly currentDeviceFingerprint: string;
@@ -86,18 +70,19 @@ export class SettingsSecretManager {
         return Object.keys(next).length > 0 ? next : undefined;
     }
 
-    decryptTarsSettings(settings?: TarsSettings | undefined): TarsSettings {
+    decryptAiRuntimeSettings(settings?: AiRuntimeSettings | undefined): AiRuntimeSettings {
         if (!settings) {
-            return cloneTarsSettings();
+            return cloneAiRuntimeSettings();
         }
         const vendorApiKeys = this.decryptVendorApiKeys(settings.vendorApiKeysByDevice);
-        const providers = (settings.providers ?? []).map((provider: ProviderConfig) => {
+        const providers = (settings.providers ?? []).map((provider: ProviderSettings) => {
             const options = provider.options || {};
             const normalizedVendor = this.normalizeProviderVendor(provider.vendor);
             const resolvedApiKey = vendorApiKeys[normalizedVendor] ?? '';
             const nextOptions: BaseOptions = {
                 ...options,
                 apiKey: resolvedApiKey,
+                parameters: options.parameters ?? {},
             };
             delete (nextOptions as Record<string, unknown>).apiKeyByDevice;
             delete (nextOptions as Record<string, unknown>).apiSecretByDevice;
@@ -109,23 +94,24 @@ export class SettingsSecretManager {
             };
         });
         DebugLogger.debug('[SettingsManager] API 密钥按供应商解密完成');
-        return cloneTarsSettings({
+        return cloneAiRuntimeSettings({
             ...settings,
             vendorApiKeys,
             providers,
         });
     }
 
-    encryptTarsSettings(settings: TarsSettings): TarsSettings {
+    encryptAiRuntimeSettings(settings: AiRuntimeSettings): AiRuntimeSettings {
         const vendorApiKeysByDevice = this.encryptVendorApiKeys(
             settings.vendorApiKeysByDevice,
             settings.vendorApiKeys
         );
-        const providers = (settings.providers ?? []).map((provider: ProviderConfig) => {
+        const providers = (settings.providers ?? []).map((provider: ProviderSettings) => {
             const options = provider.options || {};
             const encrypted: BaseOptions = {
                 ...options,
                 apiKey: '',
+                parameters: options.parameters ?? {},
             };
             delete (encrypted as Record<string, unknown>).apiKeyByDevice;
             delete (encrypted as Record<string, unknown>).apiSecretByDevice;
@@ -139,7 +125,7 @@ export class SettingsSecretManager {
             };
         });
         DebugLogger.debug('[SettingsManager] API 密钥按供应商加密完成');
-        return cloneTarsSettings({
+        return cloneAiRuntimeSettings({
             ...settings,
             vendorApiKeys: {},
             vendorApiKeysByDevice,

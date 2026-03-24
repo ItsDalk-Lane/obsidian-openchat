@@ -16,6 +16,22 @@ export function generateUniqueFilePath(app: App, originalPath: string): string {
     const pathWithoutExtension = lastDotIndex >= 0 ? normalizedPath.substring(0, lastDotIndex) : normalizedPath;
     const extension = lastDotIndex >= 0 ? normalizedPath.substring(lastDotIndex + 1) : "";
     
-    // Use Obsidian's getAvailablePath API to generate unique path
-    return app.vault.getAvailablePath(pathWithoutExtension, extension);
+    // Use Obsidian's getAvailablePath API when available; otherwise fall back to local suffixing
+    const availablePath = (app.vault as typeof app.vault & {
+        getAvailablePath?: (path: string, extension: string) => string;
+    }).getAvailablePath;
+    if (typeof availablePath === 'function') {
+        return availablePath(pathWithoutExtension, extension);
+    }
+
+    let counter = 1;
+    while (true) {
+        const candidate = extension
+            ? `${pathWithoutExtension} ${counter}.${extension}`
+            : `${pathWithoutExtension} ${counter}`;
+        if (!app.vault.getAbstractFileByPath(candidate)) {
+            return candidate;
+        }
+        counter += 1;
+    }
 }

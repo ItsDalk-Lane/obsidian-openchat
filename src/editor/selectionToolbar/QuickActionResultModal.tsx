@@ -2,10 +2,10 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { App, Notice, MarkdownRenderer, Component } from 'obsidian';
 import { X, Copy, Replace, Plus, RefreshCw, Check, Square } from 'lucide-react';
-import type { QuickAction } from '../types/chat';
-import type { ProviderSettings } from 'src/features/tars/providers';
+import type { QuickAction } from 'src/types/chat';
+import type { ProviderSettings } from 'src/types/provider';
 import { localInstance } from 'src/i18n/locals';
-import { ModelSelector } from 'src/features/chat/components/ModelSelector';
+import { ModelSelector } from 'src/components/chat-components/ModelSelector';
 import './QuickActionResultModal.css';
 
 interface QuickActionResultModalProps {

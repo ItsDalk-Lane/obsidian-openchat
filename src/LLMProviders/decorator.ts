@@ -1,5 +1,5 @@
 import { normalizePath } from 'obsidian'
-import { APP_FOLDER } from 'tars/settings'
+import { APP_FOLDER } from 'src/settings/ai-runtime'
 import { CreatePlainText, SendRequest } from '.'
 import { DebugLogger } from 'src/utils/DebugLogger'
 
@@ -53,4 +53,3 @@ const formatDate = (date: Date): string => {
 
 	return `${year}${month}${day}-${hours}${minutes}`
 }
-

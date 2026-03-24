@@ -1,9 +1,9 @@
 import { AzureOpenAI } from 'openai'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockEnd, buildReasoningBlockStart } from './utils'
 import { DebugLogger } from 'src/utils/DebugLogger'
-import { withToolCallLoopSupport } from 'src/agentLoop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop'
 
 export interface AzureOptions extends BaseOptions {
 	endpoint: string
@@ -22,7 +22,7 @@ export const azureMapResponsesParams = (params: Record<string, unknown>) => {
 }
 
 const sendRequestFuncBase = (settings: AzureOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
+	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		const { parameters, ...optionsExcludingParams } = settings
 		const options = { ...optionsExcludingParams, ...parameters }
 		const { apiKey, model, endpoint, apiVersion, enableReasoning = false, ...remains } = options
@@ -98,7 +98,7 @@ const sendRequestFuncBase = (settings: AzureOptions): SendRequest =>
 				})),
 				stream: true,
 				...remains
-			},
+			} as any,
 			{
 				signal: controller.signal
 			}

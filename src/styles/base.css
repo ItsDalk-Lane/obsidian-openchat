@@ -16,8 +16,8 @@ body > .notice-container {
 	z-index: 999;
 }
 
-/* Tars AI Provider Settings Styles */
-summary.tars-setting-h4 {
+/* AI Runtime Provider Settings Styles */
+summary.ai-runtime-setting-h4 {
         font-variant: var(--h4-variant);
         line-height: var(--h4-line-height);
         font-size: var(--h4-size);
@@ -29,8 +29,8 @@ summary.tars-setting-h4 {
         cursor: pointer;
 }
 
-/* Tars 区域描述文字样式 */
-.tars-section-desc {
+/* AI Runtime 区域描述文字样式 */
+.ai-runtime-section-desc {
         font-size: var(--font-ui-smaller);
         color: var(--text-muted);
         margin-bottom: 12px;
@@ -44,7 +44,7 @@ summary.tars-setting-h4 {
 }
 
 /* 系统消息输入框样式 */
-.tars-system-message-input {
+.ai-runtime-system-message-input {
         width: 100%;
         min-height: 100px;
         padding: 8px;
@@ -57,13 +57,13 @@ summary.tars-setting-h4 {
         resize: vertical;
 }
 
-.tars-system-message-input:disabled {
+.ai-runtime-system-message-input:disabled {
         opacity: 0.5;
         cursor: not-allowed;
 }
 
 /* Tab 补全 Ghost Text 样式 */
-.tars-ghost-text {
+.ai-runtime-ghost-text {
         color: var(--text-muted);
         opacity: 0.6;
         font-style: italic;
@@ -72,14 +72,14 @@ summary.tars-setting-h4 {
         white-space: pre-wrap;
 }
 
-.tars-ghost-text-loading {
+.ai-runtime-ghost-text-loading {
         color: var(--text-muted);
         opacity: 0.5;
         font-style: italic;
-        animation: tars-loading-pulse 1.5s ease-in-out infinite;
+        animation: ai-runtime-loading-pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes tars-loading-pulse {
+@keyframes ai-runtime-loading-pulse {
         0%, 100% { opacity: 0.3; }
         50% { opacity: 0.7; }
 }

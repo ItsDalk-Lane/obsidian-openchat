@@ -1,9 +1,9 @@
 import OpenAI from 'openai'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd } from './utils'
 import { DebugLogger } from 'src/utils/DebugLogger'
-import { withToolCallLoopSupport, OpenAILoopOptions, OpenAIToolDefinition, ToolNameMapping } from 'src/agentLoop'
+import { withToolCallLoopSupport, OpenAILoopOptions, OpenAIToolDefinition, ToolNameMapping } from 'src/core/agents/loop'
 
 // DeepSeek选项接口，扩展基础选项以支持推理功能
 export interface DeepSeekOptions extends BaseOptions {
@@ -27,7 +27,7 @@ type DeepSeekInternalConfig = {
 }
 
 const sendRequestFunc = (settings: BaseOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, _resolveEmbedAsBinary: ResolveEmbedAsBinary) {
+	async function* (messages: readonly Message[], controller: AbortController, _resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		const { parameters, ...optionsExcludingParams } = settings
 		const rawParameters = (parameters ?? {}) as Record<string, unknown>
 		const internalConfig = (rawParameters.__ff_deepseek as DeepSeekInternalConfig | undefined) ?? {}
@@ -76,7 +76,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 				messages: transformedMessages as OpenAI.ChatCompletionMessageParam[],
 				stream: true,
 				...remains
-			},
+			} as any,
 			{ signal: controller.signal }
 		)
 
@@ -85,7 +85,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 		const deepSeekOptions = settings as DeepSeekOptions
 		const isReasoningEnabled = deepSeekOptions.enableReasoning ?? false
 
-		for await (const part of stream) {
+		for await (const part of stream as any) {
 			if (part.usage && part.usage.prompt_tokens && part.usage.completion_tokens)
 				DebugLogger.debug(`Prompt tokens: ${part.usage.prompt_tokens}, completion tokens: ${part.usage.completion_tokens}`)
 
@@ -118,7 +118,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 		}
 	}
 
-const applyPrefixContinuation = (messages: Message[], config: DeepSeekInternalConfig): Message[] => {
+const applyPrefixContinuation = (messages: readonly Message[], config: DeepSeekInternalConfig): readonly Message[] => {
 	if (!config?.prefixContinuation) {
 		return messages
 	}
@@ -139,7 +139,7 @@ const applyPrefixContinuation = (messages: Message[], config: DeepSeekInternalCo
  * 根据 DeepSeek 官方文档：
  * - assistant 消息可包含 reasoning_content 字段
  */
-const transformMessagesForDeepSeek = (messages: Message[]): any[] => {
+const transformMessagesForDeepSeek = (messages: readonly Message[]): any[] => {
 	return messages.map(msg => {
 		// 处理 assistant 消息
 		if (msg.role === 'assistant') {
@@ -225,7 +225,7 @@ export const deepSeekVendor: Vendor = {
 		parameters: {},
 		enableReasoning: false // 默认关闭推理功能
 	} as DeepSeekOptions,
-	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc, deepSeekLoopOptions),
+	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as any, deepSeekLoopOptions),
 	models: DEEPSEEK_MODELS,
 	websiteToObtainKey: 'https://platform.deepseek.com',
 	capabilities: ['Text Generation', 'Reasoning', 'Structured Output']

@@ -1,5 +1,5 @@
 import { EmbedCache } from 'obsidian'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Capability, ProviderSettings, ResolveEmbedAsBinary, Vendor } from '.'
 
 export const getMimeTypeFromFilename = (filename: string) => {
@@ -292,11 +292,14 @@ export const getCapabilityDisplayText = (vendor: Vendor, options: BaseOptions): 
  * @returns 新的 options 对象，所有推理相关参数都设置为禁用状态
  */
 export const buildProviderOptionsWithReasoningDisabled = (
-	originalOptions: Record<string, unknown>,
+	originalOptions: BaseOptions,
 	vendorName: string
-): Record<string, unknown> => {
+): BaseOptions => {
 	// 创建浅拷贝，避免修改原始对象
-	const newOptions = { ...originalOptions }
+	const newOptions: BaseOptions = {
+		...originalOptions,
+		parameters: originalOptions.parameters ?? {},
+	}
 
 	// 通用推理参数禁用（适用于大部分 provider）
 	newOptions.enableReasoning = false

@@ -8,6 +8,11 @@ import {
     getPromptTemplatePath,
     moveFolderFilesWithRenameOnConflict,
 } from 'src/utils/AIPathManager';
+import {
+    LEGACY_AI_RUNTIME_CONTAINER_KEY,
+    readLegacyAiRuntimeSettings,
+    removeLegacyAiRuntimeContainer,
+} from './legacyCompatibility';
 
 const LEGACY_QUICK_ACTIONS_DATA_FILE = '.obsidian/plugins/openchat/skills.json';
 const LEGACY_SYSTEM_PROMPTS_DATA_FILE = '.obsidian/plugins/openchat/system-prompts.json';
@@ -71,7 +76,10 @@ export class SettingsMigrationService {
 
         const nextData: Record<string, unknown> = { ...persisted };
         const nextChat: Record<string, unknown> = { ...(persisted?.chat ?? {}) };
-        const nextTarsSettings: Record<string, unknown> = { ...(persisted?.tars?.settings ?? {}) };
+        const legacyPersistedAiRuntime = readLegacyAiRuntimeSettings(persisted) ?? {};
+        const nextAiRuntime: Record<string, unknown> = {
+            ...((persisted?.aiRuntime ?? legacyPersistedAiRuntime ?? {}) as Record<string, unknown>),
+        };
 
         if (Object.prototype.hasOwnProperty.call(nextChat, 'quickActions')) {
             delete nextChat.quickActions;
@@ -81,19 +89,19 @@ export class SettingsMigrationService {
             delete nextChat.skills;
             changed = true;
         }
-        if (Object.prototype.hasOwnProperty.call(nextTarsSettings, 'systemPromptsData')) {
-            delete nextTarsSettings.systemPromptsData;
+        if (Object.prototype.hasOwnProperty.call(nextAiRuntime, 'systemPromptsData')) {
+            delete nextAiRuntime.systemPromptsData;
             changed = true;
         }
-        for (const legacyTarsField of ['enableInternalLink', 'maxLinkParseDepth', 'linkParseTimeout', 'enableDefaultSystemMsg', 'defaultSystemMsg'] as const) {
-            if (Object.prototype.hasOwnProperty.call(nextTarsSettings, legacyTarsField)) {
-                delete nextTarsSettings[legacyTarsField];
+        for (const legacyAiRuntimeField of ['enableInternalLink', 'maxLinkParseDepth', 'linkParseTimeout', 'enableDefaultSystemMsg', 'defaultSystemMsg'] as const) {
+            if (Object.prototype.hasOwnProperty.call(nextAiRuntime, legacyAiRuntimeField)) {
+                delete nextAiRuntime[legacyAiRuntimeField];
                 changed = true;
             }
         }
-        for (const runtimeTarsField of ['editorStatus', 'vendorApiKeys'] as const) {
-            if (Object.prototype.hasOwnProperty.call(nextTarsSettings, runtimeTarsField)) {
-                delete nextTarsSettings[runtimeTarsField];
+        for (const legacyRuntimeOnlyField of ['editorStatus', 'vendorApiKeys'] as const) {
+            if (Object.prototype.hasOwnProperty.call(nextAiRuntime, legacyRuntimeOnlyField)) {
+                delete nextAiRuntime[legacyRuntimeOnlyField];
                 changed = true;
             }
         }
@@ -103,11 +111,11 @@ export class SettingsMigrationService {
                 changed = true;
             }
         }
-        if (nextTarsSettings.mcp && typeof nextTarsSettings.mcp === 'object') {
-            const nextMcpSettings = { ...(nextTarsSettings.mcp as Record<string, unknown>) };
+        if (nextAiRuntime.mcp && typeof nextAiRuntime.mcp === 'object') {
+            const nextMcpSettings = { ...(nextAiRuntime.mcp as Record<string, unknown>) };
             if (Object.prototype.hasOwnProperty.call(nextMcpSettings, 'servers')) {
                 delete nextMcpSettings.servers;
-                nextTarsSettings.mcp = nextMcpSettings;
+                nextAiRuntime.mcp = nextMcpSettings;
                 changed = true;
             }
             for (const legacyBuiltinField of [
@@ -120,18 +128,21 @@ export class SettingsMigrationService {
             ] as const) {
                 if (Object.prototype.hasOwnProperty.call(nextMcpSettings, legacyBuiltinField)) {
                     delete nextMcpSettings[legacyBuiltinField];
-                    nextTarsSettings.mcp = nextMcpSettings;
+                    nextAiRuntime.mcp = nextMcpSettings;
                     changed = true;
                 }
             }
         }
 
+        if (Object.prototype.hasOwnProperty.call(nextData, LEGACY_AI_RUNTIME_CONTAINER_KEY)) {
+            // 删除旧版兼容壳层，迁移后的持久化仅保留 `aiRuntime`
+            removeLegacyAiRuntimeContainer(nextData);
+            changed = true;
+        }
+
         if (changed) {
             nextData.chat = nextChat;
-            nextData.tars = {
-                ...(persisted?.tars ?? {}),
-                settings: nextTarsSettings,
-            };
+            nextData.aiRuntime = nextAiRuntime;
             await this.plugin.saveData(nextData);
             DebugLogger.info('[SettingsManager] 已清理 data.json 中的旧快捷操作/系统提示词/MCP 服务器存储位点');
         }
@@ -193,8 +204,8 @@ export class SettingsMigrationService {
                 delete (runtimeSettings.chat as unknown as Record<string, unknown>).skills;
             }
         }
-        if (runtimeSettings.tars?.settings && 'systemPromptsData' in (runtimeSettings.tars.settings as unknown as Record<string, unknown>)) {
-            delete (runtimeSettings.tars.settings as unknown as Record<string, unknown>).systemPromptsData;
+        if (runtimeSettings.aiRuntime && 'systemPromptsData' in (runtimeSettings.aiRuntime as unknown as Record<string, unknown>)) {
+            delete (runtimeSettings.aiRuntime as unknown as Record<string, unknown>).systemPromptsData;
         }
     }
 }

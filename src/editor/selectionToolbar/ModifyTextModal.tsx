@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import type { ProviderSettings } from 'src/features/tars/providers';
-import { ModelSelector } from 'src/features/chat/components/ModelSelector';
+import type { ProviderSettings } from 'src/types/provider';
+import { ModelSelector } from 'src/components/chat-components/ModelSelector';
 import { localInstance } from 'src/i18n/locals';
 import './ModifyTextModal.css';
 

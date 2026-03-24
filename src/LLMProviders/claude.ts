@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { EmbedCache } from 'obsidian'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import {
 	arrayBufferToBase64,
@@ -10,7 +10,7 @@ import {
 } from './utils'
 import { normalizeProviderError } from './errors'
 import { withRetry } from './retry'
-import { withClaudeToolCallLoopSupport } from 'src/agentLoop'
+import { withClaudeToolCallLoopSupport } from 'src/core/agents/loop'
 
 export interface ClaudeOptions extends BaseOptions {
 	max_tokens: number
@@ -67,7 +67,7 @@ const formatEmbed = async (embed: EmbedCache, resolveEmbedAsBinary: ResolveEmbed
 }
 
 const sendRequestFuncBase = (settings: ClaudeOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
+	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		try {
 			const { parameters, ...optionsExcludingParams } = settings
 			const options = { ...optionsExcludingParams, ...parameters }
@@ -168,7 +168,7 @@ const sendRequestFuncBase = (settings: ClaudeOptions): SendRequest =>
 		}
 	}
 
-const sendRequestFunc = withClaudeToolCallLoopSupport(sendRequestFuncBase, formatMsgForClaudeAPI)
+const sendRequestFunc = withClaudeToolCallLoopSupport(sendRequestFuncBase as any, formatMsgForClaudeAPI)
 
 export const CLAUDE_MODELS = [
 	'claude-sonnet-4-0',

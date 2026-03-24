@@ -5,7 +5,7 @@ import "./index.css";
 export class DropdownMenuItem {
 	label?: ReactNode;
 	icon?: ReactNode;
-	value: string;
+	value = "";
 	data?: any;
 	onClick?: (e: React.MouseEvent) => void;
 }

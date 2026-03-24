@@ -24,7 +24,7 @@ export class En implements Local {
 	stop_execution = "Stop execution";
 	execution_stopped = "Form execution stopped";
 	basic_setting = "Basic settings";
-	tars_setting = "AI Assistants";
+	ai_runtime_setting = "AI Assistants";
 	bottom_below_title = "Bottom below title";
 	brief_description = "Brief description";
 	cancel = "Cancel";
@@ -174,6 +174,10 @@ export class En implements Local {
 	run_on_startup_description = "When enabled, this form will be automatically submitted when Obsidian starts";
 	enable_context_menu = "Show in Context Menu";
 	enable_context_menu_description = "When enabled, this form can be accessed directly from the editor's context menu";
+	context_menu_group = "Context menu group";
+	context_menu_group_description = "Used to group items inside the editor context menu";
+	modify = "Modify";
+	chat = "Chat";
 	remove_value = "Remove value";
 		custom_title = "Custom Title";
 		custom_title_description = "Enter a custom action title, leave empty to use system-generated title";
@@ -559,8 +563,8 @@ export class En implements Local {
 	system_prompt_enabled = "Enabled";
 	system_prompt_disabled = "Disabled";
 	system_prompt_exclude_label = "Exclude features";
-	system_prompt_feature_tars_chat = "AI Chat";
-	system_prompt_feature_tars_chat_desc = "Full AI chat UI (modal/sidebar), multi-model switching and system prompts, image upload and vision understanding, image generation, file/folder context, chat history save/load, message editing and regeneration";
+	system_prompt_feature_ai_chat = "AI Chat";
+	system_prompt_feature_ai_chat_desc = "Full AI chat UI (modal/sidebar), multi-model switching and system prompts, image upload and vision understanding, image generation, file/folder context, chat history save/load, message editing and regeneration";
 	system_prompt_feature_ai_action = "AI Form Action";
 	system_prompt_feature_ai_action_desc = "Invoke AI models in form workflows, supports runtime model/template selection, variable substitution ({{@fieldName}}, {{output:variableName}}), internal link parsing, and streaming output modal";
 	system_prompt_feature_tab_completion = "Tab Auto Completion";
@@ -642,8 +646,6 @@ export class En implements Local {
 	start_import = "Start import";
 	previous_step = "Previous step";
 	next_step = "Next step";
-	cancel = "Cancel";
-	close = "Close";
 	complete_import = "Complete import";
 	modified_at = "Modified at";
 	data_independence_enabled = "Data independence enabled";
@@ -696,7 +698,6 @@ export class En implements Local {
 	startup_condition_file_is_open = "File is open in editor";
 	startup_condition_file_is_active = "File is currently active";
 	startup_condition_search_text = "Search Text";
-	startup_condition_search_text_placeholder = "Enter text to search";
 	startup_condition_properties = "Properties";
 	startup_condition_add_property = "Add Property";
 	startup_condition_not_met_detail = "Form execution conditions not met: {0}";
@@ -1053,4 +1054,6 @@ export class En implements Local {
 	stop_this_model = "Stop this model";
 	retry_this_model = "Retry this model";
 	generation_failed = "Generation failed";
+	slash_command_empty = "No commands available";
+	slash_command_no_match = "No matching items";
 }

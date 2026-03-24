@@ -35,8 +35,8 @@ class FileModal extends Modal {
 	private contentSourceLeafRef: WorkspaceLeaf | null = null;
 	private closeByFullScreen = false;
 	private file: TFile;
-	private leafChangeListeners: (activeLeaf: WorkspaceLeaf | null) => void;
-	private fileDeleteListener: (f: TFile) => void;
+	private leafChangeListeners: (...data: unknown[]) => void = () => {};
+	private fileDeleteListener: (...data: unknown[]) => void = () => {};
 	private closeCallback: () => void;
 	private handleKeyDown: (e: KeyboardEvent) => void;
 
@@ -59,7 +59,8 @@ class FileModal extends Modal {
 		this.addFullScreenButton();
 		this.listenFileDelete();
 		this.setupLinkClickHandler();
-		this.leafChangeListeners = (activeLeaf: WorkspaceLeaf | null) => {
+		this.leafChangeListeners = (...data: unknown[]) => {
+			const [activeLeaf] = data as [WorkspaceLeaf | null];
 			if (activeLeaf) {
 				const activeLeafFile = this.app.workspace.getActiveFile();
 				if (activeLeafFile) {
@@ -145,8 +146,9 @@ class FileModal extends Modal {
 		);
 
 		// 隐藏原始叶子的容器，但不从DOM中移除
-		if (this.modalLeafRef && this.modalLeafRef.containerEl) {
-			this.modalLeafRef.containerEl.style.display = "none";
+		const modalLeaf = this.modalLeafRef as (WorkspaceLeaf & { containerEl?: HTMLElement }) | null;
+		if (modalLeaf?.containerEl) {
+			modalLeaf.containerEl.style.display = "none";
 		}
 
 		await this.mountActiveLeafToModal(this.file);
@@ -155,8 +157,8 @@ class FileModal extends Modal {
 
 	onClose() {
 		window.removeEventListener("keydown", this.handleKeyDown, true);
-		this.app.vault.off("delete", this.fileDeleteListener);
-		this.app.workspace.off("active-leaf-change", this.leafChangeListeners);
+		(this.app.vault as any).off("delete", this.fileDeleteListener);
+		(this.app.workspace as any).off("active-leaf-change", this.leafChangeListeners);
 
 		// reset prev actived
 		if (this.prevActiveLeaf && !this.closeByFullScreen) {
@@ -185,7 +187,10 @@ class FileModal extends Modal {
 		}
 
 		// make open mode consistent with default setting
-		const defaultMode = this.app.vault.config?.defaultViewMode ?? "source";
+		const vaultConfig = (this.app.vault as typeof this.app.vault & {
+			config?: { defaultViewMode?: string };
+		}).config;
+		const defaultMode = vaultConfig?.defaultViewMode ?? "source";
 		await this.modalLeafRef.openFile(file, {
 			state: { mode: defaultMode },
 		});
@@ -200,9 +205,10 @@ class FileModal extends Modal {
 
 		// 直接将原始视图容器移动到模态窗口，而不是克隆
 		if (this.contentSourceLeafRef && this.contentSourceLeafRef.view) {
-			fileContainer.appendChild(
-				this.contentSourceLeafRef.view.containerEl
-			);
+			const viewContainer = (this.contentSourceLeafRef.view as typeof this.contentSourceLeafRef.view & {
+				containerEl: HTMLElement;
+			}).containerEl;
+			fileContainer.appendChild(viewContainer);
 
 			// 确保编辑器容器样式正确
 			const editorContainer = fileContainer.querySelector(
@@ -234,7 +240,7 @@ class FileModal extends Modal {
 		fullScreenButton.onclick = () => {
 			if (this.modalLeafRef) {
 				// 先移除事件监听，避免后续操作触发不必要的事件
-				this.app.workspace.off(
+				(this.app.workspace as any).off(
 					"active-leaf-change",
 					this.leafChangeListeners
 				);
@@ -255,11 +261,15 @@ class FileModal extends Modal {
 	}
 
 	private listenFileDelete() {
-		this.fileDeleteListener = (f: TFile) => {
-			if (f.path === this.file.path) {
+		this.fileDeleteListener = (...data: unknown[]) => {
+			const [file] = data as [TFile | null];
+			if (!file) {
+				return;
+			}
+			if (file.path === this.file.path) {
 				this.close();
 			}
 		};
-		this.app.vault.on("delete", this.fileDeleteListener);
+		(this.app.vault as any).on("delete", this.fileDeleteListener);
 	}
 }

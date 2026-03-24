@@ -1,8 +1,8 @@
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl } from './utils'
 import { feedChunk } from './sse'
-import { withToolCallLoopSupport } from 'src/agentLoop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop'
 
 // Grok选项接口，扩展基础选项以支持推理功能
 export interface GrokOptions extends BaseOptions {
@@ -23,7 +23,7 @@ export const grokMapResponsesParams = (params: Record<string, unknown>) => {
 }
 
 const sendRequestFunc = (settings: GrokOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
+	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		const { parameters, ...optionsExcludingParams } = settings
 		const options = { ...optionsExcludingParams, ...parameters }
 		const { apiKey, baseURL, model, enableReasoning = false, ...remains } = options

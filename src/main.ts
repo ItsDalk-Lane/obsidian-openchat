@@ -1,11 +1,11 @@
 import { Notice, Plugin } from 'obsidian';
 import { PluginSettings, DEFAULT_SETTINGS } from './settings/PluginSettings';
 import { SettingsManager } from './settings/SettingsManager';
-import { FeatureCoordinator } from './features/FeatureCoordinator';
+import { FeatureCoordinator } from './core/FeatureCoordinator';
 import { PluginSettingTab } from './settings/PluginSettingTab';
 import './styles/base.css'
 import './styles/chat.css'
-import { cloneTarsSettings } from './features/tars';
+import { cloneAiRuntimeSettings } from './settings/ai-runtime';
 import { DebugLogger } from './utils/DebugLogger';
 import { ensureAIDataFolders } from './utils/AIPathManager';
 
@@ -36,7 +36,7 @@ export default class OpenChatPlugin extends Plugin {
 		}
 
 		this.addSettingTab(new PluginSettingTab(this));
-		this.featureCoordinator.initializeTars(this.settings);
+		this.featureCoordinator.initializeAiRuntime(this.settings);
 		await this.featureCoordinator.initializeMcp(this.settings);
 
 		this.app.workspace.onLayoutReady(async () => {
@@ -55,14 +55,15 @@ export default class OpenChatPlugin extends Plugin {
 	}
 
 	async replaceSettings(value: Partial<PluginSettings>) {
-		const { tars, chat, ...rest } = value;
+		const { aiRuntime, chat, ...rest } = value;
 		this.settings = {
 			...this.settings,
 			...rest,
 			chat: { ...this.settings.chat, ...(chat ?? {}) },
-			tars: {
-				settings: cloneTarsSettings({ ...this.settings.tars.settings, ...(tars?.settings ?? {}) })
-			}
+			aiRuntime: cloneAiRuntimeSettings({
+				...this.settings.aiRuntime,
+				...(aiRuntime ?? {}),
+			}),
 		};
 		await this.saveSettings();
 	}
@@ -91,9 +92,9 @@ export default class OpenChatPlugin extends Plugin {
 	}
 
 	private applyDebugSettings() {
-		DebugLogger.setDebugMode(this.settings.tars?.settings?.debugMode ?? false);
-		DebugLogger.setDebugLevel(this.settings.tars?.settings?.debugLevel ?? 'error');
-		DebugLogger.setLlmConsoleLogEnabled(this.settings.tars?.settings?.enableLlmConsoleLog ?? false);
-		DebugLogger.setLlmResponsePreviewChars(this.settings.tars?.settings?.llmResponsePreviewChars ?? 100);
+		DebugLogger.setDebugMode(this.settings.aiRuntime?.debugMode ?? false);
+		DebugLogger.setDebugLevel(this.settings.aiRuntime?.debugLevel ?? 'error');
+		DebugLogger.setLlmConsoleLogEnabled(this.settings.aiRuntime?.enableLlmConsoleLog ?? false);
+		DebugLogger.setLlmResponsePreviewChars(this.settings.aiRuntime?.llmResponsePreviewChars ?? 100);
 	}
 }

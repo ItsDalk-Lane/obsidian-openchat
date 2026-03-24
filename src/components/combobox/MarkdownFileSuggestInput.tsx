@@ -26,7 +26,7 @@ export default function MarkdownFileSuggestInput(props: {
 		<ComboboxSuggestion
 			value={value}
 			placeholder={props.placeholder || ""}
-			onChange={onChange}
+			onChange={(nextValue) => onChange(nextValue ?? "")}
 			options={items}
 		/>
 	);

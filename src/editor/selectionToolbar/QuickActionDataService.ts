@@ -1,5 +1,5 @@
 import { App, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
-import type { QuickAction, QuickActionType } from '../types/chat';
+import type { QuickAction, QuickActionType } from 'src/types/chat';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { ensureAIDataFolders, getQuickActionsPath } from 'src/utils/AIPathManager';
 

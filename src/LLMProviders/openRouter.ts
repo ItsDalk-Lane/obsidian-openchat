@@ -1,11 +1,11 @@
 import { EmbedCache, Notice } from 'obsidian'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
 import { arrayBufferToBase64, buildReasoningBlockStart, buildReasoningBlockEnd, getCapabilityEmoji, getMimeTypeFromFilename } from './utils'
 import { withToolMessageContext } from './messageFormat'
 import { normalizeProviderError } from './errors'
 import { withRetry } from './retry'
-import { withToolCallLoopSupport } from 'src/agentLoop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop'
 
 // OpenRouter Reasoning Effort 级别
 export type OpenRouterReasoningEffort = 'minimal' | 'low' | 'medium' | 'high'
@@ -163,7 +163,7 @@ const buildOpenRouterHTTPError = (
 }
 
 const sendRequestFunc = (settings: OpenRouterOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary, saveAttachment?: SaveAttachment) {
+	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary, saveAttachment?: SaveAttachment) {
 		try {
 		const { parameters, ...optionsExcludingParams } = settings
 		const options = { ...optionsExcludingParams, ...parameters }
@@ -663,7 +663,7 @@ const sendRequestFunc = (settings: OpenRouterOptions): SendRequest =>
 				}
 			} catch (error) {
 				console.error('解析非流式响应失败:', error)
-				throw new Error(`解析响应失败: ${error.message}`)
+				throw new Error(`解析响应失败: ${error instanceof Error ? error.message : String(error)}`)
 			}
 		}
 		} catch (error) {
@@ -948,7 +948,7 @@ export const openRouterVendor: Vendor = {
 		reasoningEffort: 'medium',
 		parameters: {}
 	} as OpenRouterOptions,
-	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc, {
+	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as any, {
 		// OpenRouter 的 Chat Completions API 需要 reasoning 参数来启用推理功能
 		// 将插件内部的 enableReasoning + reasoningEffort 转换为 API 所需的 reasoning 对象
 		transformApiParams: (apiParams, allOptions) => {

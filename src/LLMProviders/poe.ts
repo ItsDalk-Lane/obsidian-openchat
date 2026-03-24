@@ -1,12 +1,12 @@
 import OpenAI from 'openai'
 import { Platform, requestUrl } from 'obsidian'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import {
 	executeMcpToolCalls,
 	resolveCurrentMcpTools,
 	type OpenAIToolCall
-} from 'src/mcp/client/mcpToolCallHandler'
+} from 'src/services/mcp/mcpToolCallHandler'
 import { normalizeProviderError } from './errors'
 import { withRetry } from './retry'
 import { feedChunk } from './sse'
@@ -645,16 +645,17 @@ const formatMsg = async (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinar
 
 const formatMsgForResponses = async (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinary) => {
 	const formatted = await formatMsg(msg, resolveEmbedAsBinary)
-	const role = toResponseRole(String(formatted.role ?? msg.role))
+	const formattedRecord = formatted as Record<string, unknown>
+	const role = toResponseRole(String(formattedRecord.role ?? msg.role))
 
-	if (!Array.isArray(formatted.content)) {
+	if (!Array.isArray(formattedRecord.content)) {
 		return {
 			role,
-			content: [{ type: 'input_text' as const, text: String(formatted.content ?? '') }]
+			content: [{ type: 'input_text' as const, text: String(formattedRecord.content ?? '') }]
 		}
 	}
 
-	const content = formatted.content.map((part) => {
+	const content = (formattedRecord.content as unknown[]).map((part) => {
 		if ((part as any).type === 'image_url') {
 			return {
 				type: 'input_image' as const,
@@ -931,7 +932,7 @@ const requestChatCompletionByRequestUrl = async (
 }
 
 const sendRequestFunc = (settings: PoeOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
+	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		try {
 			const { parameters, ...optionsExcludingParams } = settings
 			const options = { ...optionsExcludingParams, ...parameters }

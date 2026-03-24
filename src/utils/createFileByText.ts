@@ -112,13 +112,14 @@ async function validateAndConvertFilePath(
         if (strictTypeChecking) {
             throw error;
         }
+        const errorText = error instanceof Error ? error.message : String(error);
 
         // Fallback to string conversion in non-strict mode
         convertedValue = String(filePath);
         console.warn(`File path type conversion fallback: ${originalType} → string`, {
             originalValue,
             convertedValue,
-            error: error.message
+            error: errorText
         });
 
         return convertedValue;
@@ -187,6 +188,7 @@ async function validateAndConvertTemplate(
         if (strictTypeChecking) {
             throw error;
         }
+        const errorText = error instanceof Error ? error.message : String(error);
 
         // Fallback conversion strategies based on type
         if (originalValue === null || originalValue === undefined) {
@@ -204,7 +206,7 @@ async function validateAndConvertTemplate(
         console.warn(`Template content type conversion fallback: ${originalType} → string`, {
             originalValue,
             convertedValue,
-            error: error.message
+            error: errorText
         });
 
         return convertedValue;
@@ -222,7 +224,9 @@ async function createFileWithValidatedContent(
     options: CreateFileOptions
 ): Promise<TFile> {
     const parent = newFilePath.substring(0, newFilePath.lastIndexOf("/"));
-    const isExists = await app.vault.exists(parent);
+    const isExists = parent.length === 0
+        ? true
+        : Boolean(app.vault.getAbstractFileByPath(parent));
     if (!isExists) {
         await app.vault.createFolder(parent);
     }

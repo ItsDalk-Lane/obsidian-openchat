@@ -10,14 +10,20 @@ export interface Property {
 
 export function getAllProperties(app: App) {
     const properties: Property[] = [];
-    const pageProperties = app.metadataTypeManager.getAllProperties();
+    const metadataTypeManager = (app as App & {
+        metadataTypeManager?: {
+            getAllProperties?: () => Record<string, { name?: string; widget?: string; type?: string }>;
+        };
+    }).metadataTypeManager;
+    const pageProperties = metadataTypeManager?.getAllProperties?.() ?? {};
     // get all values
     for (const property in pageProperties) {
         // @ts-ignore
         const propType = pageProperties[property].widget ?? pageProperties[property].type ?? "text"
+        const propertyName = pageProperties[property].name ?? property;
         properties.push({
-            name: pageProperties[property].name,
-            label: pageProperties[property].name,
+            name: propertyName,
+            label: propertyName,
             type: propType,
         });
     }

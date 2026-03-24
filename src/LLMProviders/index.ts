@@ -1,13 +1,13 @@
 import { EmbedCache } from 'obsidian'
-import type { McpToolAnnotations } from 'src/mcp/client/types'
+import type { McpToolAnnotations } from 'src/services/mcp/types'
 import type {
 	GetToolsFn,
 	ToolDefinition,
 	ToolExecutionRecord,
 	ToolExecutor,
-} from 'src/agentLoop/types'
+} from 'src/core/agents/loop/types'
 
-export type MsgRole = 'user' | 'assistant' | 'system'
+export type MsgRole = 'user' | 'assistant' | 'system' | 'tool'
 
 export interface SaveAttachment {
 	(fileName: string, data: ArrayBuffer): Promise<void>
@@ -28,6 +28,9 @@ export interface Message {
 	readonly prefix?: boolean
 	/** DeepSeek 推理模式下的推理内容（仅用于 assistant 消息） */
 	readonly reasoning_content?: string
+	readonly tool_calls?: unknown
+	readonly tool_call_id?: string
+	readonly tool_name?: string
 }
 
 export type SendRequest = (
@@ -50,17 +53,18 @@ export type Capability =
 export interface Vendor {
 	readonly name: string
 	readonly defaultOptions: BaseOptions
-	readonly sendRequestFunc: (options: BaseOptions) => SendRequest
+	sendRequestFunc(options: BaseOptions): SendRequest
 	readonly models: string[]
 	readonly websiteToObtainKey: string
 	readonly capabilities: Capability[]
 }
 
 export interface BaseOptions {
+	[key: string]: unknown
 	apiKey: string
 	baseURL: string
 	model: string
-	parameters: Record<string, unknown>
+	parameters?: Record<string, unknown>
 	enableWebSearch?: boolean
 	/** 模型上下文长度（tokens），用于上下文管理 */
 	contextLength?: number

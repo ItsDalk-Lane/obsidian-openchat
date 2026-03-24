@@ -1,8 +1,8 @@
 import OpenAI from 'openai'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl } from './utils'
-import { withToolCallLoopSupport } from 'src/agentLoop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop'
 
 // Qwen 扩展选项接口
 export interface QwenOptions extends BaseOptions {
@@ -43,7 +43,7 @@ const isKnownThinkingModel = (model: string): boolean => {
 }
 
 const sendRequestFunc = (settings: BaseOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
+	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		const { parameters, ...optionsExcludingParams } = settings
 		const options = { ...optionsExcludingParams, ...parameters } as QwenOptions
 		const { apiKey, baseURL, model, enableThinking, ...remains } = options

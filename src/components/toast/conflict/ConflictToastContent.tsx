@@ -1,7 +1,7 @@
 import { AlertTriangle, Wrench } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { localInstance } from "src/i18n/locals";
-import { DetectedConflict } from "src/service/conflict/ConflictTypes";
+import { DetectedConflict } from "src/core/services/conflict/ConflictTypes";
 import "./ConflictToastContent.css";
 
 export default function ConflictToastContent(props: {

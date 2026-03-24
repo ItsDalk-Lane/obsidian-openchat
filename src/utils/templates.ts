@@ -3,7 +3,8 @@ import { Objects } from "./Objects";
 import { DateTimeCalculator } from "./DateTimeCalculator";
 
 export function processObTemplate(templateContent: any) {
-    return processObTemplateInContext(templateContent, { moment: moment() });
+    const createMoment = moment as unknown as () => moment.Moment;
+    return processObTemplateInContext(templateContent, { moment: createMoment() });
 }
 
 type Context = {

@@ -72,7 +72,8 @@ export function convertFrontmatterValue(
         return convertedValue;
 
     } catch (error) {
-        const errorMessage = `Failed to convert frontmatter property '${name}' from ${originalType} to ${targetType}: ${error.message}`;
+        const errorText = error instanceof Error ? error.message : String(error);
+        const errorMessage = `Failed to convert frontmatter property '${name}' from ${originalType} to ${targetType}: ${errorText}`;
 
         // Log failed conversion
         if (logConversions) {
@@ -104,7 +105,7 @@ export function convertFrontmatterValue(
             propertyName: name,
             originalValue: value,
             targetType,
-            error: error.message
+            error: errorText
         });
 
         return fallbackValue !== null ? fallbackValue : value;
@@ -290,7 +291,7 @@ function convertToText(value: any, strictMode: boolean): string {
             return JSON.stringify(value);
         } catch (error) {
             if (strictMode) {
-                throw new Error(`Object cannot be converted to string: ${error.message}`);
+                throw new Error(`Object cannot be converted to string: ${error instanceof Error ? error.message : String(error)}`);
             }
             return String(value);
         }

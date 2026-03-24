@@ -1,6 +1,6 @@
 import { Notice } from 'obsidian'
 import OpenAI from 'openai'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
 import { getMimeTypeFromFilename } from './utils'
 import { DebugLogger } from 'src/utils/DebugLogger'
@@ -29,7 +29,7 @@ export interface GptImageOptions extends BaseOptions {
 
 const sendRequestFunc = (settings: GptImageOptions): SendRequest =>
 	async function* (
-		messages: Message[],
+		messages: readonly Message[],
 		controller: AbortController,
 		resolveEmbedAsBinary: ResolveEmbedAsBinary,
 		saveAttachment?: SaveAttachment
@@ -46,7 +46,7 @@ const sendRequestFunc = (settings: GptImageOptions): SendRequest =>
 		if (messages.length > 1) {
 			new Notice(t('Only the last user message is used for image generation. Other messages are ignored.'))
 		}
-		const lastMsg = messages.last()
+		const lastMsg = messages[messages.length - 1]
 		if (!lastMsg) {
 			throw new Error('No user message found in the conversation')
 		}
@@ -151,4 +151,3 @@ export const gptImageVendor: Vendor = {
 	websiteToObtainKey: 'https://platform.openai.com/api-keys',
 	capabilities: ['Image Generation', 'Image Editing']
 }
-

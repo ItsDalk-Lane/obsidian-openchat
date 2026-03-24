@@ -24,7 +24,7 @@ export class Zh implements Local {
 	stop_execution = "停止执行";
 	execution_stopped = "表单执行已停止";
 	basic_setting = "基本设置";
-	tars_setting = "AI 助手";
+	ai_runtime_setting = "AI 助手";
 	bottom_below_title = "指定标题下最后一行";
 	brief_description = "简要描述";
 	cancel = "取消";
@@ -174,6 +174,10 @@ export class Zh implements Local {
 	run_on_startup_description = "开启后，Obsidian 启动时将自动提交此表单";
 	enable_context_menu = "在右键菜单中显示";
 	enable_context_menu_description = "启用后可以在编辑器右键菜单中直接访问此表单";
+	context_menu_group = "右键菜单分组";
+	context_menu_group_description = "用于在编辑器右键菜单中对入口进行分组";
+	modify = "修改";
+	chat = "对话";
 	remove_value = "删除值";
 		custom_title = "自定义标题";
 		custom_title_description = "输入自定义动作标题，留空则使用系统生成的标题";
@@ -571,8 +575,8 @@ export class Zh implements Local {
 	system_prompt_enabled = "启用";
 	system_prompt_disabled = "禁用";
 	system_prompt_exclude_label = "功能排除";
-	system_prompt_feature_tars_chat = "AI 聊天";
-	system_prompt_feature_tars_chat_desc = "完整的 AI 聊天界面（模态框/侧边栏模式），支持多模型切换和系统提示词，支持图片上传和视觉理解，支持图像生成、文件/文件夹上下文，聊天历史保存和加载、消息编辑和重新生成";
+	system_prompt_feature_ai_chat = "AI 聊天";
+	system_prompt_feature_ai_chat_desc = "完整的 AI 聊天界面（模态框/侧边栏模式），支持多模型切换和系统提示词，支持图片上传和视觉理解，支持图像生成、文件/文件夹上下文，聊天历史保存和加载、消息编辑和重新生成";
 	system_prompt_feature_ai_action = "AI 表单动作";
 	system_prompt_feature_ai_action_desc = "表单工作流中调用 AI 模型进行处理，支持运行时选择模型和提示词模板，支持变量替换（{{@fieldName}}、{{output:variableName}}），支持内链解析功能，流式输出模态框显示 AI 生成过程";
 	system_prompt_feature_tab_completion = "Tab 自动补全";

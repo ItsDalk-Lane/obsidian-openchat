@@ -32,16 +32,16 @@ export class AIStreamingModal extends Modal {
     private state: ModalState;
     
     // DOM元素引用
-    private headerTitleEl: HTMLElement;
-    private headerCountEl: HTMLElement;
-    private modelInfoEl: HTMLElement;
-    private promptInfoEl: HTMLElement;
-    private charCountEl: HTMLElement;
-    private contentDisplayEl: HTMLDivElement | HTMLTextAreaElement;  // 改名以避免与Modal的contentEl冲突
-    private contentContainer: HTMLElement;
-    private refreshBtn: HTMLButtonElement;
-    private confirmBtn: HTMLButtonElement;
-    private cancelBtn: HTMLButtonElement;
+    private headerTitleEl!: HTMLElement;
+    private headerCountEl!: HTMLElement;
+    private modelInfoEl!: HTMLElement;
+    private promptInfoEl!: HTMLElement;
+    private charCountEl!: HTMLElement;
+    private contentDisplayEl!: HTMLDivElement | HTMLTextAreaElement;  // 改名以避免与Modal的contentEl冲突
+    private contentContainer!: HTMLElement;
+    private refreshBtn!: HTMLButtonElement;
+    private confirmBtn!: HTMLButtonElement;
+    private cancelBtn!: HTMLButtonElement;
     
     // 更新控制
     private updateBuffer: string = "";

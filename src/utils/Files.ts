@@ -18,7 +18,7 @@ export class Files {
         }
 
         const normlizedFolder = normalizePath(folder);
-        const folderExists = await app.vault.exists(normlizedFolder);
+        const folderExists = Boolean(app.vault.getAbstractFileByPath(normlizedFolder));
         if (!folderExists) {
             await app.vault.createFolder(normlizedFolder);
         }

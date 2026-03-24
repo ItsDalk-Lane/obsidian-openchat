@@ -2,15 +2,15 @@ import { PluginSettingTab as ObPluginSettingTab } from "obsidian";
 import { StrictMode } from "react";
 import { Root, createRoot } from "react-dom/client";
 import { Tab } from "src/components/tab/Tab";
+import { AiRuntimeSettingsTabItem } from "src/components/settings-components/AiRuntimeSettingsTabItem";
 import { ObsidianAppContext } from "src/contexts/obsidianAppContext";
 import { localInstance } from "src/i18n/locals";
 import OpenChatPlugin from "src/main";
 import { GeneralSettingTabItem } from "./GeneralSettingTabItem";
-import { TarsSettingTabItem } from "./TarsSettingTabItem";
 
 export class PluginSettingTab extends ObPluginSettingTab {
 	plugin: OpenChatPlugin;
-	root: Root;
+	root: Root | null = null;
 
 	constructor(plugin: OpenChatPlugin) {
 		super(plugin.app, plugin);
@@ -35,9 +35,9 @@ export class PluginSettingTab extends ObPluginSettingTab {
 								),
 							},
 							{
-								id: "tars_setting",
-								title: localInstance.tars_setting,
-								content: <TarsSettingTabItem plugin={this.plugin} />,
+								id: "ai_runtime_setting",
+								title: localInstance.ai_runtime_setting,
+								content: <AiRuntimeSettingsTabItem plugin={this.plugin} />,
 							},
 						]}
 					></Tab>
@@ -47,7 +47,7 @@ export class PluginSettingTab extends ObPluginSettingTab {
 	}
 
 	hide() {
-		this.root.unmount();
+		this.root?.unmount();
 		this.containerEl.empty();
 	}
 }

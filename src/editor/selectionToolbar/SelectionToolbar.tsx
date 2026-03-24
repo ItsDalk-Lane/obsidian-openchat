@@ -10,7 +10,7 @@ import {
 	useInteractions
 } from '@floating-ui/react';
 import { MessageSquare, ChevronDown, Edit, Copy, Scissors } from 'lucide-react';
-import type { QuickAction, ChatSettings } from '../types/chat';
+import type { QuickAction, ChatSettings } from 'src/types/chat';
 import type { SelectionInfo } from './SelectionToolbarExtension';
 import { localInstance } from 'src/i18n/locals';
 import './SelectionToolbar.css';
@@ -44,7 +44,7 @@ export const SelectionToolbar = ({
 		| null
 	>(null);
 	const dropdownRef = useRef<HTMLDivElement>(null);
-	const toolbarRootRef = useRef<HTMLDivElement>(null);
+	const toolbarRootRef = useRef<HTMLDivElement | null>(null);
 	const moreButtonRef = useRef<HTMLButtonElement>(null);
 	const dropdownMenuRef = useRef<HTMLDivElement>(null);
 	const groupButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -440,7 +440,7 @@ export const SelectionToolbar = ({
 		<div
 			ref={(node) => {
 				refs.setFloating(node);
-				toolbarRootRef.current = node;
+					(toolbarRootRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
 			}}
 			className="selection-toolbar"
 			style={{ ...floatingStyles, gap: '1px' }}

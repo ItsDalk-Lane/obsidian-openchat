@@ -17,7 +17,7 @@ class GhostTextWidgetType extends WidgetType {
 
     toDOM(): HTMLElement {
         const container = document.createElement('span')
-        container.className = 'tars-ghost-text'
+        container.className = 'ai-runtime-ghost-text'
         container.setAttribute('aria-hidden', 'true')
         
         // 处理多行文本
@@ -53,7 +53,7 @@ class LoadingWidgetType extends WidgetType {
 
     toDOM(): HTMLElement {
         const container = document.createElement('span')
-        container.className = 'tars-ghost-text-loading'
+        container.className = 'ai-runtime-ghost-text-loading'
         container.textContent = '...'
         container.setAttribute('aria-label', '正在生成建议')
         return container
@@ -127,7 +127,7 @@ export const ghostTextPlugin = ViewPlugin.fromClass(
  * Ghost Text 样式
  */
 export const ghostTextStyle = EditorView.baseTheme({
-    '.tars-ghost-text': {
+    '.ai-runtime-ghost-text': {
         color: 'var(--text-muted)',
         opacity: '0.6',
         fontStyle: 'italic',
@@ -135,13 +135,13 @@ export const ghostTextStyle = EditorView.baseTheme({
         userSelect: 'none',
         whiteSpace: 'pre-wrap'
     },
-    '.tars-ghost-text-loading': {
+    '.ai-runtime-ghost-text-loading': {
         color: 'var(--text-muted)',
         opacity: '0.5',
         fontStyle: 'italic',
-        animation: 'tars-loading-pulse 1.5s ease-in-out infinite'
+        animation: 'ai-runtime-loading-pulse 1.5s ease-in-out infinite'
     },
-    '@keyframes tars-loading-pulse': {
+    '@keyframes ai-runtime-loading-pulse': {
         '0%, 100%': { opacity: '0.3' },
         '50%': { opacity: '0.7' }
     }

@@ -1,10 +1,10 @@
 import { requestUrl } from 'obsidian'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl, getMimeTypeFromFilename } from './utils'
 import { normalizeProviderError } from './errors'
 import { withRetry } from './retry'
-import { withToolCallLoopSupport } from 'src/agentLoop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop'
 import {
 	DEFAULT_DOUBAO_IMAGE_OPTIONS,
 	doubaoImageVendor,
@@ -252,7 +252,7 @@ const resolveDoubaoImageEndpoint = (baseURL: string): string => {
 // 处理消息，支持文本和图片的多模态输入
 // 当启用 Web Search 时，需要转换为 Responses API 的消息格式
 const processMessages = async (
-	messages: Message[],
+	messages: readonly Message[],
 	resolveEmbedAsBinary: ResolveEmbedAsBinary,
 	imageDetail?: 'low' | 'high',
 	imagePixelLimit?: { minPixels?: number; maxPixels?: number },
@@ -370,7 +370,7 @@ const processMessages = async (
 
 const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 	async function* (
-		messages: Message[],
+		messages: readonly Message[],
 		controller: AbortController,
 		resolveEmbedAsBinary: ResolveEmbedAsBinary,
 		saveAttachment?: SaveAttachment

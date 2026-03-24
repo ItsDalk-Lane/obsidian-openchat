@@ -1,0 +1,803 @@
+import { v4 as uuidv4 } from 'uuid';
+import type { EmbedCache } from 'obsidian';
+import type { Message as ProviderMessage } from 'src/types/provider';
+import type { ChatMessage, ChatRole, SelectedFile, SelectedFolder } from '../types/chat';
+import type { ToolCall } from '../types/tools';
+import { parseContentBlocks } from 'src/core/chat/utils/markdown';
+import { FileContentService, FileContentOptions } from './FileContentService';
+import {
+	PromptBuilder,
+	type PromptBuilderContextMessageParams,
+} from 'src/core/services/PromptBuilder';
+import { formatReasoningDuration } from 'src/LLMProviders/utils';
+
+export class MessageService {
+	constructor(private readonly app: any, private readonly fileContentService?: FileContentService) {}
+
+	createMessage(role: ChatRole, content: string, extras?: Partial<ChatMessage>): ChatMessage {
+		const now = Date.now();
+		return {
+			...extras,
+			id: extras?.id ?? uuidv4(),
+			role,
+			content: content.trim(),
+			timestamp: extras?.timestamp ?? now,
+			images: extras?.images ?? [],
+			isError: extras?.isError ?? false,
+			metadata: extras?.metadata ?? {},
+			toolCalls: extras?.toolCalls ?? []
+		};
+	}
+
+	formatTimestamp(timestamp: number): string {
+		const locale = (window as any)?.moment?.locale?.() ?? 'zh-CN';
+		const formatter = new Intl.DateTimeFormat(locale, {
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit',
+			second: '2-digit'
+		} as Intl.DateTimeFormatOptions);
+		return formatter.format(new Date(timestamp)).replace(/\//g, '/');
+	}
+
+	async toProviderMessages(
+		messages: ChatMessage[],
+		options?: {
+			contextNotes?: string[];
+			systemPrompt?: string;
+			selectedFiles?: SelectedFile[];
+			selectedFolders?: SelectedFolder[];
+			fileContentOptions?: FileContentOptions;
+			sourcePath?: string;
+			maxHistoryRounds?: number;
+			prebuiltContextMessage?: ProviderMessage | null;
+		}
+	): Promise<ProviderMessage[]> {
+		const {
+			contextNotes = [],
+			systemPrompt,
+			selectedFiles = [],
+			selectedFolders = [],
+			fileContentOptions,
+			sourcePath,
+			maxHistoryRounds,
+			prebuiltContextMessage,
+		} = options ?? {};
+
+		const promptBuilder = new PromptBuilder(this.app, this.fileContentService);
+		return promptBuilder.buildChatProviderMessages(messages, {
+			systemPrompt,
+			contextNotes,
+			selectedFiles,
+			selectedFolders,
+			fileContentOptions,
+			sourcePath,
+			maxHistoryRounds,
+			prebuiltContextMessage,
+		});
+	}
+
+	async buildContextProviderMessage(
+		params: PromptBuilderContextMessageParams
+	): Promise<ProviderMessage | null> {
+		const promptBuilder = new PromptBuilder(this.app, this.fileContentService);
+		return promptBuilder.buildChatContextMessage(params);
+	}
+
+	serializeMessage(message: ChatMessage, selectedFiles?: SelectedFile[], selectedFolders?: SelectedFolder[]): string {
+		const timestamp = this.formatTimestamp(message.timestamp);
+		const roleLabel = this.mapRoleToLabel(message.role);
+		const modelSuffix = message.modelTag ? ` [${message.modelTag}]` : '';
+
+		// 处理图片引用
+		const images = (message.images ?? []).map((image, index) => `![Image ${index + 1}](${image})`).join('\n');
+
+		// 确保消息内容完整，不进行任何截断或压缩
+		let content = message.content;
+		// 历史文件展示：将推理标记转换为可折叠 callout（不影响聊天界面渲染）
+		content = this.formatReasoningBlocksForHistory(content);
+		// 历史文件展示：将 MCP 工具调用标记转换为可折叠 callout
+		content = this.formatMcpToolBlocksForHistory(content);
+
+		// 如果有错误标记，在内容前添加错误标识
+		if (message.isError) {
+			content = `[错误] ${content}`;
+		}
+
+		// 构建完整消息，确保内容不被截断
+		let fullMessage = `# ${roleLabel}${modelSuffix} (${timestamp})\n${content}`;
+
+		if (message.taskDescription) {
+			fullMessage += `\n\n> 任务: ${message.taskDescription}`;
+		}
+
+		if (message.modelName && message.modelName !== message.modelTag) {
+			fullMessage += `\n\n> 模型名称: ${message.modelName}`;
+		}
+
+		if (typeof message.executionIndex === 'number') {
+			fullMessage += `\n\n> 执行序号: ${message.executionIndex}`;
+		}
+
+		if (message.parallelGroupId) {
+			fullMessage += `\n\n> 对比组: ${message.parallelGroupId}`;
+		}
+
+		if (message.metadata?.pinned === true) {
+			fullMessage += '\n\n> 置顶: true';
+		}
+
+		// 如果有选中文本，添加到消息中
+		if (message.metadata?.selectedText && typeof message.metadata.selectedText === 'string') {
+			const selectedText = message.metadata.selectedText;
+			fullMessage += `\n\n> 选中文本:\n> ${selectedText.split('\n').join('\n> ')}`;
+		}
+
+		// 如果是用户消息且有选中的文件或文件夹，添加文件和文件夹信息
+		if (message.role === 'user' && (selectedFiles || selectedFolders)) {
+			const fileTags = [];
+			const folderTags = [];
+
+			// 处理文件标签
+			if (selectedFiles && selectedFiles.length > 0) {
+				for (const file of selectedFiles) {
+					fileTags.push(`[[${file.path}]]`);
+				}
+			}
+
+			// 处理文件夹标签
+			if (selectedFolders && selectedFolders.length > 0) {
+				for (const folder of selectedFolders) {
+					folderTags.push(`#${folder.path}`);
+				}
+			}
+
+			// 添加文件和文件夹标签到消息中
+			if (fileTags.length > 0 || folderTags.length > 0) {
+				const allTags = [...fileTags, ...folderTags].join(' ');
+				fullMessage += `\n\n**附件:** ${allTags}`;
+			}
+		}
+
+
+		// 如果有工具调用，追加历史展示块
+		// 当消息内容中已包含 MCP 工具调用标记时，跳过追加，避免重复
+		// （MCP 标记已由 formatMcpToolBlocksForHistory 转为 callout，无需再次追加）
+		const hasMcpToolMarkers = message.content?.includes('{{FF_MCP_TOOL_START}}');
+		if (!hasMcpToolMarkers && message.toolCalls && message.toolCalls.length > 0) {
+			const displayBlock = this.formatToolCallsForHistory(message.toolCalls);
+			if (displayBlock) {
+				fullMessage += `\n\n${displayBlock}`;
+			}
+		}
+
+		// 如果有子代理状态，追加子代理内部消息
+		const subAgentStates = (message.metadata?.subAgentStates as Record<string, any>) ?? {};
+		if (Object.keys(subAgentStates).length > 0) {
+			const subAgentBlock = this.formatSubAgentStatesForHistory(subAgentStates);
+			if (subAgentBlock) {
+				fullMessage += `\n\n${subAgentBlock}`;
+			}
+		}
+
+		// 如果有图片，添加到消息末尾
+		if (images) {
+			fullMessage += `\n\n${images}`;
+		}
+
+		return fullMessage;
+	}
+
+	public extractToolCallsFromHistory(content: string): { content: string; toolCalls?: ToolCall[] } {
+		if (!content) {
+			return { content };
+		}
+
+		const { cleanedContent, toolCalls } = this.parseToolCallsFromCallout(content);
+		return { content: cleanedContent, toolCalls };
+	}
+
+	private formatToolCallsForHistory(toolCalls: ToolCall[]): string {
+		if (!toolCalls.length) return '';
+
+		const lines: string[] = [];
+		const first = toolCalls[0];
+		const firstSummary = this.buildToolCallSummary(first);
+		const title = `**${first.name}**${firstSummary ? ` ${firstSummary}` : ''}`;
+		lines.push(`> [!info]- ${title}`);
+
+		for (let index = 0; index < toolCalls.length; index += 1) {
+			const call = toolCalls[index];
+			if (index > 0) {
+				const summary = this.buildToolCallSummary(call);
+				lines.push(`> **${call.name}**${summary ? ` ${summary}` : ''}`);
+			}
+
+			const content = this.getToolCallContent(call);
+			if (content) {
+				lines.push('> ```text');
+				for (const line of content.split('\n')) {
+					lines.push(`> ${line}`);
+				}
+				lines.push('> ```');
+			}
+
+			if (call.result && call.result.trim()) {
+				const formattedResult = this.formatToolResultForHistory(call.result);
+				lines.push(`> 结果: ${formattedResult}`);
+			}
+			lines.push('>');
+		}
+
+		return lines.join('\n').trim();
+	}
+
+	private buildToolCallSummary(call: ToolCall): string {
+		const args = call.arguments ?? {};
+		const filePath = args.filePath ?? args.path ?? args.file ?? args.target;
+		if (typeof filePath === 'string' && filePath.trim().length > 0) {
+			const content = args.content;
+			if (typeof content === 'string') {
+				return `${filePath}（${content.length}字）`;
+			}
+			return filePath;
+		}
+		const url = args.url ?? args.uri ?? args.link;
+		if (typeof url === 'string' && url.trim().length > 0) {
+			return url;
+		}
+		const name = args.name ?? args.title ?? args.query;
+		if (typeof name === 'string' && name.trim().length > 0) {
+			return name;
+		}
+		return '';
+	}
+
+	private getToolCallContent(call: ToolCall): string {
+		const raw = (call.arguments ?? {}).content;
+		if (typeof raw === 'string') return raw;
+		try {
+			const text = JSON.stringify(raw ?? {}, null, 2);
+			return text === '{}' ? '' : text;
+		} catch {
+			return '';
+		}
+	}
+
+	/**
+	 * 格式化工具结果用于历史文件显示
+	 * 如果是 JSON 对象，尝试提取关键信息或格式化为单行
+	 */
+	private formatToolResultForHistory(result: string): string {
+		try {
+			const parsed = JSON.parse(result);
+			if (typeof parsed === 'object' && parsed !== null) {
+				// 如果有 message 字段，优先显示
+				if (parsed.message && typeof parsed.message === 'string') {
+					// 如果是空文件，添加标识
+					let message = parsed.message;
+					if (parsed.characterCount === 0) {
+						return message + ' (空文件)';
+					}
+					return message;
+				}
+				// 否则格式化为单行 JSON
+				return JSON.stringify(parsed);
+			}
+			return result;
+		} catch {
+			return result;
+		}
+	}
+
+	private parseToolCallsFromCallout(content: string): { cleanedContent: string; toolCalls?: ToolCall[] } {
+		const lines = content.split('\n');
+		const output: string[] = [];
+		const toolCalls: ToolCall[] = [];
+		let index = 0;
+
+		const parseSummaryToArgs = (summary: string): Record<string, any> => {
+			const trimmed = summary.trim();
+			if (!trimmed) return {};
+			const match = trimmed.match(/^(.*?)(?:（(\d+)字）)?$/);
+			if (!match) return {};
+			const filePath = match[1]?.trim();
+			if (filePath) {
+				return { filePath };
+			}
+			return {};
+		};
+
+			const parseBlock = (blockLines: string[]) => {
+			let current: ToolCall | null = null;
+			let inCode = false;
+			let codeLines: string[] = [];
+				let currentArgs: Record<string, any> = {};
+
+				const flush = () => {
+				if (!current) return;
+					if (Object.keys(currentArgs).length > 0) {
+						current.arguments = { ...(current.arguments ?? {}), ...currentArgs };
+					}
+				if (codeLines.length > 0) {
+					current.arguments = {
+						...(current.arguments ?? {}),
+						content: codeLines.join('\n')
+					};
+				}
+				toolCalls.push(current);
+				current = null;
+					currentArgs = {};
+				codeLines = [];
+			};
+
+			for (const rawLine of blockLines) {
+				const line = rawLine.replace(/^>\s?/, '');
+				const headerLine = line.startsWith('[!info]- ') ? line.replace('[!info]- ', '') : line;
+				const entryMatch = headerLine.match(/^\*\*(.+?)\*\*(.*)$/);
+				if (entryMatch) {
+					flush();
+					const summaryText = entryMatch[2] ? entryMatch[2].trim() : '';
+					currentArgs = parseSummaryToArgs(summaryText);
+					current = {
+						id: uuidv4(),
+						name: entryMatch[1].trim(),
+						arguments: {},
+						status: 'completed',
+						timestamp: Date.now()
+					};
+					inCode = false;
+					continue;
+				}
+
+				if (line.trim().startsWith('```')) {
+					if (inCode) {
+						inCode = false;
+					} else {
+						inCode = true;
+						codeLines = [];
+					}
+					continue;
+				}
+
+				if (line.startsWith('结果:')) {
+					const resultText = line.replace(/^结果:\s*/, '').trim();
+					if (current) {
+						current.result = resultText;
+					}
+					continue;
+				}
+
+				if (inCode) {
+					codeLines.push(line);
+				}
+			}
+
+			flush();
+		};
+
+		while (index < lines.length) {
+			const line = lines[index];
+			if (line.startsWith('> [!info]- **')) {
+				let endIndex = index;
+				while (endIndex + 1 < lines.length && lines[endIndex + 1].startsWith('>')) {
+					endIndex += 1;
+				}
+
+				const blockLines = lines.slice(index, endIndex + 1);
+				parseBlock(blockLines);
+				index = endIndex + 1;
+				continue;
+			}
+
+			output.push(line);
+			index += 1;
+		}
+
+		const cleanedContent = output.join('\n').trim();
+		return { cleanedContent, toolCalls: toolCalls.length > 0 ? toolCalls : undefined };
+	}
+
+	private formatReasoningBlocksForHistory(content: string): string {
+		if (!content || !content.includes('{{FF_REASONING_START}}')) {
+			return content;
+		}
+
+		const blocks = parseContentBlocks(content);
+		let result = '';
+
+		for (const block of blocks) {
+			if (block.type === 'text') {
+				result += block.content;
+				continue;
+			}
+
+			if (block.type === 'mcpTool') {
+				// MCP 工具标记由 formatMcpToolBlocksForHistory 处理，此处原样保留
+				result += `{{FF_MCP_TOOL_START}}:${block.toolName}:${block.content}{{FF_MCP_TOOL_END}}:`;
+				continue;
+			}
+
+			// reasoning block
+			const title = block.durationMs
+				? `深度思考 ${formatReasoningDuration(block.durationMs)}`
+				: '深度思考';
+
+			const raw = block.content ?? '';
+			const normalized = raw.replace(/\s+$/g, '');
+			const lines = normalized.split('\n');
+			const quotedLines = lines.map((line) => (line ? `> ${line}` : '>')).join('\n');
+			const callout = `> [!danger]- ${title}\n${quotedLines}`;
+
+			result += `\n\n${callout}\n\n`;
+		}
+
+		return result.replace(/\n{3,}/g, '\n\n');
+	}
+
+	/**
+	 * 将消息内容中的 MCP 工具标记转换为 Obsidian callout 格式用于历史文件展示
+	 *
+	 * {{FF_MCP_TOOL_START}}:toolName:content{{FF_MCP_TOOL_END}}:
+	 * → > [!info]- toolName
+	 *    > content
+	 *
+	 * 注意：跳过子代理调用的工具标记（工具名以 sub_agent_ 开头），
+	 * 因为这些会在 formatSubAgentStatesForHistory 中被完整处理
+	 */
+	private formatMcpToolBlocksForHistory(content: string): string {
+		if (!content || !content.includes('{{FF_MCP_TOOL_START}}')) {
+			return content;
+		}
+
+		const subAgentToolPrefix = 'sub_agent_';
+		const pattern = /\{\{FF_MCP_TOOL_START\}\}:([^:]+):([\s\S]*?)\{\{FF_MCP_TOOL_END\}\}:/g;
+
+		return content.replace(pattern, (_, toolName: string, toolContent: string) => {
+			// 跳过子代理调用的工具标记，这些会在 formatSubAgentStatesForHistory 中处理
+			if (toolName.startsWith(subAgentToolPrefix)) {
+				return '';
+			}
+			const normalized = (toolContent ?? '').replace(/\s+$/g, '');
+			const lines = normalized.split('\n');
+			const quotedLines = lines.map(line => (line ? `> ${line}` : '>')).join('\n');
+			return `\n\n> [!info]- ${toolName}\n${quotedLines}\n\n`;
+		}).replace(/\n{3,}/g, '\n\n');
+	}
+
+	/**
+	 * 将历史文件中的 MCP 工具 callout 格式转换回标记格式
+	 * 用于在加载历史消息时恢复 MCP 工具块的原始格式
+	 *
+	 * 注意：仅匹配标题不以 ** 开头的 [!info] callout（有 **的是工具调用记录）
+	 */
+	public parseMcpToolBlocksFromHistory(content: string): string {
+		if (!content || !content.includes('> [!info]-')) {
+			return content;
+		}
+
+		// 匹配：> [!info]- toolName（标题不以 ** 开头，区别工具调用记录）
+		// 后面跟着一个或多个引用内容行
+		const pattern = /> \[!info\]- (?!\*\*)([^\n]+)\n((?:>[^\n]*(?:\n|$))+)/g;
+
+		return content.replace(pattern, (match: string, toolName: string, quotedContent: string) => {
+			const toolContent = quotedContent
+				.split('\n')
+				.map((line: string) => line.replace(/^>\s*/, ''))
+				.filter((line: string) => line.length > 0)
+				.join('\n');
+			return `{{FF_MCP_TOOL_START}}:${toolName}:${toolContent}{{FF_MCP_TOOL_END}}:`;
+		});
+	}
+
+	/**
+	 * 将历史文件中的 callout 格式转换回推理标记格式
+	 * 用于在加载历史消息时恢复推理块的原始格式
+	 */
+	public parseReasoningBlocksFromHistory(content: string): string {
+		if (!content || !content.includes('> [!danger]')) {
+			return content;
+		}
+
+		// 匹配 callout 格式：> [!danger]- 深度思考 或 > [!danger]- 深度思考 X.XXs
+		// 后面跟着引用内容行（以 > 开头）
+		// 使用 (?:>[^\n]*(?:\n|$))+ 匹配引用内容，允许最后一行以换行符结束或直接到达字符串末尾
+		// 这样可以正确处理推理 callout 后紧接另一个 callout、位于消息末尾、或多个推理 callout 连续出现的情况
+		const calloutPattern = /> \[!danger\]- (深度思考(?:\s+\d+\.?\d*s)?)\n((?:>[^\n]*(?:\n|$))+)/g;
+		let result = content;
+		let match: RegExpExecArray | null;
+
+		while ((match = calloutPattern.exec(content)) !== null) {
+			const title = match[1];
+			const quotedContent = match[2];
+
+			// 提取时长
+			let durationMs: number | undefined;
+			const timeMatch = title.match(/(\d+\.?\d*)s/);
+			if (timeMatch) {
+				durationMs = Math.round(parseFloat(timeMatch[1]) * 1000);
+			}
+
+			// 移除引用标记，恢复原始内容
+			const reasoningContent = quotedContent
+				.split('\n')
+				.map(line => line.replace(/^>\s*/, '').trim()) // 只移除 > 和后面的空格
+				.filter(line => line.length > 0) // 过滤空行
+				.join('\n');
+
+			// 计算开始时间（使用当前时间减去时长，这样推理块会显示为已完成状态）
+			const startMs = durationMs ? Date.now() - durationMs : Date.now();
+
+			// 构建推理标记
+			let reasoningBlock: string;
+			if (durationMs !== undefined) {
+				reasoningBlock = `{{FF_REASONING_START}}:${startMs}:${reasoningContent}:{{FF_REASONING_END}}:${durationMs}`;
+			} else {
+				reasoningBlock = `{{FF_REASONING_START}}:${startMs}:${reasoningContent}`;
+			}
+
+			// 替换原内容中的 callout
+			result = result.replace(match[0], reasoningBlock);
+		}
+
+		return result;
+	}
+
+	/**
+	 * 从历史文件中解析子代理状态 callout
+	 * 将 > [!quote]- 🤖 格式的 callout 转换为 SubAgentExecutionState 对象
+	 */
+	public parseSubAgentStatesFromHistory(
+		content: string
+	): { cleanedContent: string; subAgentStates: Record<string, import('src/tools/sub-agents').SubAgentExecutionState> } {
+		const subAgentStates: Record<string, import('src/tools/sub-agents').SubAgentExecutionState> = {};
+
+		if (!content || !content.includes('> [!quote]- 🤖')) {
+			return { cleanedContent: content, subAgentStates };
+		}
+
+		// 匹配子代理 callout 块
+		// 格式：> [!quote]- 🤖 名称 (状态, N条消息)
+		const calloutPattern = /> \[!quote\]- 🤖 ([^(]+)\s*\(([^,]+),\s*(\d+)条消息\)\n((?:>[^\n]*\n?)+)/g;
+
+		let result = content;
+		let match: RegExpExecArray | null;
+		let stateIndex = 0;
+
+		while ((match = calloutPattern.exec(content)) !== null) {
+			const name = match[1].trim();
+			const statusText = match[2].trim();
+			const quotedContent = match[3]; // 消息数量（暂不使用）
+			const blockContent = match[4];
+
+			// 解析状态
+			let status: 'running' | 'completed' | 'failed' | 'cancelled' = 'completed';
+			if (statusText === '执行中') status = 'running';
+			else if (statusText === '失败') status = 'failed';
+			else if (statusText === '已取消') status = 'cancelled';
+
+			// 解析内部消息
+			const internalMessages = this.parseSubAgentInternalMessages(blockContent);
+
+			// 生成一个唯一的 toolCallId
+			const toolCallId = `subagent-history-${Date.now()}-${stateIndex}`;
+
+			subAgentStates[toolCallId] = {
+				name,
+				status,
+				internalMessages,
+				folded: true,
+				toolCallId,
+			};
+
+			stateIndex++;
+
+			// 从内容中移除这个 callout 块
+			result = result.replace(match[0], '');
+		}
+
+		// 清理多余的空行
+		result = result.replace(/\n{3,}/g, '\n\n').trim();
+
+		return { cleanedContent: result, subAgentStates };
+	}
+
+	/**
+	 * 解析子代理内部消息
+	 */
+	private parseSubAgentInternalMessages(blockContent: string): ChatMessage[] {
+		const messages: ChatMessage[] = [];
+		const lines = blockContent.split('\n');
+
+		let currentRole: 'user' | 'assistant' | 'system' = 'user';
+		let currentContent = '';
+		let currentTimestamp = Date.now();
+		let inMessage = false;
+
+		for (const line of lines) {
+			// 检查是否为消息头部：> ### 用户 (时间戳) 或 > ### AI (时间戳)
+			const headerMatch = line.match(/^>\s*###\s+(用户|AI|系统)\s*\(([^)]+)\)/);
+			if (headerMatch) {
+				// 保存前一条消息
+				if (inMessage && currentContent.trim()) {
+					messages.push(this.createMessage(currentRole, currentContent.trim(), {
+						timestamp: currentTimestamp,
+					}));
+				}
+
+				// 开始新消息
+				const roleLabel = headerMatch[1].trim();
+				if (roleLabel === 'AI') currentRole = 'assistant';
+				else if (roleLabel === '系统') currentRole = 'system';
+				else currentRole = 'user';
+
+				// 解析时间戳
+				const timestampStr = headerMatch[2].trim();
+				try {
+					const dateMatch = timestampStr.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+					if (dateMatch) {
+						const [_, year, month, day, hour, minute, second] = dateMatch.map(Number);
+						currentTimestamp = new Date(year, month - 1, day, hour, minute, second).getTime();
+					}
+				} catch {
+					currentTimestamp = Date.now();
+				}
+
+				currentContent = '';
+				inMessage = true;
+			} else if (inMessage) {
+				// 添加到当前消息内容（移除行首的 > ）
+				const contentLine = line.replace(/^>\s?/, '');
+				currentContent += contentLine + '\n';
+			}
+		}
+
+		// 保存最后一条消息
+		if (inMessage && currentContent.trim()) {
+			messages.push(this.createMessage(currentRole, currentContent.trim(), {
+				timestamp: currentTimestamp,
+			}));
+		}
+
+		return messages;
+	}
+
+	private mapRoleToLabel(role: ChatRole): string {
+		switch (role) {
+			case 'assistant':
+				return 'AI';
+			case 'system':
+				return '系统';
+			default:
+				return '用户';
+		}
+	}
+
+	/**
+	 * 从base64图片字符串数组创建EmbedCache对象数组
+	 * @param imageBase64Array base64图片字符串数组
+	 * @returns EmbedCache对象数组
+	 * @deprecated Chat 消息拼装已迁移到 PromptBuilder，此方法保留用于向下兼容。
+	 */
+	private createEmbedsFromImages(imageBase64Array: string[]): EmbedCache[] {
+		return imageBase64Array.map((imageBase64, index) => {
+			// 从base64字符串中提取MIME类型
+			let mimeType = 'image/png'; // 默认值
+			let filename = `image-${index + 1}`;
+
+			if (imageBase64.startsWith('data:')) {
+				const mimeMatch = imageBase64.match(/data:([^;]+);/);
+				if (mimeMatch) {
+					mimeType = mimeMatch[1];
+					const extension = this.getExtensionFromMimeType(mimeType);
+					filename = `image-${index + 1}.${extension}`;
+				}
+			}
+
+			// 创建虚拟的EmbedCache对象
+			return {
+				link: filename,
+				path: filename,
+				// 为了避免使用Obsidian的内部缓存，我们创建一个简单的对象
+				// 实际的图片数据将在resolveEmbedAsBinary时从base64字符串中获取
+				[Symbol.for('originalBase64')]: imageBase64,
+				[Symbol.for('mimeType')]: mimeType
+			} as unknown as EmbedCache;
+		});
+	}
+
+	/**
+	 * 格式化子代理状态用于历史文件显示
+	 * 将子代理的内部消息序列化为可读的 callout 格式
+	 */
+	private formatSubAgentStatesForHistory(
+		subAgentStates: Record<string, import('src/tools/sub-agents').SubAgentExecutionState>
+	): string {
+		const entries = Object.entries(subAgentStates);
+		if (entries.length === 0) return '';
+
+		const lines: string[] = [];
+
+		for (const [toolCallId, state] of entries) {
+			const statusLabel: Record<string, string> = {
+				running: '执行中',
+				completed: '已完成',
+				failed: '失败',
+				cancelled: '已取消',
+			};
+			const statusText = statusLabel[state.status] ?? state.status;
+
+			// 检查内部消息中是否存在包含 MCP 工具标记的 assistant 消息
+			const hasMcpToolMarkers = (state.internalMessages ?? []).some(
+				(msg) => msg.role === 'assistant' && msg.content?.includes('{{FF_MCP_TOOL_START}}')
+			);
+
+			// 过滤内部消息：
+			// 1. 始终过滤掉 system 消息（提示词）
+			// 2. 当 assistant 消息中包含 MCP 工具标记时，过滤掉 tool 消息
+			//    因为工具调用详情已通过 MCP 标记被序列化，避免重复
+			const filteredMessages = (state.internalMessages ?? []).filter((msg) => {
+				if (msg.role === 'system') return false;
+				if (msg.role === 'tool' && hasMcpToolMarkers) return false;
+				return true;
+			});
+
+			const messageCount = filteredMessages.length;
+
+			// 创建子代理 callout 标题
+			lines.push(`> [!quote]- 🤖 ${state.name} (${statusText}, ${messageCount}条消息)`);
+
+			for (const msg of filteredMessages) {
+				const roleLabel = msg.role === 'user' ? '用户' : msg.role === 'assistant' ? 'AI' : '系统';
+				const timestamp = this.formatTimestamp(msg.timestamp);
+				lines.push(`> ### ${roleLabel} (${timestamp})`);
+
+				// 添加消息内容（处理多行）
+				// 注意：需要对子代理内部消息的 content 进行 MCP 工具标记转换
+				if (msg.content) {
+					let processedContent = msg.content;
+					// 转换 MCP 工具标记为 callout 格式（跳过子代理调用的标记）
+					processedContent = this.formatMcpToolBlocksForHistory(processedContent);
+					for (const line of processedContent.split('\n')) {
+						lines.push(`> ${line}`);
+					}
+				}
+
+				// 如果有工具调用，也序列化
+				if (msg.toolCalls && msg.toolCalls.length > 0) {
+					const toolBlock = this.formatToolCallsForHistory(msg.toolCalls);
+					for (const line of toolBlock.split('\n')) {
+						lines.push(`> ${line}`);
+					}
+				}
+
+				lines.push('>');
+			}
+
+			lines.push('');
+		}
+
+		return lines.join('\n').trim();
+	}
+
+	/**
+	 * 从MIME类型获取文件扩展名
+	 * @param mimeType MIME类型
+	 * @returns 文件扩展名
+	 */
+	private getExtensionFromMimeType(mimeType: string): string {
+		const mimeToExt: Record<string, string> = {
+			'image/png': 'png',
+			'image/jpeg': 'jpg',
+			'image/jpg': 'jpg',
+			'image/gif': 'gif',
+			'image/webp': 'webp',
+			'image/svg+xml': 'svg',
+			'image/bmp': 'bmp',
+			'image/x-icon': 'ico'
+		};
+		return mimeToExt[mimeType] || 'png';
+	}
+}

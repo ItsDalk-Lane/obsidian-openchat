@@ -24,7 +24,7 @@ export class ZhTw implements Local {
 	stop_execution = "停止執行";
 	execution_stopped = "表單執行已停止";
 	basic_setting = "基本設定";
-	tars_setting = "AI 助手";
+	ai_runtime_setting = "AI 助手";
 	bottom_below_title = "指定標題下最後一行";
 	brief_description = "簡要描述";
 	cancel = "取消";
@@ -173,6 +173,10 @@ export class ZhTw implements Local {
 	run_on_startup_description = "開啟後，Obsidian 啟動時將自動提交此表單";
 	enable_context_menu = "在右鍵選單中顯示";
 	enable_context_menu_description = "啟用後可以在編輯器右鍵選單中直接訪問此表單";
+	context_menu_group = "右鍵選單分組";
+	context_menu_group_description = "用於在編輯器右鍵選單中對入口進行分組";
+	modify = "修改";
+	chat = "對話";
 	remove_value = "刪除值";
 		custom_title = "自定義標題";
 		custom_title_description = "輸入自定義動作標題，留空則使用系統生成的標題";
@@ -559,8 +563,8 @@ export class ZhTw implements Local {
 	system_prompt_enabled = "啟用";
 	system_prompt_disabled = "禁用";
 	system_prompt_exclude_label = "功能排除";
-	system_prompt_feature_tars_chat = "AI 聊天";
-	system_prompt_feature_tars_chat_desc = "完整的 AI 聊天界面（模態框/側邊欄模式），支援多模型切換和系統提示詞，支援圖片上傳和視覺理解，支援圖像生成、檔案/資料夾上下文，聊天歷史保存和載入、訊息編輯和重新生成";
+	system_prompt_feature_ai_chat = "AI 聊天";
+	system_prompt_feature_ai_chat_desc = "完整的 AI 聊天界面（模態框/側邊欄模式），支援多模型切換和系統提示詞，支援圖片上傳和視覺理解，支援圖像生成、檔案/資料夾上下文，聊天歷史保存和載入、訊息編輯和重新生成";
 	system_prompt_feature_ai_action = "AI 表單動作";
 	system_prompt_feature_ai_action_desc = "表單工作流中呼叫 AI 模型進行處理，支援運行時選擇模型和提示詞模板，支援變量替換（{{@fieldName}}、{{output:variableName}}），支援內鏈解析功能，流式輸出模態框顯示 AI 生成過程";
 	system_prompt_feature_tab_completion = "Tab 自動補全";
@@ -645,33 +649,6 @@ export class ZhTw implements Local {
 	complete_import = "完成導入";
 	modified_at = "修改於";
 	data_independence_enabled = "已啟用數據獨立性";
-	// 變量管理
-	variable_management = "變量管理";
-	loop_variable = "循環變量";
-	ai_output_variable = "AI 輸出變量";
-	suggest_field_variable = "建議欄位變量";
-	internal_variable = "內部變量";
-	system_reserved_variable = "系統保留變量";
-	has_conflicts = "存在衝突";
-	no_conflicts = "無衝突";
-	refresh = "刷新";
-	export_variables = "導出變量清單";
-	search_variables = "搜索變量";
-	total_variables = "變量總數";
-	forms_count = "表單數量";
-	variable_name = "變量名";
-	variable_type = "變量類型";
-	variable_source = "變量來源";
-	variable_file = "所屬檔案";
-	conflict_status = "衝突狀態";
-	loading = "加載中...";
-	no_variables_found = "沒有匹配的變量";
-	// 欄位名稱衝突
-	field_name_duplicate = "欄位變量名重複";
-	system_reserved_conflict = "變量名與系統保留變量衝突";
-	loop_variable_conflict = "循環變量名與其他變量衝突";
-	variable_name_conflict = "變量名衝突";
-	apply_suggestion = "應用建議";
 	execution_condition_not_met = "表單執行條件未滿足，已跳過執行";
 	// 執行條件
 	startup_conditions = "執行條件";
@@ -720,7 +697,7 @@ export class ZhTw implements Local {
 	startup_condition_file_is_open = "檔案已在編輯器中打開";
 	startup_condition_file_is_active = "檔案是當前激活檔案";
 	startup_condition_search_text = "搜索文字";
-	startup_condition_search_text_placeholder = "輸入要搜索的文字";
+	startup_condition_file_suggestions = "檔案建議";
 	startup_condition_properties = "屬性列表";
 	startup_condition_add_property = "添加屬性";
 	startup_condition_not_met_detail = "表單執行條件未滿足：{0}";
@@ -1077,4 +1054,6 @@ export class ZhTw implements Local {
 	stop_this_model = "停止此模型";
 	retry_this_model = "重試此模型";
 	generation_failed = "生成失敗";
+	slash_command_empty = "暫無可用命令";
+	slash_command_no_match = "無匹配項";
 }

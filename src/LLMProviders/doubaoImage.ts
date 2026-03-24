@@ -1,5 +1,5 @@
 import { Notice, requestUrl } from 'obsidian'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import { feedChunk } from './sse'
@@ -110,7 +110,16 @@ export const DEFAULT_DOUBAO_IMAGE_OPTIONS = {
 	sequential_image_generation: 'disabled',
 	stream: false,
 	optimize_prompt_mode: 'standard'
-}
+} as const satisfies Pick<
+	DoubaoImageOptions,
+	'displayWidth'
+	| 'size'
+	| 'response_format'
+	| 'watermark'
+	| 'sequential_image_generation'
+	| 'stream'
+	| 'optimize_prompt_mode'
+>
 
 export interface DoubaoImageOptions extends BaseOptions {
 	displayWidth: number
@@ -157,7 +166,7 @@ function parseSSEResponse(text: string): { data: any[] } {
 
 const sendRequestFunc = (settings: DoubaoImageOptions): SendRequest =>
 	async function* (
-		messages: Message[],
+		messages: readonly Message[],
 		_controller: AbortController,
 		resolveEmbedAsBinary: ResolveEmbedAsBinary,
 		saveAttachment?: SaveAttachment
@@ -188,7 +197,7 @@ const sendRequestFunc = (settings: DoubaoImageOptions): SendRequest =>
 			new Notice(t('Only the last user message is used for image generation. Other messages are ignored.'))
 		}
 		
-		const lastMsg = messages.last()
+		const lastMsg = messages[messages.length - 1]
 		if (!lastMsg) {
 			throw new Error('No user message found in the conversation')
 		}

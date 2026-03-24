@@ -9,10 +9,10 @@ import {
     limitSuggestionLength
 } from './ContextBuilder'
 import { ProviderSettings, Message } from 'src/LLMProviders'
-import { availableVendors } from 'src/features/tars/settings'
-import { t } from 'src/features/tars/lang/helper'
+import { availableVendors } from 'src/settings/ai-runtime'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { DebugLogger } from 'src/utils/DebugLogger'
-import { SystemPromptAssembler } from 'src/service/SystemPromptAssembler'
+import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler'
 import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils'
 
 /**
@@ -180,14 +180,14 @@ export class TabCompletionService {
 
         // 检查只读模式
         if (this.isEditorReadOnly(view)) {
-            new Notice(t('Editor is in read-only mode'))
+            new Notice('Editor is in read-only mode')
             return
         }
 
         // 获取 provider
         const provider = this.getProvider()
         if (!provider) {
-            new Notice(t('No AI provider configured for Tab completion'))
+            new Notice('No AI provider configured for Tab completion')
             return
         }
 
@@ -237,7 +237,7 @@ export class TabCompletionService {
 
             // 显示错误提示
             if (error.name !== 'AbortError') {
-                const errorMessage = error.message || t('Failed to generate suggestion')
+                const errorMessage = error.message || 'Failed to generate suggestion'
                 new Notice(`AI 补全失败: ${errorMessage}`, 3000)
             }
         }

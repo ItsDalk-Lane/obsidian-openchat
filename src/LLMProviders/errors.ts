@@ -102,8 +102,12 @@ const ensureError = (error: unknown, fallbackMessage: string) => {
 }
 
 export const normalizeProviderError = (error: unknown, fallbackMessage = 'Provider request failed'): NormalizedProviderError => {
-	if (isObject(error) && (error as NormalizedProviderError).type && typeof (error as NormalizedProviderError).retryable === 'boolean') {
-		return error as NormalizedProviderError
+	if (
+		isObject(error)
+		&& (error as unknown as NormalizedProviderError).type
+		&& typeof (error as unknown as NormalizedProviderError).retryable === 'boolean'
+	) {
+		return error as unknown as NormalizedProviderError
 	}
 
 	const abortLike = isAbortLikeError(error)

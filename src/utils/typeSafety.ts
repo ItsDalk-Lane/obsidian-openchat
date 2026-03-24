@@ -48,11 +48,12 @@ export function validateAndConvertToString(
 
         return result;
     } catch (error) {
+        const errorText = error instanceof Error ? error.message : String(error);
         throw new TypeConversionError(
             value,
             'string',
             typeof value,
-            `Type conversion failed: ${error.message}`,
+            `Type conversion failed: ${errorText}`,
             context
         );
     }

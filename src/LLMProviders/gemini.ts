@@ -1,8 +1,8 @@
 import OpenAI from 'openai'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { arrayBufferToBase64, getMimeTypeFromFilename } from './utils'
-import { withToolCallLoopSupport } from 'src/agentLoop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop'
 
 type GeminiContentItem = { text?: string; inlineData?: { mimeType?: string; data?: string } }
 type GeminiContent = { role: 'user' | 'model'; parts: GeminiContentItem[] }
@@ -39,7 +39,7 @@ export const geminiIsAuthError = (error: unknown) => {
 
 const toGeminiRole = (role: Message['role']): 'user' | 'model' => (role === 'assistant' ? 'model' : 'user')
 
-const buildGeminiContents = async (messages: Message[], resolveEmbedAsBinary: ResolveEmbedAsBinary) => {
+const buildGeminiContents = async (messages: readonly Message[], resolveEmbedAsBinary: ResolveEmbedAsBinary) => {
 	const systemParts: string[] = []
 	const contents: GeminiContent[] = []
 
@@ -131,7 +131,7 @@ const sendViaOpenAICompatible = async function* (
 	baseURL: string,
 	model: string,
 	remains: Record<string, unknown>,
-	messages: Message[],
+	messages: readonly Message[],
 	controller: AbortController,
 	resolveEmbedAsBinary: ResolveEmbedAsBinary
 ) {
@@ -159,7 +159,7 @@ const sendViaOpenAICompatible = async function* (
 }
 
 const sendRequestFuncBase = (settings: BaseOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
+	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		const { parameters, ...optionsExcludingParams } = settings
 		const options = { ...optionsExcludingParams, ...parameters }
 		const { apiKey, baseURL, model, ...remains } = options

@@ -1,0 +1,232 @@
+import { History, MessageCirclePlus, Settings, Zap, Paperclip, ImageUp } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { ChatService } from 'src/core/chat/services/ChatService';
+import type { ChatState } from 'src/types/chat';
+import type { ChatHistoryEntry } from 'src/core/chat/services/HistoryService';
+import { ChatHistoryPanel } from './ChatHistory';
+import { FileMenuPopup } from './FileMenuPopup';
+import { ModeSelector } from './ModeSelector';
+import { LayoutSelector } from './LayoutSelector';
+import { ToggleButtons } from './ToggleButtons';
+import { App, TFile, TFolder } from 'obsidian';
+import { localInstance } from 'src/i18n/locals';
+
+interface ChatControlsProps {
+	service: ChatService;
+	state: ChatState;
+	app: App;
+}
+
+export const ChatControls = ({
+	service,
+	state,
+	app,
+}: ChatControlsProps) => {
+	const [historyOpen, setHistoryOpen] = useState(false);
+	const [historyItems, setHistoryItems] = useState<ChatHistoryEntry[]>([]);
+	const [showFileMenu, setShowFileMenu] = useState(false);
+	const fileMenuButtonRef = useRef<HTMLSpanElement>(null);
+	const historyPanelRef = useRef<HTMLDivElement>(null);
+	const historyButtonRef = useRef<HTMLSpanElement>(null);
+
+	useEffect(() => {
+		if (historyOpen) {
+			service.listHistory().then(setHistoryItems);
+		}
+	}, [historyOpen, service]);
+
+	// 监听点击事件，实现点击外部关闭
+	useEffect(() => {
+		if (!historyOpen) return;
+
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
+			if (historyPanelRef.current?.contains(target)) {
+				return;
+			}
+			if (historyButtonRef.current?.contains(target)) {
+				return;
+			}
+			setHistoryOpen(false);
+		};
+
+		// 延迟添加事件监听，避免立即触发
+		setTimeout(() => {
+			document.addEventListener('mousedown', handleClickOutside);
+		}, 100);
+
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [historyOpen]);
+
+
+
+	const handleNewChat = () => {
+		service.createNewSession();
+	};
+
+	const handleOpenChatSettings = () => {
+		service.openChatSettingsModal();
+	};
+
+	const handleSelectHistory = async (item: ChatHistoryEntry) => {
+		await service.loadHistory(item.filePath);
+		setHistoryOpen(false);
+	};
+
+	const handleOpenHistoryFile = async (item: ChatHistoryEntry) => {
+		// 在新标签页中打开历史记录文件
+		const file = app.vault.getAbstractFileByPath(item.filePath);
+		if (file instanceof TFile) {
+			const leaf = app.workspace.getLeaf(true);
+			await leaf.openFile(file);
+			setHistoryOpen(false);
+		}
+	};
+
+	const handleTemplateButtonClick = () => {
+		service.setTemplateSelectorVisibility(true);
+	};
+
+	const handleImageUpload = () => {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = 'image/*';
+		input.multiple = true;
+		input.onchange = async (e) => {
+			const target = e.target as HTMLInputElement;
+			const files = Array.from(target.files || []);
+			if (files.length > 0) {
+				const converted = await Promise.all(files.map(async (file) => {
+					try {
+						return await fileToBase64(file);
+					} catch (error) {
+						console.error('Failed to convert image to base64:', error);
+						return null;
+					}
+				}));
+
+				const validImages = converted.filter((item): item is string => typeof item === 'string' && item.length > 0);
+				if (validImages.length > 0) {
+					service.addSelectedImages(validImages);
+				}
+			}
+		};
+		input.click();
+	};
+
+	const handleFileUpload = () => {
+		setShowFileMenu(true);
+	};
+
+	const handleFileSelect = (file: TFile) => {
+		service.addSelectedFile(file);
+	};
+
+	const handleFolderSelect = (folder: TFolder) => {
+		service.addSelectedFolder(folder);
+	};
+
+	// 辅助函数：将File转换为base64字符串
+	const fileToBase64 = (file: File): Promise<string> =>
+		new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(reader.result as string);
+			reader.onerror = () => reject(reader.error);
+			reader.readAsDataURL(file);
+		});
+
+	
+	return (
+		<div className="chat-controls tw-flex tw-items-center tw-justify-between tw-px-2 tw-py-1.5" style={{
+			background: 'transparent',
+			border: 'none'
+		}}>
+			<div className="tw-flex tw-items-center tw-gap-2">
+				<ModeSelector
+					mode={state.multiModelMode}
+					onModeChange={(mode) => service.setMultiModelMode(mode)}
+				/>
+				<ToggleButtons service={service} state={state} />
+				{state.multiModelMode === 'compare' && (
+					<LayoutSelector
+						layoutMode={state.layoutMode}
+						onLayoutChange={(mode) => service.setLayoutMode(mode)}
+					/>
+				)}
+			</div>
+			<div className="tw-flex-1"></div>
+			<div className="tw-flex tw-items-center tw-gap-2">
+				<span onClick={handleTemplateButtonClick} aria-label="选择模板" title="选择模板" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center tw-p-1 tw-rounded hover:tw-bg-purple-100">
+					<Zap className="tw-size-4" />
+				</span>
+				<span
+					ref={fileMenuButtonRef}
+					onClick={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						handleFileUpload();
+					}}
+					className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center"
+					aria-label="上传文件"
+					title="上传文件"
+				>
+					<Paperclip className="tw-size-4" />
+				</span>
+				<span
+					onClick={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						handleImageUpload();
+					}}
+					className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center"
+					aria-label="上传图片"
+					title="上传图片"
+				>
+					<ImageUp className="tw-size-4" />
+				</span>
+				<span ref={historyButtonRef} onClick={() => setHistoryOpen((prev) => !prev)} aria-label="历史记录" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center">
+					<History className="tw-size-4" />
+				</span>
+				<span onClick={handleNewChat} aria-label="新建聊天" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center">
+					<MessageCirclePlus className="tw-size-4" />
+				</span>
+				<span
+					onClick={handleOpenChatSettings}
+					aria-label={localInstance.chat_settings_button_title}
+					title={localInstance.chat_settings_button_title}
+					className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center tw-p-1 tw-rounded hover:tw-bg-purple-100"
+				>
+					<Settings className="tw-size-4" />
+				</span>
+			</div>
+			{historyOpen && (
+				<div>
+					<ChatHistoryPanel
+						items={historyItems}
+						onSelect={handleSelectHistory}
+						onOpenFile={handleOpenHistoryFile}
+						onClose={() => setHistoryOpen(false)}
+						onRefresh={async () => setHistoryItems(await service.listHistory())}
+						onDelete={async (item) => {
+							await service.deleteHistory(item.filePath);
+							setHistoryItems(await service.listHistory());
+						}}
+						anchorRef={historyButtonRef}
+						panelRef={historyPanelRef}
+					/>
+				</div>
+			)}
+			{/* 文件菜单弹出窗口 */}
+			<FileMenuPopup
+				isOpen={showFileMenu}
+				onClose={() => setShowFileMenu(false)}
+				onSelectFile={handleFileSelect}
+				onSelectFolder={handleFolderSelect}
+				app={app}
+				buttonRef={fileMenuButtonRef}
+			/>
+		</div>
+	);
+};

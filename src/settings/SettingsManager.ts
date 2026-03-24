@@ -1,13 +1,17 @@
 import { Plugin } from 'obsidian';
 import { PluginSettings, DEFAULT_SETTINGS } from './PluginSettings';
-import { DEFAULT_CHAT_SETTINGS, type ChatSettings } from 'src/features/chat';
+import { DEFAULT_CHAT_SETTINGS, type ChatSettings } from 'src/types/chat';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import { SystemPromptDataService } from 'src/systemPrompts/SystemPromptDataService';
-import { McpServerDataService } from 'src/mcp/client/McpServerDataService';
-import type { McpSettings } from 'src/mcp/client/types';
-import { DEFAULT_MCP_SETTINGS } from 'src/mcp/client/types';
+import { SystemPromptDataService } from 'src/settings/system-prompts/SystemPromptDataService';
+import { McpServerDataService } from 'src/services/mcp/McpServerDataService';
+import type { McpSettings } from 'src/services/mcp/types';
+import { DEFAULT_MCP_SETTINGS } from 'src/services/mcp/types';
 import { SettingsSecretManager } from './SettingsSecretManager';
 import { SettingsMigrationService } from './SettingsMigrationService';
+import {
+    readLegacyAiRuntimeSettings,
+    removeLegacyAiRuntimeContainer,
+} from './legacyCompatibility';
 
 export class SettingsManager {
     private readonly secretManager: SettingsSecretManager;
@@ -42,18 +46,19 @@ export class SettingsManager {
                 ?? legacyQuickActionSettings.selectionToolbarStreamOutput
                 ?? DEFAULT_CHAT_SETTINGS.quickActionsStreamOutput,
         };
-        const tarsSettings = this.secretManager.decryptTarsSettings(persisted?.tars?.settings);
+        const persistedAiRuntime = persisted?.aiRuntime ?? readLegacyAiRuntimeSettings(persisted);
+        const aiRuntimeSettings = this.secretManager.decryptAiRuntimeSettings(persistedAiRuntime);
         const aiDataFolder = this.migrationService.resolveAiDataFolder(persisted, rawChatSettings);
 
         // 迁移旧版默认系统消息到 Markdown 系统提示词目录（向下兼容）
         try {
             const systemPromptService = SystemPromptDataService.getInstance(this.plugin.app);
             const migrated = await systemPromptService.migrateFromLegacyDefaultSystemMessage({
-                enabled: (tarsSettings as any)?.enableDefaultSystemMsg,
-                content: (tarsSettings as any)?.defaultSystemMsg
+                enabled: (aiRuntimeSettings as any)?.enableDefaultSystemMsg,
+                content: (aiRuntimeSettings as any)?.defaultSystemMsg
             });
             if (migrated) {
-                tarsSettings.enableGlobalSystemPrompts = true;
+                aiRuntimeSettings.enableGlobalSystemPrompts = true;
             }
         } catch (error) {
             DebugLogger.error('[SettingsManager] 迁移默认系统消息失败（忽略，继续加载）', error);
@@ -63,24 +68,24 @@ export class SettingsManager {
         try {
             const mcpServerService = McpServerDataService.getInstance(this.plugin.app);
             const markdownServers = await mcpServerService.loadServers(aiDataFolder);
-            tarsSettings.mcp = {
+            aiRuntimeSettings.mcp = {
                 ...DEFAULT_MCP_SETTINGS,
-                ...(tarsSettings.mcp ?? {}),
+                ...(aiRuntimeSettings.mcp ?? {}),
                 servers: markdownServers,
             };
         } catch (error) {
             DebugLogger.error('[SettingsManager] 加载 MCP 服务器 Markdown 配置失败，回退空列表', error);
-            tarsSettings.mcp = {
+            aiRuntimeSettings.mcp = {
                 ...DEFAULT_MCP_SETTINGS,
-                ...(tarsSettings.mcp ?? {}),
+                ...(aiRuntimeSettings.mcp ?? {}),
                 servers: [],
             };
         }
 
         // 剥离旧字段，避免继续在运行期被引用
-        delete (tarsSettings as any).enableDefaultSystemMsg;
-        delete (tarsSettings as any).defaultSystemMsg;
-        delete (tarsSettings as any).systemPromptsData;
+        delete (aiRuntimeSettings as any).enableDefaultSystemMsg;
+        delete (aiRuntimeSettings as any).defaultSystemMsg;
+        delete (aiRuntimeSettings as any).systemPromptsData;
 
         const { promptTemplateFolder: _legacyPromptTemplateFolder, ...persistedWithoutLegacyTop } = persisted;
         const {
@@ -104,9 +109,7 @@ export class SettingsManager {
             ...DEFAULT_SETTINGS,
             ...persistedWithoutLegacyTop,
             aiDataFolder,
-            tars: {
-                settings: tarsSettings,
-            },
+            aiRuntime: aiRuntimeSettings,
             chat: {
                 ...chatWithoutLegacy,
                 quickActions: [],
@@ -123,15 +126,15 @@ export class SettingsManager {
     }
 
     async save(settings: PluginSettings): Promise<void> {
-        const encryptedTars = this.secretManager.encryptTarsSettings(settings.tars.settings);
+        const encryptedAiRuntime = this.secretManager.encryptAiRuntimeSettings(settings.aiRuntime);
         // 剥离旧字段，避免写回 data.json
-        delete (encryptedTars as any).enableDefaultSystemMsg;
-        delete (encryptedTars as any).defaultSystemMsg;
+        delete (encryptedAiRuntime as any).enableDefaultSystemMsg;
+        delete (encryptedAiRuntime as any).defaultSystemMsg;
 
         // 基于当前 data.json 合并写回，避免覆盖由独立服务维护的字段
         const persisted = (await this.plugin.loadData()) ?? {};
         const persistedChat = persisted?.chat ?? {};
-        const persistedTarsSettings = persisted?.tars?.settings ?? {};
+        const persistedAiRuntime = persisted?.aiRuntime ?? readLegacyAiRuntimeSettings(persisted) ?? {};
 
         const mergedChat = {
             ...persistedChat,
@@ -140,7 +143,7 @@ export class SettingsManager {
         delete (mergedChat as any).chatFolder;
         delete (mergedChat as any).quickActions;
         delete (mergedChat as any).skills;
-        // 剥离已废弃的内链解析旧字段（已迁移到 tars.settings.internalLinkParsing）
+        // 剥离已废弃的内链解析旧字段（兼容读取仅保留在迁移层）
         delete (mergedChat as any).enableInternalLinkParsing;
         delete (mergedChat as any).parseLinksInTemplates;
         delete (mergedChat as any).maxLinkParseDepth;
@@ -149,26 +152,26 @@ export class SettingsManager {
         delete (mergedChat as any).enableSelectionToolbar;
         delete (mergedChat as any).maxToolbarButtons;
         delete (mergedChat as any).selectionToolbarStreamOutput;
-        const mergedTarsSettings = {
-            ...persistedTarsSettings,
-            ...encryptedTars,
+        const mergedAiRuntime = {
+            ...persistedAiRuntime,
+            ...encryptedAiRuntime,
         };
-        delete (mergedTarsSettings as any).enableDefaultSystemMsg;
-        delete (mergedTarsSettings as any).defaultSystemMsg;
-        delete (mergedTarsSettings as any).systemPromptsData;
+        delete (mergedAiRuntime as any).enableDefaultSystemMsg;
+        delete (mergedAiRuntime as any).defaultSystemMsg;
+        delete (mergedAiRuntime as any).systemPromptsData;
         // 剥离运行时状态字段（不应持久化）
-        delete (mergedTarsSettings as any).editorStatus;
+        delete (mergedAiRuntime as any).editorStatus;
         // 剥离运行时明文密钥（实际密钥存储在 vendorApiKeysByDevice 中）
-        delete (mergedTarsSettings as any).vendorApiKeys;
+        delete (mergedAiRuntime as any).vendorApiKeys;
         // 剥离已废弃的内链解析旧字段（已迁移到 internalLinkParsing）
-        delete (mergedTarsSettings as any).enableInternalLink;
-        delete (mergedTarsSettings as any).maxLinkParseDepth;
-        delete (mergedTarsSettings as any).linkParseTimeout;
+        delete (mergedAiRuntime as any).enableInternalLink;
+        delete (mergedAiRuntime as any).maxLinkParseDepth;
+        delete (mergedAiRuntime as any).linkParseTimeout;
         const normalizedAiDataFolder = this.migrationService.normalizeLegacyFolderPath(settings.aiDataFolder) || DEFAULT_SETTINGS.aiDataFolder;
         const mcpServerService = McpServerDataService.getInstance(this.plugin.app);
         const runtimeMcpSettings: McpSettings = {
             ...DEFAULT_MCP_SETTINGS,
-            ...(settings.tars.settings.mcp ?? {}),
+            ...(settings.aiRuntime.mcp ?? {}),
         };
         for (const removedBuiltinField of [
             'builtinVaultEnabled',
@@ -184,14 +187,14 @@ export class SettingsManager {
             normalizedAiDataFolder,
             runtimeMcpSettings.servers ?? []
         );
-        settings.tars.settings.mcp = {
+        settings.aiRuntime.mcp = {
             ...runtimeMcpSettings,
             servers: normalizedMcpServers,
         };
 
         const mergedMcpSettings = {
             ...DEFAULT_MCP_SETTINGS,
-            ...((mergedTarsSettings as any).mcp ?? {}),
+            ...((mergedAiRuntime as any).mcp ?? {}),
         } as Record<string, unknown>;
         delete mergedMcpSettings.servers;
         for (const removedBuiltinField of [
@@ -204,19 +207,16 @@ export class SettingsManager {
         ] as const) {
             delete mergedMcpSettings[removedBuiltinField];
         }
-        (mergedTarsSettings as any).mcp = mergedMcpSettings;
+        (mergedAiRuntime as any).mcp = mergedMcpSettings;
 
         const settingsToPersist = {
             ...persisted,
             ...settings,
             chat: mergedChat,
-            tars: {
-                ...(persisted?.tars ?? {}),
-                ...(settings?.tars ?? {}),
-                settings: mergedTarsSettings,
-            },
+            aiRuntime: mergedAiRuntime,
         };
         delete (settingsToPersist as any).promptTemplateFolder;
+        removeLegacyAiRuntimeContainer(settingsToPersist as any);
 
         await this.plugin.saveData(settingsToPersist);
     }

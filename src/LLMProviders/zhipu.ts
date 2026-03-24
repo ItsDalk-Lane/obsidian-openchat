@@ -1,9 +1,9 @@
 import OpenAI from 'openai'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import { buildReasoningBlockStart, buildReasoningBlockEnd } from './utils'
-import { withToolCallLoopSupport } from 'src/agentLoop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop'
 
 export type ZhipuThinkingType = 'enabled' | 'disabled' | 'auto'
 
@@ -22,7 +22,7 @@ export interface ZhipuOptions extends BaseOptions {
 }
 
 const sendRequestFunc = (settings: ZhipuOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, _resolveEmbedAsBinary: ResolveEmbedAsBinary) {
+	async function* (messages: readonly Message[], controller: AbortController, _resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		const { parameters, ...optionsExcludingParams } = settings
 		const options = { ...optionsExcludingParams, ...parameters }
 		const { apiKey, baseURL, model, enableWebSearch, enableReasoning, thinkingType, ...remains } = options
@@ -55,7 +55,7 @@ const sendRequestFunc = (settings: ZhipuOptions): SendRequest =>
 			}
 		}
 
-		const stream = await client.chat.completions.create(requestParams, {
+		const stream = await client.chat.completions.create(requestParams as any, {
 			signal: controller.signal
 		})
 
@@ -128,7 +128,7 @@ export const zhipuVendor: Vendor = {
 		thinkingType: DEFAULT_ZHIPU_THINKING_TYPE,
 		parameters: {}
 	} as ZhipuOptions,
-	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc),
+	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as any),
 	models: ZHIPU_MODELS,
 	websiteToObtainKey: 'https://open.bigmodel.cn/',
 	capabilities: ['Text Generation', 'Web Search', 'Reasoning']

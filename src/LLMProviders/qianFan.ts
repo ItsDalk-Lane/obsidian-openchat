@@ -1,11 +1,11 @@
 import { Notice, requestUrl } from 'obsidian'
 import OpenAI from 'openai'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
 import { buildReasoningBlockEnd, buildReasoningBlockStart, convertEmbedToImageUrl } from './utils'
 import { withToolMessageContext } from './messageFormat'
 import { DebugLogger } from 'src/utils/DebugLogger'
-import { withToolCallLoopSupport } from 'src/agentLoop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop'
 
 export interface QianFanOptions extends BaseOptions {
 	enableThinking?: boolean
@@ -130,7 +130,7 @@ const inferImageExtensionFromUrl = (url: string) => {
 }
 
 const toArrayBuffer = (buffer: Buffer): ArrayBuffer =>
-	buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+	Uint8Array.from(buffer).buffer
 
 const formatMsg = async (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinary) => {
 	const content: ContentItem[] = msg.embeds
@@ -159,7 +159,7 @@ const formatMsg = async (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinar
 
 const streamChatCompletion = async function* (
 	client: OpenAI,
-	messages: Message[],
+	messages: readonly Message[],
 	controller: AbortController,
 	resolveEmbedAsBinary: ResolveEmbedAsBinary,
 	options: Record<string, unknown>
@@ -177,7 +177,7 @@ const streamChatCompletion = async function* (
 		requestPayload.enable_thinking = true
 	}
 
-	const stream = await client.chat.completions.create(requestPayload as OpenAI.ChatCompletionCreateParamsStreaming, {
+	const stream = await client.chat.completions.create(requestPayload as any, {
 		signal: controller.signal
 	})
 
@@ -218,14 +218,14 @@ const generateImage = async function* (
 	baseURL: string,
 	apiKey: string,
 	model: string,
-	messages: Message[],
+	messages: readonly Message[],
 	controller: AbortController,
 	saveAttachment: SaveAttachment | undefined,
 	options: Record<string, unknown>
 ) {
 	const lastUserMessage = [...messages].reverse().find((msg) => msg.role === 'user') ?? messages[messages.length - 1]
 	if (!lastUserMessage?.content?.trim()) {
-		throw new Error(t('No user message found for image generation'))
+		throw new Error('No user message found for image generation')
 	}
 
 	new Notice(t('This is a non-streaming request, please wait...'), 5 * 1000)
@@ -239,11 +239,11 @@ const generateImage = async function* (
 	} = options as QianFanOptions & Record<string, unknown>
 
 	const payload: Record<string, unknown> = {
+		...remains,
 		model,
 		prompt: lastUserMessage.content,
 		n: normalizeImageCount(imageCount, 1),
 		response_format: imageResponseFormat,
-		...remains
 	}
 	if (typeof imageSize === 'string' && imageSize.trim()) {
 		payload.size = imageSize.trim()
@@ -310,7 +310,7 @@ const generateImage = async function* (
 
 const sendRequestFunc = (settings: QianFanOptions): SendRequest =>
 	async function* (
-		messages: Message[],
+		messages: readonly Message[],
 		controller: AbortController,
 		resolveEmbedAsBinary: ResolveEmbedAsBinary,
 		saveAttachment?: SaveAttachment
@@ -412,7 +412,7 @@ export const qianFanVendor: Vendor = {
 		imageDisplayWidth: 400,
 		parameters: {}
 	} as QianFanOptions,
-	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc, {
+	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as any, {
 		transformApiParams: (apiParams, allOptions) => {
 			const mapped: Record<string, unknown> = { ...apiParams }
 			if (allOptions.enableThinking === true && mapped.enable_thinking === undefined) {

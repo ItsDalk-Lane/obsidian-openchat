@@ -22,7 +22,7 @@ export interface Local {
 	stop_execution: string;
 	execution_stopped: string;
 	basic_setting: string;
-	tars_setting: string;
+	ai_runtime_setting: string;
 	bottom_below_title: string;
 	brief_description: string;
 	cancel: string;
@@ -171,6 +171,8 @@ export interface Local {
 	enable_context_menu_description: string;
 	context_menu_group: string;
 	context_menu_group_description: string;
+	modify: string;
+	chat: string;
 	remove_value: string;
 	custom_title: string;
 	custom_title_description: string;
@@ -525,11 +527,11 @@ export interface Local {
 	system_prompt_disabled: string;
 	system_prompt_exclude_label: string;
 	system_prompt_feature_ai_action: string;
-	system_prompt_feature_tars_chat: string;
+	system_prompt_feature_ai_chat: string;
 	system_prompt_feature_tab_completion: string;
 	system_prompt_feature_selection_toolbar: string;
 	system_prompt_feature_ai_action_desc: string;
-	system_prompt_feature_tars_chat_desc: string;
+	system_prompt_feature_ai_chat_desc: string;
 	system_prompt_feature_tab_completion_desc: string;
 	system_prompt_feature_selection_toolbar_desc: string;
 	system_prompt_error_name_required: string;
@@ -650,7 +652,6 @@ export interface Local {
 	startup_condition_properties: string;
 	startup_condition_add_property: string;
 	startup_condition_not_met_detail: string;
-	startup_condition_search_text_placeholder: string;
 	// 变量引用相关
 	insert_variable: string;
 	builtin_variables: string;
@@ -841,6 +842,8 @@ export interface Local {
 	selection_toolbar_max_buttons: string;
 	selection_toolbar_max_buttons_desc: string;
 	selection_toolbar_settings_section: string;
+	selection_toolbar_stream_output: string;
+	selection_toolbar_stream_output_desc: string;
 	// Quick Action Management
 	quick_action_management: string;
 	quick_action_management_hint: string;
@@ -868,6 +871,9 @@ export interface Local {
 	quick_action_edit_deleted: string;
 	quick_action_edit_use_default_system_prompt: string;
 	quick_action_edit_use_default_system_prompt_hint: string;
+	quick_action_edit_model_label: string;
+	quick_action_edit_model_hint: string;
+	quick_action_edit_model_default: string;
 	quick_action_edit_model_exec_time: string;
 	quick_action_result_waiting_model: string;
 	quick_action_result_select_model_hint: string;
@@ -989,4 +995,6 @@ export interface Local {
 	stop_this_model: string;
 	retry_this_model: string;
 	generation_failed: string;
+	slash_command_empty: string;
+	slash_command_no_match: string;
 }

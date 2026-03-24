@@ -1,11 +1,11 @@
 import { App, TFile, Notice } from 'obsidian';
-import type { QuickAction } from '../types/chat';
-import type { TarsSettings } from 'src/features/tars/settings';
-import { availableVendors } from 'src/features/tars/settings';
-import type { ProviderSettings, Message, Vendor } from 'src/features/tars/providers';
+import type { QuickAction } from 'src/types/chat';
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
+import { availableVendors } from 'src/settings/ai-runtime';
+import type { ProviderSettings, Message, Vendor } from 'src/types/provider';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import { SystemPromptAssembler } from 'src/service/SystemPromptAssembler';
+import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler';
 import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils';
 
 /**
@@ -44,7 +44,7 @@ export class QuickActionExecutionService {
 
 	constructor(
 		private readonly app: App,
-		private readonly getTarsSettings: () => TarsSettings,
+		private readonly getAiRuntimeSettings: () => AiRuntimeSettings,
 		private readonly getPromptTemplateFolder: () => string
 	) {}
 
@@ -113,9 +113,9 @@ export class QuickActionExecutionService {
 			}
 
 			// 2. 获取AI模型配置
-			const tarsSettings = this.getTarsSettings();
+			const aiRuntimeSettings = this.getAiRuntimeSettings();
 			const effectiveModelTag = modelTag || quickAction.modelTag;
-			const providerSettings = this.getProviderSettings(tarsSettings, effectiveModelTag);
+			const providerSettings = this.getProviderSettings(aiRuntimeSettings, effectiveModelTag);
 
 			if (!providerSettings) {
 				return {
@@ -252,10 +252,10 @@ export class QuickActionExecutionService {
 	 * 获取AI提供商设置
 	 */
 	private getProviderSettings(
-		tarsSettings: TarsSettings,
+		aiRuntimeSettings: AiRuntimeSettings,
 		modelTag?: string
 	): ProviderSettings | null {
-		const providers = tarsSettings.providers;
+		const providers = aiRuntimeSettings.providers;
 		
 		if (providers.length === 0) {
 			return null;
@@ -404,9 +404,9 @@ export class QuickActionExecutionService {
 			}
 
 			// 2. 获取AI模型配置
-			const tarsSettings = this.getTarsSettings();
+			const aiRuntimeSettings = this.getAiRuntimeSettings();
 			const effectiveModelTag = modelTag || quickAction.modelTag;
-			const providerSettings = this.getProviderSettings(tarsSettings, effectiveModelTag);
+			const providerSettings = this.getProviderSettings(aiRuntimeSettings, effectiveModelTag);
 
 			if (!providerSettings) {
 				throw new Error('未找到可用的AI模型配置');

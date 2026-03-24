@@ -1,7 +1,7 @@
 import { Extension, StateField, StateEffect } from '@codemirror/state';
 import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet } from '@codemirror/view';
 import { App, TFile, MarkdownView } from 'obsidian';
-import type { ChatSettings } from '../types/chat';
+import type { ChatSettings } from 'src/types/chat';
 
 /**
  * 获取文件内容（不包括 frontmatter）

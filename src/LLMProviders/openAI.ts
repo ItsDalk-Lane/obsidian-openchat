@@ -1,5 +1,5 @@
 import OpenAI from 'openai'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import {
 	buildReasoningBlockEnd,
@@ -9,7 +9,7 @@ import {
 import { withToolMessageContext } from './messageFormat'
 import { normalizeProviderError } from './errors'
 import { withRetry } from './retry'
-import { withToolCallLoopSupport } from 'src/agentLoop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop'
 
 export interface OpenAIOptions extends BaseOptions {
 	enableReasoning?: boolean
@@ -26,7 +26,7 @@ export const openAIMapResponsesParams = (params: Record<string, unknown>) => {
 }
 
 const sendRequestFunc = (settings: OpenAIOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
+	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		try {
 			const { parameters, ...optionsExcludingParams } = settings
 			const options = { ...optionsExcludingParams, ...parameters }
@@ -110,13 +110,13 @@ const sendRequestFunc = (settings: OpenAIOptions): SendRequest =>
 							messages: formattedMessages as OpenAI.ChatCompletionMessageParam[],
 							stream: true,
 							...remains
-						},
+						} as any,
 						{ signal: controller.signal }
 					),
 				{ signal: controller.signal }
 			)
 
-			for await (const part of stream) {
+			for await (const part of stream as any) {
 				const delta: any = part.choices[0]?.delta
 				const text = delta?.content
 				if (text) {
@@ -183,7 +183,7 @@ export const openAIVendor: Vendor = {
 		enableReasoning: false,
 		parameters: {}
 	} as OpenAIOptions,
-	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc),
+	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as any),
 	models: [],
 	websiteToObtainKey: 'https://platform.openai.com/api-keys',
 	capabilities: ['Text Generation', 'Image Vision', 'Reasoning']

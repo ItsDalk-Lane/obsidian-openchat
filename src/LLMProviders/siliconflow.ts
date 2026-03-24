@@ -1,9 +1,9 @@
 import OpenAI from 'openai'
-import { t } from 'tars/lang/helper'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl } from './utils'
 import { withToolMessageContext } from './messageFormat'
-import { withToolCallLoopSupport } from 'src/agentLoop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop'
 
 // SiliconFlow选项接口，扩展基础选项以支持推理功能
 export interface SiliconFlowOptions extends BaseOptions {
@@ -16,7 +16,7 @@ type DeepSeekDelta = OpenAI.ChatCompletionChunk.Choice.Delta & {
 } // hack, deepseek-reasoner added a reasoning_content field
 
 const sendRequestFunc = (settings: BaseOptions): SendRequest =>
-	async function* (messages: Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
+	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		const { parameters, ...optionsExcludingParams } = settings
 		const options = { ...optionsExcludingParams, ...parameters }
 		const { apiKey, baseURL, model, ...remains } = options
@@ -35,7 +35,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 				messages: formattedMessages as OpenAI.ChatCompletionMessageParam[],
 				stream: true,
 				...remains
-			},
+			} as any,
 			{ signal: controller.signal }
 		)
 
@@ -43,7 +43,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 		let reasoningStartMs: number | null = null
 		const siliconFlowOptions = settings as SiliconFlowOptions
 		const isReasoningEnabled = siliconFlowOptions.enableReasoning ?? false
-		for await (const part of stream) {
+		for await (const part of stream as any) {
 			const delta = part.choices[0]?.delta as DeepSeekDelta
 			const reasonContent = delta?.reasoning_content
 
@@ -106,7 +106,7 @@ export const siliconFlowVendor: Vendor = {
 		parameters: {},
 		enableReasoning: false // 默认关闭推理功能
 	} as SiliconFlowOptions,
-	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc),
+	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as any),
 	models: [],
 	websiteToObtainKey: 'https://siliconflow.cn',
 	capabilities: ['Text Generation', 'Image Vision', 'Reasoning']

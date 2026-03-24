@@ -10,7 +10,11 @@ export default function getPropertyTypeByName(app: App, name?: string): string {
     }
 
     const lowerName = name.toLowerCase ? name.toLowerCase() : name;
-    const propertyInfo = app.metadataTypeManager.getPropertyInfo(lowerName);
+    const propertyInfo = (app as App & {
+        metadataTypeManager?: {
+            getPropertyInfo?: (propertyName: string) => { widget?: string; type?: string } | null | undefined;
+        };
+    }).metadataTypeManager?.getPropertyInfo?.(lowerName);
     if (propertyInfo) {
         // @ts-ignore
         if (propertyInfo.widget) {

@@ -70,7 +70,7 @@ class ModifyGhostTextWidget extends WidgetType {
 
 	toDOM(): HTMLElement {
 		const container = document.createElement('span');
-		container.className = 'tars-ghost-text';
+		container.className = 'ai-runtime-ghost-text';
 		container.setAttribute('aria-hidden', 'true');
 
 		const lines = this.text.split('\n');
@@ -130,7 +130,7 @@ const modifyGhostPlugin = ViewPlugin.fromClass(
 );
 
 const modifyGhostStyle = EditorView.baseTheme({
-	'.tars-ghost-text': {
+	'.ai-runtime-ghost-text': {
 		color: 'var(--text-muted)',
 		opacity: '0.6',
 		fontStyle: 'italic',

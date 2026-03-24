@@ -4,12 +4,16 @@ export function focusLatestEditor(app: App) {
     let markdownview = app.workspace.getActiveViewOfType(MarkdownView);
     if (!markdownview) {
         let current = null as WorkspaceLeaf | null;
+        let currentActiveTime = -Infinity;
         app.workspace.iterateAllLeaves(leaf => {
             if (leaf.view instanceof MarkdownView) {
+                const leafActiveTime = Number((leaf as WorkspaceLeaf & { activeTime?: number }).activeTime ?? -Infinity);
                 if (!current) {
                     current = leaf;
-                } else if (current.activeTime! <= leaf.activeTime!) {
+                    currentActiveTime = leafActiveTime;
+                } else if (currentActiveTime <= leafActiveTime) {
                     current = leaf;
+                    currentActiveTime = leafActiveTime;
                 }
             }
         })

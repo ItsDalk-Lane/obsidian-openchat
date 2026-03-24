@@ -13,7 +13,7 @@ type Options = {
 };
 
 export class CreateFileModal extends Modal {
-	root: Root | null;
+	root: Root | null = null;
 
 	constructor(public app: App, public options: Options) {
 		super(app);

@@ -43,7 +43,7 @@ export default function FolderSuggestInput(props: {
 	return (
 		<ComboboxSuggestion
 			value={value}
-			onChange={onChange}
+			onChange={(nextValue) => onChange(nextValue ?? "")}
 			options={items}
 			placeholder={props.placeholder}
 		/>
