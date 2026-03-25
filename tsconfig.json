@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "module": "ESNext",
     "target": "ES2018",
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "noImplicitAny": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "importHelpers": true,
     "isolatedModules": true,
     "strictNullChecks": true,
