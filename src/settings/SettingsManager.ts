@@ -9,6 +9,57 @@ import { DEFAULT_MCP_SETTINGS } from 'src/services/mcp/types';
 import { SettingsSecretManager } from './SettingsSecretManager';
 import { SettingsMigrationService } from './SettingsMigrationService';
 
+const asRecord = (value: unknown): Record<string, unknown> => {
+    return value && typeof value === 'object'
+        ? value as Record<string, unknown>
+        : {};
+};
+
+const deleteFields = (value: unknown, fields: readonly string[]): void => {
+    const target = asRecord(value);
+    for (const field of fields) {
+        delete target[field];
+    }
+};
+
+const getBooleanField = (value: unknown, field: string): boolean | undefined => {
+    const fieldValue = asRecord(value)[field];
+    return typeof fieldValue === 'boolean' ? fieldValue : undefined;
+};
+
+const getStringOrNullField = (
+    value: unknown,
+    field: string
+): string | null | undefined => {
+    const fieldValue = asRecord(value)[field];
+    if (typeof fieldValue === 'string' || fieldValue === null) {
+        return fieldValue;
+    }
+    return undefined;
+};
+
+const CHAT_RUNTIME_ONLY_FIELDS = ['quickActions', 'skills'] as const;
+const CHAT_LEGACY_FIELDS = [
+    'chatFolder',
+    'enableInternalLinkParsing',
+    'parseLinksInTemplates',
+    'maxLinkParseDepth',
+    'linkParseTimeout',
+    'enableSelectionToolbar',
+    'maxToolbarButtons',
+    'selectionToolbarStreamOutput',
+] as const;
+const AI_RUNTIME_LEGACY_FIELDS = [
+    'enableDefaultSystemMsg',
+    'defaultSystemMsg',
+    'systemPromptsData',
+    'enableInternalLink',
+    'maxLinkParseDepth',
+    'linkParseTimeout',
+] as const;
+const AI_RUNTIME_RUNTIME_ONLY_FIELDS = ['editorStatus', 'vendorApiKeys'] as const;
+const LEGACY_TOP_LEVEL_FIELDS = ['promptTemplateFolder', 'tars'] as const;
+
 export class SettingsManager {
     private readonly secretManager: SettingsSecretManager;
     private readonly migrationService: SettingsMigrationService;
@@ -42,17 +93,15 @@ export class SettingsManager {
                 ?? legacyQuickActionSettings.selectionToolbarStreamOutput
                 ?? DEFAULT_CHAT_SETTINGS.quickActionsStreamOutput,
         };
-        const persistedAiRuntime = persisted?.aiRuntime ?? {};
+        const persistedAiRuntime = this.migrationService.resolvePersistedAiRuntime(persisted);
         const aiRuntimeSettings = this.secretManager.decryptAiRuntimeSettings(persistedAiRuntime);
         const aiDataFolder = this.migrationService.resolveAiDataFolder(persisted, rawChatSettings);
 
         // 迁移旧版默认系统消息到 Markdown 系统提示词目录（向下兼容）
         try {
             const systemPromptService = SystemPromptDataService.getInstance(this.plugin.app);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const legacyEnabled = (aiRuntimeSettings as any)?.enableDefaultSystemMsg;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const legacyContent = (aiRuntimeSettings as any)?.defaultSystemMsg;
+            const legacyEnabled = getBooleanField(aiRuntimeSettings, 'enableDefaultSystemMsg');
+            const legacyContent = getStringOrNullField(aiRuntimeSettings, 'defaultSystemMsg');
             const migrated = await systemPromptService.migrateFromLegacyDefaultSystemMessage({
                 enabled: legacyEnabled,
                 content: legacyContent,
@@ -83,12 +132,7 @@ export class SettingsManager {
         }
 
         // 剥离旧字段，避免继续在运行期被引用
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (aiRuntimeSettings as any).enableDefaultSystemMsg;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (aiRuntimeSettings as any).defaultSystemMsg;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (aiRuntimeSettings as any).systemPromptsData;
+    deleteFields(aiRuntimeSettings, ['enableDefaultSystemMsg', 'defaultSystemMsg', 'systemPromptsData']);
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { promptTemplateFolder: _legacyPromptTemplateFolder, ...persistedWithoutLegacyTop } = persisted;
@@ -134,65 +178,26 @@ export class SettingsManager {
     async save(settings: PluginSettings): Promise<void> {
         const encryptedAiRuntime = this.secretManager.encryptAiRuntimeSettings(settings.aiRuntime);
         // 剥离旧字段，避免写回 data.json
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (encryptedAiRuntime as any).enableDefaultSystemMsg;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (encryptedAiRuntime as any).defaultSystemMsg;
+        deleteFields(encryptedAiRuntime, ['enableDefaultSystemMsg', 'defaultSystemMsg']);
 
         // 基于当前 data.json 合并写回，避免覆盖由独立服务维护的字段
         const persisted = (await this.plugin.loadData()) ?? {};
         const persistedChat = persisted?.chat ?? {};
-        const persistedAiRuntime = persisted?.aiRuntime ?? {};
+        const persistedAiRuntime = this.migrationService.resolvePersistedAiRuntime(persisted);
 
         const mergedChat = {
             ...persistedChat,
             ...settings.chat,
         };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedChat as any).chatFolder;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedChat as any).quickActions;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedChat as any).skills;
-        // 剥离已废弃的内链解析旧字段（兼容读取仅保留在迁移层）
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedChat as any).enableInternalLinkParsing;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedChat as any).parseLinksInTemplates;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedChat as any).maxLinkParseDepth;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedChat as any).linkParseTimeout;
-        // 剥离已废弃的选择工具栏旧字段（已迁移到 quickActions 系列）
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedChat as any).enableSelectionToolbar;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedChat as any).maxToolbarButtons;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedChat as any).selectionToolbarStreamOutput;
+        deleteFields(mergedChat, [...CHAT_RUNTIME_ONLY_FIELDS, ...CHAT_LEGACY_FIELDS]);
         const mergedAiRuntime = {
             ...persistedAiRuntime,
             ...encryptedAiRuntime,
         };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedAiRuntime as any).enableDefaultSystemMsg;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedAiRuntime as any).defaultSystemMsg;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedAiRuntime as any).systemPromptsData;
-        // 剥离运行时状态字段（不应持久化）
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedAiRuntime as any).editorStatus;
-        // 剥离运行时明文密钥（实际密钥存储在 vendorApiKeysByDevice 中）
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedAiRuntime as any).vendorApiKeys;
-        // 剥离已废弃的内链解析旧字段（已迁移到 internalLinkParsing）
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedAiRuntime as any).enableInternalLink;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedAiRuntime as any).maxLinkParseDepth;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (mergedAiRuntime as any).linkParseTimeout;
+        deleteFields(
+            mergedAiRuntime,
+            [...AI_RUNTIME_LEGACY_FIELDS, ...AI_RUNTIME_RUNTIME_ONLY_FIELDS]
+        );
         const normalizedAiDataFolder = this.migrationService.normalizeLegacyFolderPath(settings.aiDataFolder) || DEFAULT_SETTINGS.aiDataFolder;
         const mcpServerService = McpServerDataService.getInstance(this.plugin.app);
         const runtimeMcpSettings: McpSettings = {
@@ -220,8 +225,7 @@ export class SettingsManager {
 
         const mergedMcpSettings = {
             ...DEFAULT_MCP_SETTINGS,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ...((mergedAiRuntime as any).mcp ?? {}),
+            ...((asRecord(mergedAiRuntime).mcp ?? {}) as Record<string, unknown>),
         } as Record<string, unknown>;
         delete mergedMcpSettings.servers;
         for (const removedBuiltinField of [
@@ -234,8 +238,7 @@ export class SettingsManager {
         ] as const) {
             delete mergedMcpSettings[removedBuiltinField];
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mergedAiRuntime as any).mcp = mergedMcpSettings;
+        asRecord(mergedAiRuntime).mcp = mergedMcpSettings;
 
         const settingsToPersist = {
             ...persisted,
@@ -243,8 +246,7 @@ export class SettingsManager {
             chat: mergedChat,
             aiRuntime: mergedAiRuntime,
         };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (settingsToPersist as any).promptTemplateFolder;
+        deleteFields(settingsToPersist, LEGACY_TOP_LEVEL_FIELDS);
         await this.plugin.saveData(settingsToPersist);
     }
 }

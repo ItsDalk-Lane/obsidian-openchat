@@ -8,8 +8,13 @@ import {
 	resolveCurrentTools,
 } from 'src/core/agents/loop'
 import type { ToolCallRequest } from 'src/core/agents/loop/types'
-import type { OpenAIToolCall } from 'src/core/agents/loop/OpenAILoopHandler'
 import { normalizeProviderError } from './errors'
+import {
+	type OllamaNativeToolCall,
+	accumulateNativeToolCalls,
+	finalizeNativeToolCalls,
+	normalizeToolResultContent,
+} from './ollamaToolCallUtils'
 
 // Structured Output Format 类型
 export type StructuredOutputFormat = 'json' | Record<string, unknown>
@@ -26,19 +31,21 @@ export interface OllamaOptions extends BaseOptions {
 
 type OllamaChatRole = 'user' | 'assistant' | 'system' | 'tool'
 
-interface OllamaNativeToolCall {
-	function: {
-		name: string
-		arguments: Record<string, unknown>
-	}
-}
-
 interface OllamaChatMessage {
 	role: OllamaChatRole
 	content: string
 	images?: string[]
 	tool_calls?: OllamaNativeToolCall[]
 	tool_name?: string
+}
+
+type OllamaChatRequest = Parameters<Ollama['chat']>[0]
+type OllamaStreamPart = {
+	message?: {
+		thinking?: unknown
+		content?: unknown
+		tool_calls?: unknown
+	}
 }
 
 const DEFAULT_MAX_TOOL_CALL_LOOPS = 10
@@ -161,71 +168,6 @@ const buildOllamaChatRequest = (
 	return requestParams
 }
 
-const accumulateNativeToolCalls = (
-	toolCallsMap: Map<number, OllamaNativeToolCall>,
-	rawToolCalls: unknown[]
-): void => {
-	rawToolCalls.forEach((rawCall, index) => {
-		if (!rawCall || typeof rawCall !== 'object') return
-		const functionPayload =
-			typeof (rawCall as { function?: unknown }).function === 'object'
-			&& (rawCall as { function?: unknown }).function !== null
-				? ((rawCall as { function: { name?: unknown; arguments?: unknown } }).function)
-				: undefined
-		const name =
-			typeof functionPayload?.name === 'string' ? functionPayload.name.trim() : ''
-		if (!name) return
-
-		const rawArgs = functionPayload?.arguments
-		let args: Record<string, unknown> = {}
-		if (rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs)) {
-			args = rawArgs as Record<string, unknown>
-		} else if (typeof rawArgs === 'string' && rawArgs.trim()) {
-			try {
-				const parsed = JSON.parse(rawArgs) as unknown
-				if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-					args = parsed as Record<string, unknown>
-				}
-			} catch {
-				args = { __raw: rawArgs }
-			}
-		}
-
-		toolCallsMap.set(index, {
-			function: {
-				name,
-				arguments: args,
-			},
-		})
-	})
-}
-
-const finalizeNativeToolCalls = (
-	toolCallsMap: Map<number, OllamaNativeToolCall>
-): { nativeToolCalls: OllamaNativeToolCall[]; openAIToolCalls: OpenAIToolCall[] } => {
-	const entries = Array.from(toolCallsMap.entries()).sort((a, b) => a[0] - b[0])
-	const nativeToolCalls = entries.map(([, call]) => call)
-	const openAIToolCalls = nativeToolCalls.map((call, index) => ({
-		id: `ollama_call_${index + 1}`,
-		type: 'function' as const,
-		function: {
-			name: call.function.name,
-			arguments: JSON.stringify(call.function.arguments ?? {}),
-		},
-	}))
-	return { nativeToolCalls, openAIToolCalls }
-}
-
-const normalizeToolResultContent = (content: unknown): string => {
-	if (typeof content === 'string') return content
-	if (content === undefined || content === null) return ''
-	try {
-		return JSON.stringify(content)
-	} catch {
-		return String(content)
-	}
-}
-
 const sendRequestFuncBase = (settings: BaseOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		try {
@@ -236,13 +178,13 @@ const sendRequestFuncBase = (settings: BaseOptions): SendRequest =>
 			)
 
 			const ollama = new Ollama({ host: options.baseURL })
-			const response = await ollama.chat(buildOllamaChatRequest(options, formattedMessages) as any)
+			const response = await ollama.chat(buildOllamaChatRequest(options, formattedMessages) as OllamaChatRequest)
 
 			let inReasoning = false
 			let reasoningStartMs: number | null = null
 			const isReasoningEnabled = options.enableReasoning ?? false
 
-			for await (const part of response as AsyncIterable<any>) {
+			for await (const part of response as unknown as AsyncIterable<OllamaStreamPart>) {
 				if (controller.signal.aborted) {
 					ollama.abort()
 					return
@@ -316,7 +258,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 						options,
 						loopMessages,
 						currentTools.length > 0 ? { tools: toOpenAITools(currentTools) } : undefined
-					) as any
+					) as OllamaChatRequest
 				)
 
 				let inReasoning = false
@@ -324,7 +266,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 				let contentBuffer = ''
 				const nativeToolCallsMap = new Map<number, OllamaNativeToolCall>()
 
-				for await (const part of response as AsyncIterable<any>) {
+				for await (const part of response as unknown as AsyncIterable<OllamaStreamPart>) {
 					if (controller.signal.aborted) {
 						ollama.abort()
 						return
@@ -385,6 +327,11 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 					tool_calls: nativeToolCalls,
 				})
 
+				const toolExecutor = settings.toolExecutor
+				if (!toolExecutor) {
+					throw new Error('Tool executor is required for Ollama tool loop execution')
+				}
+
 				const toolResults = await Promise.all(openAIToolCalls.map(async (call) => {
 					const request: ToolCallRequest = {
 						id: call.id,
@@ -392,7 +339,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 						arguments: call.function.arguments,
 					}
 					try {
-						const result = await settings.toolExecutor!.execute(request, currentTools, {
+						const result = await toolExecutor.execute(request, currentTools, {
 							abortSignal: controller.signal,
 						})
 						const resultContent = normalizeToolResultContent(result.content)
@@ -408,7 +355,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 							name: result.name ?? 'tool',
 							content: resultContent,
 							message: {
-								role: 'tool',
+								role: 'tool' as const,
 								content: resultContent,
 								tool_name: result.name,
 							},
@@ -428,7 +375,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 							name: call.function.name,
 							content: errorContent,
 							message: {
-								role: 'tool',
+								role: 'tool' as const,
 								content: errorContent,
 								tool_name: call.function.name,
 							},
@@ -438,15 +385,15 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 
 				for (const result of toolResults) {
 					yield `{{FF_MCP_TOOL_START}}:${result.name}:${result.content}{{FF_MCP_TOOL_END}}:`
-					loopMessages.push(result.message as any)
+					loopMessages.push(result.message)
 				}
 			}
 
-			const finalResponse = await ollama.chat(buildOllamaChatRequest(options, loopMessages) as any)
+			const finalResponse = await ollama.chat(buildOllamaChatRequest(options, loopMessages) as OllamaChatRequest)
 			let inReasoning = false
 			let reasoningStartMs: number | null = null
 
-			for await (const part of finalResponse as AsyncIterable<any>) {
+			for await (const part of finalResponse as unknown as AsyncIterable<OllamaStreamPart>) {
 				if (controller.signal.aborted) {
 					ollama.abort()
 					return

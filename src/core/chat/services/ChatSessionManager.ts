@@ -9,6 +9,7 @@ import { HistoryService, ChatHistoryEntry } from './HistoryService';
 import type { ChatSession, ChatState } from '../types/chat';
 import type { MultiModelMode, LayoutMode } from '../types/multiModel';
 import { getChatHistoryPath } from 'src/utils/AIPathManager';
+import { DebugLogger } from '../../../utils/DebugLogger';
 
 export interface SessionManagerDeps {
 	getState: () => ChatState;
@@ -133,9 +134,9 @@ export class ChatSessionManager {
 	} {
 		const selectedModels = Array.from(
 			new Set(
-				session.messages
-					.filter((message) => message.role === 'assistant' && message.modelTag)
-					.map((message) => message.modelTag!)
+				session.messages.flatMap((message) =>
+					message.role === 'assistant' && message.modelTag ? [message.modelTag] : []
+				)
 			)
 		);
 		const hasParallelGroup = session.messages.some((message) => Boolean(message.parallelGroupId));
@@ -208,7 +209,7 @@ export class ChatSessionManager {
 				return raw;
 			}
 		} catch (error) {
-			console.warn('[ChatSessionManager] 读取布局偏好失败:', error);
+			DebugLogger.warn('[ChatSessionManager] 读取布局偏好失败:', error);
 		}
 		return null;
 	}
@@ -220,7 +221,7 @@ export class ChatSessionManager {
 		try {
 			window.localStorage.setItem('openchat-layout-mode', mode);
 		} catch (error) {
-			console.warn('[ChatSessionManager] 保存布局偏好失败:', error);
+			DebugLogger.warn('[ChatSessionManager] 保存布局偏好失败:', error);
 		}
 	}
 

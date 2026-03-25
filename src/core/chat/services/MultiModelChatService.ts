@@ -2,10 +2,23 @@ import { Notice } from 'obsidian';
 import { v4 as uuidv4 } from 'uuid';
 import type { ChatMessage } from '../types/chat';
 import type { ParallelResponseEntry, ParallelResponseGroup } from '../types/multiModel';
-import type { ChatService, PreparedChatRequest } from './ChatService';
+import type { ChatService } from './ChatService';
+import type { PreparedChatRequest } from './ChatServiceCore';
 import { MultiModelConfigService } from './MultiModelConfigService';
 import { localInstance } from 'src/i18n/locals';
 import { buildRetryContextMessages } from 'src/core/chat/utils/compareContext';
+import { DebugLogger } from 'src/utils/DebugLogger';
+import {
+	applyParallelResponsePatch,
+	clearAllPendingParallelUpdates,
+	clearPendingParallelUpdates,
+	createErrorMessage,
+	flushQueuedParallelResponseUpdates,
+	getModelDisplayName,
+	isAbortError,
+	queueParallelResponseUpdate,
+	runWithConcurrency,
+} from './multiModelChatHelpers';
 
 export class MultiModelChatService {
 	private static readonly MAX_COMPARE_CONCURRENCY = 5;
@@ -26,7 +39,7 @@ export class MultiModelChatService {
 		const requestedModelTags = await this.resolveCompareModelTags();
 		const modelTags = await this.filterAvailableCompareModels(requestedModelTags, prepared);
 		if (modelTags.length === 0) {
-			new Notice(localInstance.no_models_selected || '请至少选择一个模型');
+			new Notice(localInstance.no_models_selected);
 			return;
 		}
 
@@ -36,7 +49,7 @@ export class MultiModelChatService {
 			userMessageId: prepared.userMessage.id,
 			responses: modelTags.map((tag) => ({
 				modelTag: tag,
-				modelName: this.getModelDisplayName(tag),
+				modelName: getModelDisplayName(tag, this.chatService),
 				content: '',
 				isComplete: false,
 				isError: false
@@ -48,10 +61,10 @@ export class MultiModelChatService {
 		this.chatService.setGeneratingState(true);
 
 		try {
-			const results = await this.runWithConcurrency(
-				modelTags,
-				MultiModelChatService.MAX_COMPARE_CONCURRENCY,
-				async (modelTag) => {
+				const results = await runWithConcurrency(
+					modelTags,
+					MultiModelChatService.MAX_COMPARE_CONCURRENCY,
+					async (modelTag) => {
 					if (this.compareStopRequested) {
 						return null;
 					}
@@ -65,11 +78,23 @@ export class MultiModelChatService {
 							createMessageInSession: false,
 							manageGeneratingState: false,
 							onChunk: (_chunk, currentMessage) => {
-								this.queueParallelResponseUpdate(parallelGroupId, modelTag, {
-									content: currentMessage.content
-								});
-							}
-						});
+									queueParallelResponseUpdate(
+										parallelGroupId,
+										modelTag,
+										{ content: currentMessage.content },
+										this.pendingResponsePatches,
+										this.pendingFlushTimers,
+										MultiModelChatService.STREAM_UPDATE_INTERVAL,
+										(groupId) =>
+											flushQueuedParallelResponseUpdates(
+												groupId,
+												this.pendingResponsePatches,
+												this.pendingFlushTimers,
+												this.chatService
+											)
+									);
+								}
+							});
 
 						message.parallelGroupId = parallelGroupId;
 						message.metadata = {
@@ -77,44 +102,59 @@ export class MultiModelChatService {
 							hiddenFromModel: true
 						};
 
-						this.flushQueuedParallelResponseUpdates(parallelGroupId);
-						this.applyParallelResponsePatch(parallelGroupId, modelTag, {
-							content: message.content,
-							isComplete: true,
-							isError: false,
+							flushQueuedParallelResponseUpdates(
+								parallelGroupId,
+								this.pendingResponsePatches,
+								this.pendingFlushTimers,
+								this.chatService
+							);
+							applyParallelResponsePatch(parallelGroupId, modelTag, {
+								content: message.content,
+								isComplete: true,
+								isError: false,
 							error: undefined,
 							errorMessage: undefined,
-							messageId: message.id
-						});
+								messageId: message.id
+							}, this.chatService);
 
 						return message;
 					} catch (error) {
-						if (this.isAbortError(error)) {
-							this.flushQueuedParallelResponseUpdates(parallelGroupId);
-							this.applyParallelResponsePatch(parallelGroupId, modelTag, {
-								isComplete: true,
-								isError: false,
-								error: undefined,
-								errorMessage: undefined
-							});
-							return null;
-						}
+							if (isAbortError(error)) {
+								flushQueuedParallelResponseUpdates(
+									parallelGroupId,
+									this.pendingResponsePatches,
+									this.pendingFlushTimers,
+									this.chatService
+								);
+								applyParallelResponsePatch(parallelGroupId, modelTag, {
+									isComplete: true,
+									isError: false,
+									error: undefined,
+									errorMessage: undefined
+								}, this.chatService);
+								return null;
+							}
 
-						const failedMessage = this.createErrorMessage(modelTag, error, {
-							parallelGroupId
-						});
-						this.flushQueuedParallelResponseUpdates(parallelGroupId);
-						this.applyParallelResponsePatch(parallelGroupId, modelTag, {
-							content: failedMessage.content,
-							isComplete: true,
-							isError: true,
+							const failedMessage = createErrorMessage(modelTag, error, this.chatService, {
+								parallelGroupId
+							});
+							flushQueuedParallelResponseUpdates(
+								parallelGroupId,
+								this.pendingResponsePatches,
+								this.pendingFlushTimers,
+								this.chatService
+							);
+							applyParallelResponsePatch(parallelGroupId, modelTag, {
+								content: failedMessage.content,
+								isComplete: true,
+								isError: true,
 							error: failedMessage.content,
 							errorMessage: failedMessage.content,
-							messageId: failedMessage.id
-						});
-						return failedMessage;
-					} finally {
-						this.abortControllers.delete(modelTag);
+								messageId: failedMessage.id
+							}, this.chatService);
+							return failedMessage;
+						} finally {
+							this.abortControllers.delete(modelTag);
 					}
 				},
 				() => this.compareStopRequested
@@ -129,18 +169,22 @@ export class MultiModelChatService {
 			const successCount = results.length - failedCount;
 			if (failedCount > 0) {
 				new Notice(
-					(localInstance.partial_success || '{success}/{total} 个模型响应成功，{failed} 个失败')
+					localInstance.partial_success
 						.replace('{success}', String(successCount))
 						.replace('{total}', String(results.length))
 						.replace('{failed}', String(failedCount))
 				);
 			}
-		} finally {
-			this.compareStopRequested = false;
-			this.clearPendingParallelUpdates(parallelGroupId);
-			this.chatService.clearParallelResponses();
-			this.chatService.setGeneratingState(false);
-		}
+			} finally {
+				this.compareStopRequested = false;
+				clearPendingParallelUpdates(
+					parallelGroupId,
+					this.pendingResponsePatches,
+					this.pendingFlushTimers
+				);
+				this.chatService.clearParallelResponses();
+				this.chatService.setGeneratingState(false);
+			}
 	}
 
 	stopAllGeneration(): void {
@@ -149,7 +193,7 @@ export class MultiModelChatService {
 			controller.abort();
 		}
 		this.abortControllers.clear();
-		this.clearAllPendingParallelUpdates();
+		clearAllPendingParallelUpdates(this.pendingResponsePatches, this.pendingFlushTimers);
 		this.chatService.setGeneratingState(false);
 	}
 
@@ -161,7 +205,7 @@ export class MultiModelChatService {
 			}
 		}
 		if (this.abortControllers.size === 0) {
-			this.clearAllPendingParallelUpdates();
+			clearAllPendingParallelUpdates(this.pendingResponsePatches, this.pendingFlushTimers);
 			this.chatService.setGeneratingState(false);
 		}
 	}
@@ -174,7 +218,7 @@ export class MultiModelChatService {
 
 		const target = session.messages.find((message) => message.id === messageId);
 		if (!target || !target.modelTag) {
-			new Notice('未找到可重试的模型消息。');
+			new Notice(localInstance.multi_model_retry_target_not_found);
 			return;
 		}
 
@@ -206,7 +250,7 @@ export class MultiModelChatService {
 			responses: [
 				{
 					modelTag,
-					modelName: draftMessage.modelName ?? this.getModelDisplayName(modelTag),
+					modelName: draftMessage.modelName ?? getModelDisplayName(modelTag, this.chatService),
 					content: '',
 					isComplete: false,
 					isError: false,
@@ -237,7 +281,7 @@ export class MultiModelChatService {
 						responses: [
 							{
 								modelTag,
-								modelName: currentMessage.modelName ?? this.getModelDisplayName(modelTag),
+										modelName: currentMessage.modelName ?? getModelDisplayName(modelTag, this.chatService),
 								content: currentMessage.content,
 								isComplete: false,
 								isError: false,
@@ -260,15 +304,15 @@ export class MultiModelChatService {
 			session.updatedAt = Date.now();
 			await this.chatService.rewriteSessionMessages(session);
 		} catch (error) {
-			if (this.isAbortError(error)) {
-				if (draftMessage.content.trim().length === 0) {
-					session.messages.splice(index, 1, target);
-				}
-			} else {
-				const failedMessage = this.createErrorMessage(modelTag, error, {
-					taskDescription: target.taskDescription,
-					executionIndex: target.executionIndex,
-					parallelGroupId: target.parallelGroupId
+				if (isAbortError(error)) {
+					if (draftMessage.content.trim().length === 0) {
+						session.messages.splice(index, 1, target);
+					}
+				} else {
+					const failedMessage = createErrorMessage(modelTag, error, this.chatService, {
+						taskDescription: target.taskDescription,
+						executionIndex: target.executionIndex,
+						parallelGroupId: target.parallelGroupId
 				});
 				failedMessage.id = target.id;
 				failedMessage.timestamp = Date.now();
@@ -295,7 +339,7 @@ export class MultiModelChatService {
 		const failedMessages = session.messages.filter((message) => message.role === 'assistant' && message.isError && message.modelTag);
 		if (failedMessages.length > 0) {
 			new Notice(
-				(localInstance.retrying_failed || '正在重试 {count} 个失败的模型...')
+				localInstance.retrying_failed
 					.replace('{count}', String(failedMessages.length))
 			);
 		}
@@ -327,7 +371,12 @@ export class MultiModelChatService {
 		}
 
 		if (uniqueTags.length > MultiModelChatService.MAX_COMPARE_CONCURRENCY) {
-			new Notice(`已选择 ${uniqueTags.length} 个模型。系统会最多并发 ${MultiModelChatService.MAX_COMPARE_CONCURRENCY} 个请求，建议使用对比组管理常用组合。`, 6000);
+			new Notice(
+				localInstance.multi_model_compare_concurrency_notice
+					.replace('{count}', String(uniqueTags.length))
+					.replace('{max}', String(MultiModelChatService.MAX_COMPARE_CONCURRENCY)),
+				6000
+			);
 		}
 
 		const validTags: string[] = [];
@@ -338,13 +387,13 @@ export class MultiModelChatService {
 		for (const modelTag of uniqueTags) {
 			const provider = this.chatService.findProviderByTagExact(modelTag);
 			if (!provider) {
-				console.warn('[MultiModelChatService] 模型配置不存在，已跳过:', modelTag);
+				DebugLogger.warn('[MultiModelChatService] 模型配置不存在，已跳过:', modelTag);
 				missingModels.push(modelTag);
 				continue;
 			}
 
 			if (prepared.isImageGenerationIntent && !this.chatService.isProviderSupportImageGenerationByTag(modelTag)) {
-				excludedImageModels.push(this.getModelDisplayName(modelTag));
+					excludedImageModels.push(getModelDisplayName(modelTag, this.chatService));
 				continue;
 			}
 
@@ -357,191 +406,34 @@ export class MultiModelChatService {
 		}
 
 		if (missingModels.length > 0) {
-			new Notice(`以下模型配置不存在，已跳过: ${missingModels.join(', ')}`, 5000);
+			new Notice(
+				localInstance.multi_model_missing_configs_notice.replace('{models}', missingModels.join(', ')),
+				5000
+			);
 		}
 
 		if (excludedImageModels.length > 0) {
 			if (excludedImageModels.length === uniqueTags.length) {
-				new Notice(localInstance.all_models_excluded || '所有选中的模型都不支持此功能', 5000);
+				new Notice(localInstance.all_models_excluded, 5000);
 			} else {
 				new Notice(
-					(localInstance.models_excluded_image || '以下模型不支持图片生成，已排除: {models}')
-						.replace('{models}', excludedImageModels.join(', ')),
+					localInstance.models_excluded_image.replace('{models}', excludedImageModels.join(', ')),
 					7000
 				);
 			}
 		}
 
 		if (disabledReasoningModels.length > 0) {
-			new Notice(`以下 Ollama 模型不支持推理，已自动关闭推理能力: ${disabledReasoningModels.join(', ')}`, 5000);
+			new Notice(
+				localInstance.multi_model_reasoning_disabled_notice.replace('{models}', disabledReasoningModels.join(', ')),
+				5000
+			);
 		}
 
 		if (validTags.length === 0 && missingModels.length === uniqueTags.length) {
-			new Notice('所有选中的模型都不存在或已失效，已取消发送。', 5000);
+			new Notice(localInstance.multi_model_all_invalid_notice, 5000);
 		}
 
-		return validTags;
-	}
-
-	private queueParallelResponseUpdate(groupId: string, modelTag: string, patch: Partial<ParallelResponseEntry>): void {
-		const groupBuffer = this.pendingResponsePatches.get(groupId) ?? new Map<string, Partial<ParallelResponseEntry>>();
-		const previousPatch = groupBuffer.get(modelTag) ?? {};
-		groupBuffer.set(modelTag, {
-			...previousPatch,
-			...patch
-		});
-		this.pendingResponsePatches.set(groupId, groupBuffer);
-
-		if (this.pendingFlushTimers.has(groupId)) {
-			return;
+			return validTags;
 		}
-
-		const timer = window.setTimeout(() => {
-			this.pendingFlushTimers.delete(groupId);
-			this.flushQueuedParallelResponseUpdates(groupId);
-		}, MultiModelChatService.STREAM_UPDATE_INTERVAL);
-		this.pendingFlushTimers.set(groupId, timer);
-	}
-
-	private flushQueuedParallelResponseUpdates(groupId: string): void {
-		const timer = this.pendingFlushTimers.get(groupId);
-		if (timer !== undefined) {
-			window.clearTimeout(timer);
-			this.pendingFlushTimers.delete(groupId);
-		}
-
-		const buffer = this.pendingResponsePatches.get(groupId);
-		if (!buffer || buffer.size === 0) {
-			return;
-		}
-
-		const state = this.chatService.getState();
-		const current = state.parallelResponses;
-		if (!current || current.groupId !== groupId) {
-			this.pendingResponsePatches.delete(groupId);
-			return;
-		}
-
-		const nextGroup: ParallelResponseGroup = {
-			...current,
-			responses: current.responses.map((response) => {
-				const patch = buffer.get(response.modelTag);
-				if (!patch) {
-					return response;
-				}
-				return {
-					...response,
-					...patch
-				};
-			})
-		};
-		this.pendingResponsePatches.delete(groupId);
-		this.chatService.setParallelResponses(nextGroup);
-	}
-
-	private applyParallelResponsePatch(groupId: string, modelTag: string, patch: Partial<ParallelResponseEntry>): void {
-		const state = this.chatService.getState();
-		const current = state.parallelResponses;
-		if (!current || current.groupId !== groupId) {
-			return;
-		}
-
-		const nextGroup: ParallelResponseGroup = {
-			...current,
-			responses: current.responses.map((response) => {
-				if (response.modelTag !== modelTag) {
-					return response;
-				}
-				return {
-					...response,
-					...patch
-				};
-			})
-		};
-		this.chatService.setParallelResponses(nextGroup);
-	}
-
-	private clearPendingParallelUpdates(groupId: string): void {
-		const timer = this.pendingFlushTimers.get(groupId);
-		if (timer !== undefined) {
-			window.clearTimeout(timer);
-			this.pendingFlushTimers.delete(groupId);
-		}
-		this.pendingResponsePatches.delete(groupId);
-	}
-
-	private clearAllPendingParallelUpdates(): void {
-		for (const timer of this.pendingFlushTimers.values()) {
-			window.clearTimeout(timer);
-		}
-		this.pendingFlushTimers.clear();
-		this.pendingResponsePatches.clear();
-	}
-
-	private async runWithConcurrency<TInput, TResult>(
-		items: TInput[],
-		concurrency: number,
-		worker: (item: TInput, index: number) => Promise<TResult | null>,
-		shouldStop?: () => boolean
-	): Promise<TResult[]> {
-		const results = new Array<TResult | null>(items.length).fill(null);
-		let cursor = 0;
-		const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-			while (cursor < items.length) {
-				if (shouldStop?.()) {
-					return;
-				}
-				const currentIndex = cursor;
-				cursor += 1;
-				if (shouldStop?.()) {
-					return;
-				}
-				results[currentIndex] = await worker(items[currentIndex], currentIndex);
-			}
-		});
-		await Promise.all(runners);
-		return results.filter((item): item is TResult => item !== null);
-	}
-
-	private isAbortError(error: unknown): boolean {
-		if (error instanceof DOMException && error.name === 'AbortError') {
-			return true;
-		}
-		if (error instanceof Error) {
-			return error.name === 'AbortError';
-		}
-		return false;
-	}
-
-	private createErrorMessage(
-		modelTag: string,
-		error: unknown,
-		extras?: {
-			taskDescription?: string;
-			executionIndex?: number;
-			parallelGroupId?: string;
-		}
-	): ChatMessage {
-		const errorMessage = error instanceof Error ? error.message : `生成过程中发生未知错误: ${String(error)}`;
-		return {
-			id: `chat-${uuidv4()}`,
-			role: 'assistant',
-			content: errorMessage,
-			timestamp: Date.now(),
-			isError: true,
-			modelTag,
-			modelName: this.getModelDisplayName(modelTag),
-			taskDescription: extras?.taskDescription,
-			executionIndex: extras?.executionIndex,
-			parallelGroupId: extras?.parallelGroupId,
-			metadata: {
-				hiddenFromModel: true
-			}
-		};
-	}
-
-	private getModelDisplayName(modelTag: string): string {
-		const provider = this.chatService.findProviderByTagExact(modelTag);
-		return provider?.options.model || provider?.tag || modelTag;
-	}
 }

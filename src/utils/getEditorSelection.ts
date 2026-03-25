@@ -1,4 +1,5 @@
 import { App, MarkdownView } from "obsidian";
+import { DebugLogger } from "./DebugLogger";
 
 export function getEditorSelection(app: App) {
     const editor = app.workspace.getActiveViewOfType(MarkdownView)?.editor;
@@ -108,7 +109,7 @@ export async function getCurrentFileContent(
         
         return processedContent;
     } catch (err) {
-        console.error("Error reading file content:", err);
+        DebugLogger.error("Error reading file content:", err);
         return "";
     }
 }

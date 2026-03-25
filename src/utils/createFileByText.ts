@@ -3,6 +3,7 @@ import { FileConflictResolution } from "src/types/enums/FileConflictResolution";
 import { processObTemplate } from "./templates";
 import { generateUniqueFilePath } from "./generateUniqueFilePath";
 import { convertVariableToString, logTypeConversion, TypeConversionError } from "./typeSafety";
+import { DebugLogger } from "./DebugLogger";
 
 export interface CreateFileOptions {
     enableAutoTypeConversion?: boolean;
@@ -14,7 +15,7 @@ export interface CreateFileOptions {
 export interface TypeConversionWarning {
     fieldName?: string;
     originalType: string;
-    originalValue: any;
+    originalValue: unknown;
     convertedValue: string;
     location: string;
     timestamp: string;
@@ -57,7 +58,7 @@ export async function createFileByText(
  * Validates and converts file path to ensure it's a string
  */
 async function validateAndConvertFilePath(
-    filePath: any,
+    filePath: unknown,
     options: CreateFileOptions
 ): Promise<string> {
     const { enableAutoTypeConversion, strictTypeChecking, logTypeConversions } = options;
@@ -95,7 +96,7 @@ async function validateAndConvertFilePath(
                 );
             }
 
-            console.warn(`File path type conversion: ${originalType} "${originalValue}" → string "${convertedValue}"`, warning);
+            DebugLogger.warn(`File path type conversion: ${originalType} "${originalValue}" → string "${convertedValue}"`, warning);
 
             return convertedValue;
         } else {
@@ -119,7 +120,7 @@ async function validateAndConvertFilePath(
 
         // Fallback to string conversion in non-strict mode
         convertedValue = String(filePath);
-        console.warn(`File path type conversion fallback: ${originalType} → string`, {
+        DebugLogger.warn(`File path type conversion fallback: ${originalType} → string`, {
             originalValue,
             convertedValue,
             error: errorText
@@ -133,7 +134,7 @@ async function validateAndConvertFilePath(
  * Validates and converts template content to ensure it's a string
  */
 async function validateAndConvertTemplate(
-    template: any,
+    template: unknown,
     options: CreateFileOptions
 ): Promise<string> {
     const { enableAutoTypeConversion, strictTypeChecking, logTypeConversions } = options;
@@ -171,7 +172,7 @@ async function validateAndConvertTemplate(
                 );
             }
 
-            console.warn(`Template content type conversion: ${originalType} → string`, warning);
+            DebugLogger.warn(`Template content type conversion: ${originalType} → string`, warning);
 
             return convertedValue;
         } else {
@@ -206,7 +207,7 @@ async function validateAndConvertTemplate(
             convertedValue = String(originalValue);
         }
 
-        console.warn(`Template content type conversion fallback: ${originalType} → string`, {
+        DebugLogger.warn(`Template content type conversion fallback: ${originalType} → string`, {
             originalValue,
             convertedValue,
             error: errorText

@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { useObsidianApp } from 'src/contexts/obsidianAppContext';
 import { Notice } from 'obsidian';
 import { getPromptTemplatePath } from 'src/utils/AIPathManager';
+import { localInstance } from 'src/i18n/locals';
+import { DebugLogger } from 'src/utils/DebugLogger';
 import './TemplateSelector.css';
 
 interface TemplateSelectorProps {
@@ -14,6 +16,8 @@ interface TemplateSelectorProps {
 
 export const TemplateSelector = ({ visible, onSelect, onClose, inputValue }: TemplateSelectorProps) => {
 	const app = useObsidianApp();
+	type OpenChatPluginLike = { settings?: { aiDataFolder?: string } }
+	type AppWithPlugins = typeof app & { plugins?: { plugins?: Record<string, OpenChatPluginLike | undefined> } }
 	const [templates, setTemplates] = useState<Array<{ value: string; label: string; description: string }>>([]);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [filterText, setFilterText] = useState('');
@@ -26,7 +30,7 @@ export const TemplateSelector = ({ visible, onSelect, onClose, inputValue }: Tem
 		const fetchTemplates = async () => {
 			try {
 				// 获取插件设置中的提示词模板目录
-				const plugin = (app as any).plugins?.plugins?.["openchat"];
+				const plugin = (app as AppWithPlugins).plugins?.plugins?.['openchat'];
 				const promptTemplateFolder = getPromptTemplatePath(plugin?.settings?.aiDataFolder || 'System/AI Data');
 				
 				// 获取所有Markdown文件
@@ -51,8 +55,8 @@ export const TemplateSelector = ({ visible, onSelect, onClose, inputValue }: Tem
 				setTemplates(templateOptions);
 				setSelectedIndex(0);
 			} catch (error) {
-				console.error('[TemplateSelector] 获取模板列表失败:', error);
-				new Notice('获取模板列表失败');
+				DebugLogger.error('[TemplateSelector] 获取模板列表失败', error);
+				new Notice(localInstance.chat_template_list_failed);
 			}
 		};
 
@@ -117,13 +121,13 @@ export const TemplateSelector = ({ visible, onSelect, onClose, inputValue }: Tem
 		<div className="template-selector-overlay" onClick={onClose}>
 			<div className="template-selector" onClick={(e) => e.stopPropagation()}>
 				<div className="template-selector-header">
-					<h3>选择提示词模板</h3>
-					<button className="template-selector-close" onClick={onClose}>×</button>
+					<h3>{localInstance.chat_template_selector_title}</h3>
+					<button className="template-selector-close" onClick={onClose} title={localInstance.close}>×</button>
 				</div>
 				<div className="template-selector-search">
 					<input
 						type="text"
-						placeholder="搜索模板..."
+						placeholder={localInstance.chat_template_selector_search_placeholder}
 						value={filterText}
 						onChange={(e) => {
 							setFilterText(e.target.value);
@@ -134,7 +138,7 @@ export const TemplateSelector = ({ visible, onSelect, onClose, inputValue }: Tem
 				</div>
 				<div className="template-selector-list" ref={listRef}>
 					{filteredTemplates.length === 0 ? (
-						<div className="template-selector-empty">没有找到匹配的模板</div>
+						<div className="template-selector-empty">{localInstance.chat_template_selector_empty}</div>
 					) : (
 						filteredTemplates.map((template, index) => (
 							<div

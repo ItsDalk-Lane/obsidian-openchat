@@ -7,6 +7,7 @@ import {
 	X,
 } from "lucide-react";
 import { ToastType } from "./Toast";
+import { localInstance } from 'src/i18n/locals';
 
 // 获取与 Toast 类型对应的图标
 export function getToastIcon(type: ToastType) {
@@ -52,7 +53,7 @@ export function ToastView({
 			<button
 				className="form--Toast__close"
 				onClick={onClose}
-				aria-label="Close"
+				aria-label={localInstance.close}
 			>
 				<X size={16} />
 			</button>

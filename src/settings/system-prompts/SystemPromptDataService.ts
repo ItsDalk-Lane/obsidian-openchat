@@ -16,7 +16,7 @@ const VALID_FEATURE_IDS: ReadonlySet<AiFeatureId> = new Set([
 type RawSystemPrompt = Partial<SystemPromptItem>;
 
 interface OpenChatPluginLike {
-	loadData?: () => Promise<any>;
+	loadData?: () => Promise<unknown>;
 	settings?: {
 		aiDataFolder?: string;
 		aiRuntime?: {
@@ -320,7 +320,10 @@ export class SystemPromptDataService {
 	}
 
 	private getPluginInstance(): OpenChatPluginLike | null {
-		return ((this.app as any).plugins?.plugins?.['openchat'] as OpenChatPluginLike | undefined) ?? null;
+		const appWithPlugins = this.app as App & {
+			plugins?: { plugins?: Record<string, OpenChatPluginLike | undefined> };
+		};
+		return appWithPlugins.plugins?.plugins?.openchat ?? null;
 	}
 
 	private async getStorageFolderPath(): Promise<string | null> {
@@ -328,7 +331,7 @@ export class SystemPromptDataService {
 		let aiDataFolder = plugin?.settings?.aiDataFolder;
 		if (plugin?.loadData) {
 			try {
-				const persisted = await plugin.loadData();
+				const persisted = await plugin.loadData() as { aiDataFolder?: unknown } | null;
 				const persistedAiDataFolder = persisted?.aiDataFolder;
 				if (isNonEmptyString(persistedAiDataFolder)) {
 					aiDataFolder = persistedAiDataFolder;

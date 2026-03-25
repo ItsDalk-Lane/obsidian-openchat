@@ -9,7 +9,9 @@ export class SystemPromptAssembler {
 
 	async buildGlobalSystemPrompt(featureId: AiFeatureId): Promise<string> {
 		try {
-			const plugin = (this.app as any).plugins?.plugins?.['openchat'];
+			type OpenChatPluginLike = { settings?: { aiRuntime?: { enableGlobalSystemPrompts?: boolean } } }
+			type AppWithPlugins = App & { plugins?: { plugins?: Record<string, OpenChatPluginLike | undefined> } }
+			const plugin = (this.app as AppWithPlugins).plugins?.plugins?.['openchat'];
 			const enabled = plugin?.settings?.aiRuntime?.enableGlobalSystemPrompts === true;
 			if (!enabled) {
 				return '';

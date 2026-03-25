@@ -1,28 +1,25 @@
-import { getLanguage } from "obsidian";
-import { En } from "./en";
-import { Local } from "./local";
-import { Zh } from "./zh";
-import { ZhTw } from "./zhTw";
-
+import { getLanguage } from 'obsidian';
+import type { Local } from './local';
+import { en } from './en';
+import { zh } from './zh';
+import { zhTw } from './zhTw';
 
 export class Locals {
 	static get(): Local {
 		const lang = getLanguage();
-		// simplified chinese
-		if (lang === "zh-CN" || lang === "zh") {
-			return new Zh();
+		if (lang === 'zh-CN' || lang === 'zh') {
+			return { ...zh };
 		}
-		// traditional chinese
-		if (lang === "zh-TW") {
-			return new ZhTw();
+		if (lang === 'zh-TW') {
+			return { ...zhTw };
 		}
-		return new En();
+		return { ...en };
 	}
 }
 
 export function isZh(): boolean {
 	const lang = getLanguage();
-	return lang === "zh" || lang === 'zh-TW' || lang === 'zh-CN';
+	return lang === 'zh' || lang === 'zh-TW' || lang === 'zh-CN';
 }
 
 export const localInstance = Locals.get();

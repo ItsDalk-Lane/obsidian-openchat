@@ -4,14 +4,14 @@ import "./RadioSelect.css";
 export type RadioOption = {
 	id: string;
 	label: string;
-	value: any;
+	value: unknown;
 };
 
 export default function RadioSelect(props: {
 	name?: string;
-	value: any;
+	value: unknown;
 	options: RadioOption[];
-	onChange: (value: any) => void;
+	onChange: (value: unknown) => void;
 	required?: boolean;
 	autoFocus?: boolean;
 }) {
@@ -39,21 +39,24 @@ export default function RadioSelect(props: {
 
 function Option(props: {
 	name: string;
-	value: any;
-	onChange: (value: any) => void;
+	value: unknown;
+	onChange: (value: unknown) => void;
 	option: RadioOption;
 	autoFocus?: boolean;
 	required?: boolean;
 }) {
 	const { option, autoFocus, value, onChange, name } = props;
-	const optionValue = option.value || option.label;
+	const optionValue = option.value ?? option.label;
+	const inputValue = typeof optionValue === 'string' || typeof optionValue === 'number'
+		? optionValue
+		: String(optionValue);
 	const isChecked = value === optionValue;
 	return (
-		<label key={option.value} className="form--RadioSelectOption" data-checked={isChecked === true}>
+		<label key={option.id} className="form--RadioSelectOption" data-checked={isChecked === true}>
 			<input
 				type="radio"
 				name={name}
-				value={optionValue}
+				value={inputValue}
 				checked={isChecked}
 				onChange={(e) => onChange(e.target.value)}
 				autoFocus={autoFocus}

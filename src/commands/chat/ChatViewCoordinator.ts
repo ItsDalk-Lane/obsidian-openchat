@@ -11,6 +11,7 @@ import { ChatModal } from 'src/components/chat-components/ChatModal';
 import { ChatPersistentModal } from 'src/components/chat-components/ChatPersistentModal';
 import type { ChatOpenMode } from 'src/types/chat';
 import { localInstance } from 'src/i18n/locals';
+import { DebugLogger } from 'src/utils/DebugLogger';
 
 export class ChatViewCoordinator {
 	private persistentModal: ChatPersistentModal | null = null;
@@ -200,7 +201,7 @@ export class ChatViewCoordinator {
 				} else {
 					const leaf = this.plugin.app.workspace.getRightLeaf(false);
 					if (!leaf) {
-						console.warn('OpenChat: 无法获取右侧边栏，可能工作区还未完全初始化');
+						DebugLogger.warn('OpenChat: 无法获取右侧边栏，可能工作区还未完全初始化');
 						const leftLeaf = this.plugin.app.workspace.getLeftLeaf(false);
 						if (leftLeaf) {
 							await this.openLeaf(leftLeaf, VIEW_TYPE_CHAT_SIDEBAR, true);
@@ -217,7 +218,7 @@ export class ChatViewCoordinator {
 				} else {
 					const leaf = this.plugin.app.workspace.getLeftLeaf(false);
 					if (!leaf) {
-						console.warn('OpenChat: 无法获取左侧边栏，可能工作区还未完全初始化');
+						DebugLogger.warn('OpenChat: 无法获取左侧边栏，可能工作区还未完全初始化');
 						const rightLeaf = this.plugin.app.workspace.getRightLeaf(false);
 						if (rightLeaf) {
 							await this.openLeaf(rightLeaf, VIEW_TYPE_CHAT_SIDEBAR, true);
@@ -236,7 +237,7 @@ export class ChatViewCoordinator {
 				}
 			}
 		} catch (error) {
-			console.error('OpenChat: 激活聊天视图失败:', error);
+			DebugLogger.error('OpenChat: 激活聊天视图失败:', error);
 		}
 	}
 
@@ -311,7 +312,7 @@ export class ChatViewCoordinator {
 			await new Promise(resolve => setTimeout(resolve, retryDelay));
 		}
 
-		console.warn('OpenChat: 工作区准备检查超时，将尝试继续执行');
+		DebugLogger.warn('OpenChat: 工作区准备检查超时，将尝试继续执行');
 	}
 
 	/**
@@ -322,7 +323,7 @@ export class ChatViewCoordinator {
 			const leaf = this.plugin.app.workspace.getLeaf('window');
 			await this.openLeaf(leaf, VIEW_TYPE_CHAT_TAB, true);
 		} catch (error) {
-			console.error('OpenChat: 在新窗口中打开失败，回退到标签页模式:', error);
+			DebugLogger.error('OpenChat: 在新窗口中打开失败，回退到标签页模式:', error);
 			const leaf = this.plugin.app.workspace.getLeaf(true);
 			await this.openLeaf(leaf, VIEW_TYPE_CHAT_TAB, true);
 		}
@@ -341,7 +342,7 @@ export class ChatViewCoordinator {
 				this.plugin.app.workspace.revealLeaf(leaf);
 			}
 		} catch (error) {
-			console.error('OpenChat: 设置叶子视图状态失败:', error);
+			DebugLogger.error('OpenChat: 设置叶子视图状态失败:', error);
 			throw error;
 		}
 	}

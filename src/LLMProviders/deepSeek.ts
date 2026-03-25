@@ -15,6 +15,14 @@ type DeepSeekDelta = OpenAI.ChatCompletionChunk.Choice.Delta & {
 	reasoning_content?: string
 } // hack, deepseek-reasoner added a reasoning_content field
 
+type DeepSeekMessagePayload = {
+	role: Message['role']
+	content: string
+	reasoning_content?: string
+	embeds?: Message['embeds']
+	prefix?: boolean
+}
+
 type DeepSeekInternalConfig = {
 	prefixContinuation?: boolean
 	assistantPrefix?: string
@@ -76,7 +84,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 				messages: transformedMessages as OpenAI.ChatCompletionMessageParam[],
 				stream: true,
 				...remains
-			} as any,
+			} as OpenAI.ChatCompletionCreateParamsStreaming,
 			{ signal: controller.signal }
 		)
 
@@ -85,7 +93,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 		const deepSeekOptions = settings as DeepSeekOptions
 		const isReasoningEnabled = deepSeekOptions.enableReasoning ?? false
 
-		for await (const part of stream as any) {
+		for await (const part of stream) {
 			if (part.usage && part.usage.prompt_tokens && part.usage.completion_tokens)
 				DebugLogger.debug(`Prompt tokens: ${part.usage.prompt_tokens}, completion tokens: ${part.usage.completion_tokens}`)
 
@@ -139,7 +147,7 @@ const applyPrefixContinuation = (messages: readonly Message[], config: DeepSeekI
  * 根据 DeepSeek 官方文档：
  * - assistant 消息可包含 reasoning_content 字段
  */
-const transformMessagesForDeepSeek = (messages: readonly Message[]): any[] => {
+const transformMessagesForDeepSeek = (messages: readonly Message[]): DeepSeekMessagePayload[] => {
 	return messages.map(msg => {
 		// 处理 assistant 消息
 		if (msg.role === 'assistant') {
@@ -225,7 +233,7 @@ export const deepSeekVendor: Vendor = {
 		parameters: {},
 		enableReasoning: false // 默认关闭推理功能
 	} as DeepSeekOptions,
-	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as any, deepSeekLoopOptions),
+	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as (settings: BaseOptions) => SendRequest, deepSeekLoopOptions),
 	models: DEEPSEEK_MODELS,
 	websiteToObtainKey: 'https://platform.deepseek.com',
 	capabilities: ['Text Generation', 'Reasoning', 'Structured Output']

@@ -29,6 +29,15 @@ export interface ModelCapabilityProbeResult {
 	statusCode?: number
 }
 
+type CapabilityProbeError = {
+	status?: unknown
+	statusCode?: unknown
+	message?: unknown
+	response?: {
+		status?: unknown
+	}
+}
+
 export const REASONING_CAPABILITY_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 const clampConfidence = (value: number) => Math.max(0, Math.min(1, value))
@@ -359,17 +368,18 @@ export const resolveReasoningCapability = (input: ResolveReasoningCapabilityInpu
 
 const resolveErrorStatus = (error: unknown): number | undefined => {
 	if (!error || typeof error !== 'object') return undefined
+	const errorLike = error as CapabilityProbeError
 	const candidate = [
-		(error as any).status,
-		(error as any).statusCode,
-		(error as any).response?.status
+		errorLike.status,
+		errorLike.statusCode,
+		errorLike.response?.status
 	].find((value) => typeof value === 'number')
 	return typeof candidate === 'number' ? candidate : undefined
 }
 
 export const classifyReasoningProbeError = (error: unknown): ModelCapabilityProbeResult => {
 	const statusCode = resolveErrorStatus(error)
-	const message = toLowerSafe((error as any)?.message ?? error)
+	const message = toLowerSafe((error as CapabilityProbeError | null)?.message ?? error)
 
 	if (statusCode === 401 || statusCode === 403) {
 		return {

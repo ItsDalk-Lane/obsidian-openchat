@@ -97,6 +97,7 @@ const qianFanNormalizeBaseURL = (baseURL: string | undefined) => {
 	return `${parsed.origin}${pathname}`
 }
 export { qianFanNormalizeBaseURL }
+export const qianFanNormalizeBaseURLForTest = qianFanNormalizeBaseURL
 
 const KNOWN_IMAGE_GENERATION_MODELS = ['qwen-image', 'flux-1-schnell', 'air-image', 'qwen-image-plus']
 
@@ -164,6 +165,10 @@ const streamChatCompletion = async function* (
 	resolveEmbedAsBinary: ResolveEmbedAsBinary,
 	options: Record<string, unknown>
 ) {
+	type QianFanDelta = OpenAI.ChatCompletionChunk.Choice.Delta & {
+		reasoning_content?: string
+	}
+
 	const { model, enableThinking = false, ...remains } = options
 	const formattedMessages = await Promise.all(messages.map((msg) => formatMsg(msg, resolveEmbedAsBinary)))
 	const requestPayload: Record<string, unknown> = {
@@ -177,15 +182,15 @@ const streamChatCompletion = async function* (
 		requestPayload.enable_thinking = true
 	}
 
-	const stream = await client.chat.completions.create(requestPayload as any, {
+	const stream = await client.chat.completions.create(requestPayload as unknown as OpenAI.ChatCompletionCreateParamsStreaming, {
 		signal: controller.signal
 	})
 
 	let reasoningActive = false
 	let reasoningStartMs: number | null = null
 
-	for await (const part of stream as any) {
-		const delta = part.choices?.[0]?.delta
+	for await (const part of stream) {
+		const delta = part.choices?.[0]?.delta as QianFanDelta | undefined
 		const reasoningText = String(delta?.reasoning_content ?? '')
 		if (reasoningText && enableThinking) {
 			if (!reasoningActive) {
@@ -411,7 +416,7 @@ export const qianFanVendor: Vendor = {
 		imageDisplayWidth: 400,
 		parameters: {}
 	} as QianFanOptions,
-	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as any, {
+	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as (settings: BaseOptions) => SendRequest, {
 		transformApiParams: (apiParams, allOptions) => {
 			const mapped: Record<string, unknown> = { ...apiParams }
 			if (allOptions.enableThinking === true && mapped.enable_thinking === undefined) {

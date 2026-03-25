@@ -14,8 +14,9 @@ export default function useSortableItem(
 	id: string,
 	allowedEdges: Edge[] = ["top", "bottom"],
 	canSort?: () => boolean,
-	data?: any
+	data?: unknown
 ) {
+	const dataRecord = data && typeof data === 'object' ? data as Record<string, unknown> : {};
 	const [dragging, setDragging] = useState<boolean>(false);
 	const [draggedOver, setIsDraggedOver] = useState<boolean>(false);
 	const [closestEdge, setClosestEdge] = useState<Edge | null>(null);
@@ -36,7 +37,7 @@ export default function useSortableItem(
 					return {
 						type: "sortable-item",
 						itemId: id,
-						...data,
+						...dataRecord,
 					};
 				},
 				canDrag: () => {
@@ -57,7 +58,7 @@ export default function useSortableItem(
 						{
 							type: "sortable-item",
 							itemId: id,
-							...data,
+							...dataRecord,
 						},
 						{
 							element: elRef,

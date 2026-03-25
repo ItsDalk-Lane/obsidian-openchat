@@ -28,7 +28,7 @@ export class ChatModal extends Modal {
 	private root: Root | null = null;
 	private autoAddedFileId: string | null = null;
 	private previousShouldSaveHistory: boolean | null = null; // 保存之前的历史保存状态
-	private previousSession: any = null; // 保存之前的会话状态
+	private previousSession: ReturnType<ChatService['saveSessionState']> | null = null; // 保存之前的会话状态
 
 	// 拖动相关
 	private isDragging = false;

@@ -12,9 +12,7 @@ import type { McpServerConfig, McpServerStatus, McpToolInfo } from './types'
 import type { ITransport, JsonRpcMessage, JsonRpcResponse } from './transport/ITransport'
 import { isJsonRpcResponse, isJsonRpcNotification } from './transport/ITransport'
 import { StdioTransport } from './transport/StdioTransport'
-import { WebSocketTransport } from './transport/WebSocketTransport'
-import { HttpTransport } from './transport/HttpTransport'
-import { RemoteSseTransport } from './transport/RemoteSseTransport'
+import { createMcpTransport, isMcpRemoteTransport } from './mcpTransportFactory'
 
 /** MCP 协议版本 */
 const MCP_PROTOCOL_VERSION = '2024-11-05'
@@ -98,7 +96,7 @@ export class McpClient {
 		this.updateStatus('connecting')
 
 		try {
-			this.transport = this.createTransport()
+			this.transport = createMcpTransport(this.config)
 			this.transport.onMessage = (msg) => this.handleMessage(msg)
 			this.transport.onClose = (code) => this.handleClose(code)
 			this.transport.onError = (err) => this.handleError(err)
@@ -256,48 +254,6 @@ export class McpClient {
 		this.updateStatus('stopped')
 	}
 
-	/** 创建传输层实例 */
-	private createTransport(): ITransport {
-		switch (this.config.transportType) {
-		case 'stdio':
-		case 'sse': // legacy: 兼容旧配置，继续使用本地 stdio 传输
-			if (!this.config.command) {
-				throw new Error(`MCP 服务器 "${this.config.name}" 未配置启动命令`)
-			}
-			return new StdioTransport({
-				command: this.config.command,
-				args: this.config.args ?? [],
-				env: this.config.env,
-				cwd: this.config.cwd,
-			})
-		case 'websocket':
-			if (!this.config.url) {
-				throw new Error(`MCP 服务器 "${this.config.name}" 未配置 WebSocket URL`)
-			}
-			return new WebSocketTransport({ url: this.config.url })
-		case 'http':
-			if (!this.config.url) {
-				throw new Error(`MCP 服务器 "${this.config.name}" 未配置 HTTP URL`)
-			}
-			return new HttpTransport({
-				url: this.config.url,
-				headers: this.config.headers,
-				timeout: this.config.timeout,
-			})
-		case 'remote-sse':
-			if (!this.config.url) {
-				throw new Error(`MCP 服务器 "${this.config.name}" 未配置 Remote SSE URL`)
-			}
-			return new RemoteSseTransport({
-				url: this.config.url,
-				headers: this.config.headers,
-				timeout: this.config.timeout,
-			})
-		default:
-			throw new Error(`不支持的传输类型: ${this.config.transportType}`)
-		}
-	}
-
 	/** 发送 JSON-RPC 请求并等待响应 */
 	private sendRequest(method: string, params?: Record<string, unknown>): Promise<unknown> {
 		return new Promise((resolve, reject) => {
@@ -453,11 +409,7 @@ export class McpClient {
 	}
 
 	private isRemoteTransport(): boolean {
-		return (
-			this.config.transportType === 'http'
-			|| this.config.transportType === 'remote-sse'
-			|| this.config.transportType === 'websocket'
-		)
+		return isMcpRemoteTransport(this.config)
 	}
 
 	/**

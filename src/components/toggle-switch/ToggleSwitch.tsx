@@ -1,4 +1,5 @@
 import './ToggleSwitch.css';
+import { localInstance } from 'src/i18n/locals';
 
 export interface ToggleSwitchProps {
   checked: boolean;
@@ -20,9 +21,9 @@ export function ToggleSwitch(props: ToggleSwitchProps) {
   return (
     <button
       type="button"
-     role="switch"
+      role="switch"
       aria-checked={checked}
-      aria-label={ariaLabel || (checked ? '启用' : '禁用')}
+      aria-label={ariaLabel || (checked ? localInstance.enabled : localInstance.disabled)}
       disabled={disabled}
       className={`toggle-switch ${checked ? 'toggle-switch_checked' : ''} ${disabled ? 'toggle-switch_disabled' : ''} ${className}`.trim()}
       onClick={handleChange}

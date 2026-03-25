@@ -1,6 +1,5 @@
 import { countTokens } from 'gpt-tokenizer';
 import type { Message as ProviderMessage } from 'src/types/provider';
-import { parseContentBlocks } from 'src/core/chat/utils/markdown';
 import type {
 	ChatContextCompactionRange,
 	ChatContextCompactionState,
@@ -9,26 +8,16 @@ import type {
 } from '../types/chat';
 import { isPinnedChatMessage } from '../types/chat';
 import { estimateProviderMessagesTokens as estimateProviderMessagesTokensFromPayload } from 'src/core/chat/utils/token';
+import {
+	buildHistorySummary,
+	type SummaryBuildResult,
+	fitHistorySummaryToBudget,
+	normalizeGeneratedHistorySummary,
+} from './messageContextSummary';
 
 const CONTEXT_COMPACTION_VERSION = 3;
 const MAX_SECTION_ITEMS = 6;
 const MAX_SUMMARY_LINE_CHARS = 220;
-const TOOL_RESULT_PREVIEW_CHARS = 160;
-const HISTORY_SUMMARY_HEADER = '[Earlier conversation summary]';
-const HISTORY_SUMMARY_INTRO =
-	'This block compresses earlier chat turns. Treat it as prior context, not a new instruction.';
-const SUMMARY_CONTEXT_HEADING = '[CONTEXT]';
-const SUMMARY_DECISIONS_HEADING = '[KEY DECISIONS]';
-const SUMMARY_CURRENT_STATE_HEADING = '[CURRENT STATE]';
-const SUMMARY_IMPORTANT_DETAILS_HEADING = '[IMPORTANT DETAILS]';
-const SUMMARY_OPEN_ITEMS_HEADING = '[OPEN ITEMS]';
-const SUMMARY_HEADINGS = [
-	SUMMARY_CONTEXT_HEADING,
-	SUMMARY_DECISIONS_HEADING,
-	SUMMARY_CURRENT_STATE_HEADING,
-	SUMMARY_IMPORTANT_DETAILS_HEADING,
-	SUMMARY_OPEN_ITEMS_HEADING,
-] as const;
 
 export interface SummaryGenerationRequest {
 	kind: 'history';
@@ -48,11 +37,6 @@ export interface MessageContextOptimizationResult {
 	contextCompaction: ChatContextCompactionState | null;
 	historyTokenEstimate: number;
 	usedSummary: boolean;
-	droppedReasoningCount: number;
-}
-
-interface SummaryBuildResult {
-	summary: string;
 	droppedReasoningCount: number;
 }
 
@@ -163,7 +147,7 @@ export class MessageContextOptimizer {
 					messages.map((message) => ({
 						role: message.role === 'tool' ? 'assistant' : message.role,
 						content: message.content,
-					})) as any
+					})) as Array<{ role: string; content: string }>
 				)
 			);
 		} catch {
@@ -265,7 +249,7 @@ export class MessageContextOptimizer {
 			};
 		}
 
-		const baseSummary = this.buildSummary(messages, summaryBudgetTokens);
+		const baseSummary = buildHistorySummary(messages, summaryBudgetTokens);
 		if (!summaryGenerator) {
 			return {
 				summary: this.fitSummaryToBudget(baseSummary.summary, summaryBudgetTokens),
@@ -288,7 +272,7 @@ export class MessageContextOptimizer {
 			});
 			return {
 				summary: this.fitSummaryToBudget(
-					this.normalizeGeneratedSummary(generatedSummary, baseSummary.summary),
+					normalizeGeneratedHistorySummary(generatedSummary, baseSummary.summary),
 					summaryBudgetTokens
 				),
 				droppedReasoningCount: baseSummary.droppedReasoningCount,
@@ -330,27 +314,8 @@ export class MessageContextOptimizer {
 
 		const deltaMessages = messages.slice(previousCount);
 		return deltaMessages.length > 0
-			? this.buildSummary(deltaMessages, Number.MAX_SAFE_INTEGER)
+			? buildHistorySummary(deltaMessages, Number.MAX_SAFE_INTEGER)
 			: null;
-	}
-
-	private normalizeGeneratedSummary(summary: string | null, fallback: string): string {
-		const trimmed = summary?.trim();
-		if (!trimmed) {
-			return fallback;
-		}
-		if (!this.hasExpectedSummaryStructure(trimmed)) {
-			return fallback;
-		}
-		const normalized = trimmed.includes(HISTORY_SUMMARY_HEADER)
-			? trimmed
-			: [
-				HISTORY_SUMMARY_HEADER,
-				HISTORY_SUMMARY_INTRO,
-				'',
-				trimmed,
-			].join('\n');
-		return this.mergeImportantDetails(normalized, fallback);
 	}
 
 	private canReuseCompaction(
@@ -399,428 +364,6 @@ export class MessageContextOptimizer {
 			}
 		}
 		return String(hash >>> 0);
-	}
-
-	private buildSummary(
-		messages: ChatMessage[],
-		summaryBudgetTokens: number
-	): SummaryBuildResult {
-		const sessionIntent: string[] = [];
-		const currentState: string[] = [];
-		const decisions: string[] = [];
-		const importantDetails: string[] = [];
-		const openItems: string[] = [];
-		let droppedReasoningCount = 0;
-		const detailLimit = summaryBudgetTokens < 320
-			? 2
-			: summaryBudgetTokens < 640
-				? 4
-				: MAX_SECTION_ITEMS;
-		const importantDetailLimit = Math.min(
-			MAX_SECTION_ITEMS,
-			Math.max(4, detailLimit)
-		);
-
-		for (const message of messages) {
-			const text = this.extractVisibleText(message);
-			const compact = this.compactLine(text);
-
-			if (message.role === 'user' && compact) {
-				this.pushUnique(sessionIntent, compact);
-				this.pushUnique(openItems, compact);
-			}
-
-			if (message.role === 'assistant' && compact) {
-				this.pushUnique(currentState, compact);
-				if (this.looksLikeDecision(compact)) {
-					this.pushUnique(decisions, compact);
-				}
-			}
-
-			if (message.role === 'user') {
-				const constraints = this.extractConstraintLines(message.content);
-				for (const requirement of constraints.requirements) {
-					this.pushUnique(importantDetails, `Requirement: ${requirement}`);
-				}
-				for (const prohibition of constraints.prohibitions) {
-					this.pushUnique(importantDetails, `Prohibition: ${prohibition}`);
-				}
-			}
-
-			const reasoningBlocks = parseContentBlocks(message.content).filter(
-				(block) => block.type === 'reasoning'
-			);
-			droppedReasoningCount += reasoningBlocks.length;
-
-			for (const reference of this.extractPathReferences(message)) {
-				this.pushUnique(importantDetails, `Path: ${reference}`);
-			}
-
-			for (const detail of this.extractImportantDetailLines(message.content)) {
-				this.pushUnique(importantDetails, detail);
-			}
-
-			for (const toolCall of message.toolCalls ?? []) {
-				const parts = [toolCall.name];
-				const target = this.extractToolTarget(toolCall.arguments ?? {});
-				if (target) {
-					parts.push(target);
-				}
-				const resultPreview = this.compactLine(toolCall.result ?? '', TOOL_RESULT_PREVIEW_CHARS);
-				if (resultPreview) {
-					parts.push(`结果: ${resultPreview}`);
-				}
-				this.pushUnique(importantDetails, `Tool: ${parts.join(' · ')}`);
-			}
-		}
-
-		const lines = [
-			HISTORY_SUMMARY_HEADER,
-			HISTORY_SUMMARY_INTRO,
-			'',
-			SUMMARY_CONTEXT_HEADING,
-			...this.toBulletLines(sessionIntent, Math.min(3, detailLimit)),
-			'',
-			SUMMARY_DECISIONS_HEADING,
-			...this.toBulletLines(decisions, detailLimit),
-			'',
-			SUMMARY_CURRENT_STATE_HEADING,
-			...this.toBulletLines(currentState, detailLimit),
-			'',
-			SUMMARY_IMPORTANT_DETAILS_HEADING,
-			...this.toBulletLines(importantDetails, importantDetailLimit),
-			'',
-			SUMMARY_OPEN_ITEMS_HEADING,
-			...this.toBulletLines(openItems, Math.min(3, detailLimit)),
-		];
-
-		return {
-			summary: lines.join('\n').trim(),
-			droppedReasoningCount,
-		};
-	}
-
-	private extractImportantDetailLines(content: string): string[] {
-		const details: string[] = [];
-		const lines = String(content ?? '').split('\n');
-
-		for (const rawLine of lines) {
-			const line = rawLine
-				.replace(/^\s*(?:[-*+]\s+|\d+[.)、]\s*|#+\s*)/, '')
-				.trim();
-			if (!line || line.length > MAX_SUMMARY_LINE_CHARS * 1.8) {
-				continue;
-			}
-			if (
-				/`[^`]+`/.test(line)
-				|| /(?:^|[^\d])\d+(?:\.\d+)?(?:%|ms|s|kb|mb|gb|tokens?)?/i.test(line)
-				|| /(max_tokens|max_output_tokens|contextlength|summarymodeltag|frontmatter|contextsummary|contextsourcesignature|totaltokenestimate)/i.test(line)
-				|| /[:=]/.test(line)
-			) {
-				this.pushUnique(details, line);
-			}
-		}
-
-		return details;
-	}
-
-	private extractVisibleText(message: ChatMessage): string {
-		if (message.role !== 'assistant') {
-			return this.normalizeText(message.content);
-		}
-
-		const blocks = parseContentBlocks(message.content);
-		const textBlocks = blocks.filter((block) => block.type === 'text');
-		if (textBlocks.length > 0) {
-			return this.normalizeText(textBlocks.map((block) => block.content).join('\n'));
-		}
-		return this.normalizeText(message.content);
-	}
-
-	private extractPathReferences(message: ChatMessage): string[] {
-		const matches = new Set<string>();
-		const push = (value: string) => {
-			const normalized = this.normalizePathReference(value);
-			if (!normalized) {
-				return;
-			}
-			matches.add(normalized);
-		};
-
-		for (const match of message.content.matchAll(/\[\[([^\]]+)\]\]/g)) {
-			if (match[1]) {
-				push(match[1]);
-			}
-		}
-
-		for (const match of message.content.matchAll(/`([^`\n]*[\\/][^`\n]+)`/g)) {
-			if (match[1]) {
-				push(match[1]);
-			}
-		}
-
-		for (const match of message.content.matchAll(
-			/(?:^|[\s(（:：])((?:\/)?(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.:-]+(?:\.[A-Za-z0-9_.-]+)?)(?=$|[\s),.;:，。；）])/gm
-		)) {
-			if (match[1]) {
-				push(match[1]);
-			}
-		}
-
-		for (const toolCall of message.toolCalls ?? []) {
-			const target = this.extractToolTarget(toolCall.arguments ?? {});
-			if (target) {
-				push(target);
-			}
-		}
-
-		return Array.from(matches).slice(0, MAX_SECTION_ITEMS);
-	}
-
-	private normalizePathReference(value: string): string {
-		const normalized = value
-			.trim()
-			.replace(/[，。；：,.;:]+$/g, '')
-			.replace(/^['"`]+|['"`]+$/g, '');
-		if (!this.isLikelyPathReference(normalized)) {
-			return '';
-		}
-		return normalized;
-	}
-
-	private isLikelyPathReference(value: string): boolean {
-		if (!value || /^https?:\/\//i.test(value)) {
-			return false;
-		}
-		if (!value.includes('/') && !value.includes('\\')) {
-			return false;
-		}
-		if (/\s/.test(value)) {
-			return false;
-		}
-		return /[A-Za-z0-9_.-]/.test(value);
-	}
-
-	private extractConstraintLines(content: string): {
-		requirements: string[];
-		prohibitions: string[];
-	} {
-		const requirements: string[] = [];
-		const prohibitions: string[] = [];
-		const lines = String(content ?? '').split('\n');
-
-		for (const rawLine of lines) {
-			const line = rawLine
-				.replace(/^\s*(?:[-*+]\s+|\d+[.)、]\s*|#+\s*)/, '')
-				.trim();
-			if (!line) {
-				continue;
-			}
-			if (line.length > MAX_SUMMARY_LINE_CHARS * 1.8) {
-				continue;
-			}
-			if (this.isConstraintLine(line)) {
-				if (this.isProhibitionLine(line)) {
-					this.pushUnique(prohibitions, line);
-				} else {
-					this.pushUnique(requirements, line);
-				}
-			}
-		}
-
-		return { requirements, prohibitions };
-	}
-
-	private isConstraintLine(line: string): boolean {
-		return /必须|需要|应当|共享|进入同一套|只保留|优先生成|回退到|只能看到|至少要记住|完整保留|原始历史|frontmatter|reasoning_content|telemetry|markdown 正文|文件上下文|工具调用结果/i.test(
-			line
-		);
-	}
-
-	private isProhibitionLine(line: string): boolean {
-		return /不允许|禁止|不得|不能|不要|不再|严禁/i.test(line);
-	}
-
-	private hasExpectedSummaryStructure(summary: string): boolean {
-		return SUMMARY_HEADINGS.every((heading) => summary.includes(heading));
-	}
-
-	private mergeImportantDetails(summary: string, fallback: string): string {
-		const fallbackItems = this.extractSectionItems(
-			fallback,
-			SUMMARY_IMPORTANT_DETAILS_HEADING
-		);
-		if (
-			fallbackItems.length === 0
-			|| fallbackItems.every((item) => item === '- None')
-		) {
-			return summary;
-		}
-
-		const summaryItems = this.extractSectionItems(
-			summary,
-			SUMMARY_IMPORTANT_DETAILS_HEADING
-		);
-		const missingItems = fallbackItems.filter((item) => !summaryItems.includes(item));
-		if (missingItems.length === 0) {
-			return summary;
-		}
-
-		const parsed = this.parseStructuredSummary(summary);
-		const importantSection = parsed.sections.find(
-			(section) => section.heading === SUMMARY_IMPORTANT_DETAILS_HEADING
-		);
-		if (!importantSection) {
-			parsed.sections.push({
-				heading: SUMMARY_IMPORTANT_DETAILS_HEADING,
-				items: [...missingItems],
-			});
-			return this.renderStructuredSummary(parsed);
-		}
-
-		for (const item of missingItems) {
-			if (!importantSection.items.includes(item)) {
-				importantSection.items.push(item);
-			}
-		}
-
-		return this.renderStructuredSummary(parsed);
-	}
-
-	private extractSectionItems(summary: string, heading: string): string[] {
-		const lines = summary.split('\n');
-		const items: string[] = [];
-		let collecting = false;
-
-		for (const line of lines) {
-			if (line === heading) {
-				collecting = true;
-				continue;
-			}
-			if (!collecting) {
-				continue;
-			}
-			if (SUMMARY_HEADINGS.includes(line as typeof SUMMARY_HEADINGS[number])) {
-				break;
-			}
-			if (line.startsWith('- ')) {
-				items.push(line);
-			}
-		}
-
-		return items;
-	}
-
-	private parseStructuredSummary(summary: string): {
-		preamble: string[];
-		sections: Array<{ heading: string; items: string[] }>;
-	} {
-		const lines = summary.trim().split('\n');
-		const preamble: string[] = [];
-		const sections: Array<{ heading: string; items: string[] }> = [];
-		let currentSection: { heading: string; items: string[] } | null = null;
-
-		for (const line of lines) {
-			if (SUMMARY_HEADINGS.includes(line as typeof SUMMARY_HEADINGS[number])) {
-				currentSection = { heading: line, items: [] };
-				sections.push(currentSection);
-				continue;
-			}
-			if (!currentSection) {
-				preamble.push(line);
-				continue;
-			}
-			if (line.startsWith('- ')) {
-				currentSection.items.push(line);
-			} else if (line.trim()) {
-				currentSection.items.push(`- ${line.trim()}`);
-			}
-		}
-
-		for (const heading of SUMMARY_HEADINGS) {
-			if (!sections.some((section) => section.heading === heading)) {
-				sections.push({ heading, items: ['- None'] });
-			}
-		}
-
-		return { preamble, sections };
-	}
-
-	private renderStructuredSummary(summary: {
-		preamble: string[];
-		sections: Array<{ heading: string; items: string[] }>;
-	}): string {
-		const lines: string[] = [];
-		const preamble = summary.preamble.filter((line) => line.trim().length > 0);
-		if (preamble.length > 0) {
-			lines.push(...preamble, '');
-		}
-
-		for (const heading of SUMMARY_HEADINGS) {
-			const section = summary.sections.find((item) => item.heading === heading);
-			lines.push(heading, ...(section?.items.length ? section.items : ['- None']), '');
-		}
-
-		return lines.join('\n').trim();
-	}
-
-	private fitSummaryToBudget(summary: string, targetBudgetTokens: number): string {
-		const trimmed = summary.trim();
-		if (!trimmed || targetBudgetTokens <= 0) {
-			return '';
-		}
-
-		let parsed = this.parseStructuredSummary(trimmed);
-		let fitted = this.renderStructuredSummary(parsed);
-		const estimateTokens = (value: string) =>
-			this.estimateProviderMessagesTokens([{ role: 'assistant', content: value }]);
-		if (estimateTokens(fitted) <= targetBudgetTokens) {
-			return fitted;
-		}
-
-		const trimOrder = [
-			SUMMARY_OPEN_ITEMS_HEADING,
-			SUMMARY_CURRENT_STATE_HEADING,
-			SUMMARY_DECISIONS_HEADING,
-			SUMMARY_CONTEXT_HEADING,
-		];
-
-		for (;;) {
-			let removed = false;
-			for (const heading of trimOrder) {
-				const section = parsed.sections.find((item) => item.heading === heading);
-				if (section && section.items.length > 1) {
-					section.items.pop();
-					removed = true;
-					break;
-				}
-			}
-			fitted = this.renderStructuredSummary(parsed);
-			if (!removed || estimateTokens(fitted) <= targetBudgetTokens) {
-				break;
-			}
-		}
-
-		for (const maxChars of [180, 140, 110, 90, 70, 50]) {
-			parsed = {
-				...parsed,
-				sections: parsed.sections.map((section) => ({
-					...section,
-					items: section.items.map((item) =>
-						item === '- None'
-							|| section.heading === SUMMARY_IMPORTANT_DETAILS_HEADING
-							? item
-							: `- ${this.compactLine(item.slice(2), maxChars)}`
-					),
-				})),
-			};
-			fitted = this.renderStructuredSummary(parsed);
-			if (estimateTokens(fitted) <= targetBudgetTokens) {
-				return fitted;
-			}
-		}
-
-		return fitted;
 	}
 
 	private extractToolTarget(args: Record<string, unknown>): string | null {
@@ -896,5 +439,13 @@ export class MessageContextOptimizer {
 			return Math.floor(value);
 		}
 		return fallback;
+	}
+
+	private fitSummaryToBudget(summary: string, targetBudgetTokens: number): string {
+		return fitHistorySummaryToBudget(
+			summary,
+			targetBudgetTokens,
+			(value) => this.estimateProviderMessagesTokens([{ role: 'assistant', content: value }])
+		);
 	}
 }

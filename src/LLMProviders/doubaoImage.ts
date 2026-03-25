@@ -135,16 +135,25 @@ export interface DoubaoImageOptions extends BaseOptions {
  * event: done
  * data: [DONE]
  */
-function parseSSEResponse(text: string): { data: any[] } {
-	const result: any[] = []
+type DoubaoImageResponseItem = {
+	url?: string
+	b64_json?: string
+}
+
+type DoubaoImageResponse = {
+	data: DoubaoImageResponseItem[]
+}
+
+function parseSSEResponse(text: string): DoubaoImageResponse {
+	const result: DoubaoImageResponseItem[] = []
 	const parsed = feedChunk('', `${text}\n\n`)
 	for (const event of parsed.events) {
 		if (event.isDone) continue
 		if (event.parseError) {
-			console.warn('Failed to parse SSE data line:', event.data, event.parseError)
+			DebugLogger.warn('Failed to parse SSE data line:', event.data, event.parseError)
 			continue
 		}
-		const jsonData = event.json as any
+		const jsonData = event.json as DoubaoImageResponseItem | undefined
 		if (!jsonData) continue
 		if (event.event === 'image' || !event.event || jsonData.url || jsonData.b64_json) {
 			result.push(jsonData)
@@ -257,7 +266,7 @@ const sendRequestFunc = (settings: DoubaoImageOptions): SendRequest =>
 						}
 					}
 				} catch (error) {
-					console.error('Failed to process embed image:', error)
+					DebugLogger.error('Failed to process embed image:', error)
 				}
 			}
 		}
@@ -314,7 +323,7 @@ const sendRequestFunc = (settings: DoubaoImageOptions): SendRequest =>
 		DebugLogger.debug('Response headers:', response.headers)
 
 		// 处理响应数据
-		let responseData: any
+		let responseData: DoubaoImageResponse
 		
 		// 检查是否是流式响应（通过 Content-Type 判断）
 		const contentType = response.headers['content-type'] || response.headers['Content-Type'] || ''
@@ -326,13 +335,13 @@ const sendRequestFunc = (settings: DoubaoImageOptions): SendRequest =>
 			try {
 				responseData = parseSSEResponse(response.text)
 			} catch (error) {
-				console.error('Failed to parse SSE response:', error)
+				DebugLogger.error('Failed to parse SSE response:', error)
 				DebugLogger.debug('Raw response text:', response.text)
 				throw new Error('解析流式响应失败，请尝试关闭流式输出选项')
 			}
 		} else {
 			// 普通 JSON 响应
-			responseData = response.json
+			responseData = response.json as DoubaoImageResponse
 		}
 
 		DebugLogger.debug('Parsed response data:', responseData)
@@ -358,7 +367,7 @@ const sendRequestFunc = (settings: DoubaoImageOptions): SendRequest =>
 			const imageBase64 = imageData.b64_json || imageData.url
 			
 			if (!imageBase64) {
-				console.error(`No image data returned for image ${i + 1}`)
+				DebugLogger.error(`No image data returned for image ${i + 1}`)
 				continue
 			}
 
@@ -373,7 +382,7 @@ const sendRequestFunc = (settings: DoubaoImageOptions): SendRequest =>
 					const imgResponse = await requestUrl({ url: imageBase64, method: 'GET' })
 					imageBuffer = imgResponse.arrayBuffer
 				} catch (error) {
-					console.error(`Failed to download image ${i + 1}:`, error)
+					DebugLogger.error(`Failed to download image ${i + 1}:`, error)
 					yield `❌ 图片 ${i + 1} 下载失败\n\n`
 					continue
 				}
@@ -389,7 +398,7 @@ const sendRequestFunc = (settings: DoubaoImageOptions): SendRequest =>
 				yield `![[${filename}|${displayWidth}]]\n\n`
 			} catch (error) {
 				const detail = error instanceof Error ? error.message : String(error)
-				console.error(`Failed to save image ${i + 1}:`, error)
+				DebugLogger.error(`Failed to save image ${i + 1}:`, error)
 				yield `❌ 图片 ${i + 1} 保存失败: ${detail}\n\n`
 			}
 		}

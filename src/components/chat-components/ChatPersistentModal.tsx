@@ -1,14 +1,11 @@
 import { App, EventRef, MarkdownView, Modal, TFile } from 'obsidian';
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { ObsidianAppContext } from 'src/contexts/obsidianAppContext';
 import { localInstance } from 'src/i18n/locals';
 import { ChatService } from 'src/core/chat/services/ChatService';
-import type { ChatState } from 'src/types/chat';
-import { ChatPlanPanel } from './ChatPlanPanel';
-import { ChatMessages } from './ChatMessages';
-import { ChatControls } from './ChatControls';
-import { ChatInput } from './ChatInput';
+import { ChatPersistentModalApp } from './ChatPersistentModalApp';
+import { setupModalDragging } from './chatPersistentModalDrag';
 
 /**
  * Chat 持久化模态框配置选项
@@ -37,14 +34,8 @@ export class ChatPersistentModal extends Modal {
 	// 事件监听器引用(用于清理)
 	private eventRefs: EventRef[] = [];
 
-	// 拖动相关
-	private isDragging = false;
-	private dragStartX = 0;
-	private dragStartY = 0;
-	private modalStartLeft = 0;
-	private modalStartTop = 0;
-	private dragMouseUpHandler: ((e: MouseEvent) => void) | null = null;
-	private dragMouseMoveHandler: ((e: MouseEvent) => void) | null = null;
+	// 拖动清理函数
+	private dragCleanup: (() => void) | null = null;
 
 	// 缩小功能相关
 	private isMinimized = false;
@@ -91,7 +82,7 @@ export class ChatPersistentModal extends Modal {
 		titleEl.textContent = localInstance.chat_modal_title;
 
 		// 设置模态框为可拖动
-		this.setupDraggable(modalEl, titleEl);
+		this.dragCleanup = setupModalDragging(modalEl, titleEl, () => this.handleMinimize(), () => this.close());
 
 		// 设置模态框尺寸
 		modalEl.style.setProperty('--chat-modal-width', `${this.options.width}px`);
@@ -155,7 +146,8 @@ export class ChatPersistentModal extends Modal {
 		this.unregisterEventListeners();
 
 		// 清理拖动事件监听器
-		this.cleanupDragListeners();
+		this.dragCleanup?.();
+		this.dragCleanup = null;
 
 		// 清理焦点捕获监听器
 		if (this.focusCaptureHandler) {
@@ -268,113 +260,6 @@ export class ChatPersistentModal extends Modal {
 				</ObsidianAppContext.Provider>
 			</StrictMode>
 		);
-	}
-
-	/**
-	 * 设置模态框拖动功能
-	 */
-	private setupDraggable(modalEl: HTMLElement, titleEl: HTMLElement) {
-		// 设置标题栏光标样式
-		titleEl.style.cursor = 'move';
-		titleEl.style.userSelect = 'none';
-		titleEl.style.position = 'relative'; // 确保按钮容器正确定位
-
-		// 创建关闭按钮容器
-		const closeBtnContainer = titleEl.createDiv('modal-close-button-container');
-
-		// 创建缩小按钮
-		const minimizeBtn = closeBtnContainer.createEl('button', {
-			cls: 'chat-persistent-modal-minimize-btn',
-			attr: { 'aria-label': '缩小' }
-		});
-		minimizeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
-		minimizeBtn.addEventListener('click', (e) => {
-			e.stopPropagation();
-			this.handleMinimize();
-		});
-
-		// 创建关闭按钮
-		const closeBtn = closeBtnContainer.createEl('button', {
-			cls: 'chat-persistent-modal-close-btn',
-			attr: { 'aria-label': '关闭' }
-		});
-		closeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-		closeBtn.addEventListener('click', (e) => {
-			e.stopPropagation();
-			this.close();
-		});
-
-		// 鼠标按下开始拖动
-		titleEl.addEventListener('mousedown', (e: MouseEvent) => {
-			if (e.button !== 0) return; // 只响应左键
-
-			// 检查点击是否在按钮容器内
-			if ((e.target as HTMLElement).closest('.modal-close-button-container')) {
-				return; // 不启动拖动
-			}
-
-			this.isDragging = true;
-			this.dragStartX = e.clientX;
-			this.dragStartY = e.clientY;
-
-			// 获取当前模态框位置
-			const rect = modalEl.getBoundingClientRect();
-			this.modalStartLeft = rect.left;
-			this.modalStartTop = rect.top;
-
-			// 创建鼠标移动和释放事件处理函数
-			this.dragMouseMoveHandler = (moveEvent: MouseEvent) => {
-				if (!this.isDragging) return;
-
-				const deltaX = moveEvent.clientX - this.dragStartX;
-				const deltaY = moveEvent.clientY - this.dragStartY;
-
-				// 计算新位置
-				const newLeft = this.modalStartLeft + deltaX;
-				const newTop = this.modalStartTop + deltaY;
-
-				// 应用新位置
-				modalEl.style.position = 'fixed';
-				modalEl.style.left = `${newLeft}px`;
-				modalEl.style.top = `${newTop}px`;
-				modalEl.style.transform = 'none';
-				modalEl.style.margin = '0';
-			};
-
-			this.dragMouseUpHandler = () => {
-				this.isDragging = false;
-				if (this.dragMouseMoveHandler) {
-					document.removeEventListener('mousemove', this.dragMouseMoveHandler);
-					this.dragMouseMoveHandler = null;
-				}
-				if (this.dragMouseUpHandler) {
-					document.removeEventListener('mouseup', this.dragMouseUpHandler);
-					this.dragMouseUpHandler = null;
-				}
-			};
-
-			// 添加全局事件监听器
-			document.addEventListener('mousemove', this.dragMouseMoveHandler);
-			document.addEventListener('mouseup', this.dragMouseUpHandler);
-
-			// 阻止默认行为
-			e.preventDefault();
-		});
-	}
-
-	/**
-	 * 清理拖动事件监听器
-	 */
-	private cleanupDragListeners() {
-		if (this.dragMouseMoveHandler) {
-			document.removeEventListener('mousemove', this.dragMouseMoveHandler);
-			this.dragMouseMoveHandler = null;
-		}
-		if (this.dragMouseUpHandler) {
-			document.removeEventListener('mouseup', this.dragMouseUpHandler);
-			this.dragMouseUpHandler = null;
-		}
-		this.isDragging = false;
 	}
 
 	/**
@@ -585,103 +470,3 @@ export class ChatPersistentModal extends Modal {
 		}
 	}
 }
-
-interface ChatPersistentModalAppProps {
-	service: ChatService;
-	app: App;
-}
-
-/**
- * Chat 持久化模态框 React 应用组件
- * UI结构与ChatView保持一致
- */
-const ChatPersistentModalApp = ({ service, app }: ChatPersistentModalAppProps) => {
-	const [state, setState] = useState<ChatState>(service.getState());
-	const MODAL_VIEWPORT_PADDING = 8;
-
-	const keepModalInViewport = () => {
-		const modalEl = document.querySelector<HTMLElement>('.chat-persistent-modal');
-		if (!modalEl) {
-			return;
-		}
-
-		const computedStyle = window.getComputedStyle(modalEl);
-		const hasFixedPosition = computedStyle.position === 'fixed';
-		if (!hasFixedPosition) {
-			return;
-		}
-
-		const currentTop = Number.parseFloat(modalEl.style.top || computedStyle.top || '0');
-		if (!Number.isFinite(currentTop)) {
-			return;
-		}
-
-		const rect = modalEl.getBoundingClientRect();
-		let adjustedTop = currentTop;
-
-		if (rect.bottom > window.innerHeight - MODAL_VIEWPORT_PADDING) {
-			adjustedTop -= rect.bottom - (window.innerHeight - MODAL_VIEWPORT_PADDING);
-		}
-		if (rect.top < MODAL_VIEWPORT_PADDING) {
-			adjustedTop += MODAL_VIEWPORT_PADDING - rect.top;
-		}
-
-		if (adjustedTop !== currentTop) {
-			modalEl.style.top = `${Math.max(MODAL_VIEWPORT_PADDING, adjustedTop)}px`;
-		}
-	};
-
-	useEffect(() => {
-		const unsubscribe = service.subscribe((next) => {
-			setState(next);
-		});
-		return () => unsubscribe();
-	}, [service]);
-
-	const session = state.activeSession;
-
-	// 判断是否有消息
-	const hasMessages = session && session.messages.length > 0;
-
-	// 动态控制模态框高度
-	useEffect(() => {
-		const modalEl = document.querySelector('.chat-persistent-modal');
-		if (modalEl) {
-			if (!hasMessages) {
-				modalEl.classList.add('auto-height');
-			} else {
-				modalEl.classList.remove('auto-height');
-			}
-			window.requestAnimationFrame(() => {
-				keepModalInViewport();
-			});
-		}
-	}, [hasMessages]);
-
-	return (
-		<div className="chat-persistent-modal-app tw-flex tw-h-full tw-flex-col tw-overflow-hidden tw-gap-2">
-			<div className={`chat-persistent-modal-body tw-flex tw-flex-col tw-overflow-hidden tw-gap-2 ${hasMessages ? 'tw-flex-1' : ''}`}>
-				{session ? (
-					<>
-						{hasMessages && <ChatMessages service={service} state={state} />}
-						<ChatPlanPanel
-							sessionId={session.id}
-							plan={session.livePlan}
-							isGenerating={state.isGenerating}
-						/>
-						<ChatControls
-							service={service}
-							state={state}
-							app={app}
-						/>
-						<ChatInput service={service} state={state} app={app} />
-					</>
-				) : (
-					<div className="tw-flex tw-h-full tw-items-center tw-justify-center tw-text-muted">
-						暂无聊天会话,点击"New Chat"开始新的对话。
-					</div>
-				)}
-			</div>
-		</div>
-	);
-};

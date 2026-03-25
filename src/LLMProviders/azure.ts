@@ -1,4 +1,4 @@
-import { AzureOpenAI } from 'openai'
+import OpenAI, { AzureOpenAI } from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockEnd, buildReasoningBlockStart } from './utils'
@@ -9,6 +9,15 @@ export interface AzureOptions extends BaseOptions {
 	endpoint: string
 	apiVersion: string
 	enableReasoning?: boolean
+}
+
+type AzureResponseEvent = {
+	type?: string
+	delta?: unknown
+}
+
+type AzureDelta = OpenAI.ChatCompletionChunk.Choice.Delta & {
+	reasoning_content?: string
 }
 
 export const azureUseResponsesAPI = (options: AzureOptions) => options.enableReasoning === true
@@ -44,12 +53,12 @@ const sendRequestFuncBase = (settings: AzureOptions): SendRequest =>
 				responseData.reasoning = { effort: 'medium' }
 			}
 
-			const stream = await client.responses.create(responseData as any, {
+			const stream = await client.responses.create(responseData as Parameters<typeof client.responses.create>[0], {
 				signal: controller.signal
 			})
 			let reasoningActive = false
 			let reasoningStartMs: number | null = null
-			for await (const event of stream as any) {
+			for await (const event of stream as AsyncIterable<AzureResponseEvent>) {
 				if (event.type === 'response.reasoning_text.delta' || event.type === 'response.reasoning_summary_text.delta') {
 					const text = String(event.delta ?? '')
 					if (!text) continue
@@ -98,7 +107,7 @@ const sendRequestFuncBase = (settings: AzureOptions): SendRequest =>
 				})),
 				stream: true,
 				...remains
-			} as any,
+			} as OpenAI.ChatCompletionCreateParamsStreaming,
 			{
 				signal: controller.signal
 			}
@@ -106,11 +115,11 @@ const sendRequestFuncBase = (settings: AzureOptions): SendRequest =>
 
 		let reasoningActive = false
 		let reasoningStartMs: number | null = null
-		for await (const part of stream as any) {
+		for await (const part of stream) {
 			if (part.usage && part.usage.prompt_tokens && part.usage.completion_tokens)
 				DebugLogger.debug(`Prompt tokens: ${part.usage.prompt_tokens}, completion tokens: ${part.usage.completion_tokens}`)
 
-			const delta = part.choices[0]?.delta
+			const delta = part.choices[0]?.delta as AzureDelta | undefined
 			const reasoningContent = delta?.reasoning_content
 			if (reasoningContent) {
 				if (!reasoningActive) {

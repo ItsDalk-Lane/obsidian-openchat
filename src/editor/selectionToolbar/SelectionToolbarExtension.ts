@@ -2,6 +2,7 @@ import { Extension } from '@codemirror/state';
 import { EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import { App, TFile, MarkdownView } from 'obsidian';
 import type { ChatSettings } from 'src/types/chat';
+import { DebugLogger } from 'src/utils/DebugLogger';
 
 /**
  * 获取文件内容（不包括 frontmatter）
@@ -264,7 +265,7 @@ export function createSelectionToolbarExtension(
 						bottom: Math.max(fromCoords.bottom, toCoords.bottom)
 					};
 				} catch (e) {
-					console.error('[SelectionToolbarExtension] 获取选区坐标失败:', e);
+					DebugLogger.error('[SelectionToolbarExtension] 获取选区坐标失败', e);
 					return null;
 				}
 			}

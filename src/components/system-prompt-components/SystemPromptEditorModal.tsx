@@ -119,7 +119,9 @@ function SystemPromptEditorForm(props: {
 	}, []);
 
 	const templateFiles = useMemo(() => {
-		const plugin = (app as any).plugins?.plugins?.['openchat'];
+		type OpenChatPluginLike = { settings?: { aiDataFolder?: string } }
+		type AppWithPlugins = typeof app & { plugins?: { plugins?: Record<string, OpenChatPluginLike | undefined> } }
+		const plugin = (app as AppWithPlugins).plugins?.plugins?.['openchat'];
 		const folder = getPromptTemplatePath(plugin?.settings?.aiDataFolder || 'System/AI Data');
 		const files = app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(folder + '/'));
 		return files.map((f) => ({

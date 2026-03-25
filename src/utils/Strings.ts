@@ -32,14 +32,14 @@ export class Strings {
         if (this.isBlank(value)) {
             return defaultValue;
         }
-        return value!;
+        return value as string;
     }
 
     static defaultIfEmpty(value: string | null | undefined, defaultValue: string): string {
         if (this.isEmpty(value)) {
             return defaultValue;
         }
-        return value!;
+        return value as string;
     }
 
     static isEmail(value: string | null | undefined) {
@@ -47,7 +47,7 @@ export class Strings {
             return false;
         }
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        return emailRegex.test(value!);
+        return emailRegex.test(value as string);
     }
 
     static isStartsWith(value: string | null | undefined, prefixList: string[]): boolean {
@@ -57,27 +57,32 @@ export class Strings {
         if (!Array.isArray(prefixList) || prefixList.length === 0) {
             return false;
         }
+        const normalizedValue = value as string;
         for (const prefix of prefixList) {
-            if (value!.startsWith(prefix)) {
+            if (normalizedValue.startsWith(prefix)) {
                 return true;
             }
         }
         return false;
     }
 
-    static safeToLowerCaseString(value: any) {
+    static safeToLowerCaseString(value: unknown) {
         if (value === undefined || value === null) {
             return "";
         }
 
-        if (value.toLowerCase) {
+        if (typeof value === 'string') {
             return value.toLowerCase();
         }
 
-        if (value.toString) {
+        if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
             return value.toString().toLowerCase();
         }
 
-        return value + "";
+        if (typeof value === 'object' && 'toString' in value && typeof value.toString === 'function') {
+            return value.toString().toLowerCase();
+        }
+
+        return String(value);
     }
 }

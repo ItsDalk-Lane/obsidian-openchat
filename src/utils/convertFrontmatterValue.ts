@@ -1,26 +1,27 @@
 import { App } from "obsidian";
 import getPropertyTypeByName from "./getPropertyTypeByName";
 import { isValidYamlValue, TypeConversionError, logTypeConversion } from "./typeSafety";
+import { DebugLogger } from "./DebugLogger";
 
 export interface FrontmatterConversionOptions {
     strictMode?: boolean;
     logConversions?: boolean;
-    fallbackValue?: any;
+    fallbackValue?: unknown;
 }
 
 export function convertFrontmatterValue(
     app: App,
     name: string,
-    value: any,
+    value: unknown,
     options: FrontmatterConversionOptions = {}
-): any {
+): unknown {
     const { strictMode = false, logConversions = false, fallbackValue = null } = options;
 
     const targetType = getPropertyTypeByName(app, name);
     const originalType = typeof value;
 
     try {
-        let convertedValue: any;
+        let convertedValue: unknown;
         const conversionContext = {
             fieldName: name,
             actionType: 'frontmatter_update',
@@ -100,7 +101,7 @@ export function convertFrontmatterValue(
         }
 
         // In non-strict mode, log warning and return fallback or original value
-        console.warn(errorMessage, {
+        DebugLogger.warn(errorMessage, {
             propertyName: name,
             originalValue: value,
             targetType,
@@ -114,7 +115,7 @@ export function convertFrontmatterValue(
 /**
  * Converts value to boolean for checkbox properties
  */
-function convertToCheckbox(value: any, strictMode: boolean): boolean {
+function convertToCheckbox(value: unknown, strictMode: boolean): boolean {
     if (typeof value === 'boolean') {
         return value;
     }
@@ -143,7 +144,7 @@ function convertToCheckbox(value: any, strictMode: boolean): boolean {
 /**
  * Converts value to number for number properties
  */
-function convertToNumber(value: any, strictMode: boolean): number {
+function convertToNumber(value: unknown, strictMode: boolean): number {
     if (typeof value === 'number') {
         if (isNaN(value)) {
             throw new Error('Value is NaN');
@@ -188,7 +189,7 @@ function convertToNumber(value: any, strictMode: boolean): number {
 /**
  * Converts value to Date for date properties
  */
-function convertToDate(value: any, strictMode: boolean): Date {
+function convertToDate(value: unknown, strictMode: boolean): Date {
     if (value instanceof Date) {
         if (isNaN(value.getTime())) {
             throw new Error('Invalid Date object');
@@ -216,6 +217,10 @@ function convertToDate(value: any, strictMode: boolean): Date {
         throw new Error(`Cannot convert '${value}' (${typeof value}) to Date`);
     }
 
+    if (typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date)) {
+        throw new Error(`Cannot convert '${String(value)}' to Date`);
+    }
+
     const dateValue = new Date(value);
     if (isNaN(dateValue.getTime())) {
         throw new Error(`Cannot convert '${value}' to Date`);
@@ -226,7 +231,7 @@ function convertToDate(value: any, strictMode: boolean): Date {
 /**
  * Converts value to Date string for datetime properties
  */
-function convertToDateTime(value: any, strictMode: boolean): string {
+function convertToDateTime(value: unknown, strictMode: boolean): string {
     const dateValue = convertToDate(value, strictMode);
     return dateValue.toISOString();
 }
@@ -234,7 +239,7 @@ function convertToDateTime(value: any, strictMode: boolean): string {
 /**
  * Converts value to array for tags properties
  */
-function convertToTags(value: any, strictMode: boolean): string[] {
+function convertToTags(value: unknown, strictMode: boolean): string[] {
     if (Array.isArray(value)) {
         return value.map(item => String(item)).filter(tag => tag.trim() !== '');
     }
@@ -256,7 +261,7 @@ function convertToTags(value: any, strictMode: boolean): string[] {
 /**
  * Converts value to array for multitext properties
  */
-function convertToMultitext(value: any, strictMode: boolean): string[] {
+function convertToMultitext(value: unknown, strictMode: boolean): string[] {
     if (Array.isArray(value)) {
         return value.map(item => String(item));
     }
@@ -276,7 +281,7 @@ function convertToMultitext(value: any, strictMode: boolean): string[] {
 /**
  * Converts value to text (string) for text properties
  */
-function convertToText(value: any, strictMode: boolean): string {
+function convertToText(value: unknown, strictMode: boolean): string {
     if (typeof value === 'string') {
         return value;
     }

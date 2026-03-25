@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { StopCircle, RotateCw, AlertTriangle } from 'lucide-react';
-import { Component } from 'obsidian';
+import { App, Component } from 'obsidian';
 import { useObsidianApp } from 'src/contexts/obsidianAppContext';
 import type { ChatMessage } from 'src/types/chat';
 import type { LayoutMode, ParallelResponseGroup } from 'src/core/chat/types/multiModel';
@@ -130,7 +130,7 @@ const SingleResponse = ({ message, service, isStreaming, isError, compact }: Sin
 	);
 };
 
-const MarkdownBlock = ({ content, app }: { content: string; app: any }) => {
+const MarkdownBlock = ({ content, app }: { content: string; app: App }) => {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const componentRef = useRef(new Component());
 

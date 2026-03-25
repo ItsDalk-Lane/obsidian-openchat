@@ -3,12 +3,14 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import { createScriptLogger } from "./script-logger.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const pluginDir = resolve(scriptDir, "..");
 const repoRootDir = resolve(pluginDir, "..");
 const ENV_KEY = "OBSIDIAN_VAULT_PATH";
 const defaultBuildFiles = ["main.js", "styles.css", "manifest.json"];
+const logger = createScriptLogger("copy-to-vault");
 
 function loadEnvFiles() {
 	const envCandidates = [resolve(pluginDir, ".env"), resolve(repoRootDir, ".env")];
@@ -134,11 +136,11 @@ export async function copyToVault(options = {}) {
 		copiedFiles.push(file.name);
 	}
 
-	console.log(`[openchat] Source: ${sourceDir}`);
-	console.log(`[openchat] Vault: ${vaultRoot}`);
-	console.log(`[openchat] Plugin id: ${pluginId}`);
-	console.log(`[openchat] Target: ${targetPluginDir}`);
-	console.log(`[openchat] Copy: ${copiedFiles.join(", ")}`);
+	logger.info(`Source: ${sourceDir}`);
+	logger.info(`Vault: ${vaultRoot}`);
+	logger.info(`Plugin id: ${pluginId}`);
+	logger.info(`Target: ${targetPluginDir}`);
+	logger.info(`Copied files: ${copiedFiles.join(", ")}`);
 
 	return {
 		pluginId,
@@ -155,7 +157,7 @@ if (isDirectRun) {
 	try {
 		await copyToVault();
 	} catch (error) {
-		console.error(`[openchat] Copy failed: ${error.message}`);
+		logger.error(`Copy failed: ${error.message}`);
 		process.exit(1);
 	}
 }

@@ -1,46 +1,34 @@
 import { Notice, Plugin } from 'obsidian';
+import { localInstance } from 'src/i18n/locals';
 import { PluginSettings, DEFAULT_SETTINGS } from './settings/PluginSettings';
 import { SettingsManager } from './settings/SettingsManager';
 import { FeatureCoordinator } from './core/FeatureCoordinator';
 import { PluginSettingTab } from './settings/PluginSettingTab';
-import './styles/base.css'
-import './styles/chat.css'
-import { cloneAiRuntimeSettings } from './settings/ai-runtime';
 import { DebugLogger } from './utils/DebugLogger';
-import { ensureAIDataFolders } from './utils/AIPathManager';
+import './styles/base.css';
+import './styles/chat.css';
+import { PluginSettingsController } from './settings/PluginSettingsController';
+import { PluginStartupCoordinator } from './core/PluginStartupCoordinator';
 
 export default class OpenChatPlugin extends Plugin {
 	settings: PluginSettings = DEFAULT_SETTINGS;
 
 	private settingsManager = new SettingsManager(this);
 	featureCoordinator = new FeatureCoordinator(this);
+	private settingsController = new PluginSettingsController(this, this.settingsManager, this.featureCoordinator);
+	private startupCoordinator = new PluginStartupCoordinator(this.app, this.settingsManager, this.featureCoordinator);
 
 
 	async onload() {
-		await this.loadSettings();
-		try {
-			await this.settingsManager.cleanupLegacyAIStorage();
-		} catch (error) {
-			DebugLogger.error('[OpenChatPlugin] 旧版快捷操作/系统提示词清理失败（忽略）', error);
-		}
-		try {
-			await ensureAIDataFolders(this.app, this.settings.aiDataFolder);
-		} catch (error) {
-			DebugLogger.error('[OpenChatPlugin] AI数据文件夹初始化失败，将在下次保存设置时重试', error);
-		}
-		try {
-			await this.settingsManager.migrateAIDataStorage(this.settings);
-		} catch (error) {
-			DebugLogger.error('[OpenChatPlugin] AI数据目录迁移失败', error);
-			new Notice('AI 数据目录迁移失败，请在设置中检查“AI数据总文件夹”并手动调整。');
-		}
-
+		this.settings = await this.settingsController.loadSettings();
 		this.addSettingTab(new PluginSettingTab(this));
 		this.featureCoordinator.initializeAiRuntime(this.settings);
-		await this.featureCoordinator.initializeMcp(this.settings);
 
-		this.app.workspace.onLayoutReady(async () => {
-			await this.featureCoordinator.initializeChat(this.settings);
+		this.app.workspace.onLayoutReady(() => {
+			void this.initializeDeferredFeatures().catch((error) => {
+				DebugLogger.error('[OpenChatPlugin] 延迟初始化失败', error);
+				new Notice(localInstance.plugin_deferred_initialization_failed_notice);
+			});
 		});
 	}
 
@@ -49,28 +37,22 @@ export default class OpenChatPlugin extends Plugin {
 		this.featureCoordinator.dispose();
 	}
 
-	private async loadSettings() {
-		this.settings = await this.settingsManager.load();
-		this.applyDebugSettings();
+	private async initializeDeferredFeatures(): Promise<void> {
+		try {
+			await this.startupCoordinator.runDeferredInitialization(this.settings);
+		} catch (error) {
+			DebugLogger.error('[OpenChatPlugin] 延迟初始化部分失败，继续初始化 Chat', error);
+		}
+
+		await this.featureCoordinator.initializeChat(this.settings);
 	}
 
 	async replaceSettings(value: Partial<PluginSettings>) {
-		const { aiRuntime, chat, ...rest } = value;
-		this.settings = {
-			...this.settings,
-			...rest,
-			chat: { ...this.settings.chat, ...(chat ?? {}) },
-			aiRuntime: cloneAiRuntimeSettings({
-				...this.settings.aiRuntime,
-				...(aiRuntime ?? {}),
-			}),
-		};
-		await this.saveSettings();
+		this.settings = await this.settingsController.replaceSettings(this.settings, value);
 	}
 
 	async saveSettings() {
-		await this.settingsManager.save(this.settings);
-		await this.applyRuntimeUpdates();
+		await this.settingsController.saveSettings(this.settings);
 	}
 
 	/**
@@ -79,22 +61,6 @@ export default class OpenChatPlugin extends Plugin {
 	 * @param folderPath - 可选，指定要创建的文件夹路径；为空时使用当前设置值
 	 */
 	async tryEnsureAIDataFolders(folderPath?: string): Promise<void> {
-		try {
-			await ensureAIDataFolders(this.app, folderPath ?? this.settings.aiDataFolder);
-		} catch (error) {
-			DebugLogger.error('[OpenChatPlugin] AI数据文件夹创建失败', error);
-		}
-	}
-
-	private async applyRuntimeUpdates() {
-		this.applyDebugSettings();
-		await this.featureCoordinator.refresh(this.settings);
-	}
-
-	private applyDebugSettings() {
-		DebugLogger.setDebugMode(this.settings.aiRuntime?.debugMode ?? false);
-		DebugLogger.setDebugLevel(this.settings.aiRuntime?.debugLevel ?? 'error');
-		DebugLogger.setLlmConsoleLogEnabled(this.settings.aiRuntime?.enableLlmConsoleLog ?? false);
-		DebugLogger.setLlmResponsePreviewChars(this.settings.aiRuntime?.llmResponsePreviewChars ?? 100);
+		await this.settingsController.ensureAiDataFolders(folderPath ?? this.settings.aiDataFolder);
 	}
 }

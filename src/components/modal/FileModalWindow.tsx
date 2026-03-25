@@ -156,9 +156,15 @@ class FileModal extends Modal {
 	}
 
 	onClose() {
+		const vault = this.app.vault as typeof this.app.vault & {
+			off?: (event: 'delete', listener: (...args: unknown[]) => void) => void;
+		};
+		const workspace = this.app.workspace as typeof this.app.workspace & {
+			off?: (event: 'active-leaf-change', listener: (...args: unknown[]) => void) => void;
+		};
 		window.removeEventListener("keydown", this.handleKeyDown, true);
-		(this.app.vault as any).off("delete", this.fileDeleteListener);
-		(this.app.workspace as any).off("active-leaf-change", this.leafChangeListeners);
+		vault.off?.("delete", this.fileDeleteListener);
+		workspace.off?.("active-leaf-change", this.leafChangeListeners);
 
 		// reset prev actived
 		if (this.prevActiveLeaf && !this.closeByFullScreen) {
@@ -239,8 +245,11 @@ class FileModal extends Modal {
 		setIcon(fullScreenButton, "fullscreen");
 		fullScreenButton.onclick = () => {
 			if (this.modalLeafRef) {
+				const workspace = this.app.workspace as typeof this.app.workspace & {
+					off?: (event: 'active-leaf-change', listener: (...args: unknown[]) => void) => void;
+				};
 				// 先移除事件监听，避免后续操作触发不必要的事件
-				(this.app.workspace as any).off(
+				workspace.off?.(
 					"active-leaf-change",
 					this.leafChangeListeners
 				);
@@ -261,6 +270,9 @@ class FileModal extends Modal {
 	}
 
 	private listenFileDelete() {
+		const vault = this.app.vault as typeof this.app.vault & {
+			on?: (event: 'delete', listener: (...args: unknown[]) => void) => void;
+		};
 		this.fileDeleteListener = (...data: unknown[]) => {
 			const [file] = data as [TFile | null];
 			if (!file) {
@@ -270,6 +282,6 @@ class FileModal extends Modal {
 				this.close();
 			}
 		};
-		(this.app.vault as any).on("delete", this.fileDeleteListener);
+		vault.on?.("delete", this.fileDeleteListener);
 	}
 }

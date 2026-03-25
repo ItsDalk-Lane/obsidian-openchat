@@ -91,7 +91,8 @@ export async function createBuiltinToolsRuntime(
 		registry.registerAll(createTimeTools({
 			defaultTimezone:
 				settings.builtinTimeDefaultTimezone
-				?? DEFAULT_MCP_SETTINGS.builtinTimeDefaultTimezone!,
+				?? DEFAULT_MCP_SETTINGS.builtinTimeDefaultTimezone
+				?? 'UTC',
 		}));
 		registry.registerAll(createLinkTools());
 	}

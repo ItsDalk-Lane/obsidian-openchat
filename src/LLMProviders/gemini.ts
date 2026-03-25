@@ -3,9 +3,24 @@ import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { arrayBufferToBase64, getMimeTypeFromFilename } from './utils'
 import { withToolCallLoopSupport } from 'src/core/agents/loop'
+import { DebugLogger } from 'src/utils/DebugLogger'
 
 type GeminiContentItem = { text?: string; inlineData?: { mimeType?: string; data?: string } }
 type GeminiContent = { role: 'user' | 'model'; parts: GeminiContentItem[] }
+type GeminiErrorLike = { status?: unknown; statusCode?: unknown; message?: unknown }
+type GeminiChunk = { text?: string | (() => string) }
+type GeminiStreamClient = {
+	models: {
+		generateContentStream(args: {
+			model: string
+			contents: GeminiContent[]
+			config: Record<string, unknown>
+		}): Promise<AsyncIterable<GeminiChunk>>
+	}
+}
+type GoogleGenAIModule = {
+	GoogleGenAI?: new (options: { apiKey: string }) => GeminiStreamClient
+}
 
 export const geminiNormalizeOpenAIBaseURL = (baseURL: string) => {
 	const trimmed = (baseURL || '').trim().replace(/\/+$/, '')
@@ -25,9 +40,10 @@ export const geminiBuildConfig = (parameters: Record<string, unknown>) => {
 }
 
 export const geminiIsAuthError = (error: unknown) => {
-	const status = Number((error as any)?.status ?? (error as any)?.statusCode ?? 0)
+	const errorLike = (error ?? {}) as GeminiErrorLike
+	const status = Number(errorLike.status ?? errorLike.statusCode ?? 0)
 	if (status === 401 || status === 403) return true
-	const message = String((error as any)?.message ?? '').toLowerCase()
+	const message = String(errorLike.message ?? '').toLowerCase()
 	return (
 		message.includes('api key') ||
 		message.includes('unauthorized') ||
@@ -85,6 +101,8 @@ const buildGeminiContents = async (messages: readonly Message[], resolveEmbedAsB
 		contents
 	}
 }
+
+export const geminiBuildContents = buildGeminiContents
 
 type OpenAIMessagePart =
 	| {
@@ -168,7 +186,7 @@ const sendRequestFuncBase = (settings: BaseOptions): SendRequest =>
 
 		try {
 			const sdk = await import('@google/genai')
-			const GoogleGenAI = (sdk as any).GoogleGenAI
+			const GoogleGenAI = (sdk as GoogleGenAIModule).GoogleGenAI
 			if (!GoogleGenAI) {
 				throw new Error('GoogleGenAI export not found')
 			}
@@ -189,8 +207,7 @@ const sendRequestFuncBase = (settings: BaseOptions): SendRequest =>
 				if (controller.signal.aborted) {
 					throw new DOMException('Operation was aborted', 'AbortError')
 				}
-				const chunkText =
-					typeof (chunk as any).text === 'function' ? (chunk as any).text() : (chunk as any).text
+				const chunkText = typeof chunk.text === 'function' ? chunk.text() : chunk.text
 				if (chunkText) {
 					yield chunkText
 				}
@@ -200,7 +217,7 @@ const sendRequestFuncBase = (settings: BaseOptions): SendRequest =>
 			if (geminiIsAuthError(error)) {
 				throw new Error('Gemini authentication failed. Please verify your API key and project permissions.')
 			}
-			console.warn('[Gemini] @google/genai path failed, falling back to OpenAI-compatible endpoint:', error)
+			DebugLogger.warn('[Gemini] @google/genai path failed, falling back to OpenAI-compatible endpoint:', error)
 		}
 
 		try {
@@ -242,4 +259,3 @@ export const geminiVendor: Vendor = {
 	websiteToObtainKey: 'https://makersuite.google.com/app/apikey',
 	capabilities: ['Text Generation']
 }
-

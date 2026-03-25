@@ -1,17 +1,16 @@
-import { CornerDownLeft, StopCircle, X, FileText, Folder, Palette, Zap, Highlighter, RotateCw } from 'lucide-react';
-import { FormEvent, useEffect, useState, useRef, Fragment, useMemo, lazy, Suspense, useCallback } from 'react';
+import { CornerDownLeft, StopCircle, Palette, RotateCw } from 'lucide-react';
+import { FormEvent, useEffect, useState, useRef, Fragment, useMemo, lazy, Suspense } from 'react';
 import { ChatService } from 'src/core/chat/services/ChatService';
 import type { ChatState } from 'src/types/chat';
 import type { CompareGroup } from 'src/core/chat/types/multiModel';
-import type { SlashCommandItem } from 'src/core/chat/types/slashCommand';
 import { MultiModelSelector } from './MultiModelSelector';
 import { TemplateSelector } from './TemplateSelector';
-import { ModelTag } from './ModelTag';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { SlashCommandMenu } from './SlashCommandMenu';
-import { App, Notice } from 'obsidian';
+import { App } from 'obsidian';
 import { localInstance } from 'src/i18n/locals';
-import { availableVendors } from 'src/settings/ai-runtime';
+import { useChatInputSlashCommand } from './useChatInputSlashCommand';
+import { ChatInputInfoTags, ChatInputImagePreview, ChatInputFileTags, ChatInputSelectedModelsHint } from './ChatInputSubComponents';
 
 interface ChatInputProps {
 	service: ChatService;
@@ -34,15 +33,14 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 	const [showGroupManager, setShowGroupManager] = useState(false);
 	const isMultiModel = state.multiModelMode !== 'single';
 
-	// 斜杠命令状态
-	const [slashCommandVisible, setSlashCommandVisible] = useState(false);
-	const [slashCommandItems, setSlashCommandItems] = useState<SlashCommandItem[]>([]);
-	const [slashCommandFilter, setSlashCommandFilter] = useState('');
-	const [slashCommandSelectedIndex, setSlashCommandSelectedIndex] = useState(0);
-	const [slashCommandPosition, setSlashCommandPosition] = useState({ top: 0, left: 0 });
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const [slashCommandStartIndex, setSlashCommandStartIndex] = useState<number | null>(null);
-	const slashCommandLoadingRef = useRef(false);
+	// 斜杠命令状态（来自 hook）
+	const {
+		slashCommandVisible, setSlashCommandVisible,
+		slashCommandItems, slashCommandFilter,
+		slashCommandSelectedIndex, setSlashCommandSelectedIndex,
+		slashCommandPosition, filteredSlashCommandItems,
+		executeSlashCommand, closeSlashCommandMenu,
+	} = useChatInputSlashCommand(service, value, state.isGenerating, textareaRef);
 
 	useEffect(() => {
 		setIsImageGenerationIntent(service.detectImageGenerationIntent(value));
@@ -117,173 +115,6 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 		return () => window.removeEventListener('keydown', handleShortcut);
 	}, [isMultiModel, service, showGroupManager, slashCommandVisible]);
 
-	// 加载斜杠命令列表
-	useEffect(() => {
-		const loadCommands = async () => {
-			if (slashCommandLoadingRef.current) return;
-			slashCommandLoadingRef.current = true;
-
-			try {
-				const [skillsResult, agentsResult] = await Promise.all([
-					service.loadInstalledSkills(),
-					service.loadInstalledSubAgents(),
-				]);
-
-				const skillItems: SlashCommandItem[] = skillsResult.skills.map((skill) => ({
-					name: skill.metadata.name,
-					description: skill.metadata.description,
-					type: 'skill' as const,
-					definition: skill,
-				}));
-
-				const agentItems: SlashCommandItem[] = agentsResult.agents.map((agent) => ({
-					name: agent.metadata.name,
-					description: agent.metadata.description,
-					type: 'agent' as const,
-					definition: agent,
-				}));
-
-				// 混合并按名称排序
-				const allItems = [...skillItems, ...agentItems].sort((a, b) =>
-					a.name.localeCompare(b.name)
-				);
-
-				setSlashCommandItems(allItems);
-			} catch (error) {
-				console.error('[ChatInput] 加载命令列表失败:', error);
-				setSlashCommandItems([]);
-			} finally {
-				slashCommandLoadingRef.current = false;
-			}
-		};
-
-		void loadCommands();
-
-		// 监听变化
-		const unsubSkills = service.onInstalledSkillsChange?.(() => {
-			void loadCommands();
-		});
-		const unsubAgents = service.onInstalledSubAgentsChange?.(() => {
-			void loadCommands();
-		});
-
-		return () => {
-			unsubSkills?.();
-			unsubAgents?.();
-		};
-	}, [service]);
-
-	// 监听输入值变化，检测斜杠命令
-	useEffect(() => {
-		if (state.isGenerating) {
-			setSlashCommandVisible(false);
-			setSlashCommandStartIndex(null);
-			return;
-		}
-
-		const textarea = textareaRef.current;
-		if (!textarea) return;
-
-		const { selectionStart } = textarea;
-		const textBeforeCursor = value.substring(0, selectionStart);
-		const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
-
-		if (lastSlashIndex === -1) {
-			setSlashCommandVisible(false);
-			setSlashCommandStartIndex(null);
-			setSlashCommandFilter('');
-			return;
-		}
-
-		// 检查斜杠后面是否有空格或换行
-		const textAfterSlash = textBeforeCursor.substring(lastSlashIndex + 1);
-		if (textAfterSlash.includes(' ') || textAfterSlash.includes('\n')) {
-			setSlashCommandVisible(false);
-			setSlashCommandStartIndex(null);
-			setSlashCommandFilter('');
-			return;
-		}
-
-		// 检查斜杠前面是否是空格或行首
-		const charBeforeSlash = lastSlashIndex > 0 ? textBeforeCursor[lastSlashIndex - 1] : '';
-		if (charBeforeSlash !== '' && charBeforeSlash !== ' ' && charBeforeSlash !== '\n') {
-			setSlashCommandVisible(false);
-			setSlashCommandStartIndex(null);
-			setSlashCommandFilter('');
-			return;
-		}
-
-		// 更新菜单状态
-		setSlashCommandStartIndex(lastSlashIndex);
-		setSlashCommandFilter(textAfterSlash);
-		setSlashCommandSelectedIndex(0);
-
-		// 计算菜单位置
-		const textareaRect = textarea.getBoundingClientRect();
-		const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 20;
-		const lines = textBeforeCursor.split('\n');
-		const currentLineIndex = lines.length - 1;
-		const currentLineText = lines[currentLineIndex] || '';
-		const charWidth = 8; // 估算的字符宽度
-		const offsetX = Math.min(currentLineText.length * charWidth, textareaRect.width - 280);
-		const offsetY = Math.min((currentLineIndex + 1) * lineHeight, textareaRect.height);
-
-		setSlashCommandPosition({
-			top: textareaRect.top + offsetY + 10,
-			left: Math.max(10, textareaRect.left + offsetX),
-		});
-
-		setSlashCommandVisible(true);
-	}, [value, state.isGenerating]);
-
-	// 过滤后的候选项
-	const filteredSlashCommandItems = useMemo(() => {
-		if (!slashCommandFilter) return slashCommandItems;
-
-		const lowerFilter = slashCommandFilter.toLowerCase();
-		return slashCommandItems
-			.filter((item) => {
-				const nameMatch = item.name.toLowerCase().includes(lowerFilter);
-				const descMatch = item.description.toLowerCase().includes(lowerFilter);
-				return nameMatch || descMatch;
-			})
-			.sort((a, b) => {
-				const aStartsWith = a.name.toLowerCase().startsWith(lowerFilter);
-				const bStartsWith = b.name.toLowerCase().startsWith(lowerFilter);
-				if (aStartsWith && !bStartsWith) return -1;
-				if (!aStartsWith && bStartsWith) return 1;
-				return a.name.localeCompare(b.name);
-			});
-	}, [slashCommandItems, slashCommandFilter]);
-
-	// 执行斜杠命令
-	const executeSlashCommand = useCallback(
-		async (item: SlashCommandItem) => {
-			setSlashCommandVisible(false);
-			setSlashCommandStartIndex(null);
-			setSlashCommandFilter('');
-
-			try {
-				if (item.type === 'skill') {
-					await service.executeSkillCommand(item.name);
-				} else {
-					await service.executeSubAgentCommand(item.name);
-				}
-			} catch (error) {
-				const reason = error instanceof Error ? error.message : String(error);
-				new Notice(`执行命令失败: ${reason}`);
-				console.error('[ChatInput] 执行命令失败:', error);
-			}
-		},
-		[service]
-	);
-
-	// 关闭斜杠命令菜单
-	const closeSlashCommandMenu = useCallback(() => {
-		setSlashCommandVisible(false);
-		setSlashCommandStartIndex(null);
-		setSlashCommandFilter('');
-	}, []);
 
 	const handleSubmit = async (event?: FormEvent) => {
 		event?.preventDefault();
@@ -358,99 +189,6 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 
 	const providers = service.getProviders();
 
-	// 共享的模板/文本标签组件
-	const renderInfoTags = () => (
-		<>
-			{state.selectedPromptTemplate && (
-				<div className="selected-template tw-flex tw-items-center tw-gap-1 tw-px-2 tw-py-1 tw-bg-purple-100 tw-text-purple-700 tw-rounded tw-text-xs tw-mb-2">
-					<Zap className="tw-size-3 tw-flex-shrink-0" />
-					<span className="tw-max-w-40 tw-truncate" title={state.selectedPromptTemplate.name}>
-						{localInstance.template_label || '模板'}: {state.selectedPromptTemplate.name}
-					</span>
-					<button
-						type="button"
-						className="tw-ml-1 tw-p-0 tw-text-purple-700 hover:tw-text-purple-900 tw-cursor-pointer"
-						onClick={(e) => { e.stopPropagation(); handleClearTemplate(); }}
-						title={localInstance.clear_template || '清除模板'}
-					>
-						<X className="tw-size-4" />
-					</button>
-				</div>
-			)}
-			{state.selectedText && (
-				<div className="selected-text tw-flex tw-items-center tw-gap-1 tw-px-2 tw-py-1 tw-bg-orange-100 tw-text-orange-700 tw-rounded tw-text-xs tw-mb-2">
-					<Highlighter className="tw-size-3 tw-flex-shrink-0" />
-					<span className="tw-max-w-60 tw-truncate" title={state.selectedText}>
-						{state.selectedText.length > 50 ? state.selectedText.substring(0, 50) + '...' : state.selectedText}
-					</span>
-					<button
-						type="button"
-						className="tw-ml-1 tw-p-0 tw-text-orange-700 hover:tw-text-orange-900 tw-cursor-pointer"
-						onClick={(e) => { e.stopPropagation(); handleClearSelectedText(); }}
-						title={localInstance.clear_selected_text || '清除选中文本'}
-					>
-						<X className="tw-size-4" />
-					</button>
-				</div>
-			)}
-		</>
-	);
-
-	// 共享的图片预览
-	const renderImagePreview = () => (
-		state.selectedImages.length > 0 ? (
-			<div className="selected-images tw-flex tw-flex-wrap tw-gap-2 tw-mb-2">
-				{state.selectedImages.map((image, index) => (
-					<div key={image} className="image-preview-container tw-relative">
-						<img src={image} alt={`selected-${index}`}
-							className="selected-image-preview tw-w-16 tw-h-16 tw-object-cover tw-rounded tw-border tw-border-gray-300" />
-						<button type="button"
-							className="remove-image-button tw-absolute tw-top-0 tw-right-0 tw-bg-red-500 tw-text-white tw-rounded-full tw-w-4 tw-h-4 tw-flex tw-items-center tw-justify-center tw-text-xs tw-cursor-pointer hover:tw-bg-red-600"
-							onClick={() => handleRemoveImage(image)}>
-							<X className="tw-size-3" />
-						</button>
-					</div>
-				))}
-			</div>
-		) : null
-	);
-
-	// 共享的文件标签
-	const renderFileTags = () => (
-		(state.selectedFiles.length > 0 || state.selectedFolders.length > 0) ? (
-			<div className="selected-files tw-flex tw-flex-wrap tw-gap-2 tw-mb-2">
-				{state.selectedFiles.map((file) => (
-					<div key={file.id}
-						className={`file-tag tw-flex tw-items-center tw-gap-1 tw-px-2 tw-py-1 tw-rounded tw-text-xs tw-relative group ${
-							file.isAutoAdded ? 'tw-bg-green-100 tw-text-green-700' : 'tw-bg-gray-100 tw-text-gray-700'
-						}`}>
-						<FileText className="tw-size-3 tw-flex-shrink-0" />
-						<span className="tw-max-w-40 tw-truncate" title={file.path}>
-							{file.name}
-							{file.isAutoAdded && <span className="ml-1 tw-px-1 tw-bg-green-600 tw-text-white tw-rounded tw-text-[10px]">活跃</span>}
-							{file.extension === 'pdf' && <span className="ml-1 tw-px-1 tw-bg-blue-500 tw-text-white tw-rounded tw-text-[10px]">pdf</span>}
-							{file.extension === 'canvas' && <span className="ml-1 tw-px-1 tw-bg-green-500 tw-text-white tw-rounded tw-text-[10px]">canvas</span>}
-						</span>
-						<button type="button" className="tw-ml-1 tw-p-0 tw-text-muted hover:tw-text-foreground tw-cursor-pointer"
-							onClick={(e) => { e.stopPropagation(); handleRemoveFile(file.id); }} title={localInstance.delete_file || '删除文件'}>
-							<X className="tw-size-4" />
-						</button>
-					</div>
-				))}
-				{state.selectedFolders.map((folder) => (
-					<div key={folder.id} className="folder-tag tw-flex tw-items-center tw-gap-1 tw-px-2 tw-py-1 tw-bg-blue-100 tw-text-blue-700 tw-rounded tw-text-xs tw-relative group">
-						<Folder className="tw-size-3 tw-flex-shrink-0" />
-						<span className="tw-max-w-40 tw-truncate" title={folder.path}>{folder.name || folder.path}</span>
-						<button type="button" className="tw-ml-1 tw-p-0 tw-text-muted hover:tw-text-foreground tw-cursor-pointer"
-							onClick={(e) => { e.stopPropagation(); handleRemoveFolder(folder.id); }} title={localInstance.delete_folder || '删除文件夹'}>
-							<X className="tw-size-4" />
-						</button>
-					</div>
-				))}
-			</div>
-		) : null
-	);
-
 	// 模型选择器区域
 	const renderModelSelector = () => (
 		isLoadingConfigs ? (
@@ -486,36 +224,7 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 		)
 	);
 
-	// 多模型已选模型提示（对比模式下显示在输入框上方）
-	const renderSelectedModelsHint = () => {
-		if (state.multiModelMode === 'compare' && state.selectedModels.length > 0) {
-			return (
-				<div className="tw-flex tw-flex-wrap tw-gap-1 tw-mb-1">
-					{state.selectedModels.map((tag) => {
-						const p = providers.find((prov) => prov.tag === tag);
-						const vendorName = p ? availableVendors.find((v) => v.name === p.vendor)?.name : undefined;
-						return (
-							<ModelTag
-								key={tag}
-								modelTag={tag}
-								vendor={vendorName}
-								size="sm"
-								onClick={() => service.removeSelectedModel(tag)}
-							/>
-						);
-					})}
-				</div>
-			);
-		}
-		if (state.multiModelMode === 'compare' && state.selectedModels.length === 0) {
-			return (
-				<div className="tw-text-xs tw-text-muted tw-mb-1">
-					{localInstance.no_models_selected || '请至少选择一个模型'}
-				</div>
-			);
-		}
-		return null;
-	};
+
 
 	return (
 		<Fragment>
@@ -523,10 +232,22 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 				border: '1px solid var(--background-modifier-border)',
 				borderRadius: 'var(--radius-m)'
 			}} onSubmit={handleSubmit}>
-				{renderInfoTags()}
+				<ChatInputInfoTags
+					selectedPromptTemplate={state.selectedPromptTemplate}
+					selectedText={state.selectedText}
+					onClearTemplate={handleClearTemplate}
+					onClearSelectedText={handleClearSelectedText}
+				/>
 
 				{/* 多模型已选模型提示 */}
-				{!state.isGenerating && isMultiModel && renderSelectedModelsHint()}
+				{!state.isGenerating && isMultiModel && (
+					<ChatInputSelectedModelsHint
+						multiModelMode={state.multiModelMode}
+						selectedModels={state.selectedModels}
+						providers={providers}
+						onRemoveModel={(tag) => service.removeSelectedModel(tag)}
+					/>
+				)}
 
 				{!state.isGenerating ? (
 					<>
@@ -541,10 +262,10 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 							value={value}
 							onChange={(event) => { setValue(event.target.value); service.setInputValue(event.target.value); }}
 							onKeyDown={handleKeyDown}
-							placeholder={localInstance.input_description_here || '输入消息，按 Enter 发送，Shift+Enter 换行'}
+							placeholder={localInstance.input_description_here}
 						/>
-						{renderImagePreview()}
-						{renderFileTags()}
+						<ChatInputImagePreview images={state.selectedImages} onRemoveImage={handleRemoveImage} />
+						<ChatInputFileTags selectedFiles={state.selectedFiles} selectedFolders={state.selectedFolders} onRemoveFile={handleRemoveFile} onRemoveFolder={handleRemoveFolder} />
 						<div className="tw-flex tw-items-center tw-justify-between tw-mt-0">
 							<div className="tw-flex tw-items-center tw-gap-2" style={{ flex: 1, minWidth: 0 }}>
 								{renderModelSelector()}
@@ -561,10 +282,11 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 								<span
 									onClick={(e) => { e.preventDefault(); handleSubmit(); }}
 									className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center"
-									aria-label={state.activeSession?.messages.some((msg) => msg.role !== 'system') ? 'Chat' : 'Save'}
+										aria-label={state.activeSession?.messages.some((msg) => msg.role !== 'system') ? localInstance.chat_send_button_label : localInstance.chat_save_button_label}
+										title={state.activeSession?.messages.some((msg) => msg.role !== 'system') ? localInstance.chat_send_button_label : localInstance.chat_save_button_label}
 								>
 									<CornerDownLeft className="tw-size-4" />
-									<span className="tw-ml-1 tw-text-xs">{state.activeSession?.messages.some((msg) => msg.role !== 'system') ? 'Chat' : 'Save'}</span>
+										<span className="tw-ml-1 tw-text-xs">{state.activeSession?.messages.some((msg) => msg.role !== 'system') ? localInstance.chat_send_button_label : localInstance.chat_save_button_label}</span>
 								</span>
 							</div>
 						</div>
@@ -582,11 +304,11 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 							value={value}
 							onChange={(event) => { setValue(event.target.value); service.setInputValue(event.target.value); }}
 							onKeyDown={handleKeyDown}
-							placeholder={localInstance.input_description_here || '输入消息，按 Enter 发送，Shift+Enter 换行'}
+							placeholder={localInstance.input_description_here}
 							disabled={state.isGenerating}
 						/>
-						{renderImagePreview()}
-						{renderFileTags()}
+						<ChatInputImagePreview images={state.selectedImages} onRemoveImage={handleRemoveImage} />
+						<ChatInputFileTags selectedFiles={state.selectedFiles} selectedFolders={state.selectedFolders} onRemoveFile={handleRemoveFile} onRemoveFolder={handleRemoveFolder} />
 						<div className="tw-flex tw-items-center tw-justify-between tw-mt-0">
 							<div className="tw-flex tw-items-center tw-gap-2" style={{ flex: 1, minWidth: 0 }}>
 								{renderModelSelector()}
@@ -605,7 +327,7 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 									<div className="multi-model-stop-bar tw-flex tw-items-center tw-gap-2">
 										{multiModelProgress.generating > 0 && (
 											<span className="tw-text-xs tw-text-muted">
-												{(localInstance.generating_progress || '{completed}/{total} 生成中')
+												{localInstance.generating_progress
 													.replace('{completed}', String(multiModelProgress.completed + multiModelProgress.errors))
 													.replace('{total}', String(multiModelProgress.total))}
 											</span>
@@ -613,20 +335,22 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 										<span
 											onClick={() => service.stopAllGeneration()}
 											className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center"
-											aria-label={localInstance.stop_all || '停止所有'}
+											aria-label={localInstance.stop_all}
+											title={localInstance.stop_all}
 										>
 											<StopCircle className="tw-size-4" />
-											<span className="tw-ml-1 tw-text-xs">{localInstance.stop_all || '停止所有'}</span>
+											<span className="tw-ml-1 tw-text-xs">{localInstance.stop_all}</span>
 										</span>
 										{multiModelProgress.errors > 0 && (
 											<span
 												onClick={() => service.retryAllFailed()}
 												className="tw-cursor-pointer tw-flex tw-items-center"
 												style={{ color: 'var(--text-error, #dc2626)' }}
-												aria-label={localInstance.retry_failed || '重试失败'}
+												aria-label={localInstance.retry_failed}
+												title={localInstance.retry_failed}
 											>
 												<RotateCw style={{ width: 14, height: 14 }} />
-												<span className="tw-ml-1 tw-text-xs">{localInstance.retry_failed || '重试失败'}({multiModelProgress.errors})</span>
+												<span className="tw-ml-1 tw-text-xs">{localInstance.retry_failed}({multiModelProgress.errors})</span>
 											</span>
 										)}
 									</div>
@@ -634,17 +358,18 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 									<span
 										onClick={() => service.stopGeneration()}
 										className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center"
-										aria-label="Stop"
+										aria-label={localInstance.chat_stop_button_label}
+										title={localInstance.chat_stop_button_label}
 									>
 										<StopCircle className="tw-size-4" />
-										<span className="tw-ml-1 tw-text-xs">Stop</span>
+										<span className="tw-ml-1 tw-text-xs">{localInstance.chat_stop_button_label}</span>
 									</span>
 								)}
 
 								{isImageGenerationIntent && (
 									<div className="tw-flex tw-items-center tw-gap-1 tw-ml-2 tw-px-2 tw-py-1 tw-bg-purple-100 tw-text-purple-700 tw-rounded tw-text-xs">
 										<Palette className="tw-size-3" />
-										<span>{localInstance.image_generation_mode || '图片生成模式'}</span>
+										<span>{localInstance.image_generation_mode}</span>
 									</div>
 								)}
 							</div>

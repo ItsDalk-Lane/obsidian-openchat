@@ -10,6 +10,7 @@ import { LayoutSelector } from './LayoutSelector';
 import { ToggleButtons } from './ToggleButtons';
 import { App, TFile, TFolder } from 'obsidian';
 import { localInstance } from 'src/i18n/locals';
+import { DebugLogger } from 'src/utils/DebugLogger';
 
 interface ChatControlsProps {
 	service: ChatService;
@@ -102,7 +103,7 @@ export const ChatControls = ({
 					try {
 						return await fileToBase64(file);
 					} catch (error) {
-						console.error('Failed to convert image to base64:', error);
+						DebugLogger.error('[ChatControls] Failed to convert image to base64', error);
 						return null;
 					}
 				}));
@@ -158,7 +159,7 @@ export const ChatControls = ({
 			</div>
 			<div className="tw-flex-1"></div>
 			<div className="tw-flex tw-items-center tw-gap-2">
-				<span onClick={handleTemplateButtonClick} aria-label="选择模板" title="选择模板" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center tw-p-1 tw-rounded hover:tw-bg-purple-100">
+				<span onClick={handleTemplateButtonClick} aria-label={localInstance.select_template} title={localInstance.select_template} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center tw-p-1 tw-rounded hover:tw-bg-purple-100">
 					<Zap className="tw-size-4" />
 				</span>
 				<span
@@ -169,8 +170,8 @@ export const ChatControls = ({
 						handleFileUpload();
 					}}
 					className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center"
-					aria-label="上传文件"
-					title="上传文件"
+					aria-label={localInstance.chat_upload_file}
+					title={localInstance.chat_upload_file}
 				>
 					<Paperclip className="tw-size-4" />
 				</span>
@@ -181,15 +182,15 @@ export const ChatControls = ({
 						handleImageUpload();
 					}}
 					className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center"
-					aria-label="上传图片"
-					title="上传图片"
+					aria-label={localInstance.chat_upload_image}
+					title={localInstance.chat_upload_image}
 				>
 					<ImageUp className="tw-size-4" />
 				</span>
-				<span ref={historyButtonRef} onClick={() => setHistoryOpen((prev) => !prev)} aria-label="历史记录" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center">
+				<span ref={historyButtonRef} onClick={() => setHistoryOpen((prev) => !prev)} aria-label={localInstance.chat_history_button_title} title={localInstance.chat_history_button_title} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center">
 					<History className="tw-size-4" />
 				</span>
-				<span onClick={handleNewChat} aria-label="新建聊天" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center">
+				<span onClick={handleNewChat} aria-label={localInstance.chat_new_chat} title={localInstance.chat_new_chat} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center">
 					<MessageCirclePlus className="tw-size-4" />
 				</span>
 				<span

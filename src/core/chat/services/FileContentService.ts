@@ -1,5 +1,6 @@
 import { App, TFile, TFolder } from 'obsidian';
 import type { SelectedFile, SelectedFolder } from '../types/chat';
+import { DebugLogger } from '../../../utils/DebugLogger';
 
 export interface FileContent {
 	path: string;
@@ -52,31 +53,31 @@ export class FileContentService {
 			// 获取Obsidian文件对象
 			const tFile = this.app.vault.getAbstractFileByPath(file.path);
 			if (!tFile || !(tFile instanceof TFile)) {
-				console.warn(`[FileContentService] 文件不存在或不是文件: ${file.path}`);
+				DebugLogger.warn(`[FileContentService] 文件不存在或不是文件: ${file.path}`);
 				return null;
 			}
 
 			// 检查文件大小
 			const fileSize = await this.app.vault.adapter.stat(file.path);
 			if (fileSize && fileSize.size > opts.maxFileSize) {
-				console.warn(`[FileContentService] 文件过大，跳过: ${file.path} (${fileSize.size} bytes)`);
+				DebugLogger.warn(`[FileContentService] 文件过大，跳过: ${file.path} (${fileSize.size} bytes)`);
 				return null;
 			}
 
 			// 检查文件扩展名
 			if (opts.includeExtensions.length > 0 && !opts.includeExtensions.includes(file.extension)) {
-				console.warn(`[FileContentService] 文件扩展名不匹配，跳过: ${file.path}`);
+				DebugLogger.warn(`[FileContentService] 文件扩展名不匹配，跳过: ${file.path}`);
 				return null;
 			}
 
 			if (opts.excludeExtensions.includes(file.extension)) {
-				console.warn(`[FileContentService] 文件扩展名被排除，跳过: ${file.path}`);
+				DebugLogger.warn(`[FileContentService] 文件扩展名被排除，跳过: ${file.path}`);
 				return null;
 			}
 
 			// 检查排除模式
 			if (opts.excludePatterns.some(pattern => pattern.test(file.path))) {
-				console.warn(`[FileContentService] 文件路径匹配排除模式，跳过: ${file.path}`);
+				DebugLogger.warn(`[FileContentService] 文件路径匹配排除模式，跳过: ${file.path}`);
 				return null;
 			}
 
@@ -96,7 +97,7 @@ export class FileContentService {
 				size: fileSize?.size || 0
 			};
 		} catch (error) {
-			console.error(`[FileContentService] 读取文件失败: ${file.path}`, error);
+			DebugLogger.error(`[FileContentService] 读取文件失败: ${file.path}`, error);
 			return null;
 		}
 	}
@@ -114,7 +115,7 @@ export class FileContentService {
 			// 获取Obsidian文件夹对象
 			const tFolder = this.app.vault.getAbstractFileByPath(folder.path);
 			if (!tFolder || !(tFolder instanceof TFolder)) {
-				console.warn(`[FileContentService] 文件夹不存在或不是文件夹: ${folder.path}`);
+				DebugLogger.warn(`[FileContentService] 文件夹不存在或不是文件夹: ${folder.path}`);
 				return null;
 			}
 
@@ -127,7 +128,7 @@ export class FileContentService {
 				files
 			};
 		} catch (error) {
-			console.error(`[FileContentService] 读取文件夹失败: ${folder.path}`, error);
+			DebugLogger.error(`[FileContentService] 读取文件夹失败: ${folder.path}`, error);
 			return null;
 		}
 	}

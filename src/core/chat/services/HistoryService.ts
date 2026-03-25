@@ -13,6 +13,7 @@ import { ensureFolderExists, joinPath, sanitizeFileName } from 'src/core/chat/ut
 import { MessageService } from './MessageService';
 import { ChatHistoryParser } from './ChatHistoryParser';
 import { PlanSnapshotResolver } from './PlanSnapshotResolver';
+import { DebugLogger } from '../../../utils/DebugLogger';
 
 export interface ChatHistoryEntry {
 	id: string;
@@ -78,7 +79,7 @@ export class HistoryService {
 			}
 			return entries.sort((a, b) => b.updatedAt - a.updatedAt);
 		} catch (error) {
-			console.error('[Chat][HistoryService] listSessions error', error);
+			DebugLogger.error('[Chat][HistoryService] listSessions error', error);
 			return [];
 		}
 	}
@@ -203,7 +204,7 @@ ${body}
 			};
 			return session;
 		} catch (error) {
-			console.error('[Chat][HistoryService] loadSession error', error);
+			DebugLogger.error('[Chat][HistoryService] loadSession error', error);
 			return null;
 		}
 	}
@@ -344,7 +345,7 @@ ${serializedMessage}
 		const { frontmatter, body } = this.parser.extractFrontmatter(content);
 
 		if (!frontmatter) {
-			console.warn('[HistoryService] 文件没有frontmatter，无法更新');
+			DebugLogger.warn('[HistoryService] 文件没有frontmatter，无法更新');
 			return;
 		}
 

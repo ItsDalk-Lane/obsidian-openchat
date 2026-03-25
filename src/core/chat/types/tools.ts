@@ -1,7 +1,7 @@
 export interface ToolCall {
 	id: string;
 	name: string;
-	arguments: Record<string, any>;
+	arguments: Record<string, unknown>;
 	/**
 	 * 工具调用结果，存储为序列化后的 JSON 字符串
 	 */

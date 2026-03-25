@@ -41,6 +41,22 @@ interface ClaudeLoopSettings extends BaseOptions {
 }
 
 type FormatMsgFn = (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinary) => Promise<Anthropic.MessageParam>
+type ClaudeStreamEvent = {
+	type?: string
+	index?: number
+	content_block?: {
+		type?: string
+		id?: string
+		name?: string
+	}
+	delta?: {
+		type?: string
+		text?: string
+		partial_json?: string
+		thinking?: string
+		stop_reason?: string
+	}
+}
 
 /**
  * 为 Claude (Anthropic) Provider 包装工具调用循环支持
@@ -107,7 +123,7 @@ export function withClaudeToolCallLoopSupport(
 							model: model as string,
 							max_tokens: max_tokens as number,
 							messages: loopMessages,
-							tools: claudeTools as any,
+							tools: claudeTools as unknown as Parameters<typeof client.messages.create>[0]['tools'],
 							stream: true,
 							...(systemMsg && { system: systemMsg.content }),
 							...(enableThinking && { thinking: { type: 'enabled', budget_tokens: budget_tokens as number } }),
@@ -121,24 +137,31 @@ export function withClaudeToolCallLoopSupport(
 					let startReasoning = false
 
 					for await (const event of stream) {
-						const e = event as any
+						const e = event as ClaudeStreamEvent
+						const blockIndex = typeof e.index === 'number' ? e.index : 0
 						if (e.type === 'content_block_start') {
 							const block = e.content_block
+							if (!block) {
+								continue
+							}
 							if (block.type === 'tool_use') {
 								hasToolUse = true
-								contentBlocks[e.index] = { type: 'tool_use', id: block.id, name: block.name, input: {} } as Anthropic.ToolUseBlock
-								toolInputJsonBuffers[e.index] = ''
+								contentBlocks[blockIndex] = { type: 'tool_use', id: block.id, name: block.name, input: {} } as Anthropic.ToolUseBlock
+								toolInputJsonBuffers[blockIndex] = ''
 							} else if (block.type === 'text') {
-								contentBlocks[e.index] = { type: 'text', text: '' } as Anthropic.TextBlock
+								contentBlocks[blockIndex] = { type: 'text', text: '' } as Anthropic.TextBlock
 							} else if (block.type === 'thinking') {
-								contentBlocks[e.index] = { type: 'thinking', thinking: '' } as any
+								contentBlocks[blockIndex] = { type: 'thinking', thinking: '' } as Anthropic.ContentBlock
 							}
 						} else if (e.type === 'content_block_delta') {
 							const delta = e.delta
+							if (!delta) {
+								continue
+							}
 							if (delta.type === 'text_delta') {
 								const text: string = delta.text ?? ''
-								if ((contentBlocks[e.index] as Anthropic.TextBlock)?.type === 'text') {
-									(contentBlocks[e.index] as Anthropic.TextBlock).text += text
+								if ((contentBlocks[blockIndex] as Anthropic.TextBlock)?.type === 'text') {
+									(contentBlocks[blockIndex] as Anthropic.TextBlock).text += text
 								}
 								if (text && !hasToolUse) {
 									if (startReasoning) {
@@ -149,16 +172,16 @@ export function withClaudeToolCallLoopSupport(
 									}
 								}
 							} else if (delta.type === 'input_json_delta') {
-								toolInputJsonBuffers[e.index] = (toolInputJsonBuffers[e.index] ?? '') + (delta.partial_json ?? '')
+								toolInputJsonBuffers[blockIndex] = (toolInputJsonBuffers[blockIndex] ?? '') + (delta.partial_json ?? '')
 							} else if (delta.type === 'thinking_delta') {
 								const prefix = !startReasoning ? ((startReasoning = true), CALLOUT_BLOCK_START) : ''
 								yield prefix + (delta.thinking ?? '').replace(/\n/g, '\n> ')
 							}
 						} else if (e.type === 'content_block_stop') {
-							const block = contentBlocks[e.index]
-							if (block?.type === 'tool_use' && toolInputJsonBuffers[e.index] !== undefined) {
+							const block = contentBlocks[blockIndex]
+							if (block?.type === 'tool_use' && toolInputJsonBuffers[blockIndex] !== undefined) {
 								try {
-									(block as Anthropic.ToolUseBlock).input = JSON.parse(toolInputJsonBuffers[e.index] || '{}')
+									(block as Anthropic.ToolUseBlock).input = JSON.parse(toolInputJsonBuffers[blockIndex] || '{}')
 								} catch {
 									// JSON 解析失败时保留空 input
 								}
@@ -195,7 +218,7 @@ export function withClaudeToolCallLoopSupport(
 						let resultText: string
 						let status: 'completed' | 'failed' = 'completed'
 						try {
-							const result = await executor!.execute(request, currentTools, {
+							const result = await executor.execute(request, currentTools, {
 								abortSignal: controller.signal,
 							})
 							resultText = result.content
@@ -245,7 +268,7 @@ export function withClaudeToolCallLoopSupport(
 
 				let finalStartReasoning = false
 				for await (const event of finalStream) {
-					const e = event as any
+					const e = event as ClaudeStreamEvent
 					if (e.type === 'content_block_delta') {
 						if (e.delta?.type === 'text_delta') {
 							if (finalStartReasoning) {

@@ -3,6 +3,7 @@ import { localInstance } from 'src/i18n/locals';
 import { t } from 'src/i18n/ai-runtime/helper';
 import { summarizeToolDescriptionForUi } from './toolDescriptionSummary';
 import type { McpServerConfig, McpToolInfo } from './types';
+import { DebugLogger } from 'src/utils/DebugLogger';
 
 export class McpServerEditModal extends Modal {
 	private server: McpServerConfig;
@@ -411,10 +412,10 @@ export class BuiltinMcpToolsModal extends Modal {
 	private async copyToolName(toolName: string): Promise<void> {
 		try {
 			await navigator.clipboard.writeText(toolName);
-			new Notice(localInstance.copy_success || '复制成功');
+			new Notice(localInstance.copy_success);
 		} catch (error) {
-			console.error('Failed to copy builtin MCP tool name', error);
-			new Notice(localInstance.copy_failed || '复制失败');
+			DebugLogger.error('Failed to copy builtin MCP tool name', error);
+			new Notice(localInstance.copy_failed);
 		}
 	}
 
@@ -453,8 +454,8 @@ export class BuiltinMcpToolsModal extends Modal {
 				const copyButton = header.createEl('button', {
 					attr: {
 						type: 'button',
-						'aria-label': localInstance.copy || '复制',
-						title: localInstance.copy || '复制',
+						'aria-label': localInstance.copy,
+						title: localInstance.copy,
 					},
 				});
 				copyButton.addClass('clickable-icon');

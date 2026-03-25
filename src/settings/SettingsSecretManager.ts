@@ -6,6 +6,12 @@ import { DebugLogger } from 'src/utils/DebugLogger';
 
 export type VendorApiKeysByDevice = Record<string, Record<string, string>>;
 
+const deleteFields = (value: Record<string, unknown>, fields: readonly string[]): void => {
+    for (const field of fields) {
+        delete value[field];
+    }
+};
+
 /**
  * 负责 API 密钥与 AiRuntimeSettings 的加密 / 解密逻辑
  */
@@ -25,7 +31,16 @@ export class SettingsSecretManager {
         const result: Record<string, string> = {};
         for (const [vendor, slots] of Object.entries(vendorApiKeysByDevice)) {
             const encrypted = slots?.[this.currentDeviceFingerprint] ?? '';
-            const plain = encrypted ? decryptApiKey(encrypted) : '';
+            let plain = '';
+            try {
+                plain = encrypted ? decryptApiKey(encrypted) : '';
+            } catch (error) {
+                DebugLogger.warn('[SettingsManager] 解密供应商 API 密钥失败', {
+                    vendor,
+                    error,
+                });
+                throw error;
+            }
             if (plain) {
                 result[vendor] = plain;
             }
@@ -55,7 +70,15 @@ export class SettingsSecretManager {
             const plain = normalized[vendor] ?? '';
             const slots = { ...(next[vendor] ?? {}) };
             if (plain) {
-                slots[this.currentDeviceFingerprint] = encryptApiKey(plain);
+                try {
+                    slots[this.currentDeviceFingerprint] = encryptApiKey(plain);
+                } catch (error) {
+                    DebugLogger.warn('[SettingsManager] 加密供应商 API 密钥失败', {
+                        vendor,
+                        error,
+                    });
+                    throw error;
+                }
             } else {
                 delete slots[this.currentDeviceFingerprint];
             }
@@ -70,12 +93,65 @@ export class SettingsSecretManager {
         return Object.keys(next).length > 0 ? next : undefined;
     }
 
-    decryptAiRuntimeSettings(settings?: AiRuntimeSettings | undefined): AiRuntimeSettings {
+    private asVendorApiKeysByDevice(value: unknown): VendorApiKeysByDevice | undefined {
+        if (!value || typeof value !== 'object') {
+            return undefined;
+        }
+
+        const next: VendorApiKeysByDevice = {};
+        for (const [vendor, slots] of Object.entries(value as Record<string, unknown>)) {
+            if (!slots || typeof slots !== 'object') {
+                continue;
+            }
+
+            const normalizedSlots: Record<string, string> = {};
+            for (const [deviceId, encrypted] of Object.entries(slots as Record<string, unknown>)) {
+                if (typeof encrypted === 'string') {
+                    normalizedSlots[deviceId] = encrypted;
+                }
+            }
+
+            if (Object.keys(normalizedSlots).length > 0) {
+                next[vendor] = normalizedSlots;
+            }
+        }
+
+        return Object.keys(next).length > 0 ? next : undefined;
+    }
+
+    private asPlainVendorApiKeys(value: unknown): Record<string, string> {
+        if (!value || typeof value !== 'object') {
+            return {};
+        }
+
+        const next: Record<string, string> = {};
+        for (const [vendor, key] of Object.entries(value as Record<string, unknown>)) {
+            if (typeof key === 'string') {
+                next[vendor] = key;
+            }
+        }
+
+        return next;
+    }
+
+    private asProviderSettingsList(value: unknown): ProviderSettings[] {
+        return Array.isArray(value) ? value as ProviderSettings[] : [];
+    }
+
+    decryptAiRuntimeSettings(
+        settings?: Partial<AiRuntimeSettings> | Record<string, unknown> | undefined
+    ): AiRuntimeSettings {
         if (!settings) {
             return cloneAiRuntimeSettings();
         }
-        const vendorApiKeys = this.decryptVendorApiKeys(settings.vendorApiKeysByDevice);
-        const providers = (settings.providers ?? []).map((provider: ProviderSettings) => {
+        const decryptedVendorApiKeys = this.decryptVendorApiKeys(
+            this.asVendorApiKeysByDevice(settings.vendorApiKeysByDevice)
+        );
+        const vendorApiKeys = {
+            ...this.asPlainVendorApiKeys(settings.vendorApiKeys),
+            ...decryptedVendorApiKeys,
+        };
+        const providers = this.asProviderSettingsList(settings.providers).map((provider: ProviderSettings) => {
             const options = provider.options || {};
             const normalizedVendor = this.normalizeProviderVendor(provider.vendor);
             const resolvedApiKey = vendorApiKeys[normalizedVendor] ?? '';
@@ -84,8 +160,10 @@ export class SettingsSecretManager {
                 apiKey: resolvedApiKey,
                 parameters: options.parameters ?? {},
             };
-            delete (nextOptions as Record<string, unknown>).apiKeyByDevice;
-            delete (nextOptions as Record<string, unknown>).apiSecretByDevice;
+            deleteFields(nextOptions as Record<string, unknown>, [
+                'apiKeyByDevice',
+                'apiSecretByDevice',
+            ]);
 
             return {
                 ...provider,
@@ -113,8 +191,10 @@ export class SettingsSecretManager {
                 apiKey: '',
                 parameters: options.parameters ?? {},
             };
-            delete (encrypted as Record<string, unknown>).apiKeyByDevice;
-            delete (encrypted as Record<string, unknown>).apiSecretByDevice;
+            deleteFields(encrypted as Record<string, unknown>, [
+                'apiKeyByDevice',
+                'apiSecretByDevice',
+            ]);
             if (Object.prototype.hasOwnProperty.call(options, 'apiSecret')) {
                 encrypted.apiSecret = '';
             }

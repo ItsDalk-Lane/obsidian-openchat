@@ -2,6 +2,7 @@ import { X, RotateCcw, ExternalLink, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { ChatHistoryEntry } from 'src/core/chat/services/HistoryService';
+import { localInstance } from 'src/i18n/locals';
 
 interface ChatHistoryPanelProps {
 	items: ChatHistoryEntry[];
@@ -55,11 +56,11 @@ function getTimeGroup(timestamp: number): TimeGroup {
  */
 function getGroupLabel(group: TimeGroup): string {
 	switch (group) {
-		case 'today': return '今天';
-		case 'yesterday': return '昨天';
-		case 'week': return '7天内';
-		case 'month': return '30天内';
-		case 'older': return '更早';
+		case 'today': return localInstance.chat_history_group_today;
+		case 'yesterday': return localInstance.chat_history_group_yesterday;
+		case 'week': return localInstance.chat_history_group_week;
+		case 'month': return localInstance.chat_history_group_month;
+		case 'older': return localInstance.chat_history_group_older;
 	}
 }
 
@@ -164,19 +165,19 @@ export const ChatHistoryPanel = ({ items, onSelect, onOpenFile, onClose, onRefre
 			bottom: position.bottom !== undefined ? `${position.bottom}px` : undefined
 		}}>
 			<header className="chat-history-panel__header">
-				<h3>聊天历史</h3>
+				<h3>{localInstance.chat_history_title}</h3>
 				<div className="chat-history-panel__header-actions">
-					<span onClick={onRefresh} aria-label="刷新历史记录" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
+					<span onClick={onRefresh} aria-label={localInstance.chat_history_refresh} title={localInstance.chat_history_refresh} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 						<RotateCcw className="tw-size-4" />
 					</span>
-					<span onClick={onClose} aria-label="关闭历史记录" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
+					<span onClick={onClose} aria-label={localInstance.chat_history_close} title={localInstance.chat_history_close} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 						<X className="tw-size-4" />
 					</span>
 				</div>
 			</header>
 			<div className="chat-history-panel__content">
 				{items.length === 0 ? (
-					<p className="tw-text-muted">暂无历史会话</p>
+					<p className="tw-text-muted">{localInstance.chat_history_empty}</p>
 				) : (
 					<div className="chat-history-groups">
 						{groupedItems.map((group) => (
@@ -201,7 +202,8 @@ export const ChatHistoryPanel = ({ items, onSelect, onOpenFile, onClose, onRefre
 														e.stopPropagation();
 														onOpenFile(item);
 													}}
-													aria-label="打开文件"
+													aria-label={localInstance.open_file}
+													title={localInstance.open_file}
 												>
 													<ExternalLink className="tw-size-3.5" />
 												</button>
@@ -212,7 +214,8 @@ export const ChatHistoryPanel = ({ items, onSelect, onOpenFile, onClose, onRefre
 															e.stopPropagation();
 															onDelete(item);
 														}}
-														aria-label="删除记录"
+														aria-label={localInstance.chat_history_delete_record}
+														title={localInstance.chat_history_delete_record}
 													>
 														<Trash2 className="tw-size-3.5" />
 													</button>

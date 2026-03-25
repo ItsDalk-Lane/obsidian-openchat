@@ -12,14 +12,16 @@ if you want to view the source, please visit the github repository of this plugi
 
 const prod = process.argv[2] === "production";
 
-// 调试信息：打印参数和模式
-console.log("📋 构建参数:", process.argv);
-console.log("🔧 构建模式:", prod ? "生产模式 (production)" : "开发模式 (development)");
-
 // 统一输出到插件目录，由独立同步脚本复制到 Vault
 const OUTPUT_DIR = ".";
 
-console.log("📁 输出目录:", OUTPUT_DIR);
+function logBuildInfo(message) {
+	process.stdout.write(`[openchat][build] ${message}\n`);
+}
+
+function logBuildError(message, error) {
+	process.stderr.write(`[openchat][build] ${message}: ${error instanceof Error ? error.message : String(error)}\n`);
+}
 
 const cssOutputPlugin = () => ({
 	name: "css-output-plugin",
@@ -34,7 +36,7 @@ const cssOutputPlugin = () => ({
 			try {
 				if (fs.existsSync(cssFileName)) {
 					fs.renameSync(cssFileName, newCssFileName);
-					console.log(`✅ 已重命名 CSS 文件: ${newCssFileName}`);
+					logBuildInfo(`已重命名 CSS 文件: ${newCssFileName}`);
 				}
 				
 				// 生产模式：复制 manifest.json 到输出目录
@@ -43,13 +45,13 @@ const cssOutputPlugin = () => ({
 					const manifestTarget = path.resolve(parent, "manifest.json");
 					if (fs.existsSync(manifestSource) && manifestSource !== manifestTarget) {
 						fs.copyFileSync(manifestSource, manifestTarget);
-						console.log(`✅ 已复制 manifest.json 到: ${manifestTarget}`);
+						logBuildInfo(`已复制 manifest.json 到: ${manifestTarget}`);
 					}
 
-					console.log(`\n🎉 插件构建完成，产物目录: ${path.resolve(parent)}`);
+					logBuildInfo(`插件构建完成，产物目录: ${path.resolve(parent)}`);
 				}
 			} catch (e) {
-				console.error("❌ CSS 处理失败:", e);
+				logBuildError("CSS 处理失败", e);
 			}
 		});
 	},
@@ -87,7 +89,6 @@ const context = await esbuild.context({
 	format: "cjs",
 	target: "es2018",
 	logLevel: "info",
-	sourcemap: prod ? false : "inline",
 	treeShaking: true,
 	outfile: path.join(OUTPUT_DIR, "main.js"),
 	minify: prod,
@@ -95,7 +96,7 @@ const context = await esbuild.context({
 
 if (!fs.existsSync(OUTPUT_DIR)) {
 	fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-	console.log(`📁 创建输出目录: ${OUTPUT_DIR}`);
+	logBuildInfo(`创建输出目录: ${OUTPUT_DIR}`);
 }
 
 if (prod) {

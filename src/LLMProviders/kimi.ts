@@ -5,11 +5,21 @@ import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from 
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl } from './utils'
 import { feedChunk, ParsedSSEEvent } from './sse'
 import { withToolCallLoopSupport } from 'src/core/agents/loop'
+import { DebugLogger } from 'src/utils/DebugLogger'
 
 // Kimi选项接口，扩展基础选项以支持推理功能
 export interface KimiOptions extends BaseOptions {
 	// 推理功能配置
 	enableReasoning?: boolean // 是否启用推理功能
+}
+
+type KimiSSEPayload = {
+	choices?: Array<{
+		delta?: {
+			reasoning_content?: string
+			content?: string
+		}
+	}>
 }
 
 const sendRequestFunc = (settings: BaseOptions): SendRequest =>
@@ -54,9 +64,9 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 					break
 				}
 				if (event.parseError) {
-					console.warn('[Kimi] Failed to parse SSE JSON:', event.parseError)
+					DebugLogger.warn('[Kimi] Failed to parse SSE JSON:', event.parseError)
 				}
-				const payload = event.json as any
+				const payload = event.json as KimiSSEPayload | undefined
 				if (!payload || !payload.choices || !payload.choices[0]?.delta) {
 					continue
 				}

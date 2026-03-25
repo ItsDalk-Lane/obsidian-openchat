@@ -7,6 +7,7 @@ import {
 import type { ChatSession } from '../types/chat';
 import { HistoryService } from './HistoryService';
 import { ChatStateStore } from './ChatStateStore';
+import { DebugLogger } from 'src/utils/DebugLogger';
 
 const serializePlanSnapshot = (
 	snapshot: PlanSnapshot | null | undefined
@@ -85,7 +86,7 @@ export class ChatPlanSyncService {
 	): void {
 		this.pendingPlanSync = this.pendingPlanSync
 			.catch((error) => {
-				console.warn('[ChatService] 前一个任务计划同步失败，继续执行后续同步:', error);
+				DebugLogger.warn('[ChatService] 前一个任务计划同步失败，继续执行后续同步:', error);
 			})
 			.then(async () => {
 				const runtime = await ensureRuntime(session);
@@ -95,7 +96,7 @@ export class ChatPlanSyncService {
 				runtime.syncPlanSnapshot(clonePlanSnapshot(session?.livePlan ?? null));
 			})
 			.catch((error) => {
-				console.warn('[ChatService] 同步任务计划失败:', error);
+				DebugLogger.warn('[ChatService] 同步任务计划失败:', error);
 			});
 	}
 
@@ -114,7 +115,7 @@ export class ChatPlanSyncService {
 				livePlan: clonePlanSnapshot(session.livePlan ?? null),
 			});
 		} catch (error) {
-			console.error('[ChatService] 持久化任务计划失败:', error);
+			DebugLogger.error('[ChatService] 持久化任务计划失败:', error);
 		}
 	}
 

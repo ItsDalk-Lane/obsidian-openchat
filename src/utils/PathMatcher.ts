@@ -9,6 +9,11 @@ export interface PathMatchResult {
 	score: number;
 }
 
+interface PathMatcherVaultLike {
+	getFiles(): TFile[];
+	getAllFolders(): TFolder[];
+}
+
 export class PathMatcher {
 	/**
 	 * 智能路径匹配算法，支持多种匹配模式
@@ -182,7 +187,7 @@ export class PathMatcher {
 	/**
 	 * 获取所有文件和文件夹
 	 */
-	static getAllFilesAndFolders(vault: any): TAbstractFile[] {
+	static getAllFilesAndFolders(vault: PathMatcherVaultLike): TAbstractFile[] {
 		const allFiles: TAbstractFile[] = [];
 
 		// 添加所有文件

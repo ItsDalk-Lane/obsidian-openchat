@@ -54,11 +54,11 @@ export const QuickActionResultModal = ({
 		try {
 			await navigator.clipboard.writeText(result);
 			setCopySuccess(true);
-			new Notice(localInstance.copy_success || '复制成功');
+			new Notice(localInstance.copy_success);
 			setTimeout(() => setCopySuccess(false), 2000);
 			onCopy();
 		} catch (e) {
-			new Notice(localInstance.copy_failed || '复制失败');
+			new Notice(localInstance.copy_failed);
 		}
 	}, [result, onCopy]);
 
@@ -148,7 +148,7 @@ export const QuickActionResultModal = ({
 
 						{isLoading && (
 							<span className="quick-action-result-modal-loading">
-								{localInstance.handling || '处理中...'}
+								{localInstance.handling}
 							</span>
 						)}
 					</div>
@@ -157,16 +157,16 @@ export const QuickActionResultModal = ({
 							<button
 								className="quick-action-result-modal-stop"
 								onClick={onStop}
-								title={localInstance.quick_action_result_stop || '停止生成'}
+								title={localInstance.quick_action_result_stop}
 							>
 								<Square size={14} />
-								<span>{localInstance.quick_action_result_stop || '停止'}</span>
+								<span>{localInstance.quick_action_result_stop}</span>
 							</button>
 						)}
 						<button
 							className="quick-action-result-modal-close"
 							onClick={onClose}
-							title={localInstance.close || '关闭'}
+							title={localInstance.close}
 						>
 							<X size={18} />
 						</button>
@@ -178,9 +178,9 @@ export const QuickActionResultModal = ({
 					{requiresModelSelection && !selectedModelTag ? (
 						<div className="quick-action-result-modal-waiting-model">
 							<div className="quick-action-result-modal-waiting-icon">🤖</div>
-							<span>{localInstance.quick_action_result_waiting_model || '请选择模型以开始执行'}</span>
+							<span>{localInstance.quick_action_result_waiting_model}</span>
 							<span className="quick-action-result-modal-hint-text">
-								{localInstance.quick_action_result_select_model_hint || '在上方选择AI模型后，将自动开始处理'}
+								{localInstance.quick_action_result_select_model_hint}
 							</span>
 						</div>
 					) : error ? (
@@ -191,7 +191,7 @@ export const QuickActionResultModal = ({
 					) : (isLoading && !result) ? (
 						<div className="quick-action-result-modal-loading-content">
 							<div className="quick-action-result-modal-spinner" />
-							<span>{localInstance.ai_executing || 'AI处理中...'}</span>
+							<span>{localInstance.ai_executing}</span>
 						</div>
 					) : (
 						<>
@@ -202,7 +202,7 @@ export const QuickActionResultModal = ({
 							{isLoading && (
 								<div className="quick-action-result-modal-streaming-indicator">
 									<span className="quick-action-result-modal-streaming-dot" />
-									<span>{localInstance.ai_streaming_generating || '生成中...'}</span>
+									<span>{localInstance.ai_streaming_generating}</span>
 								</div>
 							)}
 						</>
@@ -216,10 +216,10 @@ export const QuickActionResultModal = ({
 							className="quick-action-result-modal-btn"
 							onClick={onRegenerate}
 							disabled={isLoading}
-							title={localInstance.quick_action_result_regenerate || '重新生成'}
+							title={localInstance.quick_action_result_regenerate}
 						>
 							<RefreshCw size={14} />
-							<span>{localInstance.quick_action_result_regenerate || '重新生成'}</span>
+							<span>{localInstance.quick_action_result_regenerate}</span>
 						</button>
 					</div>
 					
@@ -228,30 +228,30 @@ export const QuickActionResultModal = ({
 							className="quick-action-result-modal-btn"
 							onClick={handleCopy}
 							disabled={isLoading || !result}
-							title={localInstance.copy || '复制'}
+							title={localInstance.copy}
 						>
 							{copySuccess ? <Check size={14} /> : <Copy size={14} />}
-							<span>{copySuccess ? (localInstance.copy_success || '已复制') : (localInstance.copy || '复制')}</span>
+							<span>{copySuccess ? localInstance.copy_success : localInstance.copy}</span>
 						</button>
 						
 						<button
 							className="quick-action-result-modal-btn"
 							onClick={handleAppend}
 							disabled={isLoading || !result}
-							title={localInstance.quick_action_result_append || '追加到选中内容'}
+							title={localInstance.quick_action_result_append}
 						>
 							<Plus size={14} />
-							<span>{localInstance.quick_action_result_append || '追加'}</span>
+							<span>{localInstance.quick_action_result_append}</span>
 						</button>
 						
 						<button
 							className="quick-action-result-modal-btn quick-action-result-modal-btn-primary"
 							onClick={handleReplace}
 							disabled={isLoading || !result}
-							title={localInstance.quick_action_result_replace || '替换选中文本'}
+							title={localInstance.quick_action_result_replace}
 						>
 							<Replace size={14} />
-							<span>{localInstance.quick_action_result_replace || '替换'}</span>
+							<span>{localInstance.quick_action_result_replace}</span>
 						</button>
 					</div>
 				</div>

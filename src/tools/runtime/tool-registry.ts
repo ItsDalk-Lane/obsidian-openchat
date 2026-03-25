@@ -71,7 +71,7 @@ export class BuiltinToolRegistry {
 	}
 
 	private zodSchemaToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
-		return zodToJsonSchema(schema as any, {
+		return zodToJsonSchema(schema as unknown as Parameters<typeof zodToJsonSchema>[0], {
 			target: 'openApi3',
 			$refStrategy: 'none',
 		}) as Record<string, unknown>;

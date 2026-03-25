@@ -6,6 +6,7 @@ import type { ProviderSettings, Message, Vendor } from 'src/types/provider';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler';
 import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils';
+import { localInstance } from 'src/i18n/locals';
 
 /**
  * 快捷操作执行结果接口
@@ -78,14 +79,14 @@ export class QuickActionExecutionService {
 				return {
 					success: false,
 					content: '',
-					error: '操作组不能直接执行'
+					error: localInstance.quick_action_group_not_executable
 				};
 			}
 
 			// 普通操作：执行 AI 调用
 			return await this.executeNormalQuickAction(quickAction, selection, modelTag);
 		} catch (error) {
-			console.error('[QuickActionExecutionService] 执行操作失败:', error);
+			DebugLogger.error('[QuickActionExecutionService] 执行操作失败', error);
 			return {
 				success: false,
 				content: '',
@@ -120,7 +121,7 @@ export class QuickActionExecutionService {
 				return {
 					success: false,
 					content: '',
-					error: '未找到可用的AI模型配置'
+					error: localInstance.quick_action_no_model_config
 				};
 			}
 
@@ -141,7 +142,7 @@ export class QuickActionExecutionService {
 				content: result
 			};
 		} catch (error) {
-			console.error('[QuickActionExecutionService] 执行操作失败:', error);
+			DebugLogger.error('[QuickActionExecutionService] 执行操作失败', error);
 			return {
 				success: false,
 				content: '',
@@ -159,11 +160,11 @@ export class QuickActionExecutionService {
 			try {
 				return await this.app.vault.read(file);
 			} catch (e) {
-				console.warn(`[QuickActionExecutionService] 读取模板文件失败: ${filePath}`, e);
-				throw new Error(`无法读取模板文件: ${filePath}`);
+				DebugLogger.warn(`[QuickActionExecutionService] 读取模板文件失败: ${filePath}`, e);
+				throw new Error(`${localInstance.quick_action_template_read_failed_prefix}: ${filePath}`);
 			}
 		}
-		throw new Error(`模板文件不存在: ${filePath}`);
+		throw new Error(`${localInstance.quick_action_template_missing_prefix}: ${filePath}`);
 	}
 
 	/**
@@ -238,13 +239,13 @@ export class QuickActionExecutionService {
 				try {
 					return await this.app.vault.read(file);
 				} catch (e) {
-					console.warn(`[QuickActionExecutionService] 读取模板文件失败: ${path}`, e);
+					DebugLogger.warn(`[QuickActionExecutionService] 读取模板文件失败: ${path}`, e);
 				}
 			}
 		}
 
-		console.warn(`[QuickActionExecutionService] 未找到模板文件: ${templateName}`);
-		return `[模板未找到: ${templateName}]`;
+		DebugLogger.warn(`[QuickActionExecutionService] 未找到模板文件: ${templateName}`);
+		return `[${localInstance.quick_action_template_missing_prefix}: ${templateName}]`;
 	}
 
 	/**
@@ -343,7 +344,7 @@ export class QuickActionExecutionService {
 		const vendor = this.getVendor(providerSettings.vendor);
 
 		if (!vendor) {
-			throw new Error(`未找到AI提供商: ${providerSettings.vendor}`);
+			throw new Error(`${localInstance.quick_action_provider_missing_prefix}: ${providerSettings.vendor}`);
 		}
 
 		// 创建新的 AbortController 并保存到实例变量
@@ -389,7 +390,7 @@ export class QuickActionExecutionService {
 
 		// 操作组不应该直接执行
 		if (actionType === 'group') {
-			throw new Error('操作组不能直接执行');
+			throw new Error(localInstance.quick_action_group_not_executable);
 		}
 
 		// 普通操作：流式执行 AI 调用
@@ -408,7 +409,7 @@ export class QuickActionExecutionService {
 			const providerSettings = this.getProviderSettings(aiRuntimeSettings, effectiveModelTag);
 
 			if (!providerSettings) {
-				throw new Error('未找到可用的AI模型配置');
+				throw new Error(localInstance.quick_action_no_model_config);
 			}
 
 			// 3. 构建消息（复用 buildMessages 方法）
@@ -423,7 +424,7 @@ export class QuickActionExecutionService {
 			// 4. 流式调用AI
 			const vendor = this.getVendor(providerSettings.vendor);
 			if (!vendor) {
-				throw new Error(`未找到AI提供商: ${providerSettings.vendor}`);
+				throw new Error(`${localInstance.quick_action_provider_missing_prefix}: ${providerSettings.vendor}`);
 			}
 
 			// 创建新的 AbortController 并保存到实例变量
@@ -468,7 +469,7 @@ export class QuickActionExecutionService {
 				DebugLogger.debug('[QuickActionExecutionService] 操作执行已取消');
 				return;
 			}
-			console.error('[QuickActionExecutionService] 流式执行操作失败:', error);
+			DebugLogger.error('[QuickActionExecutionService] 流式执行操作失败', error);
 			throw error;
 		}
 	}

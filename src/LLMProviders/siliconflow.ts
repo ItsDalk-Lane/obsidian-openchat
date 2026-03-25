@@ -35,7 +35,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 				messages: formattedMessages as OpenAI.ChatCompletionMessageParam[],
 				stream: true,
 				...remains
-			} as any,
+			} as OpenAI.ChatCompletionCreateParamsStreaming,
 			{ signal: controller.signal }
 		)
 
@@ -43,7 +43,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 		let reasoningStartMs: number | null = null
 		const siliconFlowOptions = settings as SiliconFlowOptions
 		const isReasoningEnabled = siliconFlowOptions.enableReasoning ?? false
-		for await (const part of stream as any) {
+		for await (const part of stream) {
 			const delta = part.choices[0]?.delta as DeepSeekDelta
 			const reasonContent = delta?.reasoning_content
 
@@ -106,7 +106,7 @@ export const siliconFlowVendor: Vendor = {
 		parameters: {},
 		enableReasoning: false // 默认关闭推理功能
 	} as SiliconFlowOptions,
-	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as any),
+	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as (settings: BaseOptions) => SendRequest),
 	models: [],
 	websiteToObtainKey: 'https://siliconflow.cn',
 	capabilities: ['Text Generation', 'Image Vision', 'Reasoning']

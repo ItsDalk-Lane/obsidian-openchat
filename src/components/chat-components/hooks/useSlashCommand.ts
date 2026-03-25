@@ -3,6 +3,7 @@ import type { SlashCommandItem, SlashCommandType } from 'src/core/chat/types/sla
 import type { SkillDefinition } from 'src/services/skills';
 import type { SubAgentDefinition } from 'src/tools/sub-agents';
 import type { ChatService } from 'src/core/chat/services/ChatService';
+import { DebugLogger } from 'src/utils/DebugLogger';
 
 interface UseSlashCommandOptions {
 	service: ChatService;
@@ -86,7 +87,7 @@ export const useSlashCommand = ({
 
 				setItems(allItems);
 			} catch (error) {
-				console.error('[useSlashCommand] 加载命令列表失败:', error);
+				DebugLogger.error('[useSlashCommand] 加载命令列表失败:', error);
 				setItems([]);
 			} finally {
 				loadingRef.current = false;

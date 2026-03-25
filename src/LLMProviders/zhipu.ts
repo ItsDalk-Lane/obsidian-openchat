@@ -21,6 +21,10 @@ export interface ZhipuOptions extends BaseOptions {
 	thinkingType: ZhipuThinkingType
 }
 
+type ZhipuDelta = OpenAI.ChatCompletionChunk.Choice.Delta & {
+	reasoning_content?: string
+}
+
 const sendRequestFunc = (settings: ZhipuOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, _resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		const { parameters, ...optionsExcludingParams } = settings
@@ -36,7 +40,7 @@ const sendRequestFunc = (settings: ZhipuOptions): SendRequest =>
 		})
 
 		// 构建请求参数
-		const requestParams: any = {
+		const requestParams: Record<string, unknown> = {
 			model,
 			messages,
 			stream: true,
@@ -55,15 +59,15 @@ const sendRequestFunc = (settings: ZhipuOptions): SendRequest =>
 			}
 		}
 
-		const stream = await client.chat.completions.create(requestParams as any, {
+		const stream = await client.chat.completions.create(requestParams as unknown as OpenAI.ChatCompletionCreateParamsStreaming, {
 			signal: controller.signal
 		})
 
 		let reasoningActive = false
 		let reasoningStartMs: number | null = null
 
-		for await (const part of stream as any) {
-			const delta = part.choices[0]?.delta
+		for await (const part of stream) {
+			const delta = part.choices[0]?.delta as ZhipuDelta | undefined
 
 			// 处理推理内容（参考官方文档的 reasoning_content 字段）
 			// 只有在用户启用推理功能时才处理推理内容
@@ -125,7 +129,7 @@ export const zhipuVendor: Vendor = {
 		thinkingType: DEFAULT_ZHIPU_THINKING_TYPE,
 		parameters: {}
 	} as ZhipuOptions,
-	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as any),
+	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as (settings: BaseOptions) => SendRequest),
 	models: ZHIPU_MODELS,
 	websiteToObtainKey: 'https://open.bigmodel.cn/',
 	capabilities: ['Text Generation', 'Web Search', 'Reasoning']

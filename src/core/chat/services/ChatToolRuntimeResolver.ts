@@ -102,7 +102,7 @@ export class ChatToolRuntimeResolver {
 			return;
 		}
 		await runtime.close().catch((error) => {
-			console.warn('[ChatService] 关闭内置工具运行时失败:', error);
+			DebugLogger.warn('[ChatService] 关闭内置工具运行时失败:', error);
 		});
 		})();
 

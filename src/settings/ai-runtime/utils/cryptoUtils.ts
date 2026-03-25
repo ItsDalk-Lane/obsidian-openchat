@@ -3,6 +3,8 @@
  * 使用 XOR 加密算法和设备指纹生成主密码
  */
 
+import { DebugLogger } from 'src/utils/DebugLogger'
+
 const DEFAULT_FALLBACK_FINGERPRINT_SEED = 'obsidian-openchat-default-key'
 
 const buildFallbackFingerprintKey = (seed: string): string => simpleHash(seed)
@@ -33,7 +35,7 @@ export function generateDeviceFingerprint(): string {
 		// 使用简单哈希算法生成密钥
 		return simpleHash(fingerprint)
 	} catch (error) {
-		console.warn('[Crypto] 生成设备指纹失败，使用默认密钥', error)
+		DebugLogger.warn('[Crypto] 生成设备指纹失败，使用默认密钥', error)
 		// 如果获取失败，使用一个固定的默认值
 		return buildFallbackFingerprintKey(DEFAULT_FALLBACK_FINGERPRINT_SEED)
 	}
@@ -164,7 +166,7 @@ export function encryptApiKey(apiKey: string): string {
 
 				return hexString
 		} catch (xorError) {
-			console.warn('[Crypto] XOR 加密失败，尝试 Base64 方案', xorError)
+			DebugLogger.warn('[Crypto] XOR 加密失败，尝试 Base64 方案', xorError)
 		}
 
 		// 方案2: Base64 编码（后备方案）
@@ -175,14 +177,14 @@ export function encryptApiKey(apiKey: string): string {
 
 				return base64String
 		} catch (base64Error) {
-			console.warn('[Crypto] Base64 加密失败', base64Error)
+			DebugLogger.warn('[Crypto] Base64 加密失败', base64Error)
 		}
 
 		// 方案3: 如果所有加密方法都失败，返回原始密钥
-		console.warn('[Crypto] 所有加密方法失败，保存原始密钥')
+		DebugLogger.warn('[Crypto] 所有加密方法失败，保存原始密钥')
 		return apiKey
 	} catch (error) {
-		console.error('[Crypto] 加密过程发生错误', error)
+		DebugLogger.error('[Crypto] 加密过程发生错误', error)
 		return apiKey
 	}
 }
@@ -211,7 +213,7 @@ export function decryptApiKey(encryptedKey: string): string {
 						return decrypted
 					}
 				} catch (hexError) {
-					console.warn('[Crypto] 十六进制解密失败', hexError)
+					DebugLogger.warn('[Crypto] 十六进制解密失败', hexError)
 				}
 			}
 		}
@@ -232,7 +234,7 @@ export function decryptApiKey(encryptedKey: string): string {
 						return decrypted
 					}
 				} catch (base64Error) {
-					console.warn('[Crypto] Base64 解密失败', base64Error)
+					DebugLogger.warn('[Crypto] Base64 解密失败', base64Error)
 				}
 			}
 
@@ -253,10 +255,10 @@ export function decryptApiKey(encryptedKey: string): string {
 		}
 
 		// 解密失败但格式不明，仍然返回原值
-		console.warn('[Crypto] 无法解密 API 密钥，返回原始值')
+		DebugLogger.warn('[Crypto] 无法解密 API 密钥，返回原始值')
 		return encryptedKey
 	} catch (error) {
-		console.error('[Crypto] 解密过程发生错误', error)
+		DebugLogger.error('[Crypto] 解密过程发生错误', error)
 		return encryptedKey
 	}
 }

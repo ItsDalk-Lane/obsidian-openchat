@@ -7,6 +7,7 @@ import type {
 	ChatSession,
 } from '../types/chat';
 import { MessageService } from './MessageService';
+import { DebugLogger } from 'src/utils/DebugLogger';
 
 const FRONTMATTER_DELIMITER = '---';
 
@@ -317,7 +318,7 @@ export class ChatHistoryParser {
 						timestamp = new Date(year, month - 1, day, hour, minute, second).getTime();
 					}
 				} catch (e) {
-					console.warn('[ChatHistoryParser] 无法解析时间戳:', currentHeader.timestampStr, e);
+					DebugLogger.warn('[ChatHistoryParser] 无法解析时间戳:', currentHeader.timestampStr, e);
 				}
 			}
 
@@ -398,7 +399,7 @@ export class ChatHistoryParser {
 
 		// 宽松回退解析：当严格解析未匹配到任何消息时使用
 		if (messages.length === 0 && body.trim()) {
-			console.warn('[ChatHistoryParser] 使用更宽松的解析方式');
+			DebugLogger.warn('[ChatHistoryParser] 使用更宽松的解析方式');
 			const lines = body.split('\n');
 			let currentMessage = '';
 			let currentRole: ChatRole = 'user';

@@ -18,14 +18,28 @@ interface RegisterBuiltinToolOptions {
 	annotations?: McpToolAnnotations;
 }
 
-export function registerBuiltinTool(
+interface McpServerWithRegisterTool {
+	registerTool: (
+		name: string,
+		options: {
+			title?: string;
+			description: string;
+			inputSchema: z.ZodTypeAny;
+			outputSchema?: z.ZodTypeAny;
+			annotations?: McpToolAnnotations;
+		},
+		handler: (args: Record<string, unknown>) => Promise<unknown>
+	) => void;
+}
+
+export function registerBuiltinTool<TArgs extends Record<string, unknown>>(
 	server: McpServer,
 	registry: BuiltinToolRegistry,
 	name: string,
 	options: RegisterBuiltinToolOptions,
-	handler: (args: any) => Promise<unknown> | unknown
+	handler: (args: TArgs) => Promise<unknown> | unknown
 ): void {
-	const tool: BuiltinTool<any> = {
+	const tool: BuiltinTool<TArgs> = {
 		name,
 		title: options.title,
 		description: options.description,
@@ -35,8 +49,9 @@ export function registerBuiltinTool(
 		execute: async (args) => await handler(args),
 	};
 	registry.register(tool);
+	const registeredServer = server as unknown as McpServerWithRegisterTool;
 
-	(server as any).registerTool(
+	registeredServer.registerTool(
 		name,
 		{
 			title: options.title,
@@ -47,7 +62,7 @@ export function registerBuiltinTool(
 		},
 		async (args: Record<string, unknown>) => {
 			try {
-				const result = await handler(args);
+				const result = await handler(args as TArgs);
 				return normalizeStructuredToolResult(result);
 			} catch (error) {
 				return {

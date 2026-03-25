@@ -1,11 +1,11 @@
-import { Check, Copy, PenSquare, RotateCw, TextCursorInput, Trash2, X, Maximize2, Download, Highlighter, ChevronDown, ChevronRight, StopCircle, Pin } from 'lucide-react';
-import { Component, TFile } from 'obsidian';
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Check, Copy, PenSquare, RotateCw, TextCursorInput, Trash2, X, Maximize2, Download, Highlighter, StopCircle, Pin } from 'lucide-react';
+import { TFile } from 'obsidian';
+import { useEffect, useMemo, useState } from 'react';
 import { useObsidianApp } from 'src/contexts/obsidianAppContext';
 import type { ChatMessage, ChatMessageMetadata } from 'src/types/chat';
-import { ChatService } from 'src/core/chat/services/ChatService';
+import type { ChatService } from 'src/core/chat/services/ChatService';
 import { MessageService } from 'src/core/chat/services/MessageService';
-import { renderMarkdownContent, parseContentBlocks, ContentBlock } from 'src/core/chat/utils/markdown';
+import { parseContentBlocks, ContentBlock } from 'src/core/chat/utils/markdown';
 import { getEditableUserMessageContent } from 'src/core/chat/utils/userMessageEditing';
 import { Notice } from 'obsidian';
 import { ModelTag } from './ModelTag';
@@ -15,6 +15,8 @@ import { localInstance } from 'src/i18n/locals';
 import { isPinnedChatMessage } from 'src/types/chat';
 import { SkillCallBlock } from './SkillCallBlock';
 import { SubAgentMessageFold } from './SubAgentMessageFold';
+import { DebugLogger } from 'src/utils/DebugLogger';
+import { ReasoningBlockComponent, McpToolBlockComponent, TextBlockComponent } from './messageItemBlocks';
 
 interface MessageItemProps {
 	message: ChatMessage;
@@ -24,145 +26,6 @@ interface MessageItemProps {
 	hideModelTag?: boolean;
 	compact?: boolean;
 }
-
-// 格式化推理耗时
-const formatDuration = (durationMs: number): string => {
-	const centiSeconds = Math.max(1, Math.round(durationMs / 10))
-	return `${(centiSeconds / 100).toFixed(2)}s`
-}
-
-// 推理块组件
-interface ReasoningBlockProps {
-	content: string;
-	startMs: number;
-	durationMs?: number;
-	isGenerating: boolean;
-}
-
-const ReasoningBlockComponent = ({ content, startMs, durationMs, isGenerating }: ReasoningBlockProps) => {
-	const [collapsed, setCollapsed] = useState(false);
-	const [elapsedTime, setElapsedTime] = useState('0.00s');
-	const contentRef = useRef<HTMLDivElement>(null);
-	
-	// 推理完成后自动折叠
-	useEffect(() => {
-		if (durationMs !== undefined) {
-			setCollapsed(true);
-			setElapsedTime(formatDuration(durationMs));
-		}
-	}, [durationMs]);
-	
-	// 实时更新计时器
-	useEffect(() => {
-		if (durationMs !== undefined) return; // 已完成，不需要计时
-		if (!isGenerating) return;
-		
-		let rafId: number;
-		const tick = () => {
-			const elapsed = Date.now() - startMs;
-			setElapsedTime(`${(elapsed / 1000).toFixed(2)}s`);
-			rafId = requestAnimationFrame(tick);
-		};
-		rafId = requestAnimationFrame(tick);
-		
-		return () => {
-			if (rafId) cancelAnimationFrame(rafId);
-		};
-	}, [startMs, durationMs, isGenerating]);
-	
-	// 自动滚动到底部
-	useEffect(() => {
-		if (!collapsed && contentRef.current && isGenerating) {
-			contentRef.current.scrollTop = contentRef.current.scrollHeight;
-		}
-	}, [content, collapsed, isGenerating]);
-	
-	const toggleCollapse = useCallback(() => {
-		setCollapsed(prev => !prev);
-	}, []);
-	
-	return (
-		<div className="ff-reasoning-block">
-			<div 
-				className="ff-reasoning-header"
-				onClick={toggleCollapse}
-			>
-				<span className="ff-reasoning-title">深度思考</span>
-				<span className="ff-reasoning-time">{elapsedTime}</span>
-					<span className="ff-reasoning-toggle">
-					{collapsed ? <ChevronRight className="tw-size-4" /> : <ChevronDown className="tw-size-4" />}
-				</span>
-			</div>
-			{!collapsed && (
-				<div 
-					ref={contentRef}
-					className="ff-reasoning-content"
-				>
-					{content}
-				</div>
-			)}
-		</div>
-	);
-};
-
-// MCP 工具调用块组件
-interface McpToolBlockProps {
-	toolName: string;
-	content: string;
-}
-
-const McpToolBlockComponent = ({ toolName, content }: McpToolBlockProps) => {
-	const [collapsed, setCollapsed] = useState(true);
-
-	const toggleCollapse = useCallback(() => {
-		setCollapsed(prev => !prev);
-	}, []);
-
-	return (
-		<div className="ff-reasoning-block">
-			<div
-				className="ff-reasoning-header"
-				onClick={toggleCollapse}
-			>
-				<span className="ff-reasoning-title">{toolName}</span>
-					<span className="ff-reasoning-toggle">
-					{collapsed ? <ChevronRight className="tw-size-4" /> : <ChevronDown className="tw-size-4" />}
-				</span>
-			</div>
-			{!collapsed && (
-				<div className="ff-reasoning-content">
-					{content}
-				</div>
-			)}
-		</div>
-	);
-};
-
-// 文本块组件 - 用于渲染 Markdown 内容
-interface TextBlockProps {
-	content: string;
-	app: any;
-}
-
-const TextBlockComponent = ({ content, app }: TextBlockProps) => {
-	const containerRef = useRef<HTMLDivElement>(null);
-	const componentRef = useRef(new Component());
-	
-	useEffect(() => {
-		if (!containerRef.current) return;
-		
-		const run = async () => {
-			await renderMarkdownContent(app, content, containerRef.current as HTMLDivElement, componentRef.current);
-		};
-		void run();
-		
-		return () => {
-			componentRef.current.unload();
-		};
-	}, [app, content]);
-	
-	return <div ref={containerRef}></div>;
-};
 
 export const MessageItem = ({ message, service, isGenerating, hideModelTag, compact = false }: MessageItemProps) => {
 	const app = useObsidianApp();
@@ -224,7 +87,8 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 			setCopied(true);
 			setTimeout(() => setCopied(false), 2000);
 		} catch (error) {
-			console.error('[Chat] 复制失败', error);
+			DebugLogger.error('[MessageItem] 复制失败', error);
+			new Notice(localInstance.copy_failed);
 		}
 	};
 
@@ -319,8 +183,8 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 				}
 			}
 		} catch (error) {
-			console.error('[Chat] 下载图片失败', error);
-			new Notice('下载图片失败，请稍后再试');
+			DebugLogger.error('[MessageItem] 下载图片失败', error);
+			new Notice(localInstance.chat_download_image_failed);
 		}
 	};
 
@@ -354,14 +218,14 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 									<button
 										onClick={() => handleImageClick(image)}
 										className="tw-bg-black tw-bg-opacity-50 tw-text-white tw-rounded tw-p-1 tw-cursor-pointer hover:tw-bg-opacity-70"
-										title="查看大图"
+										title={localInstance.chat_view_large_image}
 									>
 										<Maximize2 className="tw-size-3" />
 									</button>
 									<button
 										onClick={() => handleDownloadImage(image, index)}
 										className="tw-bg-black tw-bg-opacity-50 tw-text-white tw-rounded tw-p-1 tw-cursor-pointer hover:tw-bg-opacity-70"
-										title="下载图片"
+										title={localInstance.chat_download_image}
 									>
 										<Download className="tw-size-3" />
 									</button>
@@ -520,7 +384,7 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 									{localInstance.chat_message_pinned}
 								</span>
 							)}
-							<span className="tw-text-xs tw-text-faint" title={`Token 数量: ${tokenCount}`}>
+							<span className="tw-text-xs tw-text-faint" title={localInstance.chat_token_count_title.replace('{count}', String(tokenCount))}>
 								{formatTokenCount(tokenCount)} tokens
 							</span>
 						</div>
@@ -528,23 +392,23 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 							{/* User message buttons */}
 							{message.role === 'user' && (
 								<>
-									<span onClick={handleCopy} aria-label="复制消息" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
+									<span onClick={handleCopy} aria-label={localInstance.chat_copy_message} title={localInstance.chat_copy_message} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 										{copied ? <Check className="tw-size-4" /> : <Copy className="tw-size-4" />}
 									</span>
 									{!editing && (
 										<span onClick={() => {
 											setDraft(editableContent);
 											setEditing(true);
-										}} aria-label="编辑消息" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
+										}} aria-label={localInstance.chat_edit_message} title={localInstance.chat_edit_message} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 											<PenSquare className="tw-size-4" />
 										</span>
 									)}
 									{editing && (
 										<>
-											<span onClick={handleCancelEdit} aria-label="取消编辑" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
+											<span onClick={handleCancelEdit} aria-label={localInstance.chat_cancel_edit} title={localInstance.chat_cancel_edit} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 												<X className="tw-size-4" />
 											</span>
-											<span onClick={handleSaveEdit} aria-label="保存编辑" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
+											<span onClick={handleSaveEdit} aria-label={localInstance.chat_save_edit} title={localInstance.chat_save_edit} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 												<Check className="tw-size-4" />
 											</span>
 										</>
@@ -557,7 +421,7 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 									>
 										<Pin className="tw-size-4" />
 									</span>
-									<span onClick={handleDelete} aria-label="删除消息" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
+									<span onClick={handleDelete} aria-label={localInstance.chat_delete_message} title={localInstance.chat_delete_message} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 										<Trash2 className="tw-size-4" />
 									</span>
 								</>
@@ -566,20 +430,24 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 						{message.role === 'assistant' && (
 							<>
 								{/* 停止按钮：仅在对比模式下流式生成时显示 */}
-								{isGenerating && message.modelTag && (
-									<span
-										onClick={() => service?.stopModelGeneration(message.modelTag!)}
-										aria-label="停止此模型"
-										className="tw-cursor-pointer tw-text-muted hover:tw-text-destructive"
-										title="停止此模型"
-									>
-										<StopCircle className="tw-size-4" />
-									</span>
-								)}
-								<span onClick={handleInsert} aria-label="插入到编辑器" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
+								{isGenerating && message.modelTag && (() => {
+									const modelTag = message.modelTag;
+									if (!modelTag) return null;
+									return (
+										<span
+											onClick={() => service?.stopModelGeneration(modelTag)}
+											aria-label={localInstance.stop_this_model}
+											className="tw-cursor-pointer tw-text-muted hover:tw-text-destructive"
+											title={localInstance.stop_this_model}
+										>
+											<StopCircle className="tw-size-4" />
+										</span>
+									);
+								})()}
+								<span onClick={handleInsert} aria-label={localInstance.chat_insert_to_editor} title={localInstance.chat_insert_to_editor} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 									<TextCursorInput className="tw-size-4" />
 								</span>
-								<span onClick={handleCopy} aria-label="复制消息" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
+								<span onClick={handleCopy} aria-label={localInstance.chat_copy_message} title={localInstance.chat_copy_message} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 									{copied ? <Check className="tw-size-4" /> : <Copy className="tw-size-4" />}
 								</span>
 								<span
@@ -590,10 +458,10 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 								>
 									<Pin className="tw-size-4" />
 								</span>
-								<span onClick={handleRegenerate} aria-label="重新生成" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
+								<span onClick={handleRegenerate} aria-label={localInstance.quick_action_result_regenerate} title={localInstance.quick_action_result_regenerate} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 									<RotateCw className="tw-size-4" />
 								</span>
-								<span onClick={handleDelete} aria-label="删除消息" className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
+								<span onClick={handleDelete} aria-label={localInstance.chat_delete_message} title={localInstance.chat_delete_message} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 									<Trash2 className="tw-size-4" />
 								</span>
 							</>
@@ -612,7 +480,7 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 					<div className="tw-relative tw-max-w-full tw-max-h-full">
 						<img 
 							src={previewImage} 
-							alt="预览图片" 
+							alt={localInstance.chat_image_preview_alt} 
 							className="tw-max-w-full tw-max-h-full tw-object-contain tw-rounded-md"
 						/>
 						<button

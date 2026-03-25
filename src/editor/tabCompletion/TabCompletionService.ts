@@ -5,14 +5,14 @@ import {
     buildEditorContext,
     generateContextPrompt,
     EditorContext,
-    postProcessSuggestion,
-    limitSuggestionLength
 } from './ContextBuilder'
+import { postProcessSuggestion, limitSuggestionLength } from './contextPostProcess'
 import { ProviderSettings, Message } from 'src/LLMProviders'
 import { availableVendors } from 'src/settings/ai-runtime'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler'
 import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils'
+import { localInstance } from 'src/i18n/locals'
 
 /**
  * Tab 补全设置接口
@@ -179,14 +179,14 @@ export class TabCompletionService {
 
         // 检查只读模式
         if (this.isEditorReadOnly(view)) {
-            new Notice('Editor is in read-only mode')
+            new Notice(localInstance.tab_completion_read_only)
             return
         }
 
         // 获取 provider
         const provider = this.getProvider()
         if (!provider) {
-            new Notice('No AI provider configured for Tab completion')
+            new Notice(localInstance.tab_completion_no_provider)
             return
         }
 
@@ -226,7 +226,7 @@ export class TabCompletionService {
                     effects: clearSuggestionEffect.of(undefined)
                 })
             }
-        } catch (error: any) {
+        } catch (error) {
             DebugLogger.error('[TabCompletion] AI 请求失败', error)
             
             // 清除状态
@@ -235,9 +235,11 @@ export class TabCompletionService {
             })
 
             // 显示错误提示
-            if (error.name !== 'AbortError') {
-                const errorMessage = error.message || 'Failed to generate suggestion'
-                new Notice(`AI 补全失败: ${errorMessage}`, 3000)
+            if (!(error instanceof Error && error.name === 'AbortError')) {
+                const errorMessage = error instanceof Error
+                    ? (error.message || localInstance.tab_completion_failed_default_reason)
+                    : localInstance.tab_completion_failed_default_reason
+                new Notice(localInstance.tab_completion_failed_prefix.replace('{message}', errorMessage), 3000)
             }
         }
     }

@@ -46,7 +46,7 @@ async function fetchStream(
 // JSON流式处理相关类型
 type ParsedDataProcessor<T> = (parsedData: T) => void;
 
-type JsonStreamOptions<T = any> = {
+type JsonStreamOptions<T = unknown> = {
     onChunk?: ChunkProcessor;  // 可选的原始数据回调
     onParsedData: ParsedDataProcessor<T>;  // 必需的JSON数据回调
     dataLinePrefix?: string;   // 用于SSE格式的行前缀
@@ -60,7 +60,7 @@ type JsonStreamOptions<T = any> = {
  * @param jsonOptions JSON流处理选项
  * @returns 完成时返回的Promise
  */
-async function fetchJsonStream<T = any>(
+async function fetchJsonStream<T = unknown>(
     url: string | URL,
     fetchOptions: FetchStreamOptions,
     jsonOptions: JsonStreamOptions<T>

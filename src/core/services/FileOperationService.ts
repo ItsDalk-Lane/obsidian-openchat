@@ -1,113 +1,54 @@
 import { App, normalizePath, TFile, TFolder } from "obsidian";
-import { FormTemplateProcessEngine, type TemplateState } from "./engine/FormTemplateProcessEngine";
-import { createFileByText, CreateFileOptions } from "src/utils/createFileByText";
+import { FormTemplateProcessEngine } from "./engine/FormTemplateProcessEngine";
+import { createFileByText } from "src/utils/createFileByText";
 import { FileConflictResolution } from "src/types/enums/FileConflictResolution";
-import { validateAndConvertToString, TypeConversionError, FormFieldValidationError } from "src/utils/typeSafety";
 import { Strings } from "src/utils/Strings";
 import { openFilePathDirectly } from "src/utils/openFilePathDirectly";
-import { OpenPageInType } from "src/types/enums/OpenPageInType";
-import { localInstance } from "src/i18n/locals";
 import { PathResolverService } from "./PathResolverService";
+import {
+    resolveState,
+    normalizeAndValidatePath,
+    mapConflictStrategy,
+    isConflictStrategy,
+    normalizeOpenMode,
+    buildMoveTargetPath,
+    generateAvailablePath,
+    ensureFolderExists,
+    resolveContent,
+} from "./fileOperationHelpers";
 
-export type FileConflictStrategy =
-    | "error"
-    | "overwrite"
-    | "rename"
-    | "skip"
-    | FileConflictResolution;
-
-export type FolderDeleteMode = "recursive" | "files-only" | "folder-only";
-
-export type OpenFileMode =
-    | "none"
-    | "modal"
-    | "new-tab"
-    | "current"
-    | "split"
-    | "new-window"
-    | "tab"
-    | "window";
-
-export interface WriteFileOptions {
-    path: string;
-    content?: string;
-    template?: string;
-    variables?: Record<string, any>;
-    state?: TemplateState;
-    createFolders?: boolean;
-    conflictStrategy?: FileConflictStrategy;
-    confirmOverwrite?: boolean;
-    silent?: boolean;
-    createFileOptions?: CreateFileOptions;
-}
-
-export interface WriteFileResult {
-    success: boolean;
-    action: "create" | "overwrite" | "skipped";
-    path: string;
-    bytesWritten?: number;
-    error?: string;
-    actualPath?: string;
-}
-
-export interface DeleteFileOptions {
-    paths: string | string[];
-    folderMode?: FolderDeleteMode;
-    deleteType?: "file" | "folder";
-    silent?: boolean;
-    state?: TemplateState;
-    variables?: Record<string, any>;
-}
-
-export interface DeleteFileResult {
-    success: boolean;
-    deletedFiles: string[];
-    deletedFolders: string[];
-    skippedFiles: string[];
-    errors: Array<{ path: string; error: string }>;
-}
-
-export interface MoveFileOptions {
-    paths: string | string[];
-    targetFolder: string;
-    moveType?: "file" | "folder";
-    conflictStrategy?: FileConflictStrategy;
-    silent?: boolean;
-    state?: TemplateState;
-    variables?: Record<string, any>;
-}
-
-export interface MoveFileResult {
-    success: boolean;
-    moved: Array<{ from: string; to: string }>;
-    skipped: Array<{ path: string; reason: string }>;
-    errors: Array<{ path: string; error: string }>;
-}
-
-export interface OpenFileOptions {
-    path: string;
-    mode?: OpenFileMode | OpenPageInType;
-    state?: TemplateState;
-    variables?: Record<string, any>;
-    silent?: boolean;
-}
-
-export interface OpenFileResult {
-    success: boolean;
-    path: string;
-    mode: string;
-    error?: string;
-}
+export type {
+    FolderDeleteMode,
+    OpenFileMode,
+    WriteFileOptions,
+    WriteFileResult,
+    DeleteFileOptions,
+    DeleteFileResult,
+    MoveFileOptions,
+    MoveFileResult,
+    OpenFileOptions,
+    OpenFileResult,
+} from "./fileOperationTypes";
+import type {
+    WriteFileOptions,
+    WriteFileResult,
+    DeleteFileOptions,
+    DeleteFileResult,
+    MoveFileOptions,
+    MoveFileResult,
+    OpenFileOptions,
+    OpenFileResult,
+} from "./fileOperationTypes";
 
 export class FileOperationService {
     constructor(private readonly app: App) {}
 
     async writeFile(options: WriteFileOptions): Promise<WriteFileResult> {
         try {
-            const state = this.resolveState(options.state, options.variables);
+            const state = resolveState(options.state, options.variables);
             const engine = new FormTemplateProcessEngine();
             const rawPath = await engine.process(options.path ?? "", state, this.app);
-            const filePath = this.normalizeAndValidatePath(rawPath);
+            const filePath = normalizeAndValidatePath(rawPath);
             if (!filePath) {
                 return {
                     success: false,
@@ -117,12 +58,12 @@ export class FileOperationService {
                 };
             }
 
-            const content = await this.resolveContent(options, engine, state);
+            const content = await resolveContent(this.app, options, engine, state);
             const normalized = normalizePath(filePath);
             const existing = this.app.vault.getAbstractFileByPath(normalized);
             const conflictStrategy = options.conflictStrategy ?? FileConflictResolution.OVERWRITE;
 
-            if (this.isConflictStrategy(conflictStrategy, FileConflictResolution.SKIP) && existing) {
+            if (isConflictStrategy(conflictStrategy, FileConflictResolution.SKIP) && existing) {
                 return {
                     success: true,
                     action: "skipped",
@@ -130,7 +71,7 @@ export class FileOperationService {
                 };
             }
 
-            if (this.isConflictStrategy(conflictStrategy, "error") && existing) {
+            if (isConflictStrategy(conflictStrategy, "error") && existing) {
                 return {
                     success: false,
                     action: "skipped",
@@ -145,7 +86,7 @@ export class FileOperationService {
                 logTypeConversions: process.env.NODE_ENV === "development",
             };
 
-            const resolution = this.mapConflictStrategy(conflictStrategy);
+            const resolution = mapConflictStrategy(conflictStrategy);
             const file = await createFileByText(this.app, normalized, content, resolution, createFileOptions);
             const finalPath = file.path;
             const writeAction = existing ? "overwrite" : "create";
@@ -177,7 +118,7 @@ export class FileOperationService {
             errors: [],
         };
 
-        const state = this.resolveState(options.state, options.variables);
+        const state = resolveState(options.state, options.variables);
         const engine = new FormTemplateProcessEngine();
         const rawPaths = Array.isArray(options.paths) ? options.paths : [options.paths];
         const resolvedPaths: string[] = [];
@@ -279,7 +220,7 @@ export class FileOperationService {
             errors: [],
         };
 
-        const state = this.resolveState(options.state, options.variables);
+        const state = resolveState(options.state, options.variables);
         const engine = new FormTemplateProcessEngine();
         const rawPaths = Array.isArray(options.paths) ? options.paths : [options.paths];
         const resolvedPaths: string[] = [];
@@ -299,7 +240,7 @@ export class FileOperationService {
         }
 
         const processedTargetFolder = await engine.process(options.targetFolder ?? "", state, this.app);
-        const targetFolder = this.normalizeAndValidatePath(processedTargetFolder);
+        const targetFolder = normalizeAndValidatePath(processedTargetFolder);
         if (!targetFolder) {
             result.success = false;
             result.errors.push({ path: "", error: "目标文件夹不能为空" });
@@ -313,7 +254,7 @@ export class FileOperationService {
             return result;
         }
 
-        await this.ensureFolderExists(targetFolder);
+        await ensureFolderExists(this.app, targetFolder);
 
         const resolver = new PathResolverService(this.app);
         for (const sourcePath of uniquePaths) {
@@ -340,7 +281,7 @@ export class FileOperationService {
                     continue;
                 }
 
-                let targetPath = this.buildMoveTargetPath(targetFolder, source.name);
+                let targetPath = buildMoveTargetPath(targetFolder, source.name);
 
                 if (source.path === targetPath) {
                     result.skipped.push({ path: source.path, reason: "源路径与目标路径一致" });
@@ -356,19 +297,19 @@ export class FileOperationService {
                 const strategy = options.conflictStrategy ?? FileConflictResolution.SKIP;
                 const existing = this.app.vault.getAbstractFileByPath(targetPath);
                 if (existing) {
-                    if (this.isConflictStrategy(strategy, FileConflictResolution.SKIP)) {
+                    if (isConflictStrategy(strategy, FileConflictResolution.SKIP)) {
                         result.skipped.push({ path: source.path, reason: "目标路径已存在，已跳过" });
                         continue;
                     }
 
-                    if (this.isConflictStrategy(strategy, "error")) {
+                    if (isConflictStrategy(strategy, "error")) {
                         result.success = false;
                         result.errors.push({ path: source.path, error: `目标路径已存在: ${targetPath}` });
                         continue;
                     }
 
-                    if (this.isConflictStrategy(strategy, FileConflictResolution.AUTO_RENAME) || this.isConflictStrategy(strategy, "rename")) {
-                        targetPath = this.generateAvailablePath(targetPath, source instanceof TFile);
+                    if (isConflictStrategy(strategy, FileConflictResolution.AUTO_RENAME) || isConflictStrategy(strategy, "rename")) {
+                        targetPath = generateAvailablePath(this.app, targetPath, source instanceof TFile);
                     } else {
                         await this.app.vault.delete(existing, existing instanceof TFolder);
                     }
@@ -378,7 +319,7 @@ export class FileOperationService {
                     ? targetPath.substring(0, targetPath.lastIndexOf("/"))
                     : "";
                 if (parentPath) {
-                    await this.ensureFolderExists(parentPath);
+                    await ensureFolderExists(this.app, parentPath);
                 }
 
                 const from = source.path;
@@ -398,10 +339,10 @@ export class FileOperationService {
 
     async openFile(options: OpenFileOptions): Promise<OpenFileResult> {
         try {
-            const state = this.resolveState(options.state, options.variables);
+            const state = resolveState(options.state, options.variables);
             const engine = new FormTemplateProcessEngine();
             const rawPath = await engine.process(options.path ?? "", state, this.app);
-            const filePath = this.normalizeAndValidatePath(rawPath);
+            const filePath = normalizeAndValidatePath(rawPath);
             if (!filePath) {
                 return {
                     success: false,
@@ -427,7 +368,7 @@ export class FileOperationService {
                 };
             }
 
-            const mode = this.normalizeOpenMode(options.mode);
+            const mode = normalizeOpenMode(options.mode);
             if (mode === "none") {
                 return {
                     success: true,
@@ -458,210 +399,4 @@ export class FileOperationService {
         }
     }
 
-    private resolveState(state?: TemplateState, variables?: Record<string, any>): TemplateState {
-        if (state) {
-            return state;
-        }
-        return {
-            idValues: {},
-            values: variables ?? {},
-        };
-    }
-
-    private normalizeAndValidatePath(rawPath: string): string {
-        const text = String(rawPath ?? "").trim();
-        if (!text) {
-            return "";
-        }
-        const invalidChars = /[<>:"|?*]/;
-        if (invalidChars.test(text)) {
-            throw new Error("文件路径包含非法字符: < > : \" | ? *");
-        }
-        return normalizePath(text);
-    }
-
-    private async resolveContent(
-        options: WriteFileOptions,
-        engine: FormTemplateProcessEngine,
-        state: TemplateState
-    ): Promise<string> {
-        if (!Strings.isBlank(options.template ?? "")) {
-            const templatePath = await this.validateAndProcessTemplatePath(
-                engine,
-                options.template ?? "",
-                state
-            );
-            const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
-            if (!templateFile || !(templateFile instanceof TFile)) {
-                throw new FormFieldValidationError(
-                    "templateFile",
-                    "file path",
-                    `${localInstance.template_file_not_exists}: ${templatePath}`,
-                    "请确认模板文件路径是否正确"
-                );
-            }
-            const templateContent = await this.app.vault.cachedRead(templateFile);
-            return await this.validateAndProcessContent(engine, templateContent, state, "template content");
-        }
-
-        const content = options.content ?? "";
-        return await this.validateAndProcessContent(engine, content, state, "direct content");
-    }
-
-    private async validateAndProcessTemplatePath(
-        engine: FormTemplateProcessEngine,
-        templatePath: string,
-        state: TemplateState
-    ): Promise<string> {
-        try {
-            const processedPath = await engine.process(templatePath, state, this.app);
-            if (typeof processedPath !== "string") {
-                throw new TypeConversionError(
-                    processedPath,
-                    "string",
-                    typeof processedPath,
-                    "模板文件路径必须是字符串",
-                    {
-                        fieldName: "templateFile",
-                        actionType: "write_file",
-                        usage: "template file path resolution",
-                    }
-                );
-            }
-
-            if (Strings.isBlank(processedPath)) {
-                throw new FormFieldValidationError(
-                    "templateFile",
-                    "file path",
-                    "模板文件路径不能为空",
-                    "请提供有效的模板文件路径"
-                );
-            }
-
-            return normalizePath(processedPath);
-        } catch (error) {
-            if (error instanceof TypeConversionError || error instanceof FormFieldValidationError) {
-                throw error;
-            }
-            throw new FormFieldValidationError(
-                "templateFile",
-                "file path",
-                `模板文件路径处理失败: ${error instanceof Error ? error.message : String(error)}`,
-                "请检查模板文件路径变量是否正确"
-            );
-        }
-    }
-
-    private async validateAndProcessContent(
-        engine: FormTemplateProcessEngine,
-        content: string,
-        state: TemplateState,
-        contentType: string
-    ): Promise<string> {
-        try {
-            const processedContent = await engine.process(content, state, this.app);
-            return validateAndConvertToString(processedContent, {
-                fieldName: "content",
-                actionType: "write_file",
-                usage: `${contentType} processing`,
-            });
-        } catch (error) {
-            if (error instanceof TypeConversionError || error instanceof FormFieldValidationError) {
-                throw error;
-            }
-            throw new FormFieldValidationError(
-                "content",
-                "file content",
-                `内容处理失败: ${error instanceof Error ? error.message : String(error)}`,
-                "请检查内容模板中的变量是否可转换为字符串"
-            );
-        }
-    }
-
-    private mapConflictStrategy(strategy: FileConflictStrategy): FileConflictResolution {
-        if (strategy === FileConflictResolution.SKIP) return FileConflictResolution.SKIP;
-        if (strategy === FileConflictResolution.AUTO_RENAME || strategy === "rename") {
-            return FileConflictResolution.AUTO_RENAME;
-        }
-        if (strategy === FileConflictResolution.OVERWRITE) {
-            return FileConflictResolution.OVERWRITE;
-        }
-        return FileConflictResolution.OVERWRITE;
-    }
-
-    private isConflictStrategy(
-        strategy: FileConflictStrategy,
-        expected: FileConflictStrategy
-    ): boolean {
-        return String(strategy) === String(expected);
-    }
-
-    private normalizeOpenMode(mode?: OpenFileMode | OpenPageInType): OpenFileMode {
-        if (!mode) return "tab";
-        if (mode === OpenPageInType.tab) return "tab";
-        if (mode === OpenPageInType.window) return "window";
-        if (mode === OpenPageInType.modal) return "modal";
-        if (mode === OpenPageInType.current) return "current";
-        if (mode === OpenPageInType.split) return "split";
-        if (mode === OpenPageInType.none) return "none";
-        if (mode === "new-tab") return "tab";
-        if (mode === "new-window") return "window";
-        return mode;
-    }
-
-    private buildMoveTargetPath(targetFolder: string, sourceName: string): string {
-        const normalizedFolder = normalizePath(targetFolder);
-        if (!normalizedFolder || normalizedFolder === "/") {
-            return normalizePath(sourceName);
-        }
-        return normalizePath(`${normalizedFolder}/${sourceName}`);
-    }
-
-    private generateAvailablePath(originalPath: string, treatAsFile: boolean): string {
-        const normalized = normalizePath(originalPath);
-        if (!this.app.vault.getAbstractFileByPath(normalized)) {
-            return normalized;
-        }
-
-        const segments = normalized.split("/");
-        const name = segments.pop() ?? "";
-        const parent = segments.join("/");
-
-        let baseName = name;
-        let extension = "";
-
-        if (treatAsFile) {
-            const dotIndex = name.lastIndexOf(".");
-            if (dotIndex > 0) {
-                baseName = name.slice(0, dotIndex);
-                extension = name.slice(dotIndex);
-            }
-        }
-
-        let index = 1;
-        let candidate = normalized;
-        while (this.app.vault.getAbstractFileByPath(candidate)) {
-            const nextName = `${baseName} (${index})${extension}`;
-            candidate = parent ? normalizePath(`${parent}/${nextName}`) : normalizePath(nextName);
-            index += 1;
-        }
-
-        return candidate;
-    }
-
-    private async ensureFolderExists(folderPath: string): Promise<void> {
-        const normalized = normalizePath(folderPath).replace(/^\/+/, "");
-        if (!normalized || normalized === ".") {
-            return;
-        }
-
-        const parts = normalized.split("/").filter(Boolean);
-        let current = "";
-        for (const part of parts) {
-            current = current ? `${current}/${part}` : part;
-            if (!this.app.vault.getAbstractFileByPath(current)) {
-                await this.app.vault.createFolder(current);
-            }
-        }
-    }
 }

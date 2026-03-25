@@ -3,10 +3,20 @@ import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl } from './utils'
 import { withToolCallLoopSupport } from 'src/core/agents/loop'
+import { DebugLogger } from 'src/utils/DebugLogger'
 
 // Qwen 扩展选项接口
 export interface QwenOptions extends BaseOptions {
 	enableThinking?: boolean // 是否启用思考模式
+}
+
+type QwenDelta = OpenAI.ChatCompletionChunk.Choice.Delta & {
+	reasoning_content?: string
+}
+
+type QwenError = {
+	name?: unknown
+	message?: unknown
 }
 
 // 完整的模型列表（包含所有已知模型）
@@ -39,7 +49,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 		})
 
 		// 构建请求参数
-		const requestParams: any = {
+		const requestParams: Record<string, unknown> = {
 			model,
 			messages: formattedMessages as OpenAI.ChatCompletionMessageParam[],
 			stream: true,
@@ -55,7 +65,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 		}
 
 		try {
-			const stream = await client.chat.completions.create(requestParams, {
+			const stream = await client.chat.completions.create(requestParams as unknown as OpenAI.ChatCompletionCreateParamsStreaming, {
 				signal: controller.signal
 			})
 
@@ -65,12 +75,12 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 			const isThinkingEnabled = enableThinking ?? false
 
 			try {
-				for await (const part of stream as any) {
+				for await (const part of stream) {
 					
-					const delta = part.choices[0]?.delta
+					const delta = part.choices[0]?.delta as QwenDelta | undefined
 
 					// 处理推理内容
-					const reasoningContent = (delta as any)?.reasoning_content
+					const reasoningContent = delta?.reasoning_content
 					if (reasoningContent && isThinkingEnabled) {
 						if (!thinkingActive) {
 							thinkingActive = true
@@ -114,14 +124,16 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 					yield buildReasoningBlockEnd(durationMs)
 				}
 			}
-		} catch (error: any) {
-			if (error.name === "AbortError") {
+		} catch (error) {
+			const errorLike = (error ?? {}) as QwenError
+			if (errorLike.name === 'AbortError') {
 				throw new Error(t('Generation cancelled'))
 			}
 
 			// 检查是否是思考模式相关的错误
-			if (enableThinking && error.message?.includes('enable_thinking')) {
-				console.warn(`[Qwen] 思考模式参数错误，尝试不使用思考模式重试: ${error.message}`)
+			const errorMessage = String(errorLike.message ?? '')
+			if (enableThinking && errorMessage.includes('enable_thinking')) {
+				DebugLogger.warn(`[Qwen] 思考模式参数错误，尝试不使用思考模式重试: ${errorMessage}`)
 				// 这里可以实现降级逻辑，但为了避免复杂性，我们直接抛出原始错误
 			}
 

@@ -7,6 +7,7 @@ export class DebugLogger {
 	private static debugLevel: 'debug' | 'info' | 'warn' | 'error' = 'info';
 	private static llmConsoleLogEnabled = false;
 	private static llmResponsePreviewChars = 100;
+	private static readonly levels: Array<'debug' | 'info' | 'warn' | 'error'> = ['debug', 'info', 'warn', 'error'];
 
 	/**
 	 * 设置调试模式
@@ -48,49 +49,119 @@ export class DebugLogger {
 	 * 检查是否应该输出该级别的日志
 	 */
 	private static shouldLog(level: 'debug' | 'info' | 'warn' | 'error'): boolean {
-		if (!this.debugMode) return false;
+		if (level === 'warn' || level === 'error') {
+			return true;
+		}
 
-		const levels = ['debug', 'info', 'warn', 'error'];
-		return levels.indexOf(level) >= levels.indexOf(this.debugLevel);
+		if (!this.debugMode) {
+			return false;
+		}
+
+		return DebugLogger.levels.indexOf(level) >= DebugLogger.levels.indexOf(this.debugLevel);
+	}
+
+	private static emit(
+		level: 'debug' | 'info' | 'warn' | 'error' | 'log',
+		message: string,
+		args: unknown[]
+	): void {
+		switch (level) {
+			case 'debug':
+				console.debug(message, ...args);
+				return;
+			case 'info':
+			case 'log':
+				console.info(message, ...args);
+				return;
+			case 'warn':
+				console.warn(message, ...args);
+				return;
+			case 'error':
+				console.error(message, ...args);
+				return;
+		}
+	}
+
+	private static truncateText(value: string, maxChars: number): string {
+		if (maxChars <= 0 || value.length <= maxChars) {
+			return value;
+		}
+
+		return `${value.slice(0, maxChars)}...`;
+	}
+
+	private static summarizeLlmMessage(
+		message: { role?: string; content?: string; embeds?: unknown },
+		index: number,
+		maxContentChars: number,
+		remainingChars: number
+	): {
+		index: number;
+		role: string;
+		content: string;
+		embedsCount: number;
+		contentLength: number;
+	} {
+		const rawContent = message.content ?? '';
+		const contentBudget = Math.max(0, Math.min(maxContentChars, remainingChars));
+		const embedsCount = Array.isArray(message.embeds)
+			? message.embeds.length
+			: typeof message.embeds === 'object' && message.embeds !== null
+				? Object.keys(message.embeds).length
+				: 0;
+
+		return {
+			index,
+			role: message.role ?? 'unknown',
+			content: this.truncateText(rawContent, contentBudget),
+			embedsCount,
+			contentLength: rawContent.length,
+		};
 	}
 
 	/**
 	 * 输出 debug 级别日志
 	 */
-	static debug(message: string, ...args: any[]): void {
-		// intentionally noop: non-warning/error logs are disabled
+	static debug(message: string, ...args: unknown[]): void {
+		if (this.shouldLog('debug')) {
+			this.emit('debug', message, args);
+		}
 	}
 
 	/**
 	 * 输出 info 级别日志
 	 */
-	static info(message: string, ...args: any[]): void {
-		// intentionally noop: non-warning/error logs are disabled
+	static info(message: string, ...args: unknown[]): void {
+		if (this.shouldLog('info')) {
+			this.emit('info', message, args);
+		}
 	}
 
 	/**
 	 * 输出 warn 级别日志
 	 */
-	static warn(message: string, ...args: any[]): void {
+	static warn(message: string, ...args: unknown[]): void {
 		if (this.shouldLog('warn')) {
-			console.warn(message, ...args);
+			this.emit('warn', message, args);
 		}
 	}
 
 	/**
 	 * 输出 error 级别日志
 	 */
-	static error(message: string, ...args: any[]): void {
+	static error(message: string, ...args: unknown[]): void {
 		if (this.shouldLog('error')) {
-			console.error(message, ...args);
+			this.emit('error', message, args);
 		}
 	}
 
 	/**
-	 * 输出普通日志（不受调试模式控制，始终输出）
+	 * 输出普通日志（受调试模式控制，等同于 info 级别）。
 	 */
-	static log(message: string, ...args: any[]): void {
-		// intentionally noop: non-warning/error logs are disabled
+	static log(message: string, ...args: unknown[]): void {
+		if (this.shouldLog('info')) {
+			this.emit('log', message, args);
+		}
 	}
 
 	/**
@@ -108,7 +179,32 @@ export class DebugLogger {
 			printRaw?: boolean;
 		}
 	): void {
-		// intentionally noop: non-warning/error logs are disabled
+		const level = options?.level ?? 'debug';
+		if (!this.llmConsoleLogEnabled || !this.shouldLog(level)) {
+			return;
+		}
+
+		if (options?.printRaw) {
+			this.emit(level, `[LLM] ${tag} messages`, [messages]);
+			return;
+		}
+
+		const maxContentChars = options?.maxContentChars ?? this.llmResponsePreviewChars;
+		const maxTotalChars = options?.maxTotalChars ?? maxContentChars * Math.max(messages.length, 1);
+		let consumedChars = 0;
+
+		const summary = messages.map((message, index) => {
+			const item = this.summarizeLlmMessage(
+				message,
+				index,
+				maxContentChars,
+				maxTotalChars - consumedChars,
+			);
+			consumedChars += item.content.length;
+			return item;
+		});
+
+		this.emit(level, `[LLM] ${tag} messages`, [summary]);
 	}
 
 	/**
@@ -123,6 +219,20 @@ export class DebugLogger {
 			printLength?: boolean;
 		}
 	): void {
-		// intentionally noop: non-warning/error logs are disabled
+		const level = options?.level ?? 'debug';
+		if (!this.llmConsoleLogEnabled || !this.shouldLog(level)) {
+			return;
+		}
+
+		const previewChars = options?.previewChars ?? this.llmResponsePreviewChars;
+		const preview = this.truncateText(responseText, previewChars);
+		const metadata = options?.printLength ? { length: responseText.length } : undefined;
+
+		if (metadata) {
+			this.emit(level, `[LLM] ${tag} response`, [preview, metadata]);
+			return;
+		}
+
+		this.emit(level, `[LLM] ${tag} response`, [preview]);
 	}
 }

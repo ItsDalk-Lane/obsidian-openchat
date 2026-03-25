@@ -199,21 +199,31 @@ export function createTimeTools(
 			} = parseGetTimeArgs(getTimeSchema.parse(args));
 
 			if (mode === 'convert') {
+				const currentSourceTimezone = source_timezone;
+				const currentTargetTimezone = target_timezone;
+				const currentTime = time;
+				if (!currentSourceTimezone || !currentTargetTimezone || !currentTime) {
+					throw new Error('convert 模式缺少必填参数');
+				}
 				return {
 					mode,
 					...buildTimeConversionResult(
-						source_timezone!,
-						time!,
-						target_timezone!
+						currentSourceTimezone,
+						currentTime,
+						currentTargetTimezone
 					),
 				};
 			}
 
 			if (mode === 'range') {
+				const currentNaturalTime = natural_time;
+				if (!currentNaturalTime) {
+					throw new Error('range 模式缺少必填参数 natural_time');
+				}
 				return {
 					mode,
 					...buildTimeRangeResult(
-						natural_time!,
+						currentNaturalTime,
 						timezone,
 						options.defaultTimezone
 					),

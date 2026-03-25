@@ -11,11 +11,13 @@ export default function PromptTemplateFileSuggestInput(props: {
 	immediate?: boolean;
 }) {
 	const app = useObsidianApp();
+	type OpenChatPluginLike = { settings?: { aiDataFolder?: string } }
+	type AppWithPlugins = typeof app & { plugins?: { plugins?: Record<string, OpenChatPluginLike | undefined> } }
 	const { value, onChange } = props;
 	
 	const items = useMemo(() => {
 		// 获取插件设置中的提示词模板目录
-		const plugin = (app as any).plugins?.plugins?.["openchat"];
+		const plugin = (app as AppWithPlugins).plugins?.plugins?.['openchat'];
 		const promptTemplateFolder = getPromptTemplatePath(plugin?.settings?.aiDataFolder || 'System/AI Data');
 		
 		// 添加"请选择"选项

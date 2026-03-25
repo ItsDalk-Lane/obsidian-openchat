@@ -60,7 +60,10 @@ export const ModelSelector = ({ providers, value, onChange }: ModelSelectorProps
 				});
 			}
 			if (vendor) {
-				grouped.get(vendor.name)!.providers.push(provider);
+				const vendorGroup = grouped.get(vendor.name);
+				if (vendorGroup) {
+					vendorGroup.providers.push(provider);
+				}
 			}
 		});
 

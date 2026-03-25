@@ -65,22 +65,22 @@ export const QuickActionEditModal = ({
 		
 		// 验证名称
 		if (!name.trim()) {
-			newErrors.name = localInstance.quick_action_edit_name_required || '操作名称不能为空';
+			newErrors.name = localInstance.quick_action_edit_name_required;
 		} else if (name.length > 20) {
-			newErrors.name = localInstance.quick_action_edit_name_too_long || '操作名称不能超过20个字符';
+			newErrors.name = localInstance.quick_action_edit_name_too_long;
 		} else {
 			// 检查名称重复（编辑模式下排除自己）
 			const otherNames = isEditMode
 				? existingQuickActionNames.filter(n => n !== quickAction?.name)
 				: existingQuickActionNames;
 			if (otherNames.includes(name.trim())) {
-				newErrors.name = localInstance.quick_action_edit_name_duplicate || '操作名称已存在';
+				newErrors.name = localInstance.quick_action_edit_name_duplicate;
 			}
 		}
 		
 		// 验证提示词
 		if (!prompt.trim()) {
-			newErrors.prompt = localInstance.quick_action_edit_prompt_required || '提示词内容不能为空';
+			newErrors.prompt = localInstance.quick_action_edit_prompt_required;
 		}
 		
 		setErrors(newErrors);
@@ -110,8 +110,8 @@ export const QuickActionEditModal = ({
 		onSave(savedQuickAction);
 		new Notice(
 			isEditMode
-				? (localInstance.quick_action_edit_updated || '操作已更新')
-				: (localInstance.quick_action_edit_created || '操作已创建')
+				? localInstance.quick_action_edit_updated
+				: localInstance.quick_action_edit_created
 		);
 	}, [name, prompt, showInToolbar, useDefaultSystemPrompt, quickAction, existingQuickActionNames.length, validateForm, onSave, isEditMode]);
 
@@ -123,7 +123,7 @@ export const QuickActionEditModal = ({
 		);
 		
 		if (files.length === 0) {
-			new Notice(localInstance.ai_template_folder_empty || '模板文件夹为空');
+			new Notice(localInstance.ai_template_folder_empty);
 			return;
 		}
 		
@@ -173,13 +173,13 @@ export const QuickActionEditModal = ({
 				<div className="quick-action-edit-modal-header">
 					<span className="quick-action-edit-modal-title">
 						{isEditMode
-							? (localInstance.quick_action_edit_title_edit || '编辑操作')
-							: (localInstance.quick_action_edit_title_add || '添加操作')}
+							? localInstance.quick_action_edit_title_edit
+							: localInstance.quick_action_edit_title_add}
 					</span>
 					<button
 						className="quick-action-edit-modal-close"
 						onClick={onClose}
-						title={localInstance.close || '关闭'}
+						title={localInstance.close}
 					>
 						<X size={18} />
 					</button>
@@ -190,7 +190,7 @@ export const QuickActionEditModal = ({
 					{/* 操作名称 */}
 					<div className="quick-action-edit-field">
 						<label className="quick-action-edit-label">
-							{localInstance.quick_action_edit_name_label || '操作名称和图标'}
+							{localInstance.quick_action_edit_name_label}
 							<span className="quick-action-edit-required">*</span>
 						</label>
 						<div className="quick-action-edit-name-row">
@@ -200,13 +200,13 @@ export const QuickActionEditModal = ({
 								className={`quick-action-edit-input ${errors.name ? 'quick-action-edit-input-error' : ''}`}
 								value={name}
 								onChange={(e) => setName(e.target.value)}
-								placeholder={localInstance.quick_action_edit_name_placeholder || '在这里命名你的操作...'}
+								placeholder={localInstance.quick_action_edit_name_placeholder}
 								maxLength={20}
 							/>
 							<span className="quick-action-edit-name-counter">{name.length}/20</span>
 							<button
 								className="quick-action-edit-icon-btn"
-								title={localInstance.quick_action_edit_select_icon || '选择图标'}
+								title={localInstance.quick_action_edit_select_icon}
 							>
 								<Heart size={18} />
 							</button>
@@ -219,16 +219,16 @@ export const QuickActionEditModal = ({
 					{/* 提示词内容 */}
 					<div className="quick-action-edit-field">
 						<label className="quick-action-edit-label">
-							{localInstance.quick_action_edit_prompt_label || '提示词内容'}
+							{localInstance.quick_action_edit_prompt_label}
 							<span className="quick-action-edit-required">*</span>
 						</label>
 						<div className="quick-action-edit-prompt-hint">
-							{localInstance.quick_action_edit_prompt_hint || '使用特殊符串 {selection}代表划词选中的文字。'}
+							{localInstance.quick_action_edit_prompt_hint}
 							<button
 								className="quick-action-edit-link-btn"
 								onClick={handleInsertTemplate}
 							>
-								{localInstance.quick_action_edit_show_example || '示例'}
+								{localInstance.quick_action_edit_show_example}
 							</button>
 						</div>
 						<textarea
@@ -236,7 +236,7 @@ export const QuickActionEditModal = ({
 							className={`quick-action-edit-textarea ${errors.prompt ? 'quick-action-edit-input-error' : ''}`}
 							value={prompt}
 							onChange={(e) => setPrompt(e.target.value)}
-							placeholder={localInstance.quick_action_edit_prompt_placeholder || '在此输入或粘贴你的提示词。'}
+							placeholder={localInstance.quick_action_edit_prompt_placeholder}
 							rows={8}
 						/>
 						{errors.prompt && (
@@ -247,7 +247,7 @@ export const QuickActionEditModal = ({
 					{/* 使用默认系统提示词设置 */}
 					<div className="quick-action-edit-field">
 						<label className="quick-action-edit-label">
-							{localInstance.quick_action_edit_use_default_system_prompt || '使用默认系统提示词'}
+							{localInstance.quick_action_edit_use_default_system_prompt}
 						</label>
 						<div className="quick-action-edit-checkbox-row">
 							<input
@@ -258,7 +258,7 @@ export const QuickActionEditModal = ({
 								className="quick-action-edit-checkbox"
 							/>
 							<label htmlFor="useDefaultSystemPrompt" className="quick-action-edit-checkbox-label">
-								{localInstance.quick_action_edit_use_default_system_prompt_hint || '启用后将使用全局系统提示词，禁用则仅使用自定义提示词内容'}
+								{localInstance.quick_action_edit_use_default_system_prompt_hint}
 							</label>
 						</div>
 					</div>
@@ -266,7 +266,7 @@ export const QuickActionEditModal = ({
 					{/* AI模型选择 */}
 					<div className="quick-action-edit-field">
 						<label className="quick-action-edit-label">
-							{localInstance.quick_action_edit_model_label || 'AI 模型'}
+							{localInstance.quick_action_edit_model_label}
 						</label>
 						<select
 							className="quick-action-edit-select"
@@ -274,10 +274,10 @@ export const QuickActionEditModal = ({
 							onChange={(e) => setModelTag(e.target.value)}
 						>
 							<option value="">
-								{localInstance.quick_action_edit_model_default || '使用默认模型'}
+								{localInstance.quick_action_edit_model_default}
 							</option>
 							<option value="__EXEC_TIME__">
-								{localInstance.quick_action_edit_model_exec_time || '执行时选择模型'}
+								{localInstance.quick_action_edit_model_exec_time}
 							</option>
 							{providers.map(provider => (
 								<option key={provider.tag} value={provider.tag}>
@@ -286,7 +286,7 @@ export const QuickActionEditModal = ({
 							))}
 						</select>
 						<div className="quick-action-edit-model-hint">
-							{localInstance.quick_action_edit_model_hint || '选择执行此操作时使用的 AI 模型'}
+							{localInstance.quick_action_edit_model_hint}
 						</div>
 					</div>
 				</div>
@@ -297,13 +297,13 @@ export const QuickActionEditModal = ({
 						className="quick-action-edit-btn quick-action-edit-btn-secondary"
 						onClick={onClose}
 					>
-						{localInstance.cancel || '取消'}
+						{localInstance.cancel}
 					</button>
 					<button
 						className="quick-action-edit-btn quick-action-edit-btn-primary"
 						onClick={handleSave}
 					>
-						{localInstance.save || '保存'}
+						{localInstance.save}
 					</button>
 				</div>
 			</div>

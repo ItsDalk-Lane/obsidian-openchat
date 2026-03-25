@@ -2,7 +2,10 @@ import { moment } from "obsidian";
 import { Objects } from "./Objects";
 import { DateTimeCalculator } from "./DateTimeCalculator";
 
-export function processObTemplate(templateContent: any) {
+export function processObTemplate(templateContent: string): string;
+export function processObTemplate<T>(templateContent: T): T;
+export function processObTemplate(templateContent: unknown) {
+
     const createMoment = moment as unknown as () => moment.Moment;
     return processObTemplateInContext(templateContent, { moment: createMoment() });
 }
@@ -12,7 +15,7 @@ type Context = {
     title?: string;
 }
 
-export function processObTemplateInContext(templateContent: any, context: Context) {
+export function processObTemplateInContext(templateContent: unknown, context: Context) {
     if (!Objects.exists(templateContent)) {
         return templateContent;
     }

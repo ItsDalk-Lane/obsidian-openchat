@@ -7,7 +7,7 @@
  * Converts any value to string with consistent behavior
  * Follows JavaScript String() conversion rules
  */
-export function convertVariableToString(value: any): string {
+export function convertVariableToString(value: unknown): string {
     if (value === undefined || value === null) {
         return "";
     }
@@ -19,7 +19,7 @@ export function convertVariableToString(value: any): string {
  * Throws detailed error if conversion fails or produces unexpected results
  */
 export function validateAndConvertToString(
-    value: any,
+    value: unknown,
     context: {
         fieldName?: string;
         actionType?: string;
@@ -61,7 +61,7 @@ export function validateAndConvertToString(
  * Validates if a value is suitable for YAML frontmatter
  * Checks for types that can cause YAML parsing issues
  */
-export function isValidYamlValue(value: any, expectedType?: string): boolean {
+export function isValidYamlValue(value: unknown, expectedType?: string): boolean {
     // Check for undefined/null
     if (value === undefined || value === null) {
         return expectedType === 'text' || expectedType === undefined;
@@ -81,6 +81,9 @@ export function isValidYamlValue(value: any, expectedType?: string): boolean {
         case 'datetime':
             // Date strings should be parseable
             {
+				if (typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date)) {
+					return false;
+				}
                 const date = new Date(value);
                 return !isNaN(date.getTime());
             }
@@ -104,7 +107,7 @@ export function isValidYamlValue(value: any, expectedType?: string): boolean {
  */
 export class TypeConversionError extends Error {
     constructor(
-        public originalValue: any,
+        public originalValue: unknown,
         public expectedType: string,
         public actualType: string,
         message: string,
@@ -183,7 +186,7 @@ export function logTypeConversion(
         usage?: string;
         location?: string;
     },
-    originalValue: any,
+    originalValue: unknown,
     convertedValue: string,
     success = true
 ): void {
@@ -195,7 +198,7 @@ export function logTypeConversion(
  * Checks for common type-related issues
  */
 export function validateFormValues(
-    values: Record<string, any>,
+    values: Record<string, unknown>,
     context: { actionType?: string } = {}
 ): TypeConversionError[] {
     const errors: TypeConversionError[] = [];

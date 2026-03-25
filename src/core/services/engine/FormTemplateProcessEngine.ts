@@ -4,10 +4,11 @@ import { getEditorSelection, getCurrentFileContent } from "src/utils/getEditorSe
 import { processObTemplate } from "src/utils/templates";
 import { convertVariableToString, logTypeConversion, validateFormValues } from "src/utils/typeSafety";
 import { LoopVariableScope } from "src/utils/LoopVariableScope";
+import { DebugLogger } from "src/utils/DebugLogger";
 
 export type TemplateState = {
-    idValues: Record<string, any>;
-    values: Record<string, any>;
+    idValues: Record<string, unknown>;
+    values: Record<string, unknown>;
 };
 
 export class FormTemplateProcessEngine {
@@ -22,7 +23,7 @@ export class FormTemplateProcessEngine {
         });
 
         if (validationErrors.length > 0) {
-            console.warn('Form template processing validation warnings:', validationErrors);
+            DebugLogger.warn('Form template processing validation warnings:', validationErrors);
             // Continue processing but log warnings for debugging
         }
 
@@ -143,11 +144,11 @@ export class FormTemplateProcessEngine {
         }
 
         // 最后处理 Obsidian 格式模板
-        res = processObTemplate(res);
+                res = processObTemplate(String(res));
         return res;
     }
 
-    private resolvePureVariableValue(variableName: string, state: TemplateState): any {
+    private resolvePureVariableValue(variableName: string, state: TemplateState): unknown {
         const loopValue = this.getLoopScopedValue(variableName);
         if (loopValue !== undefined) {
             return loopValue;
@@ -155,7 +156,7 @@ export class FormTemplateProcessEngine {
         return this.getStateValue(variableName, state);
     }
 
-    private getLoopScopedValue(path: string): any {
+    private getLoopScopedValue(path: string): unknown {
         const directValue = LoopVariableScope.getValue(path);
         if (directValue !== undefined) {
             return directValue;
@@ -178,7 +179,7 @@ export class FormTemplateProcessEngine {
         return this.getValueByPath(rootValue, segments.slice(1));
     }
 
-    private getStateValue(path: string, state: TemplateState): any {
+    private getStateValue(path: string, state: TemplateState): unknown {
         if (!path) {
             return undefined;
         }
@@ -199,17 +200,20 @@ export class FormTemplateProcessEngine {
         return this.getValueByPath(state.values, segments);
     }
 
-    private getValueByPath(target: any, segments: string[]): any {
+    private getValueByPath(target: unknown, segments: string[]): unknown {
         if (!target) {
             return undefined;
         }
 
-        let current = target;
+        let current: unknown = target;
         for (const segment of segments) {
             if (current === undefined || current === null) {
                 return undefined;
             }
-            current = current[segment];
+            if (typeof current !== 'object') {
+                return undefined;
+            }
+            current = (current as Record<string, unknown>)[segment];
         }
         return current;
     }

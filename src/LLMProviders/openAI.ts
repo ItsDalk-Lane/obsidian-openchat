@@ -15,6 +15,21 @@ export interface OpenAIOptions extends BaseOptions {
 	enableReasoning?: boolean
 }
 
+type OpenAIResponseEvent = {
+	type?: string
+	delta?: unknown
+}
+
+type OpenAIResponsesInputItem =
+	| {
+		type: 'input_image'
+		image_url?: string
+	}
+	| {
+		type: 'input_text'
+		text: string
+	}
+
 export const openAIUseResponsesAPI = (options: OpenAIOptions) => options.enableReasoning === true
 export const openAIMapResponsesParams = (params: Record<string, unknown>) => {
 	const mapped = { ...params }
@@ -53,14 +68,14 @@ const sendRequestFunc = (settings: OpenAIOptions): SendRequest =>
 
 				const stream = await withRetry(
 					() =>
-						client.responses.create(responseData as any, {
+						client.responses.create(responseData as Parameters<typeof client.responses.create>[0], {
 							signal: controller.signal
 						}),
 					{ signal: controller.signal }
 				)
 				let reasoningActive = false
 				let reasoningStartMs: number | null = null
-				for await (const event of stream as any) {
+				for await (const event of stream as AsyncIterable<OpenAIResponseEvent>) {
 					if (event.type === 'response.reasoning_text.delta' || event.type === 'response.reasoning_summary_text.delta') {
 						if (!enableReasoning) continue
 						const text = String(event.delta ?? '')
@@ -110,14 +125,14 @@ const sendRequestFunc = (settings: OpenAIOptions): SendRequest =>
 							messages: formattedMessages as OpenAI.ChatCompletionMessageParam[],
 							stream: true,
 							...remains
-						} as any,
+						} as OpenAI.ChatCompletionCreateParamsStreaming,
 						{ signal: controller.signal }
 					),
 				{ signal: controller.signal }
 			)
 
-			for await (const part of stream as any) {
-				const delta: any = part.choices[0]?.delta
+			for await (const part of stream) {
+				const delta = part.choices[0]?.delta
 				const text = delta?.content
 				if (text) {
 					yield text
@@ -156,19 +171,21 @@ const formatMsg = async (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinar
 
 const formatMsgForResponses = async (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinary) => {
 	const base = await formatMsg(msg, resolveEmbedAsBinary)
-	const content = Array.isArray(base.content) ? base.content : [{ type: 'text' as const, text: String(base.content ?? '') }]
+	const content: ContentItem[] = Array.isArray(base.content)
+		? (base.content as ContentItem[])
+		: [{ type: 'text', text: String(base.content ?? '') }]
 	return {
 		role: msg.role === 'assistant' ? 'assistant' : msg.role === 'system' ? 'system' : 'user',
-		content: content.map((part) => {
-			if ((part as any).type === 'image_url') {
+		content: content.map<OpenAIResponsesInputItem>((part) => {
+			if (part.type === 'image_url') {
 				return {
 					type: 'input_image',
-					image_url: (part as any).image_url?.url
+					image_url: part.image_url.url
 				}
 			}
 			return {
 				type: 'input_text',
-				text: String((part as any).text ?? '')
+				text: String(part.text ?? '')
 			}
 		})
 	}
@@ -183,7 +200,7 @@ export const openAIVendor: Vendor = {
 		enableReasoning: false,
 		parameters: {}
 	} as OpenAIOptions,
-	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as any),
+	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as (settings: BaseOptions) => SendRequest),
 	models: [],
 	websiteToObtainKey: 'https://platform.openai.com/api-keys',
 	capabilities: ['Text Generation', 'Image Vision', 'Reasoning']

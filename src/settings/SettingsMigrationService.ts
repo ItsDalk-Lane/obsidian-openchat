@@ -1,6 +1,7 @@
 import { Plugin } from 'obsidian';
 import { PluginSettings, DEFAULT_SETTINGS } from './PluginSettings';
 import { DebugLogger } from 'src/utils/DebugLogger';
+import { SettingsSecretManager, type VendorApiKeysByDevice } from './SettingsSecretManager';
 import {
     canDeriveAIDataFolderFromLegacy,
     ensureAIDataFolders,
@@ -11,12 +12,36 @@ import {
 
 const LEGACY_QUICK_ACTIONS_DATA_FILE = '.obsidian/plugins/openchat/skills.json';
 const LEGACY_SYSTEM_PROMPTS_DATA_FILE = '.obsidian/plugins/openchat/system-prompts.json';
+const LEGACY_AI_RUNTIME_CONTAINER_KEY = 'tars';
+const LEGACY_AI_RUNTIME_SETTINGS_KEY = 'settings';
 
 /**
  * 负责 AI 数据目录迁移、旧版数据清理及文件夹路径规范化
  */
 export class SettingsMigrationService {
+    private readonly secretManager = new SettingsSecretManager();
+
     constructor(private readonly plugin: Plugin) {}
+
+    resolvePersistedAiRuntime(persisted: Record<string, unknown>): Record<string, unknown> {
+        const persistedAiRuntime = this.asRecord(persisted.aiRuntime);
+        const legacyAiRuntime = this.resolveLegacyAiRuntime(persisted);
+        const mergedVendorApiKeys = {
+            ...this.asStringRecord(legacyAiRuntime?.vendorApiKeys),
+            ...this.asStringRecord(persistedAiRuntime.vendorApiKeys),
+        };
+
+        const mergedAiRuntime = {
+            ...legacyAiRuntime,
+            ...persistedAiRuntime,
+        };
+
+        if (Object.keys(mergedVendorApiKeys).length > 0) {
+            mergedAiRuntime.vendorApiKeys = mergedVendorApiKeys;
+        }
+
+        return mergedAiRuntime;
+    }
 
     async migrateAIDataStorage(settings: PluginSettings): Promise<void> {
         const persisted = (await this.plugin.loadData()) ?? {};
@@ -71,9 +96,13 @@ export class SettingsMigrationService {
 
         const nextData: Record<string, unknown> = { ...persisted };
         const nextChat: Record<string, unknown> = { ...(persisted?.chat ?? {}) };
-        const nextAiRuntime: Record<string, unknown> = {
-            ...((persisted?.aiRuntime ?? {}) as Record<string, unknown>),
-        };
+        const legacyAiRuntime = this.resolveLegacyAiRuntime(persisted);
+        const nextAiRuntime = this.resolvePersistedAiRuntime(persisted);
+
+        if (legacyAiRuntime) {
+            delete nextData[LEGACY_AI_RUNTIME_CONTAINER_KEY];
+            changed = true;
+        }
 
         if (Object.prototype.hasOwnProperty.call(nextChat, 'quickActions')) {
             delete nextChat.quickActions;
@@ -93,7 +122,7 @@ export class SettingsMigrationService {
                 changed = true;
             }
         }
-        for (const legacyRuntimeOnlyField of ['editorStatus', 'vendorApiKeys'] as const) {
+        for (const legacyRuntimeOnlyField of ['editorStatus'] as const) {
             if (Object.prototype.hasOwnProperty.call(nextAiRuntime, legacyRuntimeOnlyField)) {
                 delete nextAiRuntime[legacyRuntimeOnlyField];
                 changed = true;
@@ -126,6 +155,19 @@ export class SettingsMigrationService {
                     changed = true;
                 }
             }
+        }
+
+        const nextVendorApiKeysByDevice = this.secretManager.encryptVendorApiKeys(
+            this.asVendorApiKeysByDevice(nextAiRuntime.vendorApiKeysByDevice),
+            this.asStringRecord(nextAiRuntime.vendorApiKeys)
+        );
+        if (nextVendorApiKeysByDevice) {
+            nextAiRuntime.vendorApiKeysByDevice = nextVendorApiKeysByDevice;
+            changed = true;
+        }
+        if (Object.prototype.hasOwnProperty.call(nextAiRuntime, 'vendorApiKeys')) {
+            delete nextAiRuntime.vendorApiKeys;
+            changed = true;
         }
 
         if (changed) {
@@ -166,6 +208,64 @@ export class SettingsMigrationService {
         }
         const normalized = value.trim().replace(/[\\/]+$/g, '');
         return normalized.length > 0 ? normalized : undefined;
+    }
+
+    private asRecord(value: unknown): Record<string, unknown> {
+        return value && typeof value === 'object'
+            ? { ...(value as Record<string, unknown>) }
+            : {};
+    }
+
+    private asStringRecord(value: unknown): Record<string, string> {
+        if (!value || typeof value !== 'object') {
+            return {};
+        }
+
+        const next: Record<string, string> = {};
+        for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+            if (typeof entry === 'string') {
+                next[key] = entry;
+            }
+        }
+
+        return next;
+    }
+
+    private asVendorApiKeysByDevice(value: unknown): VendorApiKeysByDevice | undefined {
+        if (!value || typeof value !== 'object') {
+            return undefined;
+        }
+
+        const next: VendorApiKeysByDevice = {};
+        for (const [vendor, slots] of Object.entries(value as Record<string, unknown>)) {
+            if (!slots || typeof slots !== 'object') {
+                continue;
+            }
+
+            const normalizedSlots: Record<string, string> = {};
+            for (const [deviceId, encrypted] of Object.entries(slots as Record<string, unknown>)) {
+                if (typeof encrypted === 'string') {
+                    normalizedSlots[deviceId] = encrypted;
+                }
+            }
+
+            if (Object.keys(normalizedSlots).length > 0) {
+                next[vendor] = normalizedSlots;
+            }
+        }
+
+        return Object.keys(next).length > 0 ? next : undefined;
+    }
+
+    private resolveLegacyAiRuntime(
+        persisted: Record<string, unknown>
+    ): Record<string, unknown> | null {
+        const legacyContainer = this.asRecord(persisted[LEGACY_AI_RUNTIME_CONTAINER_KEY]);
+        const legacyAiRuntime = this.asRecord(
+            legacyContainer[LEGACY_AI_RUNTIME_SETTINGS_KEY]
+        );
+
+        return Object.keys(legacyAiRuntime).length > 0 ? legacyAiRuntime : null;
     }
 
     private async removeLegacyFileIfExists(path: string): Promise<void> {

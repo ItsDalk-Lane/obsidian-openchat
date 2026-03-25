@@ -8,17 +8,17 @@ export interface ScriptExecutionOptions {
     script?: string;
     code?: string;
     expression?: string;
-    args?: Record<string, any>;
+    args?: Record<string, unknown>;
     timeout?: number;
     source?: ScriptSource;
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
 }
 
 export interface ScriptExecutionResult {
     success: boolean;
     stdout?: string;
     stderr?: string;
-    returnValue?: any;
+    returnValue?: unknown;
     duration: number;
     error?: string;
 }

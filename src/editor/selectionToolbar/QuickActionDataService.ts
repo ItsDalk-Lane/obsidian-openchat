@@ -1,103 +1,21 @@
-import { App, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
-import type { QuickAction, QuickActionType } from 'src/types/chat';
+import { App, TFile, TFolder, normalizePath } from 'obsidian';
+import type { QuickAction } from 'src/types/chat';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { ensureAIDataFolders, getQuickActionsPath } from 'src/utils/AIPathManager';
-
-const FRONTMATTER_DELIMITER = '---';
-
-interface RawQuickAction extends Partial<QuickAction> {
-	skillType?: QuickActionType;
-	isSkillGroup?: boolean;
-}
-
-interface OpenChatPluginLike {
-	loadData?: () => Promise<any>;
-	settings?: {
-		aiDataFolder?: string;
-		chat?: {
-			quickActions?: QuickAction[];
-			skills?: RawQuickAction[];
-		};
-	};
-}
-
-const isNonEmptyString = (value: unknown): value is string => {
-	return typeof value === 'string' && value.trim().length > 0;
-};
-
-const toStringArray = (value: unknown): string[] => {
-	if (!Array.isArray(value)) {
-		return [];
-	}
-	return value.filter((item): item is string => typeof item === 'string');
-};
-
-function resolveQuickActionType(raw: RawQuickAction): QuickActionType {
-	if (raw.actionType === 'normal' || raw.actionType === 'group') {
-		return raw.actionType;
-	}
-	if (raw.skillType === 'normal' || raw.skillType === 'group') {
-		return raw.skillType;
-	}
-	if ((raw.isActionGroup ?? raw.isSkillGroup) === true) {
-		return 'group';
-	}
-	return 'normal';
-}
-
-function normalizeQuickAction(
-	raw: RawQuickAction,
-	fallback: { id: string; order: number; prompt?: string }
-): QuickAction {
-	const now = Date.now();
-	const actionType = resolveQuickActionType(raw);
-	const isActionGroup = raw.isActionGroup ?? raw.isSkillGroup ?? actionType === 'group';
-	const {
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- 排除旧字段
-		skillType: _legacySkillType,
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- 排除旧字段
-		isSkillGroup: _legacyIsSkillGroup,
-		...rawWithoutLegacyFields
-	} = raw;
-	const promptSource = raw.promptSource === 'template' ? 'template' : 'custom';
-	const defaultPrompt = isNonEmptyString(fallback.prompt) ? fallback.prompt : '';
-	const rawPrompt = typeof raw.prompt === 'string' ? raw.prompt : defaultPrompt;
-	const normalizedPrompt = promptSource === 'template' ? '' : rawPrompt;
-	const rawName = typeof raw.name === 'string' ? raw.name.trim() : '';
-	const normalizedName = rawName || '未命名操作';
-
-	return {
-		...rawWithoutLegacyFields,
-		id: isNonEmptyString(raw.id) ? raw.id : fallback.id,
-		name: normalizedName,
-		prompt: normalizedPrompt,
-		actionType,
-		isActionGroup,
-		children: toStringArray(raw.children),
-		promptSource,
-		showInToolbar: raw.showInToolbar ?? true,
-		useDefaultSystemPrompt: raw.useDefaultSystemPrompt ?? true,
-		customPromptRole: raw.customPromptRole === 'user' ? 'user' : 'system',
-		templateFile: typeof raw.templateFile === 'string' ? raw.templateFile : undefined,
-		modelTag: typeof raw.modelTag === 'string' ? raw.modelTag : undefined,
-		order: typeof raw.order === 'number' ? raw.order : fallback.order,
-		createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : now,
-		updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : now,
-	} as QuickAction;
-}
-
-function normalizeQuickActions(rawList: unknown[], promptResolver?: (item: RawQuickAction, index: number) => string): QuickAction[] {
-	const now = Date.now();
-	return rawList
-		.filter((item): item is RawQuickAction => !!item && typeof item === 'object')
-		.map((item, index) =>
-			normalizeQuickAction(item, {
-				id: isNonEmptyString(item.id) ? item.id : `quick_action_${now}_${index}`,
-				order: index,
-				prompt: promptResolver?.(item, index) ?? '',
-			})
-		);
-}
+import {
+	type RawQuickAction,
+	type OpenChatPluginLike,
+	isNonEmptyString,
+	normalizeQuickActions,
+	parseMarkdownRecord,
+	buildMarkdownRecord,
+} from './quickActionDataUtils';
+import {
+	getNestingLevelSync,
+	removeFromAllGroupsSync,
+	getSubtreeMaxRelativeDepthSync,
+	reorderTopLevelQuickActionsSync,
+} from './quickActionGroupHelpers';
 
 /**
  * 快捷操作数据服务
@@ -242,7 +160,7 @@ export class QuickActionDataService {
 			return;
 		}
 
-		const subtreeDepth = this.getSubtreeMaxRelativeDepthSync(quickActionId, quickActions);
+		const subtreeDepth = getSubtreeMaxRelativeDepthSync(quickActionId, quickActions);
 
 		if (targetGroupId !== null) {
 			const targetGroup = byId.get(targetGroupId);
@@ -258,16 +176,16 @@ export class QuickActionDataService {
 				throw new Error('不能将操作组移动到其后代内部');
 			}
 
-			const targetLevel = this.getNestingLevelSync(targetGroupId, quickActions) + 1;
+			const targetLevel = getNestingLevelSync(targetGroupId, quickActions) + 1;
 			if (targetLevel + subtreeDepth > 2) {
 				throw new Error('最多支持 3 层嵌套');
 			}
 		}
 
-		this.removeFromAllGroupsSync(quickActionId, quickActions);
+		removeFromAllGroupsSync(quickActionId, quickActions);
 
 		if (targetGroupId === null) {
-			await this.reorderTopLevelQuickActionsSync(quickActions, quickActionId, position);
+			await reorderTopLevelQuickActionsSync(quickActions, quickActionId, position);
 			this.quickActionsCache = quickActions;
 			await this.persistQuickActions();
 			return;
@@ -284,7 +202,7 @@ export class QuickActionDataService {
 		targetGroup.children = children;
 		targetGroup.updatedAt = Date.now();
 
-		await this.reorderTopLevelQuickActionsSync(quickActions);
+		await reorderTopLevelQuickActionsSync(quickActions);
 		this.quickActionsCache = quickActions;
 		await this.persistQuickActions();
 	}
@@ -311,7 +229,7 @@ export class QuickActionDataService {
 			normalized.push(id);
 		}
 
-		const groupLevel = this.getNestingLevelSync(groupId, quickActions);
+		const groupLevel = getNestingLevelSync(groupId, quickActions);
 		for (const childId of normalized) {
 			if (childId === groupId) {
 				throw new Error('操作组不能包含自身');
@@ -322,7 +240,7 @@ export class QuickActionDataService {
 				throw new Error('操作组 children 存在循环引用');
 			}
 
-			const childSubtreeDepth = this.getSubtreeMaxRelativeDepthSync(childId, quickActions);
+			const childSubtreeDepth = getSubtreeMaxRelativeDepthSync(childId, quickActions);
 			if (groupLevel + 1 + childSubtreeDepth > 2) {
 				throw new Error('最多支持 3 层嵌套');
 			}
@@ -339,103 +257,9 @@ export class QuickActionDataService {
 	 */
 	async getNestingLevel(quickActionId: string): Promise<number> {
 		await this.initialize();
-		return this.getNestingLevelSync(quickActionId, this.quickActionsCache || []);
+		return getNestingLevelSync(quickActionId, this.quickActionsCache || []);
 	}
 
-	private getNestingLevelSync(quickActionId: string, quickActions: QuickAction[]): number {
-		let level = 0;
-		let currentId: string | null = quickActionId;
-		const seen = new Set<string>();
-		while (currentId) {
-			if (seen.has(currentId)) {
-				break;
-			}
-			seen.add(currentId);
-			const parent = this.findParentGroupSync(currentId, quickActions);
-			if (!parent) {
-				break;
-			}
-			level += 1;
-			currentId = parent.id;
-		}
-		return level;
-	}
-
-	private findParentGroupSync(quickActionId: string, quickActions: QuickAction[]): QuickAction | null {
-		for (const quickAction of quickActions) {
-			if (quickAction.isActionGroup && (quickAction.children ?? []).includes(quickActionId)) {
-				return quickAction;
-			}
-		}
-		return null;
-	}
-
-	private removeFromAllGroupsSync(quickActionId: string, quickActions: QuickAction[]): void {
-		for (const quickAction of quickActions) {
-			if (!quickAction.isActionGroup) {
-				continue;
-			}
-			const before = quickAction.children ?? [];
-			const after = before.filter((id) => id !== quickActionId);
-			if (after.length !== before.length) {
-				quickAction.children = after;
-				quickAction.updatedAt = Date.now();
-			}
-		}
-	}
-
-	private getSubtreeMaxRelativeDepthSync(quickActionId: string, quickActions: QuickAction[]): number {
-		const byId = new Map(quickActions.map((quickAction) => [quickAction.id, quickAction] as const));
-		const seen = new Set<string>();
-
-		const dfs = (currentId: string): number => {
-			if (seen.has(currentId)) {
-				return 0;
-			}
-			seen.add(currentId);
-			const current = byId.get(currentId);
-			if (!current || !current.isActionGroup) {
-				return 0;
-			}
-			let maxChild = 0;
-			for (const childId of current.children ?? []) {
-				maxChild = Math.max(maxChild, 1 + dfs(childId));
-			}
-			return maxChild;
-		};
-
-		return dfs(quickActionId);
-	}
-
-	private async reorderTopLevelQuickActionsSync(quickActions: QuickAction[], movingQuickActionId?: string, position?: number): Promise<void> {
-		const referenced = new Set<string>();
-		for (const quickAction of quickActions) {
-			if (!quickAction.isActionGroup) {
-				continue;
-			}
-			for (const id of quickAction.children ?? []) {
-				referenced.add(id);
-			}
-		}
-
-		const topLevel = quickActions
-			.filter((quickAction) => !referenced.has(quickAction.id))
-			.sort((a, b) => a.order - b.order);
-
-		if (movingQuickActionId) {
-			const movingIndex = topLevel.findIndex((quickAction) => quickAction.id === movingQuickActionId);
-			if (movingIndex >= 0) {
-				const [moving] = topLevel.splice(movingIndex, 1);
-				const insertAt = position === undefined ? topLevel.length : Math.max(0, Math.min(position, topLevel.length));
-				topLevel.splice(insertAt, 0, moving);
-			}
-		}
-
-		topLevel.forEach((quickAction, index) => {
-			quickAction.order = index;
-			quickAction.updatedAt = Date.now();
-		});
-	}
 
 	/**
 	 * 保存快捷操作（新增或更新）
@@ -466,7 +290,7 @@ export class QuickActionDataService {
 			return;
 		}
 
-		this.removeFromAllGroupsSync(id, quickActions);
+		removeFromAllGroupsSync(id, quickActions);
 		const deletedQuickAction = quickActions.splice(index, 1)[0];
 		DebugLogger.debug('[QuickActionDataService] 删除操作', deletedQuickAction.name);
 		this.quickActionsCache = quickActions;
@@ -531,7 +355,7 @@ export class QuickActionDataService {
 			for (const [index, file] of files.entries()) {
 				try {
 					const content = await this.app.vault.read(file);
-					const { frontmatter, body } = this.parseMarkdownRecord(content);
+					const { frontmatter, body } = parseMarkdownRecord(content);
 					const item: RawQuickAction = {
 						...frontmatter,
 						id: isNonEmptyString(frontmatter.id) ? frontmatter.id : file.basename,
@@ -576,7 +400,7 @@ export class QuickActionDataService {
 			// eslint-disable-next-line @typescript-eslint/no-unused-vars -- prompt 被 quickAction.prompt 替代
 			const { prompt: _prompt, ...frontmatter } = quickAction as RawQuickAction;
 			const body = quickAction.promptSource === 'template' ? '' : (quickAction.prompt ?? '');
-			const content = this.buildMarkdownRecord(frontmatter, body);
+			const content = buildMarkdownRecord(frontmatter, body);
 
 			const existing = this.app.vault.getAbstractFileByPath(filePath);
 			if (existing instanceof TFile) {
@@ -613,7 +437,10 @@ export class QuickActionDataService {
 	}
 
 	private getPluginInstance(): OpenChatPluginLike | null {
-		return ((this.app as any).plugins?.plugins?.openchat as OpenChatPluginLike | undefined) ?? null;
+		const appWithPlugins = this.app as App & {
+			plugins?: { plugins?: Record<string, OpenChatPluginLike | undefined> };
+		};
+		return appWithPlugins.plugins?.plugins?.openchat ?? null;
 	}
 
 	private async getStorageFolderPath(): Promise<string | null> {
@@ -621,7 +448,7 @@ export class QuickActionDataService {
 		let aiDataFolder = plugin?.settings?.aiDataFolder;
 		if (plugin?.loadData) {
 			try {
-				const persisted = await plugin.loadData();
+				const persisted = await plugin.loadData() as { aiDataFolder?: unknown } | null;
 				const persistedAiDataFolder = persisted?.aiDataFolder;
 				if (isNonEmptyString(persistedAiDataFolder)) {
 					aiDataFolder = persistedAiDataFolder;
@@ -647,31 +474,6 @@ export class QuickActionDataService {
 		return folder.children.filter((child): child is TFile => child instanceof TFile && child.extension === 'md');
 	}
 
-	private parseMarkdownRecord(content: string): { frontmatter: RawQuickAction; body: string } {
-		if (!content.startsWith(FRONTMATTER_DELIMITER)) {
-			return { frontmatter: {}, body: content };
-		}
-		const delimiterRegex = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\s*\r?\n)?/;
-		const matched = content.match(delimiterRegex);
-		if (!matched) {
-			return { frontmatter: {}, body: content };
-		}
-
-		try {
-			const parsed = parseYaml(matched[1]);
-			const frontmatter = (parsed && typeof parsed === 'object' ? parsed : {}) as RawQuickAction;
-			const body = content.slice(matched[0].length);
-			return { frontmatter, body };
-		} catch (error) {
-			DebugLogger.warn('[QuickActionDataService] 解析 frontmatter 失败，已使用默认值', error);
-			return { frontmatter: {}, body: '' };
-		}
-	}
-
-	private buildMarkdownRecord(frontmatter: RawQuickAction, body: string): string {
-		const yaml = stringifyYaml(frontmatter).trimEnd();
-		return `${FRONTMATTER_DELIMITER}\n${yaml}\n${FRONTMATTER_DELIMITER}\n${body}`;
-	}
 
 	private syncRuntimeSettings(quickActions: QuickAction[]): void {
 		const plugin = this.getPluginInstance();
@@ -679,8 +481,9 @@ export class QuickActionDataService {
 			return;
 		}
 		plugin.settings.chat.quickActions = quickActions;
-		if ('skills' in plugin.settings.chat) {
-			delete (plugin.settings.chat as any).skills;
+		const chatSettings = plugin.settings.chat as typeof plugin.settings.chat & { skills?: unknown };
+		if ('skills' in chatSettings) {
+			delete chatSettings.skills;
 		}
 	}
 

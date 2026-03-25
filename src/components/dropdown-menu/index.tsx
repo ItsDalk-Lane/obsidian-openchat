@@ -6,7 +6,7 @@ export class DropdownMenuItem {
 	label?: ReactNode;
 	icon?: ReactNode;
 	value = "";
-	data?: any;
+	data?: unknown;
 	onClick?: (e: React.MouseEvent) => void;
 }
 

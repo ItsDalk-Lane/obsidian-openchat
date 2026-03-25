@@ -1,4 +1,4 @@
-import { App, Modal, Notice } from 'obsidian';
+import { App, Modal, Notice, TFile } from 'obsidian';
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Pencil, Trash2, Upload } from 'lucide-react';
@@ -136,8 +136,9 @@ export function SystemPromptManagerPanel(props: { app: App; embedded?: boolean }
 			const fs = require('fs/promises');
 			await fs.writeFile(result.filePath, md, 'utf8');
 			new Notice((localInstance.system_prompt_export_success || '导出成功') + `: ${result.filePath}`);
-		} catch (error: any) {
-			new Notice((localInstance.system_prompt_export_failed || '导出失败') + `: ${error?.message || String(error)}`);
+		} catch (error: unknown) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			new Notice((localInstance.system_prompt_export_failed || '导出失败') + `: ${errorMessage}`);
 		}
 	}, [service, props.app]);
 
@@ -272,8 +273,8 @@ async function buildExportMarkdown(app: App, prompts: SystemPromptItem[]): Promi
 			if (path) {
 				try {
 					const file = app.vault.getAbstractFileByPath(path);
-					if (file) {
-						const content = await app.vault.read(file as any);
+					if (file instanceof TFile) {
+						const content = await app.vault.read(file);
 						lines.push('```');
 						lines.push(content);
 						lines.push('```');

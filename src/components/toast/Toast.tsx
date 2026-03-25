@@ -3,6 +3,7 @@ import { createRoot, Root } from "react-dom/client";
 import { v4 } from "uuid";
 import "./Toast.css";
 import { ToastView } from "./ToastView";
+import { DebugLogger } from "src/utils/DebugLogger";
 
 export type ToastProps = {
 	content: React.ReactNode;
@@ -103,7 +104,7 @@ export class Toast {
 					try {
 						this.root.unmount();
 					} catch (e) {
-						console.error("Error unmounting toast root:", e);
+						DebugLogger.error("Error unmounting toast root:", e);
 					}
 					this.root = null;
 				}

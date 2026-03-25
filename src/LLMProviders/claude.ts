@@ -167,7 +167,10 @@ const sendRequestFuncBase = (settings: ClaudeOptions): SendRequest =>
 		}
 	}
 
-const sendRequestFunc = withClaudeToolCallLoopSupport(sendRequestFuncBase as any, formatMsgForClaudeAPI)
+const sendRequestFunc = withClaudeToolCallLoopSupport(
+	sendRequestFuncBase as unknown as (settings: Parameters<typeof withClaudeToolCallLoopSupport>[0] extends (settings: infer T) => SendRequest ? T : never) => SendRequest,
+	formatMsgForClaudeAPI,
+)
 
 export const CLAUDE_MODELS = [
 	'claude-sonnet-4-0',

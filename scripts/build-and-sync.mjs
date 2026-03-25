@@ -3,11 +3,13 @@ import { copyFile, mkdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyToVault } from "./copy-to-vault.mjs";
+import { createScriptLogger } from "./script-logger.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const pluginDir = resolve(scriptDir, "..");
 const releaseRootDir = resolve(pluginDir, "openchat");
 const buildFiles = ["main.js", "styles.css", "manifest.json"];
+const logger = createScriptLogger("build-sync");
 
 function runProductionBuild() {
 	return new Promise((resolveBuild, rejectBuild) => {
@@ -56,23 +58,23 @@ async function archiveBuildArtifacts(version) {
 }
 
 try {
-	console.log("[openchat] Starting production build...");
+	logger.info("Starting production build...");
 	await runProductionBuild();
 	const manifest = await readManifest();
 	if (!manifest?.version || typeof manifest.version !== "string") {
 		throw new Error("[openchat] manifest.json 缺少有效的 version 字段");
 	}
 
-	console.log(`[openchat] Build finished. Archiving files to openchat/${manifest.version}...`);
+	logger.info(`Build finished. Archiving files to openchat/${manifest.version}...`);
 	const versionDir = await archiveBuildArtifacts(manifest.version);
 
-	console.log("[openchat] Archive finished. Syncing files to Obsidian vault...");
+	logger.info("Archive finished. Syncing files to Obsidian vault...");
 	await copyToVault({
 		sourceDir: versionDir,
 		fileNames: buildFiles
 	});
-	console.log("[openchat] Build + sync completed.");
+	logger.info("Build + sync completed.");
 } catch (error) {
-	console.error(`[openchat] Build + sync failed: ${error.message}`);
+	logger.error(`Build + sync failed: ${error.message}`);
 	process.exit(1);
 }

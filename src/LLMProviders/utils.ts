@@ -81,8 +81,11 @@ export const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
 
 export const convertEmbedToImageUrl = async (embed: EmbedCache, resolveEmbedAsBinary: ResolveEmbedAsBinary) => {
 	const mimeType = getMimeTypeFromFilename(embed.link)
-	const originalBase64 = (embed as any)?.[Symbol.for('originalBase64')] as string | undefined
-	const originalMimeType = ((embed as any)?.[Symbol.for('mimeType')] as string | undefined)?.toLowerCase()
+	const embedRecord = embed as EmbedCache & Record<symbol, unknown>
+	const rawOriginalBase64 = embedRecord[Symbol.for('originalBase64')]
+	const rawOriginalMimeType = embedRecord[Symbol.for('mimeType')]
+	const originalBase64 = typeof rawOriginalBase64 === 'string' ? rawOriginalBase64 : undefined
+	const originalMimeType = typeof rawOriginalMimeType === 'string' ? rawOriginalMimeType.toLowerCase() : undefined
 
 	if (typeof originalBase64 === 'string' && originalBase64.length > 0) {
 		const dataUrl = originalBase64.startsWith('data:')
@@ -147,7 +150,7 @@ export const getEnabledCapabilities = (vendor: Vendor, options: BaseOptions): Ca
 	const vendorCapabilities = [...vendor.capabilities]
 
 	const isReasoningEnabledForDisplay = (): boolean => {
-		const raw = options as any
+		const raw = options as BaseOptions & Record<string, unknown> & { parameters?: Record<string, unknown> }
 
 		// 通用开关（大部分 provider 使用）
 		if (raw?.enableReasoning === true) return true
@@ -177,7 +180,7 @@ export const getEnabledCapabilities = (vendor: Vendor, options: BaseOptions): Ca
 
 	// 检查是否启用了结构化输出
 	const isStructuredOutputEnabled = (): boolean => {
-		const raw = options as any
+		const raw = options as BaseOptions & Record<string, unknown> & { parameters?: Record<string, unknown> }
 		// Ollama 使用 format 参数（可能在 options 上或 parameters 中）
 		if (vendor.name === 'Ollama') {
 			return raw?.format !== undefined || raw?.parameters?.format !== undefined
@@ -185,7 +188,11 @@ export const getEnabledCapabilities = (vendor: Vendor, options: BaseOptions): Ca
 		// DeepSeek 使用 response_format: { type: 'json_object' }
 		if (vendor.name === 'DeepSeek') {
 			const responseFormat = raw?.response_format ?? raw?.parameters?.response_format
-			return responseFormat?.type === 'json_object'
+			return (
+				!!responseFormat
+				&& typeof responseFormat === 'object'
+				&& (responseFormat as { type?: unknown }).type === 'json_object'
+			)
 		}
 		// 可以在这里添加其他服务商的结构化输出检查
 		return false

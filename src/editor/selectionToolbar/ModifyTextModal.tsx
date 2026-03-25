@@ -123,11 +123,11 @@ export const ModifyTextModal = ({
 				onClick={(e) => e.stopPropagation()}
 			>
 				<div className="modify-text-modal-header">
-					<span className="modify-text-modal-title">修改</span>
+					<span className="modify-text-modal-title">{localInstance.modify_text_modal_title}</span>
 					<button
 						className="modify-text-modal-close"
 						onClick={onClose}
-						title={localInstance.close || '关闭'}
+						title={localInstance.close}
 					>
 						<X size={18} />
 					</button>
@@ -135,19 +135,19 @@ export const ModifyTextModal = ({
 
 				<div className="modify-text-modal-body">
 					<div className="modify-text-modal-field">
-						<label className="modify-text-modal-label">模型</label>
+						<label className="modify-text-modal-label">{localInstance.quick_action_edit_model_label}</label>
 						<ModelSelector providers={providers} value={selectedModelTag} onChange={onChangeModel} />
 					</div>
 
 					<div className="modify-text-modal-field">
-						<label className="modify-text-modal-label">指令</label>
+						<label className="modify-text-modal-label">{localInstance.modify_text_modal_instruction_label}</label>
 						<textarea
 							ref={textareaRef}
 							className="modify-text-modal-textarea"
 							value={instruction}
 							onChange={(e) => setInstruction(e.target.value)}
 							rows={6}
-							placeholder={'例如：请将这段文字改写为更正式的语气'}
+							placeholder={localInstance.modify_text_modal_instruction_placeholder}
 							onKeyDown={(e) => {
 								if (e.key === 'Enter' && !e.shiftKey && !(e.ctrlKey || e.metaKey)) {
 									e.preventDefault();
@@ -167,14 +167,14 @@ export const ModifyTextModal = ({
 
 				<div className="modify-text-modal-footer">
 					<button className="modify-text-modal-btn modify-text-modal-btn-secondary" onClick={onClose}>
-						{localInstance.cancel || '取消'}
+						{localInstance.cancel}
 					</button>
 					<button
 						className="modify-text-modal-btn modify-text-modal-btn-primary"
 						onClick={handleSend}
 						disabled={!providers.length || !selectedModelTag || !instruction.trim()}
 					>
-						发送
+						{localInstance.modify_text_modal_send}
 					</button>
 				</div>
 			</div>

@@ -11,14 +11,14 @@ export interface LoopVariableMeta {
  * 循环作用域信息
  */
 export interface LoopScopeInfo {
-    variables: Record<string, any>;
+    variables: Record<string, unknown>;
     meta?: LoopVariableMeta[]; // 变量元数据
 }
 
 export class LoopVariableScope {
     private static scopeStack: LoopScopeInfo[] = [];
 
-    static push(variables: Record<string, any>, meta?: LoopVariableMeta[]): void {
+    static push(variables: Record<string, unknown>, meta?: LoopVariableMeta[]): void {
         this.scopeStack.push({
             variables,
             meta
@@ -29,14 +29,14 @@ export class LoopVariableScope {
         this.scopeStack.pop();
     }
 
-    static current(): Record<string, any> | undefined {
+    static current(): Record<string, unknown> | undefined {
         if (this.scopeStack.length === 0) {
             return undefined;
         }
         return this.scopeStack[this.scopeStack.length - 1].variables;
     }
 
-    static getValue(key: string): any {
+    static getValue(key: string): unknown {
         for (let i = this.scopeStack.length - 1; i >= 0; i--) {
             const scope = this.scopeStack[i];
             if (Object.prototype.hasOwnProperty.call(scope.variables, key)) {
@@ -116,7 +116,7 @@ export class LoopVariableScope {
     /**
      * 创建标准循环变量的元数据
      */
-    static createStandardVariableMeta(variables: Record<string, any>): LoopVariableMeta[] {
+    static createStandardVariableMeta(variables: Record<string, unknown>): LoopVariableMeta[] {
         const meta: LoopVariableMeta[] = [];
 
         Object.keys(variables).forEach(varName => {

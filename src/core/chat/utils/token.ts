@@ -52,7 +52,7 @@ function countChatMessageTokens(role: 'user' | 'assistant' | 'system', content: 
 					role,
 					content,
 				},
-			] as any)
+			] as Array<{ role: 'user' | 'assistant' | 'system'; content: string }>)
 		);
 	} catch {
 		return Math.ceil(content.length / 4);
@@ -140,7 +140,7 @@ export function estimateProviderMessagesTokens(
 				messages.map((message) => ({
 					role: message.role,
 					content: message.content ?? '',
-				})) as any
+				})) as Array<{ role: ProviderMessage['role']; content: string }>
 			)
 		);
 		const reasoningTokens = messages.reduce(

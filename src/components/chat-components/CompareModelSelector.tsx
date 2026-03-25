@@ -44,7 +44,10 @@ export const CompareModelSelector = ({
 			if (!grouped.has(vendor.name)) {
 				grouped.set(vendor.name, { vendorName: vendor.name, vendor, providers: [] });
 			}
-			grouped.get(vendor.name)!.providers.push(p);
+			const vendorGroup = grouped.get(vendor.name);
+			if (vendorGroup) {
+				vendorGroup.providers.push(p);
+			}
 		});
 		return Array.from(grouped.values());
 	})();

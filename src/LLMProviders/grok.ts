@@ -1,8 +1,9 @@
 import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl } from './utils'
-import { feedChunk } from './sse'
+import { feedChunk, ParsedSSEEvent } from './sse'
 import { withToolCallLoopSupport } from 'src/core/agents/loop'
+import { DebugLogger } from 'src/utils/DebugLogger'
 
 // Grok选项接口，扩展基础选项以支持推理功能
 export interface GrokOptions extends BaseOptions {
@@ -20,6 +21,45 @@ export const grokMapResponsesParams = (params: Record<string, unknown>) => {
 		delete mapped.max_tokens
 	}
 	return mapped
+}
+
+type GrokMessageContent = string | ContentItem[]
+type GrokSSEPayload = {
+	type?: string
+	delta?: unknown
+	reasoning_content?: string
+	choices?: Array<{
+		delta?: {
+			reasoning_content?: string
+			content?: string
+		}
+	}>
+}
+
+const mapGrokResponseInputPart = (part: ContentItem) => {
+	if (part.type === 'image_url') {
+		return {
+			type: 'input_image' as const,
+			image_url: part.image_url.url
+		}
+	}
+	return {
+		type: 'input_text' as const,
+		text: String(part.text ?? '')
+	}
+}
+
+const getReasoningDeltaText = (payload: GrokSSEPayload) => {
+	if (typeof payload.reasoning_content === 'string') {
+		return payload.reasoning_content
+	}
+	if (typeof payload.delta === 'object' && payload.delta !== null) {
+		const delta = payload.delta as { reasoning_content?: unknown }
+		if (typeof delta.reasoning_content === 'string') {
+			return delta.reasoning_content
+		}
+	}
+	return ''
 }
 
 const sendRequestFunc = (settings: GrokOptions): SendRequest =>
@@ -42,17 +82,7 @@ const sendRequestFunc = (settings: GrokOptions): SendRequest =>
 			requestData.input = formattedMessages.map((message) => ({
 				role: message.role === 'assistant' ? 'assistant' : message.role === 'system' ? 'system' : 'user',
 				content: Array.isArray(message.content)
-					? message.content.map((part) =>
-							(part as any).type === 'image_url'
-								? {
-										type: 'input_image',
-										image_url: (part as any).image_url?.url
-									}
-								: {
-										type: 'input_text',
-										text: String((part as any).text ?? '')
-									}
-					)
+					? message.content.map(mapGrokResponseInputPart)
 					: [{ type: 'input_text', text: String(message.content ?? '') }]
 			}))
 			const responseParams = grokMapResponsesParams(remains as Record<string, unknown>)
@@ -87,28 +117,24 @@ const sendRequestFunc = (settings: GrokOptions): SendRequest =>
 		let reasoningStartMs: number | null = null
 		const isReasoningEnabled = enableReasoning
 
-		const processEvents = async function* (events: any[]) {
+		const processEvents = async function* (events: ParsedSSEEvent[]) {
 			for (const event of events) {
 				if (event.isDone) {
 					reading = false
 					break
 				}
 				if (event.parseError) {
-					console.warn('[Grok] Failed to parse SSE JSON:', event.parseError)
+					DebugLogger.warn('[Grok] Failed to parse SSE JSON:', event.parseError)
 				}
-				const payload = event.json as any
+				const payload = event.json as GrokSSEPayload | undefined
 				if (!payload) continue
 
 				if (useResponsesAPI) {
 					const eventType = String(payload.type ?? '')
-					let reasonContent = ''
-					if (eventType === 'response.reasoning_text.delta' || eventType === 'response.reasoning_summary_text.delta') {
-						reasonContent = String(payload.delta ?? '')
-					} else if (typeof payload.reasoning_content === 'string') {
-						reasonContent = payload.reasoning_content
-					} else if (typeof payload?.delta?.reasoning_content === 'string') {
-						reasonContent = payload.delta.reasoning_content
-					}
+					const reasonContent =
+						eventType === 'response.reasoning_text.delta' || eventType === 'response.reasoning_summary_text.delta'
+							? String(payload.delta ?? '')
+							: getReasoningDeltaText(payload)
 
 					if (reasonContent && isReasoningEnabled) {
 						if (!startReasoning) {
@@ -201,7 +227,7 @@ const formatMsg = async (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinar
 	if (content.length === 0) {
 		return {
 			role: msg.role,
-			content: msg.content
+			content: msg.content as GrokMessageContent
 		}
 	}
 	if (msg.content.trim()) {
@@ -212,7 +238,7 @@ const formatMsg = async (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinar
 	}
 	return {
 		role: msg.role,
-		content
+		content: content as GrokMessageContent
 	}
 }
 
