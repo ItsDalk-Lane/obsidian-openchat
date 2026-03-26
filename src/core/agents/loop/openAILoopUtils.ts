@@ -392,6 +392,7 @@ export function shouldFallbackToPlainRequest(err: unknown): boolean {
 		/\bunsupported\s+(tool|function)\s*(call|type)?\b/i,
 		/\bunsupported_parameter\b.*\btool\b/i,
 		/\bunknown\s+(tool|function)\s*(type|call)?\b/i,
+		/\b(no|zero)\s+(endpoint|server|backend)s?\s+(found|available)?\s*(that\s+)?support(s)?\s*(tool|function)\s*(use|call|usage|calling)?\b/i,
 	]
 
 	return explicitUnsupportedPatterns.some((pattern) => pattern.test(mergedText))

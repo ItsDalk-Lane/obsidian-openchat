@@ -180,8 +180,33 @@ const createOpenRouterChatRequest = async (
 	},
 ): Promise<OpenRouterChatRequest> => {
 	const normalizedParameters = normalizeRequestParameters(parameters)
+	// SDK 聊天请求不接受插件内部的工具循环、MCP 和图片/UI 设置字段。
+	const {
+		tools: _tools,
+		toolChoice: _toolChoice,
+		parallelToolCalls: _parallelToolCalls,
+		plugins: _plugins,
+		responseFormat: _responseFormat,
+		toolExecutor: _toolExecutor,
+		getTools: _getTools,
+		maxToolCallLoops: _maxToolCallLoops,
+		mcpTools: _mcpTools,
+		mcpCallTool: _mcpCallTool,
+		mcpGetTools: _mcpGetTools,
+		mcpMaxToolCallLoops: _mcpMaxToolCallLoops,
+		imageSaveAsAttachment: _imageSaveAsAttachment,
+		imageDisplayWidth: _imageDisplayWidth,
+		imageResponseFormat: _imageResponseFormat,
+		imageStream: _imageStream,
+		imageAspectRatio: _imageAspectRatio,
+		enableWebSearch: _enableWebSearch,
+		webSearchEngine: _webSearchEngine,
+		webSearchMaxResults: _webSearchMaxResults,
+		webSearchPrompt: _webSearchPrompt,
+		...sanitizedParameters
+	} = normalizedParameters
 	const chatGenerationParams: Record<string, unknown> = {
-		...normalizedParameters,
+		...sanitizedParameters,
 		model,
 		messages: await toChatMessages(messages, resolveEmbedAsBinary),
 		stream: options.imageStream || !options.isImageGenerationRequest,
@@ -189,11 +214,10 @@ const createOpenRouterChatRequest = async (
 
 	if (options.supportsImageGeneration) {
 		chatGenerationParams.modalities = ['image', 'text']
-		chatGenerationParams.responseFormat = options.imageResponseFormat
 		if (options.imageAspectRatio) {
 			chatGenerationParams.imageConfig = {
-				...(typeof normalizedParameters.imageConfig === 'object' && normalizedParameters.imageConfig !== null
-					? normalizedParameters.imageConfig as Record<string, unknown>
+				...(typeof sanitizedParameters.imageConfig === 'object' && sanitizedParameters.imageConfig !== null
+					? sanitizedParameters.imageConfig as Record<string, unknown>
 					: {}),
 				aspect_ratio: options.imageAspectRatio,
 			}

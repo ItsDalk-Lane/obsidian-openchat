@@ -27,6 +27,9 @@ type ChatChunk = {
 
 type ChatResponseLike = ChatChunk | AsyncIterable<ChatChunk>
 
+const OPENROUTER_IMAGE_DOWNLOAD_TIMEOUT_MS = 30_000
+const OPENROUTER_MAX_IMAGE_BYTES = 20 * 1024 * 1024
+
 const isAsyncIterable = <T>(value: unknown): value is AsyncIterable<T> =>
 	typeof value === 'object' && value !== null && Symbol.asyncIterator in value
 
@@ -39,6 +42,7 @@ const normalizeGeneratedImageUrl = (value: string): string => {
 }
 
 const extractImageUrl = (image: unknown): string | undefined => {
+	if (typeof image === 'string') return image
 	if (!image || typeof image !== 'object') return undefined
 	const record = image as Record<string, unknown>
 	const nestedImageUrl = record.image_url
@@ -46,9 +50,128 @@ const extractImageUrl = (image: unknown): string | undefined => {
 		const url = (nestedImageUrl as { url?: unknown }).url
 		return typeof url === 'string' ? url : undefined
 	}
-	const directImageUrl = record.imageUrl
-	if (typeof directImageUrl === 'string') return directImageUrl
+	const camelImageUrl = record.imageUrl
+	if (camelImageUrl && typeof camelImageUrl === 'object') {
+		const url = (camelImageUrl as { url?: unknown }).url
+		return typeof url === 'string' ? url : undefined
+	}
+	if (typeof camelImageUrl === 'string') return camelImageUrl
+	if (typeof record.url === 'string') return record.url
 	return undefined
+}
+
+const inferImageExtensionFromMimeType = (mimeType: string | null | undefined): string => {
+	const normalizedMimeType = mimeType?.toLowerCase().split(';')[0]?.trim()
+	switch (normalizedMimeType) {
+		case 'image/jpeg':
+		case 'image/jpg':
+			return 'jpg'
+		case 'image/webp':
+			return 'webp'
+		case 'image/gif':
+			return 'gif'
+		case 'image/svg+xml':
+			return 'svg'
+		default:
+			return 'png'
+	}
+}
+
+const inferImageExtensionFromUrl = (imageUrl: string): string => {
+	if (imageUrl.startsWith('data:')) {
+		const mimeTypeMatch = imageUrl.match(/^data:([^;,]+)[;,]/i)
+		return inferImageExtensionFromMimeType(mimeTypeMatch?.[1])
+	}
+
+	try {
+		const parsedUrl = new URL(imageUrl)
+		const pathname = parsedUrl.pathname.toLowerCase()
+		const extensionMatch = pathname.match(/\.([a-z0-9]+)$/i)
+		if (extensionMatch?.[1]) {
+			const extension = extensionMatch[1]
+			if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(extension)) {
+				return extension === 'jpeg' ? 'jpg' : extension
+			}
+		}
+	} catch {
+		// 忽略无效 URL，回退为 png
+	}
+
+	return 'png'
+}
+
+const decodeDataUriToArrayBuffer = (imageUrl: string): ArrayBuffer => {
+	const base64Data = imageUrl.split(',')[1]
+	if (!base64Data || base64Data.trim().length === 0) {
+		throw new Error('无效的 base64 数据')
+	}
+
+	const binaryString = atob(base64Data)
+	const bytes = new Uint8Array(binaryString.length)
+	for (let offset = 0; offset < binaryString.length; offset += 1) {
+		bytes[offset] = binaryString.charCodeAt(offset)
+	}
+	return bytes.buffer
+}
+
+const resolveGeneratedImageAsset = async (
+	imageUrl: string,
+	signal: AbortSignal,
+): Promise<{ data: ArrayBuffer; extension: string }> => {
+	if (imageUrl.startsWith('data:')) {
+		const data = decodeDataUriToArrayBuffer(imageUrl)
+		if (data.byteLength > OPENROUTER_MAX_IMAGE_BYTES) {
+			throw new Error('图片过大，已超过 20MB 限制')
+		}
+		return {
+			data,
+			extension: inferImageExtensionFromUrl(imageUrl),
+		}
+	}
+
+	const timeoutController = new AbortController()
+	const abortOnParentSignal = () => timeoutController.abort(signal.reason)
+	const timeoutId = window.setTimeout(() => {
+		timeoutController.abort(new Error('图片下载超时'))
+	}, OPENROUTER_IMAGE_DOWNLOAD_TIMEOUT_MS)
+	signal.addEventListener('abort', abortOnParentSignal, { once: true })
+
+	let response: Response
+	try {
+		response = await fetch(imageUrl, { signal: timeoutController.signal })
+	} finally {
+		window.clearTimeout(timeoutId)
+		signal.removeEventListener('abort', abortOnParentSignal)
+	}
+
+	if (!response.ok) {
+		throw new Error(`下载图片失败 (${response.status})`)
+	}
+
+	const contentLengthHeader = response.headers.get('content-length')
+	const contentLength = contentLengthHeader ? Number(contentLengthHeader) : Number.NaN
+	if (Number.isFinite(contentLength) && contentLength > OPENROUTER_MAX_IMAGE_BYTES) {
+		throw new Error('图片过大，已超过 20MB 限制')
+	}
+
+	const data = await response.arrayBuffer()
+	if (data.byteLength > OPENROUTER_MAX_IMAGE_BYTES) {
+		throw new Error('图片过大，已超过 20MB 限制')
+	}
+
+	return {
+		data,
+		extension: inferImageExtensionFromMimeType(response.headers.get('content-type'))
+			|| inferImageExtensionFromUrl(imageUrl),
+	}
+}
+
+const extractImageUrls = (images: unknown): string[] => {
+	if (!Array.isArray(images)) return []
+	const resolved = images
+		.map((image) => extractImageUrl(image))
+		.filter((imageUrl): imageUrl is string => Boolean(imageUrl))
+	return Array.from(new Set(resolved.map((imageUrl) => normalizeGeneratedImageUrl(imageUrl))))
 }
 
 const yieldImageContent = async function* (
@@ -56,32 +179,21 @@ const yieldImageContent = async function* (
 	index: number,
 	total: number,
 	context: OpenRouterResponseContext,
+	sequenceIndex = index,
 ): AsyncGenerator<string, void, undefined> {
+	const normalizedImageUrl = normalizeGeneratedImageUrl(imageUrl)
+	const imageNumber = sequenceIndex + 1
 	if (context.imageSaveAsAttachment && context.saveAttachment) {
 		try {
-			if (!imageUrl.startsWith('data:')) {
-				yield `⚠️ 检测到 URL 格式图片，但配置为保存附件。图片 URL：${imageUrl}\n\n`
-				return
-			}
-
-			const base64Data = imageUrl.split(',')[1]
-			if (!base64Data) {
-				throw new Error('无效的 base64 数据')
-			}
-
-			const binaryString = atob(base64Data)
-			const bytes = new Uint8Array(binaryString.length)
-			for (let offset = 0; offset < binaryString.length; offset += 1) {
-				bytes[offset] = binaryString.charCodeAt(offset)
-			}
+			const asset = await resolveGeneratedImageAsset(normalizedImageUrl, context.controller.signal)
 			const now = new Date()
 			const formatTime =
 				`${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
 				+ `_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
-			const indexFlag = total > 1 ? `-${index + 1}` : ''
-			const filename = `openrouter-${formatTime}${indexFlag}.png`
+			const indexFlag = total > 1 || sequenceIndex > 0 ? `-${imageNumber}` : ''
+			const filename = `openrouter-${formatTime}${indexFlag}.${asset.extension}`
 
-			await context.saveAttachment(filename, bytes.buffer)
+			await context.saveAttachment(filename, asset.data)
 			yield `![[${filename}|${context.imageDisplayWidth}]]\n\n`
 		} catch (error) {
 			DebugLogger.error('[OpenRouter] 处理图片 URL 时出错', error)
@@ -91,9 +203,7 @@ const yieldImageContent = async function* (
 		return
 	}
 
-	yield imageUrl.startsWith('data:')
-		? `📷 生成的图片（Base64 格式，长度: ${imageUrl.length}）\n\n`
-		: `📷 生成的图片 URL：${imageUrl}\n\n`
+	yield `![OpenRouter image ${imageNumber}](${normalizedImageUrl})\n\n`
 }
 
 const extractReasoningText = (response: Record<string, unknown>): string => {
@@ -328,34 +438,51 @@ export async function* handleOpenRouterChatResponse(
 		if (isAsyncIterable<ChatChunk>(response)) {
 			let hasStreamedText = false
 			let emittedImage = false
+			let emittedImageCount = 0
+			const emittedImageUrls = new Set<string>()
 			for await (const chunk of response) {
 				if (context.controller.signal.aborted) {
 					break
 				}
 				const choice = Array.isArray(chunk.choices) ? chunk.choices[0] : undefined
 				const delta = choice?.delta
+				const message = choice?.message
 				const content = typeof delta?.content === 'string' ? delta.content : ''
 				if (content) {
 					hasStreamedText = true
 					yield content
 				}
 
-				const images = Array.isArray(delta?.images)
-					? delta.images
-					: Array.isArray(delta?.imageUrls)
-						? delta.imageUrls
-						: []
-				if (images.length > 0) {
+				const images = extractImageUrls(
+					Array.isArray(delta?.images)
+						? delta.images
+						: Array.isArray(delta?.imageUrls)
+							? delta.imageUrls
+							: Array.isArray(message?.images)
+								? message.images
+								: Array.isArray(message?.imageUrls)
+									? message.imageUrls
+									: []
+				)
+				const newImages = images.filter((imageUrl) => !emittedImageUrls.has(imageUrl))
+				if (newImages.length > 0) {
 					if (!hasStreamedText && !emittedImage) {
 						yield '\n\n'
 					}
-					for (const [index, image] of images.entries()) {
-						const imageUrl = extractImageUrl(image)
-						if (imageUrl) {
-							emittedImage = true
-							yield* yieldImageContent(normalizeGeneratedImageUrl(imageUrl), index, images.length, context)
-						}
+					for (const imageUrl of newImages) {
+						emittedImageUrls.add(imageUrl)
 					}
+					for (const [index, imageUrl] of newImages.entries()) {
+						emittedImage = true
+						yield* yieldImageContent(
+							imageUrl,
+							index,
+							newImages.length,
+							context,
+							emittedImageCount + index,
+						)
+					}
+					emittedImageCount += newImages.length
 				}
 			}
 			if (!hasStreamedText && !emittedImage) {
@@ -371,18 +498,17 @@ export async function* handleOpenRouterChatResponse(
 			yield content
 		}
 
-		const images = Array.isArray(message?.images)
-			? message.images
-			: Array.isArray(message?.imageUrls)
-				? message.imageUrls
-				: []
+		const images = extractImageUrls(
+			Array.isArray(message?.images)
+				? message.images
+				: Array.isArray(message?.imageUrls)
+					? message.imageUrls
+					: []
+		)
 		if (images.length > 0) {
 			yield '\n\n'
-			for (const [index, image] of images.entries()) {
-				const imageUrl = extractImageUrl(image)
-				if (imageUrl) {
-					yield* yieldImageContent(normalizeGeneratedImageUrl(imageUrl), index, images.length, context)
-				}
+			for (const [index, imageUrl] of images.entries()) {
+				yield* yieldImageContent(imageUrl, index, images.length, context)
 			}
 			return
 		}
