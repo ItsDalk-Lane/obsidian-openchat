@@ -14,23 +14,18 @@ export const ZHIPU_THINKING_TYPE_OPTIONS: { value: ZhipuThinkingType; label: str
 export const DEFAULT_ZHIPU_THINKING_TYPE: ZhipuThinkingType = 'auto'
 
 export interface ZhipuOptions extends BaseOptions {
-	enableWebSearch: boolean
 	enableReasoning: boolean
 	thinkingType: ZhipuThinkingType
-}
-
-export type ZhipuAnthropicLoopOptions = ZhipuOptions & {
-	max_tokens: number
-	enableThinking: boolean
-	budget_tokens: number
+	/** 启用结构化输出,自动添加 response_format: { type: 'json_object' } */
+	enableStructuredOutput?: boolean
 }
 
 export const ZHIPU_SLOW_REQUEST_THRESHOLD_MS = 3000
-export const ZHIPU_ANTHROPIC_API_VERSION = '2023-06-01'
-export const ZHIPU_MAX_TOOL_LOOPS = 10
+
+const LEGACY_ZHIPU_ANTHROPIC_BASE_URL_PATTERN = /\/api\/anthropic(?:\/v1(?:\/messages)?)?\/?$/i
 
 export const toDebuggableError = (error: unknown): Record<string, unknown> => {
-	const normalized = normalizeProviderError(error, 'Zhipu anthropic request failed')
+	const normalized = normalizeProviderError(error, 'Zhipu request failed')
 	return {
 		name: normalized.name,
 		message: normalized.message,
@@ -99,15 +94,6 @@ export const createZhipuLoggedFetch = (stage: string): typeof globalThis.fetch =
 				: ''
 		const requestSummary = summarizeRequestBody(requestBody)
 
-		if (/\/api\/anthropic\/?($|\?)/i.test(url)) {
-			DebugLogger.warn(`[Zhipu][${stage}] 请求命中了 anthropic 路径`, {
-				url,
-				method,
-				requestSummary,
-				note: '请关注当前请求使用的协议分支与响应结构是否匹配。',
-			})
-		}
-
 		try {
 			const response = await globalThis.fetch(input, init)
 			const durationMs = Date.now() - startedAt
@@ -169,22 +155,27 @@ export const buildZhipuThinkingConfig = (options: Pick<ZhipuOptions, 'enableReas
 	}
 }
 
-export const isZhipuAnthropicBaseURL = (baseURL: string): boolean => {
-	const normalizedBaseURL = baseURL.trim().replace(/\/+$/, '')
-	return /\/api\/anthropic(?:\/v1(?:\/messages)?)?$/i.test(normalizedBaseURL)
-}
+export const normalizeZhipuOpenAIBaseURL = (baseURL: string): string => {
+	const trimmedBaseURL = baseURL.trim()
+	if (!trimmedBaseURL) {
+		return trimmedBaseURL
+	}
 
-export const normalizeZhipuAnthropicBaseURL = (baseURL: string): string =>
-	baseURL.trim().replace(/\/+$/, '').replace(/\/v1(?:\/messages)?$/i, '')
+	return trimmedBaseURL.replace(
+		LEGACY_ZHIPU_ANTHROPIC_BASE_URL_PATTERN,
+		'/api/paas/v4/'
+	)
+}
 
 const ZHIPU_INTERNAL_OPTION_KEYS = new Set([
 	'apiKey',
 	'baseURL',
 	'model',
 	'parameters',
-	'enableWebSearch',
 	'enableReasoning',
 	'thinkingType',
+	'enableThinking',
+	'budget_tokens',
 	'contextLength',
 	'tools',
 	'toolExecutor',
@@ -195,6 +186,7 @@ const ZHIPU_INTERNAL_OPTION_KEYS = new Set([
 	'mcpGetTools',
 	'mcpCallTool',
 	'mcpMaxToolCallLoops',
+	// response_format 不在内部选项中,需要透传到 API 请求
 ])
 
 export const filterZhipuRequestExtras = (options: Record<string, unknown>): Record<string, unknown> => {

@@ -426,6 +426,9 @@ export default {
 	'Zhipu thinking type': 'Thinking type',
 	Disabled: 'Disabled',
 	'Zhipu thinking type description': 'Controls the reasoning behavior of Zhipu AI models. ',
+	'Zhipu structured output': 'Structured Output',
+	'Zhipu structured output description':
+		'When enabled, the model will output JSON format. Useful for programmatic processing, data extraction, and API integration.',
 	'Model compatibility hint': 'Model compatibility hint',
 	'Qwen thinking mode': 'Thinking mode',
 	'Qwen thinking mode description':
@@ -449,6 +452,14 @@ export default {
 		'When enabled, Poe requests reasoning through the Responses API and shows the reasoning process.',
 	'Azure reasoning description':
 		'When enabled, Azure prefers official reasoning event parsing from the Responses API. When disabled, it uses the chat.completions compatibility path.',
+	'Doubao Responses API is not supported for this model':
+		'This Doubao model does not support the Responses API.',
+	'Doubao Responses missing tool executor':
+		'Doubao Responses returned a function call, but no tool executor is configured.',
+	'Doubao tool loop exceeded maximum iterations':
+		'Doubao tool loop exceeded the maximum iterations ({count}).',
+	'Doubao Responses missing response id':
+		'Doubao Responses did not return a response id, so the tool loop could not continue.',
 	'Debug log level debug option': 'Debug (all)',
 	'Debug log level info option': 'Info',
 	'Debug log level warn option': 'Warn',

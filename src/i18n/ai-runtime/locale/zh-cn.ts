@@ -411,6 +411,9 @@ export default {
 	'Zhipu thinking type': '推理类型',
 	Disabled: '禁用',
 	'Zhipu thinking type description': '控制 Zhipu AI 模型的推理行为。',
+	'Zhipu structured output': '结构化输出',
+	'Zhipu structured output description':
+		'启用后模型会强制输出 JSON 格式。适用于需要程序化处理响应的场景，如数据提取、API 集成等。',
 	'Model compatibility hint': '模型兼容性提示',
 	'Qwen thinking mode': '思考模式',
 	'Qwen thinking mode description':
@@ -431,6 +434,10 @@ export default {
 	'Poe reasoning description': '启用后 Poe 会在 Responses API 中请求 reasoning 并显示推理过程。',
 	'Azure reasoning description':
 		'启用后 Azure 将优先使用 Responses API 的官方推理事件解析；关闭后走 chat.completions 兼容路径。',
+	'Doubao Responses API is not supported for this model': '当前 Doubao 模型不支持 Responses API。',
+	'Doubao Responses missing tool executor': 'Doubao Responses 返回了函数调用，但当前未配置工具执行器。',
+	'Doubao tool loop exceeded maximum iterations': 'Doubao 工具循环超过最大迭代次数（{count}）。',
+	'Doubao Responses missing response id': 'Doubao Responses 未返回 response id，无法继续工具循环。',
 	'Debug log level debug option': 'Debug（全部）',
 	'Debug log level info option': 'Info（信息）',
 	'Debug log level warn option': 'Warn（警告）',

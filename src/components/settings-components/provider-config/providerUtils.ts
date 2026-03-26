@@ -9,7 +9,7 @@ import { poeVendor } from 'src/LLMProviders/poe'
 import { qianFanNormalizeBaseURL, qianFanVendor } from 'src/LLMProviders/qianFan'
 import { qwenVendor } from 'src/LLMProviders/qwen'
 import { siliconFlowVendor } from 'src/LLMProviders/siliconflow'
-import { isZhipuAnthropicBaseURL, zhipuVendor } from 'src/LLMProviders/zhipu'
+import { normalizeZhipuOpenAIBaseURL, zhipuVendor } from 'src/LLMProviders/zhipu'
 import type { BaseOptions } from 'src/types/provider'
 
 export const isValidUrl = (url: string) => {
@@ -190,6 +190,9 @@ export const normalizeProviderBaseURLForRuntime = (vendorName: string, baseURL?:
 	if (vendorName === 'Ollama') {
 		return normalizeBaseUrl(trimmed)
 	}
+	if (vendorName === zhipuVendor.name) {
+		return normalizeZhipuOpenAIBaseURL(trimmed)
+	}
 	return trimmed
 }
 
@@ -257,23 +260,14 @@ export const MODEL_FETCH_CONFIGS: Record<string, ModelFetchConfig> = {
 	[zhipuVendor.name]: {
 		requiresApiKey: true,
 		fallbackModels: [...zhipuVendor.models],
-		buildRequest: (options) => {
-			if (isZhipuAnthropicBaseURL(String(options.baseURL ?? ''))) {
-				const normalizedAnthropicBaseURL = trimTrailingSlash((options.baseURL || '').trim())
-					.replace(/\/v1(?:\/messages)?$/i, '')
-				return {
-					url: `${normalizedAnthropicBaseURL}/v1/models`,
-					headers: {
-						'x-api-key': options.apiKey,
-						'anthropic-version': '2023-06-01'
-					} as Record<string, string>
-				}
-			}
-			return {
-				url: appendPath(options.baseURL, '/models', 'https://open.bigmodel.cn/api/paas/v4/models'),
-				headers: { Authorization: `Bearer ${options.apiKey}` } as Record<string, string>
-			}
-		},
+		buildRequest: (options) => ({
+			url: appendPath(
+				normalizeZhipuOpenAIBaseURL(String(options.baseURL ?? '')),
+				'/models',
+				'https://open.bigmodel.cn/api/paas/v4/models'
+			),
+			headers: { Authorization: `Bearer ${options.apiKey}` } as Record<string, string>
+		}),
 		parseResponse: parseOpenAICompatibleModels
 	},
 	[deepSeekVendor.name]: {

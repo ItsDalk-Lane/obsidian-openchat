@@ -2,7 +2,7 @@ import OpenAI from 'openai'
 import { Notice } from 'obsidian'
 import { normalizeProviderBaseURLForRuntime } from 'src/components/settings-components/provider-config/providerUtils'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { buildZhipuThinkingConfig, createZhipuLoggedFetch, isZhipuAnthropicBaseURL } from 'src/LLMProviders/zhipu'
+import { buildZhipuThinkingConfig, createZhipuLoggedFetch, normalizeZhipuOpenAIBaseURL } from 'src/LLMProviders/zhipu'
 import { REASONING_BLOCK_END_MARKER, REASONING_BLOCK_START_MARKER } from 'src/LLMProviders/utils'
 import type { BaseOptions, Message, ProviderSettings, ResolveEmbedAsBinary, Vendor } from 'src/types/provider'
 import { isCustomOpenChatProvider } from 'src/utils/aiProviderMetadata'
@@ -39,7 +39,9 @@ const runZhipuNonStreamingFallback = async (
 	messages: Message[]
 ): Promise<boolean> => {
 	const apiKey = typeof providerOptions.apiKey === 'string' ? providerOptions.apiKey.trim() : ''
-	const baseURL = typeof providerOptions.baseURL === 'string' ? providerOptions.baseURL.trim() : ''
+	const baseURL = normalizeZhipuOpenAIBaseURL(
+		typeof providerOptions.baseURL === 'string' ? providerOptions.baseURL.trim() : ''
+	)
 	const model = typeof providerOptions.model === 'string' ? providerOptions.model.trim() : ''
 	if (!apiKey || !baseURL || !model) {
 		return false
@@ -139,10 +141,16 @@ const runFastProviderConnectivityTest = async (
 	messages: Message[]
 ): Promise<boolean | null> => {
 	if (vendorName === 'Zhipu') {
-		if (isZhipuAnthropicBaseURL(String(providerOptions.baseURL ?? ''))) {
-			return null
+		const fastTestSucceeded = await runZhipuNonStreamingFallback(providerOptions, messages)
+		if (fastTestSucceeded) {
+			return true
 		}
-		return await runZhipuNonStreamingFallback(providerOptions, messages)
+		DebugLogger.warn('[ModelTest] 智谱快速测试未获得可见输出，回退到流式测试链路', {
+			vendor: vendorName,
+			model: providerOptions.model,
+			baseURL: providerOptions.baseURL,
+		})
+		return null
 	}
 	return null
 }

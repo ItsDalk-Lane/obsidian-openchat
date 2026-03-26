@@ -12,14 +12,12 @@ import {
 	OpenAILoopOptions,
 	withToolCallLoopSupport
 } from 'src/core/agents/loop'
-import { sendAnthropicRequestFunc } from './zhipuAnthropic'
 import {
 	buildZhipuThinkingConfig,
 	createZhipuLoggedFetch,
 	DEFAULT_ZHIPU_THINKING_TYPE,
 	filterZhipuRequestExtras,
-	isZhipuAnthropicBaseURL,
-	type ZhipuAnthropicLoopOptions,
+	normalizeZhipuOpenAIBaseURL,
 	type ZhipuOptions,
 	ZHIPU_SLOW_REQUEST_THRESHOLD_MS,
 } from './zhipuShared'
@@ -28,7 +26,7 @@ export {
 	buildZhipuThinkingConfig,
 	createZhipuLoggedFetch,
 	DEFAULT_ZHIPU_THINKING_TYPE,
-	isZhipuAnthropicBaseURL,
+	normalizeZhipuOpenAIBaseURL,
 	type ZhipuOptions,
 	type ZhipuThinkingType,
 	ZHIPU_THINKING_TYPE_OPTIONS,
@@ -86,7 +84,6 @@ const formatMsg = async (
 const zhipuLoopOptions: OpenAILoopOptions = {
 	transformApiParams: (apiParams, allOptions) => {
 		const mapped: Record<string, unknown> = { ...apiParams }
-		delete mapped.enableWebSearch
 		delete mapped.enableThinking
 		delete mapped.enableReasoning
 		delete mapped.thinkingType
@@ -108,14 +105,22 @@ const zhipuLoopOptions: OpenAILoopOptions = {
 const sendRequestFunc = (settings: ZhipuOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		const options = mergeProviderOptionsWithParameters(settings)
-		const { apiKey, baseURL, model, enableWebSearch, enableReasoning, thinkingType, ...remains } = options
+		const { apiKey, baseURL, model, enableReasoning, thinkingType, enableStructuredOutput, ...remains } = options
 		if (!apiKey) throw new Error(t('API key is required'))
-		DebugLogger.debug('zhipu options', { baseURL, apiKey, model, enableWebSearch, enableReasoning, thinkingType })
+		const normalizedBaseURL = normalizeZhipuOpenAIBaseURL(baseURL)
+		if (normalizedBaseURL !== baseURL.trim()) {
+			DebugLogger.warn('[Zhipu] 检测到旧版 Anthropic 兼容 baseURL，已自动切换到 OpenAI 兼容端点', {
+				baseURL,
+				normalizedBaseURL,
+				model,
+			})
+		}
+		DebugLogger.debug('zhipu options', { baseURL: normalizedBaseURL, apiKey, model, enableReasoning, thinkingType, enableStructuredOutput })
 		const formattedMessages = await Promise.all(messages.map((msg) => formatMsg(msg, resolveEmbedAsBinary)))
 
 		const client = new OpenAI({
 			apiKey: apiKey,
-			baseURL,
+			baseURL: normalizedBaseURL,
 			dangerouslyAllowBrowser: true,
 			fetch: createZhipuLoggedFetch('chat-stream')
 		})
@@ -135,6 +140,11 @@ const sendRequestFunc = (settings: ZhipuOptions): SendRequest =>
 			thinkingType
 		})
 
+		// 添加结构化输出配置：启用时自动添加 response_format 参数
+		if (enableStructuredOutput && !requestParams.response_format) {
+			requestParams.response_format = { type: 'json_object' }
+		}
+
 		const stream = await client.chat.completions.create(requestParams as unknown as OpenAI.ChatCompletionCreateParamsStreaming, {
 			signal: controller.signal
 		})
@@ -150,7 +160,7 @@ const sendRequestFunc = (settings: ZhipuOptions): SendRequest =>
 				const firstChunkMs = Date.now() - streamStartedAt
 				if (firstChunkMs >= ZHIPU_SLOW_REQUEST_THRESHOLD_MS) {
 					DebugLogger.warn('[Zhipu][chat-stream] 首个流式分片耗时偏高', {
-						baseURL,
+						baseURL: normalizedBaseURL,
 						model,
 						firstChunkMs,
 					})
@@ -198,7 +208,9 @@ const sendRequestFuncOpenAI = withToolCallLoopSupport(sendRequestFunc as (settin
 
 export const ZHIPU_MODELS = [
 	'glm-5',
+	'glm-4.7',
 	'glm-4.6',
+	'glm-4.6v',
 	'glm-4.5',
 	'glm-4.5v',
 	'glm-4-plus',
@@ -215,28 +227,13 @@ export const zhipuVendor: Vendor = {
 		apiKey: '',
 		baseURL: 'https://open.bigmodel.cn/api/paas/v4/',
 		model: ZHIPU_MODELS[0],
-		enableWebSearch: false,
 		enableReasoning: false,
 		thinkingType: DEFAULT_ZHIPU_THINKING_TYPE,
 		max_tokens: 8192,
-		enableThinking: false,
-		budget_tokens: 1600,
 		parameters: {}
 	} as ZhipuOptions,
-	sendRequestFunc: (settings: BaseOptions) => {
-		const baseURL = typeof settings.baseURL === 'string' ? settings.baseURL : ''
-		if (isZhipuAnthropicBaseURL(baseURL)) {
-			const anthropicSettings: ZhipuAnthropicLoopOptions = {
-				...(settings as ZhipuOptions),
-				max_tokens: typeof settings.max_tokens === 'number' ? settings.max_tokens : 8192,
-				enableThinking: (settings as ZhipuOptions).enableReasoning === true,
-				budget_tokens: typeof settings.budget_tokens === 'number' ? settings.budget_tokens : 1600,
-			}
-			return sendAnthropicRequestFunc(anthropicSettings)
-		}
-		return sendRequestFuncOpenAI(settings)
-	},
+	sendRequestFunc: sendRequestFuncOpenAI,
 	models: ZHIPU_MODELS,
 	websiteToObtainKey: 'https://open.bigmodel.cn/',
-	capabilities: ['Text Generation', 'Web Search', 'Reasoning']
+	capabilities: ['Text Generation', 'Image Vision', 'Reasoning', 'Structured Output']
 }

@@ -194,6 +194,28 @@ export const getEnabledCapabilities = (vendor: Vendor, options: BaseOptions): Ca
 				&& (responseFormat as { type?: unknown }).type === 'json_object'
 			)
 		}
+		// 智谱使用 enableStructuredOutput 开关或 response_format 参数
+		if (vendor.name === 'Zhipu') {
+			// 优先检查开关
+			if (raw?.enableStructuredOutput === true) {
+				return true
+			}
+			// 兼容直接设置 response_format 的情况
+			const responseFormat = raw?.response_format ?? raw?.parameters?.response_format
+			if (!responseFormat || typeof responseFormat !== 'object') {
+				return false
+			}
+			const formatType = (responseFormat as { type?: unknown }).type
+			return formatType === 'json_object' || formatType === 'json_schema'
+		}
+		if (vendor.name === 'Doubao') {
+			const responseFormat = raw?.response_format ?? raw?.parameters?.response_format
+			if (!responseFormat || typeof responseFormat !== 'object') {
+				return false
+			}
+			const formatType = (responseFormat as { type?: unknown }).type
+			return formatType === 'json_object' || formatType === 'json_schema'
+		}
 		// 可以在这里添加其他服务商的结构化输出检查
 		return false
 	}

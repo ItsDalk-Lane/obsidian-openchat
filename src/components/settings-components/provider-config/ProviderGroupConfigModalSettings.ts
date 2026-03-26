@@ -186,6 +186,17 @@ const renderReasoningSettings = (
 					options.enableReasoning = value !== 'disabled';
 				}
 			);
+
+			// 结构化输出开关
+			addToggleSetting(
+				container,
+				t('Zhipu structured output'),
+				t('Zhipu structured output description'),
+				options.enableStructuredOutput ?? false,
+				(value) => {
+					options.enableStructuredOutput = value;
+				}
+			);
 		}
 		return;
 	}

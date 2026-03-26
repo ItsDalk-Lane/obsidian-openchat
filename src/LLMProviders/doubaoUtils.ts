@@ -10,7 +10,7 @@ type DoubaoImagePixelLimit = {
 	max_pixels?: number
 }
 
-type DoubaoImageContent = {
+type DoubaoChatImageContent = {
 	type: 'image_url'
 	image_url: {
 		url: string
@@ -19,9 +19,18 @@ type DoubaoImageContent = {
 	image_pixel_limit?: DoubaoImagePixelLimit
 }
 
+type DoubaoResponsesImageContent = {
+	type: 'input_image'
+	image_url: string
+	detail?: 'low' | 'high'
+	image_pixel_limit?: DoubaoImagePixelLimit
+}
+
 type DoubaoTextContent =
 	| { type: 'text'; text: string }
 	| { type: 'input_text'; text: string }
+
+type DoubaoImageContent = DoubaoChatImageContent | DoubaoResponsesImageContent
 
 type DoubaoContentItem = DoubaoTextContent | DoubaoImageContent
 
@@ -203,6 +212,24 @@ export const resolveDoubaoImageEndpoint = (baseURL: string): string => {
 	}
 }
 
+const createDoubaoImageContent = (
+	url: string,
+	useResponsesAPI: boolean,
+): DoubaoImageContent => {
+	if (useResponsesAPI) {
+		return {
+			type: 'input_image',
+			image_url: url,
+		}
+	}
+	return {
+		type: 'image_url',
+		image_url: {
+			url,
+		},
+	}
+}
+
 // 处理消息，支持文本和图片的多模态输入
 // 当启用 Web Search 时，需要转换为 Responses API 的消息格式
 export const processMessages = async (
@@ -223,12 +250,7 @@ export const processMessages = async (
 
 		if (textImageUrls.length > 0) {
 			for (const url of textImageUrls) {
-				imageContentsFromText.push({
-					type: 'image_url' as const,
-					image_url: {
-						url
-					}
-				})
+				imageContentsFromText.push(createDoubaoImageContent(url, useResponsesAPI))
 			}
 
 			for (const url of textImageUrls) {
@@ -262,12 +284,7 @@ export const processMessages = async (
 					let imageContent: DoubaoImageContent
 
 					if (isHttpUrl) {
-						imageContent = {
-							type: 'image_url' as const,
-							image_url: {
-								url: embed.link
-							}
-						}
+						imageContent = createDoubaoImageContent(embed.link, useResponsesAPI)
 					} else {
 						const binary = await resolveEmbedAsBinary(embed)
 						if (binary.byteLength > maxImageSize) {
@@ -281,7 +298,8 @@ export const processMessages = async (
 							continue
 						}
 
-						imageContent = await convertEmbedToImageUrl(embed, resolveEmbedAsBinary)
+						const converted = await convertEmbedToImageUrl(embed, resolveEmbedAsBinary)
+						imageContent = createDoubaoImageContent(converted.image_url.url, useResponsesAPI)
 					}
 
 					if (imageContent) {

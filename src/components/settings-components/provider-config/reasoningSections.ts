@@ -69,6 +69,17 @@ export const renderZhipuSections = (
 			})
 		})
 
+	// 结构化输出开关
+	new Setting(details)
+		.setName(t('Zhipu structured output'))
+		.setDesc(t('Zhipu structured output description'))
+		.addToggle((toggle) =>
+			toggle.setValue(options.enableStructuredOutput ?? false).onChange(async (value) => {
+				options.enableStructuredOutput = value
+				await context.saveSettings()
+			})
+		)
+
 	if (capability.state === 'unknown') {
 		new Setting(details)
 			.setName(t('Model compatibility hint'))
