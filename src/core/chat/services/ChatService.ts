@@ -18,7 +18,6 @@ import {
 	type GenerateAssistantOptions,
 } from './ChatServiceCore';
 import { ChatServiceOps } from './ChatServiceOps';
-import { ChatSettingsModal } from 'src/components/chat-components/ChatSettingsModal';
 import {
 	executeSkillCommand as executeSkillCommandHelper,
 	executeSubAgentCommand as executeSubAgentCommandHelper,
@@ -366,19 +365,12 @@ export class ChatService extends ChatServiceOps {
 	}
 
 	openChatSettingsModal(): void {
-		if (this.chatSettingsModal) {
-			return;
-		}
-
-		this.chatSettingsModal = new ChatSettingsModal(this.app, this, () => {
-			this.chatSettingsModal = null;
-		});
-		this.chatSettingsModal.open();
-	}
-
-	closeChatSettingsModal(): void {
-		this.chatSettingsModal?.close();
-		this.chatSettingsModal = null;
+		// 打开 Obsidian 插件设置界面（替代原来的独立 Modal）
+		const settingApp = (this.plugin.app as unknown as {
+			setting: { open: () => void; openTabById: (id: string) => boolean }
+		}).setting
+		settingApp.open()
+		settingApp.openTabById(this.plugin.manifest.id)
 	}
 
 	async persistChatSettings(partial: Partial<ChatSettings>): Promise<void> {

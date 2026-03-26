@@ -1,5 +1,6 @@
 import { EmbedCache } from 'obsidian'
 import type { McpToolAnnotations } from 'src/services/mcp/types'
+import { stripInternalProviderParameters } from 'src/utils/aiProviderMetadata'
 import type {
 	GetToolsFn,
 	ToolDefinition,
@@ -129,4 +130,14 @@ export interface Optional {
 	apiSecret: string
 	endpoint: string
 	apiVersion: string
+}
+
+export const mergeProviderOptionsWithParameters = <T extends BaseOptions>(
+	settings: T
+): T & Record<string, unknown> => {
+	const { parameters, ...optionsExcludingParams } = settings as T & { parameters?: Record<string, unknown> }
+	return {
+		...optionsExcludingParams,
+		...stripInternalProviderParameters(parameters)
+	} as T & Record<string, unknown>
 }

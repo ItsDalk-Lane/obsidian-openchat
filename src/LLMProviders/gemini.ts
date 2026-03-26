@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { arrayBufferToBase64, getMimeTypeFromFilename } from './utils'
 import { withToolCallLoopSupport } from 'src/core/agents/loop'
 import { DebugLogger } from 'src/utils/DebugLogger'
@@ -178,8 +178,7 @@ const sendViaOpenAICompatible = async function* (
 
 const sendRequestFuncBase = (settings: BaseOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
-		const { parameters, ...optionsExcludingParams } = settings
-		const options = { ...optionsExcludingParams, ...parameters }
+		const options = mergeProviderOptionsWithParameters(settings)
 		const { apiKey, baseURL, model, ...remains } = options
 		if (!apiKey) throw new Error(t('API key is required'))
 		if (!model) throw new Error(t('Model is required'))

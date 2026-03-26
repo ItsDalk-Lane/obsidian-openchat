@@ -38,6 +38,7 @@ interface ClaudeLoopSettings extends BaseOptions {
 	max_tokens: number
 	enableThinking: boolean
 	budget_tokens: number
+	anthropicFetch?: typeof globalThis.fetch
 }
 
 type FormatMsgFn = (msg: Message, resolveEmbedAsBinary: ResolveEmbedAsBinary) => Promise<Anthropic.MessageParam>
@@ -88,6 +89,7 @@ export function withClaudeToolCallLoopSupport(
 					max_tokens = 8192,
 					enableThinking = false,
 					budget_tokens = 1600,
+					anthropicFetch,
 				} = options
 
 				if (!apiKey) throw new Error('API key is required')
@@ -99,7 +101,12 @@ export function withClaudeToolCallLoopSupport(
 					baseURL = baseURL.slice(0, -'/v1/messages'.length)
 				}
 
-				const client = new Anthropic({ apiKey, baseURL, fetch: globalThis.fetch, dangerouslyAllowBrowser: true })
+				const client = new Anthropic({
+					apiKey,
+					baseURL,
+					fetch: anthropicFetch ?? globalThis.fetch,
+					dangerouslyAllowBrowser: true
+				})
 
 				const [systemMsg, nonSystemMsgs] =
 					messages[0]?.role === 'system' ? [messages[0], messages.slice(1)] : [null, messages]

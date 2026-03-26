@@ -1,5 +1,5 @@
 import type { App } from 'obsidian'
-import { addApiVersionSection, addBaseUrlSection, addClaudeSections as addProviderClaudeSections, addContextLengthSection as addProviderContextLengthSection, addEndpointSection, addGptImageSections as addProviderGptImageSections, addParametersSection as addProviderParametersSection, addProviderTagSection } from 'src/components/settings-components/provider-config/providerGeneralSections'
+import { addApiVersionSection, addBaseUrlSection, addClaudeSections as addProviderClaudeSections, addContextLengthSection as addProviderContextLengthSection, addEndpointSection, addGptImageSections as addProviderGptImageSections, addParametersSection as addProviderParametersSection } from 'src/components/settings-components/provider-config/providerGeneralSections'
 import { addModelButtonSection as addProviderModelButtonSection, addModelDropDownSection as addProviderModelDropDownSection, addModelTextSection as addProviderModelTextSection, addOllamaModelTextSection as addProviderOllamaModelTextSection } from 'src/components/settings-components/provider-config/providerModelSections'
 import { renderProviderConfigContent } from 'src/components/settings-components/provider-config/providerConfigRenderer'
 import type { ProviderSettingModal } from 'src/components/modals/AiRuntimeProviderModals'
@@ -81,20 +81,6 @@ export const renderProviderConfigForPanel = (
 		testProviderConfiguration: params.testProviderConfiguration,
 		renderProviderConfig: params.renderProviderConfig,
 		sections: {
-			addTagSection: (details, providerSettings, providerIndex, defaultTag) =>
-				addProviderTagSection({
-					details,
-					settings: providerSettings,
-					index: providerIndex,
-					defaultTag,
-					saveSettings: savePanelSettings,
-					updateTitle: (currentProviderIndex, nextTitle) => {
-						const titleEl = params.providerTitleEls.get(currentProviderIndex)
-						if (titleEl) {
-							titleEl.textContent = nextTitle
-						}
-					}
-				}),
 			addBaseURLSection: (details, options, defaultValue) =>
 				addBaseUrlSection({
 					details,

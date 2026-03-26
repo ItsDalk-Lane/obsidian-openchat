@@ -6,6 +6,7 @@ import type { QuickAction } from 'src/types/chat';
 import type { ProviderSettings } from 'src/types/provider';
 import { localInstance } from 'src/i18n/locals';
 import { v4 as uuidv4 } from 'uuid';
+import { formatProviderOptionLabel } from 'src/components/chat-components/chatSettingsHelpers';
 import './QuickActionEditModal.css';
 
 interface QuickActionEditModalProps {
@@ -281,7 +282,7 @@ export const QuickActionEditModal = ({
 							</option>
 							{providers.map(provider => (
 								<option key={provider.tag} value={provider.tag}>
-									{provider.tag}
+									{formatProviderOptionLabel(provider, providers)}
 								</option>
 							))}
 						</select>

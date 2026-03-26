@@ -367,7 +367,6 @@ export abstract class ChatServiceOps extends ChatServiceMid {
 	}
 
 	dispose() {
-		this.closeChatSettingsModal();
 		this.stateStore.dispose();
 		this.multiModelService?.stopAllGeneration();
 		this.controller?.abort();

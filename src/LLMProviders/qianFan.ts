@@ -1,7 +1,7 @@
 import { Notice, requestUrl } from 'obsidian'
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
 import { buildReasoningBlockEnd, buildReasoningBlockStart, convertEmbedToImageUrl } from './utils'
 import { withToolMessageContext } from './messageFormat'
 import { DebugLogger } from 'src/utils/DebugLogger'
@@ -320,8 +320,7 @@ const sendRequestFunc = (settings: QianFanOptions): SendRequest =>
 		resolveEmbedAsBinary: ResolveEmbedAsBinary,
 		saveAttachment?: SaveAttachment
 	) {
-		const { parameters, ...optionsExcludingParams } = settings
-		const options = { ...optionsExcludingParams, ...parameters } as QianFanOptions & Record<string, unknown>
+		const options = mergeProviderOptionsWithParameters(settings) as QianFanOptions & Record<string, unknown>
 		const {
 			apiKey,
 			baseURL,

@@ -19,6 +19,7 @@ import {
 } from './ChatServiceCore';
 
 export abstract class ChatServiceMid extends ChatServiceCore {
+	private _coreInitialized = false;
 
 	protected bindLivePlanStateSync(): void {
 		void this.toolRuntimeResolver.ensureBuiltinToolsRuntime(this.state.activeSession).catch((error) => {
@@ -55,6 +56,14 @@ export abstract class ChatServiceMid extends ChatServiceCore {
 	}
 
 	initialize(initialSettings?: Partial<ChatSettings>): void {
+		if (this._coreInitialized) {
+			// 已完整初始化过：仅更新设置并重新发射状态（幂等保护）
+			this.updateSettings(initialSettings ?? {});
+			this.emitState();
+			return;
+		}
+		this._coreInitialized = true;
+
 		this.updateSettings(initialSettings ?? {});
 
 		const persistedLayoutMode = this.readPersistedLayoutMode();

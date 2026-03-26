@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd } from './utils'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import { withToolCallLoopSupport, OpenAILoopOptions, OpenAIToolDefinition, ToolNameMapping } from 'src/core/agents/loop'
@@ -36,12 +36,11 @@ type DeepSeekInternalConfig = {
 
 const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, _resolveEmbedAsBinary: ResolveEmbedAsBinary) {
-		const { parameters, ...optionsExcludingParams } = settings
-		const rawParameters = (parameters ?? {}) as Record<string, unknown>
+		const rawParameters = (settings.parameters ?? {}) as Record<string, unknown>
 		const internalConfig = (rawParameters.__ff_deepseek as DeepSeekInternalConfig | undefined) ?? {}
 		const cleanedParameters = { ...rawParameters }
 		delete cleanedParameters.__ff_deepseek
-		const options = { ...optionsExcludingParams, ...cleanedParameters }
+		const options = { ...mergeProviderOptionsWithParameters(settings), ...cleanedParameters }
 		const { apiKey, baseURL, model, ...remains } = options
 		if (!apiKey) throw new Error(t('API key is required'))
 
@@ -185,10 +184,49 @@ const normalizeToolName = (name: string): string => {
 	// 将非法字符替换为下划线，并确保不以数字开头
 	let normalized = name.replace(/[^a-zA-Z0-9_-]/g, '_')
 	// 如果以数字开头，添加前缀
-	if (/^\d/.test(normalized)) {
+	if (!/^[A-Za-z]/.test(normalized)) {
 		normalized = `tool_${normalized}`
 	}
 	return normalized
+}
+
+const ensureUniqueToolName = (name: string, usedNames: Set<string>): string => {
+	if (!usedNames.has(name)) {
+		usedNames.add(name)
+		return name
+	}
+
+	let suffix = 2
+	let candidate = `${name}_${suffix}`
+	while (usedNames.has(candidate)) {
+		suffix += 1
+		candidate = `${name}_${suffix}`
+	}
+	usedNames.add(candidate)
+	return candidate
+}
+
+const sanitizeToolSchema = (value: unknown): unknown => {
+	if (Array.isArray(value)) {
+		return value.map((item) => sanitizeToolSchema(item))
+	}
+	if (!value || typeof value !== 'object') {
+		return value
+	}
+	const record = value as Record<string, unknown>
+	const next: Record<string, unknown> = {}
+	for (const [key, child] of Object.entries(record)) {
+		next[key] = sanitizeToolSchema(child)
+	}
+	if (next.exclusiveMinimum === true && typeof next.minimum === 'number') {
+		next.exclusiveMinimum = next.minimum
+		delete next.minimum
+	}
+	if (next.exclusiveMaximum === true && typeof next.maximum === 'number') {
+		next.exclusiveMaximum = next.maximum
+		delete next.maximum
+	}
+	return next
 }
 
 /**
@@ -208,8 +246,9 @@ const deepSeekLoopOptions: OpenAILoopOptions = {
 	},
 	transformTools: (tools: OpenAIToolDefinition[]): { tools: OpenAIToolDefinition[]; mapping: ToolNameMapping } => {
 		const mapping: ToolNameMapping = { normalizedToOriginal: new Map() }
+		const usedNames = new Set<string>()
 		const transformedTools = tools.map((tool) => {
-			const normalizedName = normalizeToolName(tool.function.name)
+			const normalizedName = ensureUniqueToolName(normalizeToolName(tool.function.name), usedNames)
 			// 记录映射关系（规范化名称 -> 原始名称）
 			mapping.normalizedToOriginal.set(normalizedName, tool.function.name)
 			return {
@@ -217,6 +256,7 @@ const deepSeekLoopOptions: OpenAILoopOptions = {
 				function: {
 					...tool.function,
 					name: normalizedName,
+					parameters: sanitizeToolSchema(tool.function.parameters) as Record<string, unknown>,
 				},
 			}
 		})

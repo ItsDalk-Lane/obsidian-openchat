@@ -93,10 +93,9 @@ export interface LocalPart3 {
 	chat_trigger_enable_desc: string;
 	chat_trigger_symbol: string;
 	chat_trigger_symbol_desc: string;
-	chat_modal_width: string;
-	chat_modal_width_desc: string;
-	chat_modal_height: string;
-	chat_modal_height_desc: string;
+	chat_modal_dimensions: string;
+	chat_modal_width_label: string;
+	chat_modal_height_label: string;
 	chat_modal_title: string;
 	chat_settings_button_title: string;
 	chat_settings_modal_title: string;
@@ -118,13 +117,6 @@ export interface LocalPart3 {
 	chat_settings_open_mode_tab: string;
 	chat_settings_open_mode_window: string;
 	chat_settings_open_mode_persistent_modal: string;
-	chat_settings_auto_open: string;
-	chat_settings_auto_open_desc_sidebar: string;
-	chat_settings_auto_open_desc_left_sidebar: string;
-	chat_settings_auto_open_desc_tab: string;
-	chat_settings_auto_open_desc_window: string;
-	chat_settings_auto_open_desc_persistent_modal: string;
-	chat_settings_auto_open_desc_default: string;
 	chat_settings_auto_add_active_file: string;
 	chat_settings_auto_add_active_file_desc: string;
 	chat_settings_show_ribbon_icon: string;

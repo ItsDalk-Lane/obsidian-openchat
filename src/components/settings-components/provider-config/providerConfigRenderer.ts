@@ -25,6 +25,7 @@ import type { ReasoningCapabilityRecord } from 'src/LLMProviders/modelCapability
 import { getCapabilityDisplayText } from 'src/LLMProviders/utils'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { localInstance } from 'src/i18n/locals'
+import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata'
 import type {
 	BaseOptions,
 	Optional,
@@ -57,15 +58,9 @@ import {
 import type {
 	ProviderSectionContext
 } from './types'
-import { MODEL_FETCH_CONFIGS, validateTag } from './providerUtils'
+import { MODEL_FETCH_CONFIGS } from './providerUtils'
 
 interface ProviderConfigSectionDelegates {
-	addTagSection: (
-		details: HTMLElement,
-		settings: ProviderSettings,
-		index: number,
-		defaultTag: string
-	) => void
 	addBaseURLSection: (details: HTMLElement, options: BaseOptions, defaultValue: string) => void
 	addModelButtonSection: (
 		details: HTMLElement,
@@ -154,8 +149,6 @@ export const renderProviderConfigContent = (params: RenderProviderConfigParams) 
 		text: capabilities,
 		cls: 'setting-item-description'
 	})
-
-	sections.addTagSection(container, settings, index, vendor.name)
 
 	const modelConfig = MODEL_FETCH_CONFIGS[vendor.name as keyof typeof MODEL_FETCH_CONFIGS]
 	if (modelConfig) {
@@ -375,6 +368,10 @@ export const renderProviderConfigContent = (params: RenderProviderConfigParams) 
 			settings.options as BaseOptions & Pick<Optional, 'apiVersion'>
 		)
 	}
+	const titleEl = container.querySelector('.ai-provider-title') as HTMLElement | null
+	if (titleEl) {
+		titleEl.textContent = getProviderModelDisplayName(settings, params.getAllProviders())
+	}
 	sections.addContextLengthSection(container, settings.options)
 	sections.addParametersSection(container, settings.options)
 
@@ -450,14 +447,8 @@ export const renderProviderConfigContent = (params: RenderProviderConfigParams) 
 			.onClick(async () => {
 				const tags = params.getAllProviders().map((provider) => provider.tag.toLowerCase())
 				if (tags.length !== new Set(tags).size) {
-					new Notice(t('Provider tag must be unique'))
+					new Notice(t('Model identifier must be unique'))
 					return
-				}
-				for (const provider of params.getAllProviders()) {
-					if (validateTag(provider.tag)) {
-						new Notice(`${t('Invalid provider tag')}: ${provider.tag}`)
-						return
-					}
 				}
 				await params.saveSettingsDirect()
 				new Notice(localInstance.system_prompt_saved)

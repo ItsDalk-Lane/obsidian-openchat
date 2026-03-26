@@ -60,7 +60,7 @@ export const ModelTag = ({
 				overflow: 'hidden',
 				textOverflow: 'ellipsis',
 			}}
-			title={modelTag}
+			title={displayName}
 			onClick={onClick}
 		>
 			{isGenerating && (

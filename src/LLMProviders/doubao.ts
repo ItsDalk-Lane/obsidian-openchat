@@ -1,5 +1,5 @@
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd } from './utils'
 import { normalizeProviderError } from './errors'
 import { withRetry } from './retry'
@@ -106,8 +106,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 		saveAttachment?: SaveAttachment
 	) {
 		try {
-			const { parameters, ...optionsExcludingParams } = settings
-			const options = { ...optionsExcludingParams, ...parameters } as DoubaoOptions
+			const options = mergeProviderOptionsWithParameters(settings) as DoubaoOptions
 			const {
 				apiKey,
 				baseURL,

@@ -19,6 +19,7 @@ interface QuickActionsPanelParams {
 	setActiveQuickActionsListContainer: (container: HTMLElement | null) => void
 	isSelectionToolbarCollapsed: boolean
 	setSelectionToolbarCollapsed: (value: boolean) => void
+	collapsible?: boolean
 	updateChatSettings: (partial: Partial<ChatSettings>) => Promise<void>
 	refreshQuickActionsCache?: () => Promise<void>
 }
@@ -166,77 +167,108 @@ const openManagementModal = (params: QuickActionsPanelParams): void => {
 }
 
 export const renderQuickActionsSettingsSection = (params: QuickActionsPanelParams): void => {
-	const headerSetting = new Setting(params.containerEl)
-		.setName(localInstance.selection_toolbar_settings_section)
-		.setDesc(localInstance.system_prompt_feature_selection_toolbar_desc)
+	const createActionButtons = (wrapper: HTMLElement) => {
+		wrapper.style.cssText =
+			'display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap;'
 
-	const buttonWrapper = headerSetting.controlEl.createDiv({ cls: 'ai-provider-button-wrapper' })
-	buttonWrapper.style.cssText =
-		'display: flex; align-items: center; justify-content: flex-end; gap: 8px;'
-
-	const addButton = buttonWrapper.createEl('button', { cls: 'mod-cta' })
-	addButton.textContent = localInstance.quick_action_add
-	addButton.style.cssText = 'font-size: var(--font-ui-smaller); padding: 4px 10px;'
-	addButton.onclick = async () => {
-		await openEditModal(params)
-	}
-
-	const manageButton = buttonWrapper.createEl('button')
-	manageButton.textContent = localInstance.quick_action_management
-	manageButton.style.cssText = 'font-size: var(--font-ui-smaller); padding: 4px 10px;'
-	manageButton.onclick = () => {
-		openManagementModal(params)
-	}
-
-	const chevron = buttonWrapper.createEl('div', { cls: 'ai-provider-chevron' })
-	chevron.innerHTML = CHEVRON_SVG
-	chevron.style.cssText = `
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition: transform 0.2s ease;
-		transform: ${params.isSelectionToolbarCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'};
-		width: 16px;
-		height: 16px;
-	`
-
-	const headerEl = headerSetting.settingEl
-	headerEl.style.cursor = 'pointer'
-	headerEl.style.borderRadius = '0px'
-	headerEl.style.border = '1px solid var(--background-modifier-border)'
-	headerEl.style.marginBottom = '0px'
-	headerEl.style.padding = '12px 12px'
-
-	const section = params.containerEl.createDiv({ cls: 'selection-toolbar-settings-container' })
-	section.style.padding = '0 8px 8px 8px'
-	section.style.backgroundColor = 'var(--background-secondary)'
-	section.style.borderRadius = '0px'
-	section.style.border = '1px solid var(--background-modifier-border)'
-	section.style.borderTop = 'none'
-	section.style.display = params.isSelectionToolbarCollapsed ? 'none' : 'block'
-
-	const toggleSection = () => {
-		const nextValue = !params.isSelectionToolbarCollapsed
-		params.setSelectionToolbarCollapsed(nextValue)
-		params.isSelectionToolbarCollapsed = nextValue
-		chevron.style.transform = nextValue ? 'rotate(-90deg)' : 'rotate(0deg)'
-		section.style.display = nextValue ? 'none' : 'block'
-	}
-
-	headerEl.addEventListener('click', (event) => {
-		const target = event.target as HTMLElement
-		if (target.closest('button') || target.closest('.ai-provider-chevron')) {
-			return
+		const addButton = wrapper.createEl('button', { cls: 'mod-cta' })
+		addButton.textContent = localInstance.quick_action_add
+		addButton.style.cssText = 'font-size: var(--font-ui-smaller); padding: 4px 10px;'
+		addButton.onclick = async () => {
+			await openEditModal(params)
 		}
-		toggleSection()
-	})
 
-	chevron.addEventListener('click', (event) => {
-		event.stopPropagation()
-		toggleSection()
-	})
+		const manageButton = wrapper.createEl('button')
+		manageButton.textContent = localInstance.quick_action_management
+		manageButton.style.cssText = 'font-size: var(--font-ui-smaller); padding: 4px 10px;'
+		manageButton.onclick = () => {
+			openManagementModal(params)
+		}
+	}
+
+	const isCollapsible = params.collapsible ?? true
+	let section: HTMLElement
+
+	if (isCollapsible) {
+		const headerSetting = new Setting(params.containerEl)
+			.setName(localInstance.selection_toolbar_settings_section)
+			.setDesc(localInstance.system_prompt_feature_selection_toolbar_desc)
+
+		const buttonWrapper = headerSetting.controlEl.createDiv({ cls: 'ai-provider-button-wrapper' })
+		createActionButtons(buttonWrapper)
+
+		const chevron = buttonWrapper.createEl('div', { cls: 'ai-provider-chevron' })
+		chevron.innerHTML = CHEVRON_SVG
+		chevron.style.cssText = `
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: var(--text-muted);
+			cursor: pointer;
+			transition: transform 0.2s ease;
+			transform: ${params.isSelectionToolbarCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'};
+			width: 16px;
+			height: 16px;
+		`
+
+		const headerEl = headerSetting.settingEl
+		headerEl.style.cursor = 'pointer'
+		headerEl.style.borderRadius = '0px'
+		headerEl.style.border = '1px solid var(--background-modifier-border)'
+		headerEl.style.marginBottom = '0px'
+		headerEl.style.padding = '12px 12px'
+
+		section = params.containerEl.createDiv({ cls: 'selection-toolbar-settings-container' })
+		section.style.padding = '0 8px 8px 8px'
+		section.style.backgroundColor = 'var(--background-secondary)'
+		section.style.borderRadius = '0px'
+		section.style.border = '1px solid var(--background-modifier-border)'
+		section.style.borderTop = 'none'
+		section.style.display = params.isSelectionToolbarCollapsed ? 'none' : 'block'
+
+		const toggleSection = () => {
+			const nextValue = !params.isSelectionToolbarCollapsed
+			params.setSelectionToolbarCollapsed(nextValue)
+			params.isSelectionToolbarCollapsed = nextValue
+			chevron.style.transform = nextValue ? 'rotate(-90deg)' : 'rotate(0deg)'
+			section.style.display = nextValue ? 'none' : 'block'
+		}
+
+		headerEl.addEventListener('click', (event) => {
+			const target = event.target as HTMLElement
+			if (target.closest('button') || target.closest('.ai-provider-chevron')) {
+				return
+			}
+			toggleSection()
+		})
+
+		chevron.addEventListener('click', (event) => {
+			event.stopPropagation()
+			toggleSection()
+		})
+	} else {
+		section = params.containerEl.createDiv({ cls: 'selection-toolbar-settings-container' })
+		section.style.padding = '8px'
+		section.style.backgroundColor = 'var(--background-secondary)'
+		section.style.borderRadius = '0px'
+		section.style.border = '1px solid var(--background-modifier-border)'
+
+		const toolbar = section.createDiv({ cls: 'quick-actions-settings-toolbar' })
+		toolbar.style.cssText =
+			'display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 4px 4px 12px;'
+
+		const desc = toolbar.createDiv({ cls: 'quick-actions-settings-toolbar__desc' })
+		desc.style.cssText =
+			'flex: 1; min-width: 220px; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.5;'
+		desc.textContent = localInstance.system_prompt_feature_selection_toolbar_desc
+
+		const buttonWrapper = toolbar.createDiv({ cls: 'ai-provider-button-wrapper' })
+		createActionButtons(buttonWrapper)
+
+		const toolbarSeparator = section.createEl('hr')
+		toolbarSeparator.style.cssText =
+			'margin: 0 0 12px; border: none; border-top: 1px solid var(--background-modifier-border);'
+	}
 
 	new Setting(section)
 		.setName(localInstance.selection_toolbar_enable)
@@ -270,10 +302,6 @@ export const renderQuickActionsSettingsSection = (params: QuickActionsPanelParam
 				await params.updateChatSettings({ quickActionsStreamOutput: value })
 			})
 		})
-
-	const separator = section.createEl('hr')
-	separator.style.cssText =
-		'margin: 16px 0; border: none; border-top: 1px solid var(--background-modifier-border);'
 
 	new Setting(section)
 		.setName(localInstance.chat_trigger_symbol)

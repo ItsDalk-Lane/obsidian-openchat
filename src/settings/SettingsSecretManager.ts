@@ -3,6 +3,7 @@ import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
 import { encryptApiKey, decryptApiKey, generateDeviceFingerprint } from 'src/settings/ai-runtime/utils/cryptoUtils';
 import type { BaseOptions, ProviderSettings } from 'src/types/provider';
 import { DebugLogger } from 'src/utils/DebugLogger';
+import { isCustomOpenChatProvider } from 'src/utils/aiProviderMetadata';
 
 export type VendorApiKeysByDevice = Record<string, Record<string, string>>;
 
@@ -154,7 +155,9 @@ export class SettingsSecretManager {
         const providers = this.asProviderSettingsList(settings.providers).map((provider: ProviderSettings) => {
             const options = provider.options || {};
             const normalizedVendor = this.normalizeProviderVendor(provider.vendor);
-            const resolvedApiKey = vendorApiKeys[normalizedVendor] ?? '';
+            const resolvedApiKey = isCustomOpenChatProvider(options.parameters)
+                ? (typeof options.apiKey === 'string' ? options.apiKey : '')
+                : (vendorApiKeys[normalizedVendor] ?? '');
             const nextOptions: BaseOptions = {
                 ...options,
                 apiKey: resolvedApiKey,
@@ -186,9 +189,12 @@ export class SettingsSecretManager {
         );
         const providers = (settings.providers ?? []).map((provider: ProviderSettings) => {
             const options = provider.options || {};
+            const preserveProviderApiKey = isCustomOpenChatProvider(options.parameters);
             const encrypted: BaseOptions = {
                 ...options,
-                apiKey: '',
+                apiKey: preserveProviderApiKey && typeof options.apiKey === 'string'
+                    ? options.apiKey
+                    : '',
                 parameters: options.parameters ?? {},
             };
             deleteFields(encrypted as Record<string, unknown>, [

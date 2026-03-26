@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl } from './utils'
 import { withToolCallLoopSupport } from 'src/core/agents/loop'
 import { DebugLogger } from 'src/utils/DebugLogger'
@@ -36,8 +36,7 @@ export const QWEN_MODELS = [
 
 const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
-		const { parameters, ...optionsExcludingParams } = settings
-		const options = { ...optionsExcludingParams, ...parameters } as QwenOptions
+		const options = mergeProviderOptionsWithParameters(settings) as QwenOptions
 		const { apiKey, baseURL, model, enableThinking, ...remains } = options
 		if (!apiKey) throw new Error(t('API key is required'))
 

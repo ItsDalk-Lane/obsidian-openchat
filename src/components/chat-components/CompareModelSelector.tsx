@@ -6,6 +6,7 @@ import { getCapabilityDisplayText } from 'src/LLMProviders/utils';
 import { availableVendors } from 'src/settings/ai-runtime';
 import type { CompareGroup } from 'src/core/chat/types/multiModel';
 import { localInstance } from 'src/i18n/locals';
+import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';
 
 interface CompareModelSelectorProps {
 	providers: ProviderSettings[];
@@ -181,7 +182,7 @@ export const CompareModelSelector = ({
 											style={{ margin: 0, cursor: 'pointer' }}
 										/>
 										<span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-											{provider.tag}
+													{getProviderModelDisplayName(provider, providers)}
 										</span>
 										{caps && (
 											<span style={{ fontSize: 'var(--font-ui-smaller)', opacity: 0.7 }}>{caps}</span>

@@ -1,4 +1,5 @@
 import { QuickActionDataService } from 'src/editor/selectionToolbar/QuickActionDataService'
+import { formatProviderOptionLabel } from 'src/components/chat-components/chatSettingsHelpers'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { localInstance } from 'src/i18n/locals'
 import type { QuickAction, QuickActionType } from 'src/types/chat'
@@ -178,7 +179,7 @@ export const openQuickActionEditModal = async (
 	for (const provider of context.providers) {
 		const option = document.createElement('option')
 		option.value = provider.tag
-		option.textContent = provider.tag
+		option.textContent = formatProviderOptionLabel(provider, context.providers)
 		option.selected = quickAction?.modelTag === provider.tag
 		modelSelect.appendChild(option)
 	}

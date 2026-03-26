@@ -2,35 +2,8 @@ import { Notice, Setting } from 'obsidian'
 import type { ClaudeOptions } from 'src/LLMProviders/claude'
 import type { GptImageOptions } from 'src/LLMProviders/gptImage'
 import { t } from 'src/i18n/ai-runtime/helper'
-import type { BaseOptions, Optional, ProviderSettings } from 'src/types/provider'
-import { getSummary, isValidUrl } from './providerUtils'
-
-export const addProviderTagSection = (params: {
-	details: HTMLElement
-	settings: ProviderSettings
-	index: number
-	defaultTag: string
-	saveSettings: () => Promise<void>
-	updateTitle: (index: number, nextTitle: string) => void
-}) =>
-	new Setting(params.details)
-		.setName(t('Provider tag'))
-		.setDesc(t('A short identifier used to reference this provider'))
-		.addText((text) =>
-			text
-				.setPlaceholder(params.defaultTag)
-				.setValue(params.settings.tag)
-				.onChange(async (value) => {
-					const trimmed = value.trim()
-					if (trimmed.length === 0) return
-					params.settings.tag = trimmed
-					params.updateTitle(
-						params.index,
-						getSummary(params.settings.tag, params.defaultTag)
-					)
-					await params.saveSettings()
-				})
-		)
+import type { BaseOptions, Optional } from 'src/types/provider'
+import { isValidUrl } from './providerUtils'
 
 export const addBaseUrlSection = (params: {
 	details: HTMLElement
@@ -39,7 +12,7 @@ export const addBaseUrlSection = (params: {
 	saveSettings: () => Promise<void>
 }) => {
 	let textInput: HTMLInputElement | null = null
-	return new Setting(params.details)
+	const setting = new Setting(params.details)
 		.setName('baseURL')
 		.setDesc(`${t('Default:')} ${params.defaultValue}`)
 		.addExtraButton((btn) => {
@@ -61,6 +34,9 @@ export const addBaseUrlSection = (params: {
 				await params.saveSettings()
 			})
 		})
+	setting.descEl.addClass('provider-base-url-desc')
+	setting.descEl.setAttr('title', `${t('Default:')} ${params.defaultValue}`)
+	return setting
 }
 
 const addSecretInputSection = (params: {

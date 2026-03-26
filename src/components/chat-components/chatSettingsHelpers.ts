@@ -1,6 +1,7 @@
 import type { Local } from 'src/i18n/local';
 import type { ProviderSettings } from 'src/types/provider';
 import type { McpServerStatus } from 'src/services/mcp/types';
+import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';
 import {
 	BUILTIN_SERVER_ID,
 	BUILTIN_SERVER_NAME,
@@ -35,28 +36,10 @@ export interface BuiltinToolEntry {
 	transportLabel: string;
 }
 
-export const formatProviderOptionLabel = (provider: ProviderSettings): string =>
-	`${provider.tag} · ${provider.vendor}`;
-
-export const getOpenModeAutoOpenDescription = (
-	mode: ChatOpenMode,
-	local: OpenModeLocale
-): string => {
-	switch (mode) {
-		case 'sidebar':
-			return local.chat_settings_auto_open_desc_sidebar;
-		case 'left-sidebar':
-			return local.chat_settings_auto_open_desc_left_sidebar;
-		case 'tab':
-			return local.chat_settings_auto_open_desc_tab;
-		case 'window':
-			return local.chat_settings_auto_open_desc_window;
-		case 'persistent-modal':
-			return local.chat_settings_auto_open_desc_persistent_modal;
-		default:
-			return local.chat_settings_auto_open_desc_default;
-	}
-};
+export const formatProviderOptionLabel = (
+	provider: ProviderSettings,
+	providers?: ProviderSettings[]
+): string => getProviderModelDisplayName(provider, providers);
 
 export const getMcpStatusText = (
 	status: McpServerStatus,

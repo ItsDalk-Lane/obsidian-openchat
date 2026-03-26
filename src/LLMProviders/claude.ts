@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { EmbedCache } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import {
 	arrayBufferToBase64,
 	CALLOUT_BLOCK_END,
@@ -69,8 +69,7 @@ const formatEmbed = async (embed: EmbedCache, resolveEmbedAsBinary: ResolveEmbed
 const sendRequestFuncBase = (settings: ClaudeOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		try {
-			const { parameters, ...optionsExcludingParams } = settings
-			const options = { ...optionsExcludingParams, ...parameters }
+			const options = mergeProviderOptionsWithParameters(settings)
 			const {
 				apiKey,
 				baseURL: originalBaseURL,

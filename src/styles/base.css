@@ -118,3 +118,221 @@ button.form-flow--ContextMenuFormItemMoreButton {
         height: 18px;
         font-size: 14px;
 }
+
+.provider-group-config-modal {
+        padding-top: 12px;
+}
+
+.provider-base-url-desc {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+}
+
+.provider-group-config-modal .setting-item {
+        border: none;
+        padding: 8px 0;
+}
+
+.provider-group-config-modal .setting-item:first-child {
+        padding-top: 14px;
+}
+
+.provider-group-config-modal .setting-item-control,
+.provider-group-settings-submodal .setting-item-control {
+        gap: 8px;
+        flex-wrap: wrap;
+}
+
+.provider-group-config-modal .provider-group-base-url-row .setting-item-control {
+        flex-wrap: nowrap;
+        align-items: center;
+}
+
+.provider-group-config-modal .provider-group-base-url-row .setting-item-info {
+        min-width: 0;
+        flex: 1 1 auto;
+}
+
+.provider-group-config-modal .provider-group-base-url-row input[type='text'] {
+        min-width: 0;
+        flex: 1 1 260px;
+}
+
+.provider-group-config-modal .provider-group-toolbar-row {
+        padding-top: 2px;
+        padding-bottom: 4px;
+}
+
+.provider-group-config-modal .provider-group-toolbar-row .setting-item-control {
+        gap: 6px;
+}
+
+.provider-group-config-modal .provider-group-model-row {
+        padding-top: 6px;
+        padding-bottom: 6px;
+}
+
+.provider-group-config-modal .provider-group-model-row .setting-item-control {
+        width: 100%;
+        justify-content: flex-end;
+        flex-wrap: nowrap;
+        align-items: center;
+}
+
+.provider-group-config-modal .provider-group-model-select-button {
+        flex: 1 1 240px;
+        justify-content: flex-start;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        background: var(--background-secondary);
+        color: var(--text-normal);
+        padding: 8px 12px;
+        border-radius: 10px;
+}
+
+.provider-group-config-modal .provider-group-model-input {
+        flex: 1 1 240px;
+        min-width: 0;
+}
+
+.provider-group-config-modal .provider-group-add-model-row {
+        padding-top: 12px;
+}
+
+.provider-group-empty-state {
+        padding: 10px 0;
+        color: var(--text-muted);
+}
+
+.provider-group-config-modal button,
+.provider-group-borderless-button,
+.provider-group-config-modal .extra-setting-button,
+.provider-group-settings-submodal button {
+        border: none;
+        box-shadow: none;
+        outline: none;
+        background: transparent;
+        color: var(--text-muted);
+        transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.provider-group-borderless-button:hover,
+.provider-group-config-modal .extra-setting-button:hover,
+.provider-group-settings-submodal button:hover {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+}
+
+.provider-group-borderless-button:focus-visible,
+.provider-group-config-modal .extra-setting-button:focus-visible,
+.provider-group-settings-submodal button:focus-visible {
+        box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+        color: var(--text-normal);
+}
+
+.provider-group-icon-button,
+.provider-group-config-modal .extra-setting-button {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+}
+
+.provider-group-icon-button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+}
+
+.provider-group-toolbar-button,
+.provider-group-add-model-button {
+        padding: 5px 10px;
+        min-height: 30px;
+        border-radius: 999px;
+        background: var(--background-secondary);
+        color: var(--text-normal);
+        font-size: var(--font-ui-smaller);
+        line-height: 1.2;
+}
+
+.provider-group-add-model-button {
+        padding-inline: 14px;
+        font-weight: var(--font-medium);
+}
+
+.provider-group-settings-submodal .setting-item {
+        border: none;
+        padding: 8px 0;
+}
+
+.provider-group-settings-content {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+}
+
+.provider-group-setting-dropdown {
+	min-width: 180px;
+	max-width: min(260px, 100%);
+}
+
+.provider-group-toggle-group {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 6px;
+        max-width: 100%;
+}
+
+.provider-group-toggle-chip {
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--background-secondary);
+        color: var(--text-muted);
+        font-size: var(--font-ui-smaller);
+        line-height: 1.2;
+}
+
+.provider-group-toggle-chip.is-active {
+        background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
+        color: var(--text-normal);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+}
+
+.provider-group-toggle-chip.is-disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+}
+
+.provider-group-parameters-textarea {
+        width: 100%;
+        min-height: 220px;
+        resize: vertical;
+}
+
+.provider-group-parameters-hint {
+        margin-bottom: 10px;
+        color: var(--text-muted);
+        font-size: var(--font-ui-small);
+        line-height: 1.5;
+        white-space: pre-wrap;
+}
+
+.provider-group-submodal-footer {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 12px;
+}
+
+.provider-group-settings-submodal .clickable-icon,
+.provider-group-settings-submodal .extra-setting-button {
+        color: var(--text-muted);
+}

@@ -99,6 +99,7 @@ export interface LocalPart1 {
 	folder: string;
 	form: string;
 	general_setting: string;
+	tab_models: string;
 	generate_form: string;
 	greater_than_or_equal: string;
 	greater_than: string;

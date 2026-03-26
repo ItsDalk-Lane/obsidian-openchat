@@ -4,6 +4,7 @@ import { availableVendors } from 'src/settings/ai-runtime';
 import { ChevronDown } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';
 
 interface ModelSelectorProps {
 	providers: ProviderSettings[];
@@ -266,7 +267,9 @@ export const ModelSelector = ({ providers, value, onChange }: ModelSelectorProps
 	const currentProvider = providers.find(p => p.tag === value);
 	const vendor = currentProvider ? availableVendors.find(v => v.name === currentProvider.vendor) : null;
 	const capabilityIcons = currentProvider && vendor ? getCapabilityDisplayText(vendor, currentProvider.options) : '';
-	const displayText = currentProvider ? currentProvider.tag : 'Select model';
+	const displayText = currentProvider
+		? getProviderModelDisplayName(currentProvider, providers)
+		: 'Select model';
 
 	return (
 		<div className="relative" ref={dropdownRef} style={{position: 'relative'}}>
@@ -471,7 +474,7 @@ export const ModelSelector = ({ providers, value, onChange }: ModelSelectorProps
 														whiteSpace: 'nowrap',
 														fontSize: 'var(--font-ui-small)'
 													}}>
-														{provider.tag}
+														{getProviderModelDisplayName(provider, providers)}
 													</span>
 												</div>
 												{capabilityIcons && (

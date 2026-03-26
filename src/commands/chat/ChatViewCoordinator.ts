@@ -16,6 +16,7 @@ import { DebugLogger } from 'src/utils/DebugLogger';
 export class ChatViewCoordinator {
 	private persistentModal: ChatPersistentModal | null = null;
 	private ribbonEl: HTMLElement | null = null;
+	private viewTypesRegistered = false;
 
 	constructor(
 		private readonly plugin: OpenChatPlugin,
@@ -23,10 +24,24 @@ export class ChatViewCoordinator {
 	) {}
 
 	/**
+	 * 仅注册视图类型，供插件启动时提前注册使用。
+	 * 确保 Obsidian 恢复工作区布局时能正确识别视图类型，避免显示占位图标。
+	 * 命令和 Ribbon 图标注册仍由 initialize() 完成。
+	 */
+	registerViewTypesOnly(): void {
+		if (this.viewTypesRegistered) return;
+		this.registerViews();
+		this.viewTypesRegistered = true;
+	}
+
+	/**
 	 * 初始化视图协调器
 	 */
 	initialize(): void {
-		this.registerViews();
+		if (!this.viewTypesRegistered) {
+			this.registerViews();
+			this.viewTypesRegistered = true;
+		}
 		this.registerCommands();
 		this.createRibbon();
 	}

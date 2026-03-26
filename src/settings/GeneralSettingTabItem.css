@@ -3,3 +3,10 @@
 	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 	gap: var(--size-4-4);
 }
+
+.general-settings-embedded-sections {
+	margin-top: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}

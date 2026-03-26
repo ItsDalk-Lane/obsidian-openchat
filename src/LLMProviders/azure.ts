@@ -1,6 +1,6 @@
 import OpenAI, { AzureOpenAI } from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockEnd, buildReasoningBlockStart } from './utils'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import { withToolCallLoopSupport } from 'src/core/agents/loop'
@@ -32,8 +32,7 @@ export const azureMapResponsesParams = (params: Record<string, unknown>) => {
 
 const sendRequestFuncBase = (settings: AzureOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
-		const { parameters, ...optionsExcludingParams } = settings
-		const options = { ...optionsExcludingParams, ...parameters }
+		const options = mergeProviderOptionsWithParameters(settings)
 		const { apiKey, model, endpoint, apiVersion, enableReasoning = false, ...remains } = options
 		if (!apiKey) throw new Error(t('API key is required'))
 		if (!model) throw new Error(t('Model is required'))

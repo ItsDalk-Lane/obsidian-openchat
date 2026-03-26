@@ -1,6 +1,6 @@
 import { Notice, requestUrl } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import { feedChunk } from './sse'
 
@@ -169,8 +169,7 @@ const sendRequestFunc = (settings: DoubaoImageOptions): SendRequest =>
 		resolveEmbedAsBinary: ResolveEmbedAsBinary,
 		saveAttachment?: SaveAttachment
 	) {
-		const { parameters, ...optionsExcludingParams } = settings
-		const options = { ...optionsExcludingParams, ...parameters }
+		const options = mergeProviderOptionsWithParameters(settings)
 		const { 
 			apiKey, 
 			baseURL, 

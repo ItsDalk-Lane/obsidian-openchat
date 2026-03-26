@@ -1,11 +1,12 @@
-import { Pencil, Plus, RotateCw, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { ToggleSwitch } from 'src/components/toggle-switch/ToggleSwitch'
 import { localInstance } from 'src/i18n/locals'
 import type { SkillScanResult } from 'src/services/skills'
 import type { McpServerState } from 'src/services/mcp'
 import type { SubAgentScanResult } from 'src/tools/sub-agents'
 import { getMcpStatusColor, getMcpStatusText } from './chatSettingsHelpers'
-import type { ExternalMcpEntry } from './chatSettingsModalTypes'
+import type { ExternalMcpEntry } from './chatSettingsTypes'
+import { OverflowTooltip } from './OverflowTooltip'
 
 interface McpServersSettingsTabProps {
 	externalMcpEntries: ExternalMcpEntry[]
@@ -112,9 +113,9 @@ export const McpServersSettingsTab = ({
 								</button>
 							</div>
 						</div>
-						<div className="chat-settings-server-card__desc">
+						<OverflowTooltip content={descriptionParts.join(' · ')}>
 							{descriptionParts.join(' · ')}
-						</div>
+						</OverflowTooltip>
 					</div>
 				)
 			})}
@@ -134,24 +135,6 @@ export const SkillsSettingsTab = ({
 }: SkillsSettingsTabProps) => (
 	<section className="chat-settings-panel">
 		<div className="chat-settings-subsection">
-			<div className="chat-settings-subsection__header">
-				<div>
-					<div className="chat-settings-subsection__title">{localInstance.tab_skills}</div>
-					<div className="chat-settings-field__desc">
-						{localInstance.chat_settings_skills_desc}
-					</div>
-				</div>
-				<button
-					type="button"
-					className="chat-settings-toolbar__button"
-					onClick={() => {
-						void refreshInstalledSkills()
-					}}
-				>
-					<RotateCw size={16} />
-					<span>{localInstance.chat_settings_skills_refresh}</span>
-				</button>
-			</div>
 			<div className="chat-settings-list">
 				{skillScanResult.skills.map((skill) => (
 					<div key={skill.skillFilePath} className="chat-settings-server-card">
@@ -162,10 +145,9 @@ export const SkillsSettingsTab = ({
 								</span>
 							</div>
 						</div>
-						<div className="chat-settings-server-card__desc">
+						<OverflowTooltip content={skill.metadata.description}>
 							{skill.metadata.description}
-						</div>
-						<div className="chat-settings-skill-card__path">{skill.skillFilePath}</div>
+						</OverflowTooltip>
 					</div>
 				))}
 			</div>
@@ -187,8 +169,9 @@ export const SkillsSettingsTab = ({
 								key={`${error.path}:${error.reason}`}
 								className="chat-settings-server-card"
 							>
-								<div className="chat-settings-server-card__desc">{error.reason}</div>
-								<div className="chat-settings-skill-card__path">{error.path}</div>
+								<OverflowTooltip content={error.reason}>
+									{error.reason}
+								</OverflowTooltip>
 							</div>
 						))}
 					</div>
@@ -204,26 +187,6 @@ export const SubAgentsSettingsTab = ({
 }: SubAgentsSettingsTabProps) => (
 	<section className="chat-settings-panel">
 		<div className="chat-settings-subsection">
-			<div className="chat-settings-subsection__header">
-				<div>
-					<div className="chat-settings-subsection__title">
-						{localInstance.tab_sub_agents}
-					</div>
-					<div className="chat-settings-field__desc">
-						{localInstance.chat_settings_sub_agents_desc}
-					</div>
-				</div>
-				<button
-					type="button"
-					className="chat-settings-toolbar__button"
-					onClick={() => {
-						void refreshInstalledSubAgents()
-					}}
-				>
-					<RotateCw size={16} />
-					<span>{localInstance.chat_settings_sub_agents_refresh}</span>
-				</button>
-			</div>
 			<div className="chat-settings-list">
 				{subAgentScanResult.agents.map((agent) => (
 					<div key={agent.agentFilePath} className="chat-settings-server-card">
@@ -234,9 +197,9 @@ export const SubAgentsSettingsTab = ({
 								</span>
 							</div>
 						</div>
-						<div className="chat-settings-server-card__desc">
+						<OverflowTooltip content={agent.metadata.description}>
 							{agent.metadata.description}
-						</div>
+						</OverflowTooltip>
 						<div className="chat-settings-metadata-list">
 							{agent.metadata.tools && agent.metadata.tools.length > 0 && (
 								<div className="chat-settings-metadata-row">
@@ -300,8 +263,9 @@ export const SubAgentsSettingsTab = ({
 								key={`${error.path}:${error.reason}`}
 								className="chat-settings-server-card"
 							>
-								<div className="chat-settings-server-card__desc">{error.reason}</div>
-								<div className="chat-settings-skill-card__path">{error.path}</div>
+								<OverflowTooltip content={error.reason}>
+									{error.reason}
+								</OverflowTooltip>
 							</div>
 						))}
 					</div>

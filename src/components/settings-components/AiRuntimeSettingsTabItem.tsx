@@ -1,13 +1,17 @@
 import { useEffect, useRef } from "react";
 import type OpenChatPlugin from "src/main";
-import { AiRuntimeSettingsPanel } from "src/components/settings-components/AiRuntimeSettingsPanel";
+import {
+	AiRuntimeSettingsPanel,
+	type AiRuntimeSettingsPanelOptions,
+} from "src/components/settings-components/AiRuntimeSettingsPanel";
 import { getPromptTemplatePath } from "src/utils/AIPathManager";
 
 interface Props {
 	plugin: OpenChatPlugin;
+	panelOptions?: AiRuntimeSettingsPanelOptions;
 }
 
-export const AiRuntimeSettingsTabItem = ({ plugin }: Props) => {
+export const AiRuntimeSettingsTabItem = ({ plugin, panelOptions }: Props) => {
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -33,14 +37,15 @@ export const AiRuntimeSettingsTabItem = ({ plugin }: Props) => {
 				await plugin.featureCoordinator.refreshQuickActionsCache();
 			},
 			getMcpClientManager: () => plugin.featureCoordinator.getMcpClientManager(),
-		});
+		}, panelOptions);
 
 		panel.render(containerRef.current);
 
 		return () => {
+			panel.dispose();
 			containerRef.current?.replaceChildren();
 		};
-	}, [plugin]);
+	}, [panelOptions, plugin]);
 
 	return <div ref={containerRef} />;
 };

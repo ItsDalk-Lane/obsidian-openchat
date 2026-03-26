@@ -20,9 +20,14 @@ export class ChatFeatureManager {
 	private readonly viewCoordinator: ChatViewCoordinator;
 	private readonly editorIntegration: ChatEditorIntegration;
 
-	constructor(private readonly plugin: OpenChatPlugin, runtimeDeps: ChatRuntimeDeps) {
-		this.service = new ChatService(plugin, runtimeDeps);
-		this.viewCoordinator = new ChatViewCoordinator(plugin, this.service);
+	constructor(
+		private readonly plugin: OpenChatPlugin,
+		runtimeDeps: ChatRuntimeDeps,
+		existingService?: ChatService,
+		existingViewCoordinator?: ChatViewCoordinator,
+	) {
+		this.service = existingService ?? new ChatService(plugin, runtimeDeps);
+		this.viewCoordinator = existingViewCoordinator ?? new ChatViewCoordinator(plugin, this.service);
 		this.editorIntegration = new ChatEditorIntegration(plugin, this.service);
 	}
 
@@ -42,15 +47,6 @@ export class ChatFeatureManager {
 
 		// 4. 初始化编辑器集成
 		await this.editorIntegration.initialize();
-
-		// 5. 自动打开聊天界面（如果配置了）
-		const shouldAutoOpen = initialSettings?.showSidebarByDefault ?? this.plugin.settings.chat.showSidebarByDefault;
-		if (shouldAutoOpen) {
-			const openMode = initialSettings?.openMode ?? this.plugin.settings.chat.openMode;
-			setTimeout(() => {
-				void this.viewCoordinator.activateChatView(openMode);
-			}, 300);
-		}
 	}
 
 	updateChatSettings(settings: Partial<ChatSettings>): void {

@@ -310,6 +310,22 @@ export const generateAssistantResponseForModel = async (
 	DebugLogger.logLlmMessages('ChatService.generateAssistantResponseForModel', messages, {
 		level: 'debug',
 	});
+	const requestDebugMeta = {
+		vendor: provider.vendor,
+		model: providerOptions.model,
+		baseURL: providerOptions.baseURL,
+		messageCount: messages.length,
+		requestToolsCount: requestTools.length,
+		requestToolNames: requestTools.map((tool) => tool.name),
+		readFileToolSchema: requestTools.find((tool) => tool.name === 'read_file')?.inputSchema,
+		hasToolExecutor: Boolean(providerOptions.toolExecutor),
+		enableReasoning,
+		enableThinking,
+		enableWebSearch,
+	};
+	const requestStartedAt = Date.now();
+	let firstChunkLatencyMs: number | null = null;
+	let chunkCount = 0;
 	if (shouldAttachToSession) {
 		session.messages.push(assistantMessage);
 	}
@@ -348,7 +364,27 @@ export const generateAssistantResponseForModel = async (
 		);
 	};
 
+	const appendChunk = (chunk: string) => {
+		if (firstChunkLatencyMs === null) {
+			firstChunkLatencyMs = Date.now() - requestStartedAt;
+			if (firstChunkLatencyMs >= 3000) {
+				DebugLogger.warn('[ChatService] 首包耗时偏高', {
+					...requestDebugMeta,
+					firstChunkLatencyMs,
+				});
+			}
+		}
+		chunkCount += 1;
+		assistantMessage.content += chunk;
+		session.updatedAt = Date.now();
+		options?.onChunk?.(chunk, assistantMessage);
+		if (shouldAttachToSession) {
+			deps.emitState();
+		}
+	};
+
 	try {
+		DebugLogger.warn('[ChatService] 开始请求模型', requestDebugMeta);
 		const supportsImageGeneration = deps.providerSupportsImageGeneration(provider);
 		if (supportsImageGeneration) {
 			try {
@@ -358,25 +394,25 @@ export const generateAssistantResponseForModel = async (
 					resolveEmbed,
 					saveAttachment
 				)) {
-					assistantMessage.content += chunk;
-					session.updatedAt = Date.now();
-					options?.onChunk?.(chunk, assistantMessage);
-					if (shouldAttachToSession) {
-						deps.emitState();
-					}
+					appendChunk(chunk);
 				}
 			} catch (error) {
 				deps.rethrowImageGenerationError(error);
 			}
 		} else {
 			for await (const chunk of sendRequest(messages, requestController, resolveEmbed)) {
-				assistantMessage.content += chunk;
-				session.updatedAt = Date.now();
-				options?.onChunk?.(chunk, assistantMessage);
-				if (shouldAttachToSession) {
-					deps.emitState();
-				}
+				appendChunk(chunk);
 			}
+		}
+
+		const totalDurationMs = Date.now() - requestStartedAt;
+		if (totalDurationMs >= 3000) {
+			DebugLogger.warn('[ChatService] 模型响应耗时偏高', {
+				...requestDebugMeta,
+				totalDurationMs,
+				firstChunkLatencyMs,
+				chunkCount,
+			});
 		}
 
 		DebugLogger.logLlmResponsePreview(
@@ -388,6 +424,15 @@ export const generateAssistantResponseForModel = async (
 			}
 		);
 		return assistantMessage;
+	} catch (error) {
+		DebugLogger.error('[ChatService] 模型请求失败', {
+			...requestDebugMeta,
+			totalDurationMs: Date.now() - requestStartedAt,
+			firstChunkLatencyMs,
+			chunkCount,
+			error,
+		});
+		throw error;
 	} finally {
 		if (externalSignal) {
 			externalSignal.removeEventListener('abort', abortListener);

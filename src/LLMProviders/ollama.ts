@@ -1,13 +1,14 @@
 import { Ollama } from 'ollama/browser'
 import type { EmbedCache } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { arrayBufferToBase64, getMimeTypeFromFilename, buildReasoningBlockStart, buildReasoningBlockEnd } from './utils'
 import {
 	toOpenAITools,
 	resolveCurrentTools,
 } from 'src/core/agents/loop'
 import type { ToolCallRequest } from 'src/core/agents/loop/types'
+import { normalizeProviderBaseURLForRuntime } from 'src/components/settings-components/provider-config/providerUtils'
 import { normalizeProviderError } from './errors'
 import {
 	type OllamaNativeToolCall,
@@ -171,8 +172,8 @@ const buildOllamaChatRequest = (
 const sendRequestFuncBase = (settings: BaseOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		try {
-			const { parameters, ...optionsExcludingParams } = settings
-			const options = { ...optionsExcludingParams, ...parameters } as OllamaOptions
+			const options = mergeProviderOptionsWithParameters(settings) as OllamaOptions
+			options.baseURL = normalizeProviderBaseURLForRuntime('Ollama', options.baseURL)
 			const formattedMessages = await Promise.all(
 				messages.map((msg) => formatMsgForOllama(msg, resolveEmbedAsBinary))
 			)
@@ -233,8 +234,8 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 
 	return async function* (messages, controller, resolveEmbedAsBinary) {
 		try {
-			const { parameters, ...optionsExcludingParams } = settings
-			const options = { ...optionsExcludingParams, ...parameters } as OllamaOptions
+			const options = mergeProviderOptionsWithParameters(settings) as OllamaOptions
+			options.baseURL = normalizeProviderBaseURLForRuntime('Ollama', options.baseURL)
 			const formattedMessages = await Promise.all(
 				messages.map((msg) => formatMsgForOllama(msg, resolveEmbedAsBinary))
 			)

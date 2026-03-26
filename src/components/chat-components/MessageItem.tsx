@@ -1,9 +1,9 @@
-import { Check, Copy, PenSquare, RotateCw, TextCursorInput, Trash2, X, Maximize2, Download, Highlighter, StopCircle, Pin } from 'lucide-react';
-import { TFile } from 'obsidian';
+import { Check, Copy, PenSquare, RotateCw, TextCursorInput, Trash2, X, Highlighter, StopCircle, Pin } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useObsidianApp } from 'src/contexts/obsidianAppContext';
 import type { ChatMessage, ChatMessageMetadata } from 'src/types/chat';
 import type { ChatService } from 'src/core/chat/services/ChatService';
+import { getModelDisplayNameByTag } from 'src/core/chat/services/chatProviderHelpers';
 import { MessageService } from 'src/core/chat/services/MessageService';
 import { parseContentBlocks, ContentBlock } from 'src/core/chat/utils/markdown';
 import { getEditableUserMessageContent } from 'src/core/chat/utils/userMessageEditing';
@@ -16,6 +16,7 @@ import { isPinnedChatMessage } from 'src/types/chat';
 import { SkillCallBlock } from './SkillCallBlock';
 import { SubAgentMessageFold } from './SubAgentMessageFold';
 import { DebugLogger } from 'src/utils/DebugLogger';
+import { MessageImageGallery, MessageImagePreview } from './MessageItemMedia';
 import { ReasoningBlockComponent, McpToolBlockComponent, TextBlockComponent } from './messageItemBlocks';
 
 interface MessageItemProps {
@@ -114,78 +115,12 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 
 	const handleRegenerate = () => service?.regenerateFromMessage(message.id);
 
-	// 处理图片点击，打开预览
 	const handleImageClick = (imageSrc: string) => {
 		setPreviewImage(imageSrc);
 	};
 
-	// 关闭图片预览
 	const closeImagePreview = () => {
 		setPreviewImage(null);
-	};
-
-	// 下载图片
-	const handleDownloadImage = async (imageSrc: string, index: number) => {
-		try {
-			// 如果是Obsidian附件格式，提取文件名
-			const attachmentMatch = imageSrc.match(/!\[\[(.*?)\|/);
-			let fileName = `generated-image-${index + 1}.png`;
-			
-			if (attachmentMatch) {
-				fileName = attachmentMatch[1];
-			} else if (imageSrc.startsWith('data:')) {
-				// 如果是base64格式，使用默认文件名
-				fileName = `generated-image-${index + 1}.png`;
-			} else if (imageSrc.startsWith('http')) {
-				// 如果是URL，使用URL中的文件名或默认文件名
-				const urlParts = imageSrc.split('/');
-				const urlFileName = urlParts[urlParts.length - 1];
-				fileName = urlFileName.includes('.') ? urlFileName : `generated-image-${index + 1}.png`;
-			}
-
-			if (imageSrc.startsWith('data:')) {
-				// Base64图片直接下载
-				const link = document.createElement('a');
-				link.href = imageSrc;
-				link.download = fileName;
-				document.body.appendChild(link);
-				link.click();
-				document.body.removeChild(link);
-			} else if (imageSrc.startsWith('http')) {
-				// URL图片需要先获取
-				const response = await fetch(imageSrc);
-				const blob = await response.blob();
-				const url = URL.createObjectURL(blob);
-				const link = document.createElement('a');
-				link.href = url;
-				link.download = fileName;
-				document.body.appendChild(link);
-				link.click();
-				document.body.removeChild(link);
-				URL.revokeObjectURL(url);
-			} else if (imageSrc.includes('[[') && imageSrc.includes(']]')) {
-				// Obsidian附件，尝试获取文件
-				const attachmentPath = imageSrc.match(/!\[\[(.*?)\|/)?.[1] || imageSrc.match(/!\[\[(.*?)\]\]/)?.[1];
-				if (attachmentPath) {
-					const file = app.vault.getAbstractFileByPath(attachmentPath);
-					if (file instanceof TFile) {
-						const arrayBuffer = await app.vault.readBinary(file);
-						const blob = new Blob([arrayBuffer]);
-						const url = URL.createObjectURL(blob);
-						const link = document.createElement('a');
-						link.href = url;
-						link.download = file.name;
-						document.body.appendChild(link);
-						link.click();
-						document.body.removeChild(link);
-						URL.revokeObjectURL(url);
-					}
-				}
-			}
-		} catch (error) {
-			DebugLogger.error('[MessageItem] 下载图片失败', error);
-			new Notice(localInstance.chat_download_image_failed);
-		}
 	};
 
 	const roleClass =
@@ -203,36 +138,11 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 			>
 				{/* 显示图片 */}
 				{message.images && message.images.length > 0 && (
-					<div className="message-images tw-mb-2 tw-flex tw-flex-wrap tw-gap-2">
-						{message.images.map((image, index) => (
-							<div key={index} className="tw-relative tw-group/image">
-								<img 
-									src={image} 
-									alt={`message-image-${index}`} 
-									className="message-image tw-max-w-xs tw-rounded-md tw-border tw-border-gray-300 tw-cursor-pointer hover:tw-opacity-80 tw-transition-opacity" 
-									style={{ maxHeight: '200px' }}
-									onClick={() => handleImageClick(image)}
-								/>
-								{/* 图片操作按钮 */}
-								<div className="tw-absolute tw-top-2 tw-right-2 tw-opacity-0 group-hover/image:tw-opacity-100 tw-transition-opacity tw-flex tw-gap-1">
-									<button
-										onClick={() => handleImageClick(image)}
-										className="tw-bg-black tw-bg-opacity-50 tw-text-white tw-rounded tw-p-1 tw-cursor-pointer hover:tw-bg-opacity-70"
-										title={localInstance.chat_view_large_image}
-									>
-										<Maximize2 className="tw-size-3" />
-									</button>
-									<button
-										onClick={() => handleDownloadImage(image, index)}
-										className="tw-bg-black tw-bg-opacity-50 tw-text-white tw-rounded tw-p-1 tw-cursor-pointer hover:tw-bg-opacity-70"
-										title={localInstance.chat_download_image}
-									>
-										<Download className="tw-size-3" />
-									</button>
-								</div>
-							</div>
-						))}
-					</div>
+					<MessageImageGallery
+						app={app}
+						images={message.images}
+						onPreview={handleImageClick}
+					/>
 				)}
 				
 				{/* 处理消息内容中的图片（Obsidian附件格式）*/}
@@ -259,11 +169,16 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 			{message.role === 'assistant' && message.modelTag && !hideModelTag && (() => {
 				const provider = service?.getProviders().find((p) => p.tag === message.modelTag);
 				const vendorName = provider ? availableVendors.find((v) => v.name === provider.vendor)?.name : undefined;
+				const displayName = getModelDisplayNameByTag(
+					service?.getProviders() ?? [],
+					message.modelTag,
+					message.modelName
+				);
 				return (
 					<div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
 						<ModelTag
 							modelTag={message.modelTag}
-							modelName={message.modelName}
+							modelName={displayName}
 							vendor={vendorName}
 							size="sm"
 						/>
@@ -473,24 +388,7 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 			
 			{/* 图片预览模态框 */}
 			{previewImage && (
-				<div 
-					className="tw-fixed tw-inset-0 tw-bg-black tw-bg-opacity-75 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4"
-					onClick={closeImagePreview}
-				>
-					<div className="tw-relative tw-max-w-full tw-max-h-full">
-						<img 
-							src={previewImage} 
-							alt={localInstance.chat_image_preview_alt} 
-							className="tw-max-w-full tw-max-h-full tw-object-contain tw-rounded-md"
-						/>
-						<button
-							onClick={closeImagePreview}
-							className="tw-absolute tw-top-2 tw-right-2 tw-bg-white tw-rounded-full tw-p-2 tw-shadow-lg tw-cursor-pointer hover:tw-bg-gray-100"
-						>
-							<X className="tw-size-4 tw-text-black" />
-						</button>
-					</div>
-				</div>
+				<MessageImagePreview imageSrc={previewImage} onClose={closeImagePreview} />
 			)}
 		</>
 	);

@@ -7,6 +7,7 @@ import { availableVendors } from 'src/settings/ai-runtime';
 import type { CompareGroup } from 'src/core/chat/types/multiModel';
 import { ChatService } from 'src/core/chat/services/ChatService';
 import { localInstance } from 'src/i18n/locals';
+import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';
 
 interface CompareGroupManagerDialogProps {
 	isOpen: boolean;
@@ -231,7 +232,7 @@ export const CompareGroupManagerDialog = ({
 														style={{ margin: 0 }}
 													/>
 													<span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-														{p.tag}
+														{getProviderModelDisplayName(p, providers)}
 													</span>
 													{caps && <span style={{ fontSize: 'var(--font-ui-smaller)', opacity: 0.7 }}>{caps}</span>}
 												</label>

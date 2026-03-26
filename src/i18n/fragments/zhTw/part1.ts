@@ -102,6 +102,7 @@ export const zhTwPart1 = {
 	form: "表單",
 	full_text: "全文",
 	general_setting: "通用",
+	tab_models: "模型",
 	generate_form: "生成表單",
 	greater_than: "大於",
 	greater_than_or_equal: "大於等於",

@@ -1,5 +1,5 @@
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl } from './utils'
 import { feedChunk, ParsedSSEEvent } from './sse'
 import { withToolCallLoopSupport } from 'src/core/agents/loop'
@@ -64,8 +64,7 @@ const getReasoningDeltaText = (payload: GrokSSEPayload) => {
 
 const sendRequestFunc = (settings: GrokOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
-		const { parameters, ...optionsExcludingParams } = settings
-		const options = { ...optionsExcludingParams, ...parameters }
+		const options = mergeProviderOptionsWithParameters(settings)
 		const { apiKey, baseURL, model, enableReasoning = false, ...remains } = options
 		if (!apiKey) throw new Error(t('API key is required'))
 		if (!model) throw new Error(t('Model is required'))

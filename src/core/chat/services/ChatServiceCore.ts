@@ -29,7 +29,6 @@ import {
 	type SkillDefinition,
 	type SkillScanResult,
 } from 'src/services/skills';
-import { ChatSettingsModal } from 'src/components/chat-components/ChatSettingsModal';
 import { MessageContextOptimizer } from './MessageContextOptimizer';
 import {
 	type ResolvedToolRuntime,
@@ -104,7 +103,6 @@ export abstract class ChatServiceCore {
 	protected controller: AbortController | null = null;
 	protected ollamaCapabilityCache = new Map<string, OllamaCapabilityCacheEntry>();
 	protected lastMcpNoticeAt = 0;
-	protected chatSettingsModal: ChatSettingsModal | null = null;
 	protected pendingTriggerSource: ChatTriggerSource = 'chat_input';
 	protected readonly subAgentScannerService: SubAgentScannerService;
 	protected readonly subAgentWatcherService: SubAgentWatcherService;
@@ -373,8 +371,6 @@ export abstract class ChatServiceCore {
 		selectedModels: string[];
 		layoutMode: LayoutMode;
 	};
-
-	protected abstract closeChatSettingsModal(): void;
 
 	abstract resolveProviderByTag(tag?: string): ProviderSettings | null;
 

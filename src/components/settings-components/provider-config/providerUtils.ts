@@ -9,22 +9,8 @@ import { poeVendor } from 'src/LLMProviders/poe'
 import { qianFanNormalizeBaseURL, qianFanVendor } from 'src/LLMProviders/qianFan'
 import { qwenVendor } from 'src/LLMProviders/qwen'
 import { siliconFlowVendor } from 'src/LLMProviders/siliconflow'
-import { zhipuVendor } from 'src/LLMProviders/zhipu'
-import { t } from 'src/i18n/ai-runtime/helper'
+import { isZhipuAnthropicBaseURL, zhipuVendor } from 'src/LLMProviders/zhipu'
 import type { BaseOptions } from 'src/types/provider'
-
-export const getSummary = (tag: string, defaultTag: string) =>
-	tag === defaultTag ? defaultTag : `${tag} (${defaultTag})`
-
-export const validateTag = (tag: string) => {
-	if (tag.includes('#')) {
-		return t('Provider tag must not contain #')
-	}
-	if (tag.includes(' ')) {
-		return t('Provider tag must not contain space')
-	}
-	return ''
-}
 
 export const isValidUrl = (url: string) => {
 	try {
@@ -199,6 +185,14 @@ const normalizeBaseUrl = (baseURL?: string) => {
 	return trimmed ? (trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed) : 'http://127.0.0.1:11434'
 }
 
+export const normalizeProviderBaseURLForRuntime = (vendorName: string, baseURL?: string): string => {
+	const trimmed = (baseURL || '').trim()
+	if (vendorName === 'Ollama') {
+		return normalizeBaseUrl(trimmed)
+	}
+	return trimmed
+}
+
 export const fetchOllamaLocalModels = async (baseURL?: string): Promise<string[]> => {
 	const response = await requestUrl({ url: `${normalizeBaseUrl(baseURL)}/api/tags` })
 	const models = Array.isArray(response.json?.models) ? response.json.models : []
@@ -263,10 +257,23 @@ export const MODEL_FETCH_CONFIGS: Record<string, ModelFetchConfig> = {
 	[zhipuVendor.name]: {
 		requiresApiKey: true,
 		fallbackModels: [...zhipuVendor.models],
-		buildRequest: (options) => ({
-			url: appendPath(options.baseURL, '/models', 'https://open.bigmodel.cn/api/paas/v4/models'),
-			headers: { Authorization: `Bearer ${options.apiKey}` }
-		}),
+		buildRequest: (options) => {
+			if (isZhipuAnthropicBaseURL(String(options.baseURL ?? ''))) {
+				const normalizedAnthropicBaseURL = trimTrailingSlash((options.baseURL || '').trim())
+					.replace(/\/v1(?:\/messages)?$/i, '')
+				return {
+					url: `${normalizedAnthropicBaseURL}/v1/models`,
+					headers: {
+						'x-api-key': options.apiKey,
+						'anthropic-version': '2023-06-01'
+					} as Record<string, string>
+				}
+			}
+			return {
+				url: appendPath(options.baseURL, '/models', 'https://open.bigmodel.cn/api/paas/v4/models'),
+				headers: { Authorization: `Bearer ${options.apiKey}` } as Record<string, string>
+			}
+		},
 		parseResponse: parseOpenAICompatibleModels
 	},
 	[deepSeekVendor.name]: {

@@ -1,7 +1,7 @@
 import { Notice } from 'obsidian'
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
 import { getMimeTypeFromFilename } from './utils'
 import { DebugLogger } from 'src/utils/DebugLogger'
 
@@ -34,8 +34,7 @@ const sendRequestFunc = (settings: GptImageOptions): SendRequest =>
 		resolveEmbedAsBinary: ResolveEmbedAsBinary,
 		saveAttachment?: SaveAttachment
 	) {
-		const { parameters, ...optionsExcludingParams } = settings
-		const options = { ...optionsExcludingParams, ...parameters }
+		const options = mergeProviderOptionsWithParameters(settings)
 		const { apiKey, baseURL, model, displayWidth, background, n, output_compression, output_format, quality, size } =
 			options
 		if (!apiKey) throw new Error(t('API key is required'))

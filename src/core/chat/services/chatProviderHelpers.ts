@@ -2,6 +2,7 @@ import { requestUrl } from 'obsidian';
 import { isImageGenerationModel } from 'src/LLMProviders/openRouter';
 import { availableVendors } from 'src/settings/ai-runtime';
 import type { ProviderSettings } from 'src/types/provider';
+import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';
 
 export interface OllamaCapabilityCacheEntry {
 	reasoning: boolean;
@@ -44,7 +45,21 @@ export const resolveProvider = (
 };
 
 export const getModelDisplayName = (provider: ProviderSettings): string =>
-	provider.options.model || provider.tag;
+	getProviderModelDisplayName(provider);
+
+export const getModelDisplayNameByTag = (
+	providers: ProviderSettings[],
+	tag?: string | null,
+	fallback?: string
+): string => {
+	const normalizedTag = typeof tag === 'string' ? tag : '';
+	const provider = findProviderByTagExact(providers, normalizedTag);
+	if (provider) {
+		const displayName = getProviderModelDisplayName(provider, providers);
+		return displayName || provider.tag || normalizedTag || fallback || '';
+	}
+	return fallback || normalizedTag || '';
+};
 
 export const providerSupportsImageGeneration = (
 	provider: ProviderSettings

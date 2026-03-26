@@ -260,10 +260,10 @@ export const buildProviderMessagesForAgent = async (
 		tools: requestTools,
 	});
 
-	if (messageManagement.enabled) {
-		const rawContextTokens = rawContextMessage
-			? estimateProviderMessagesTokens([rawContextMessage])
-			: 0;
+	// 消息压缩功能始终启用
+	const rawContextTokens = rawContextMessage
+		? estimateProviderMessagesTokens([rawContextMessage])
+		: 0;
 		let contextTokenEstimate = rawContextTokens;
 		let historyTokenEstimate = deps.messageContextOptimizer.estimateChatTokens(
 			requestMessages
@@ -397,25 +397,22 @@ export const buildProviderMessagesForAgent = async (
 			nextCompaction = null;
 		}
 
-		if (!rawContextMessage && nextCompaction) {
-			nextCompaction = {
-				...nextCompaction,
-				contextSummary: undefined,
-				contextSourceSignature: undefined,
-				contextTokenEstimate: undefined,
-			};
-		}
+	if (!rawContextMessage && nextCompaction) {
+		nextCompaction = {
+			...nextCompaction,
+			contextSummary: undefined,
+			contextSourceSignature: undefined,
+			contextTokenEstimate: undefined,
+		};
+	}
 
-		if (
-			nextCompaction
-			&& nextCompaction.coveredRange.messageCount === 0
-			&& !nextCompaction.summary.trim()
-			&& !nextCompaction.contextSummary
-			&& !nextCompaction.overflowedProtectedLayers
-		) {
-			nextCompaction = null;
-		}
-	} else if (session.contextCompaction) {
+	if (
+		nextCompaction
+		&& nextCompaction.coveredRange.messageCount === 0
+		&& !nextCompaction.summary.trim()
+		&& !nextCompaction.contextSummary
+		&& !nextCompaction.overflowedProtectedLayers
+	) {
 		nextCompaction = null;
 	}
 

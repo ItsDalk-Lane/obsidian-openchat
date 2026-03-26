@@ -1,14 +1,15 @@
 import { App, Setting } from 'obsidian'
-import { ollamaVendor } from 'src/LLMProviders/ollama'
-import { DebugLogger } from 'src/utils/DebugLogger'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { SelectVendorModal } from 'src/components/modals/AiRuntimeProviderModals'
-import { availableVendors, resolveToolExecutionSettings, syncToolExecutionSettings } from 'src/settings/ai-runtime'
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
 import { localInstance } from 'src/i18n/locals'
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
 import type { ChatSettings } from 'src/types/chat'
 import type { Vendor } from 'src/types/provider'
 import { renderQuickActionsSettingsSection } from 'src/components/settings-components/quick-actions/panelActions'
+import {
+	DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
+	normalizeMessageManagementSettings,
+} from 'src/types/chat'
+import { formatProviderOptionLabel } from 'src/components/chat-components/chatSettingsHelpers'
 
 const CHEVRON_SVG = `
 	<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -34,8 +35,18 @@ interface AiRuntimePanelLayoutParams {
 	promptTemplateFolder: string
 	settings: AiRuntimeSettings
 	chatSettings: ChatSettings
+	showModelSelectionSection: boolean
+	showProvidersSection: boolean
+	showProvidersPlainSection: boolean
+	showVendorApiKeysSection: boolean
+	showQuickActionsSection: boolean
+	showTabCompletionSection: boolean
+	showQuickActionsPlainSection: boolean
+	showTabCompletionPlainSection: boolean
 	setProvidersContainerEl: (container: HTMLElement) => void
-	renderProvidersGroupedByVendor: (expandLastProvider: boolean, keepOpenIndex: number) => void
+	renderProvidersGroupedByVendor: () => void
+	openCreateProviderConfigModal: () => void
+	openVendorApiKeysModal: () => void
 	getVendorApiKey: (vendor: string) => string
 	setVendorApiKey: (vendor: string, value: string) => void
 	normalizeProviderVendor: (vendor: string) => string
@@ -54,8 +65,57 @@ interface AiRuntimePanelLayoutParams {
 	setSelectionToolbarCollapsed: (value: boolean) => void
 	isTabCompletionCollapsed: () => boolean
 	setTabCompletionCollapsed: (value: boolean) => void
-	isAdvancedCollapsed: () => boolean
-	setAdvancedCollapsed: (value: boolean) => void
+}
+
+const renderModelSelectionSection = (params: AiRuntimePanelLayoutParams) => {
+	const providers = params.settings.providers ?? []
+	const providerOptions = providers.map((provider) => ({
+		value: provider.tag,
+		label: formatProviderOptionLabel(provider, providers),
+	}))
+	const messageManagement = normalizeMessageManagementSettings({
+		...DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
+		...(params.chatSettings.messageManagement ?? {}),
+	})
+
+	new Setting(params.containerEl)
+		.setName(localInstance.chat_settings_default_model)
+		.setDesc(localInstance.chat_settings_default_model_desc)
+		.addDropdown((dropdown) => {
+			if (providers.length === 0) {
+				dropdown.addOption('', localInstance.chat_settings_no_models)
+				dropdown.setValue('')
+				dropdown.setDisabled(true)
+				return
+			}
+			for (const option of providerOptions) {
+				dropdown.addOption(option.value, option.label)
+			}
+			dropdown.setValue(params.chatSettings.defaultModel || providers[0]?.tag || '')
+			dropdown.onChange((value) => {
+				void params.updateChatSettings({ defaultModel: value })
+			})
+		})
+
+	new Setting(params.containerEl)
+		.setName(localInstance.chat_settings_summary_model)
+		.setDesc(localInstance.chat_settings_summary_model_desc)
+		.addDropdown((dropdown) => {
+			dropdown.addOption('', localInstance.chat_settings_summary_model_follow_current)
+			for (const option of providerOptions) {
+				dropdown.addOption(option.value, option.label)
+			}
+			dropdown.setValue(messageManagement.summaryModelTag ?? '')
+			dropdown.setDisabled(providers.length === 0)
+			dropdown.onChange((value) => {
+				void params.updateChatSettings({
+					messageManagement: {
+						...messageManagement,
+						summaryModelTag: value || undefined,
+					},
+				})
+			})
+		})
 }
 
 const applyHeaderStyle = (headerEl: HTMLElement) => {
@@ -73,6 +133,14 @@ const applySectionStyle = (sectionEl: HTMLElement, isCollapsed: boolean) => {
 	sectionEl.style.border = '1px solid var(--background-modifier-border)'
 	sectionEl.style.borderTop = 'none'
 	sectionEl.style.display = isCollapsed ? 'none' : 'block'
+}
+
+const applyPlainSectionStyle = (sectionEl: HTMLElement) => {
+	sectionEl.style.padding = '8px'
+	sectionEl.style.backgroundColor = 'var(--background-secondary)'
+	sectionEl.style.borderRadius = '0px'
+	sectionEl.style.border = '1px solid var(--background-modifier-border)'
+	sectionEl.style.display = 'block'
 }
 
 const createChevron = (wrapper: HTMLElement, isCollapsed: boolean): HTMLElement => {
@@ -134,62 +202,25 @@ const createCollapsibleSection = (params: CollapsibleSectionParams) => {
 	return { headerSetting, sectionEl }
 }
 
-const renderVendorApiKeySection = (params: AiRuntimePanelLayoutParams): void => {
-	const { sectionEl } = createCollapsibleSection({
-		containerEl: params.containerEl,
-		name: t('Vendor API keys'),
-		desc: t('Vendor API keys description'),
-		sectionClassName: 'vendor-api-keys-container',
-		isCollapsed: params.isVendorApiKeysCollapsed,
-		setCollapsed: params.setVendorApiKeysCollapsed
-	})
-
-	const vendors = availableVendors
-		.filter((vendor) => vendor.name !== ollamaVendor.name)
-		.map((vendor) => params.normalizeProviderVendor(vendor.name))
-	const uniqueVendors = Array.from(new Set(vendors))
-
-	for (const vendorName of uniqueVendors) {
-		let inputEl: HTMLInputElement | null = null
-		let isPasswordVisible = false
-
-		new Setting(sectionEl)
-			.setName(`${vendorName} ${t('API key')}`)
-			.setDesc(t('Vendor API key empty description'))
-			.addText((text) => {
-				inputEl = text.inputEl
-				inputEl.type = 'password'
-				text
-					.setPlaceholder(t('API key'))
-					.setValue(params.getVendorApiKey(vendorName))
-					.onChange(async (value) => {
-						params.setVendorApiKey(vendorName, value)
-						await params.saveSettings()
-					})
-			})
-			.addButton((btn) => {
-				btn
-					.setIcon('eye-off')
-					.setTooltip(t('Show or hide secret'))
-					.onClick(() => {
-						isPasswordVisible = !isPasswordVisible
-						if (inputEl) {
-							inputEl.type = isPasswordVisible ? 'text' : 'password'
-						}
-						btn.setIcon(isPasswordVisible ? 'eye' : 'eye-off')
-					})
-			})
-	}
+const createPlainSectionContainer = (
+	containerEl: HTMLElement,
+	sectionClassName: string
+): HTMLElement => {
+	const sectionEl = containerEl.createDiv({ cls: sectionClassName })
+	applyPlainSectionStyle(sectionEl)
+	return sectionEl
 }
 
 const renderTabCompletionSection = (params: AiRuntimePanelLayoutParams): void => {
-	const { sectionEl } = createCollapsibleSection({
-		containerEl: params.containerEl,
-		name: t('AI Tab completion'),
-		sectionClassName: 'tab-completion-settings-container',
-		isCollapsed: params.isTabCompletionCollapsed,
-		setCollapsed: params.setTabCompletionCollapsed
-	})
+	const sectionEl = params.showTabCompletionPlainSection
+		? createPlainSectionContainer(params.containerEl, 'tab-completion-settings-container')
+		: createCollapsibleSection({
+			containerEl: params.containerEl,
+			name: t('AI Tab completion'),
+			sectionClassName: 'tab-completion-settings-container',
+			isCollapsed: params.isTabCompletionCollapsed,
+			setCollapsed: params.setTabCompletionCollapsed
+		}).sectionEl
 
 	new Setting(sectionEl)
 		.setName(t('Enable Tab completion'))
@@ -224,7 +255,7 @@ const renderTabCompletionSection = (params: AiRuntimePanelLayoutParams): void =>
 		.addDropdown((dropdown) => {
 			dropdown.addOption('', t('Auto select first available'))
 			params.settings.providers.forEach((provider) => {
-				dropdown.addOption(provider.tag, provider.tag)
+				dropdown.addOption(provider.tag, formatProviderOptionLabel(provider, params.settings.providers))
 			})
 			dropdown.setValue(params.settings.tabCompletionProviderTag ?? '')
 			dropdown.onChange(async (value) => {
@@ -290,108 +321,6 @@ const renderTabCompletionSection = (params: AiRuntimePanelLayoutParams): void =>
 		})
 }
 
-const renderAdvancedSection = (params: AiRuntimePanelLayoutParams): void => {
-	const { sectionEl } = createCollapsibleSection({
-		containerEl: params.containerEl,
-		name: t('Advanced'),
-		sectionClassName: 'advanced-settings-container',
-		isCollapsed: params.isAdvancedCollapsed,
-		setCollapsed: params.setAdvancedCollapsed
-	})
-
-	const sharedToolExecutionSettings = resolveToolExecutionSettings(params.settings)
-
-	new Setting(sectionEl)
-		.setName(localInstance.tool_execution_max_tool_calls)
-		.setDesc(localInstance.tool_execution_max_tool_calls_desc)
-		.addText((text) =>
-			text
-				.setPlaceholder(String(sharedToolExecutionSettings.maxToolCalls))
-				.setValue(String(sharedToolExecutionSettings.maxToolCalls))
-				.onChange(async (value) => {
-					const parsed = Number.parseInt(value, 10)
-					if (!Number.isFinite(parsed) || parsed < 1) {
-						return
-					}
-					syncToolExecutionSettings(params.settings, { maxToolCalls: parsed })
-					await params.saveSettings()
-				})
-		)
-
-	new Setting(sectionEl)
-		.setName(localInstance.tool_execution_timeout)
-		.setDesc(localInstance.tool_execution_timeout_desc)
-		.addText((text) =>
-			text
-				.setPlaceholder(String(sharedToolExecutionSettings.timeoutMs))
-				.setValue(String(sharedToolExecutionSettings.timeoutMs))
-				.onChange(async (value) => {
-					const parsed = Number.parseInt(value, 10)
-					if (!Number.isFinite(parsed) || parsed < 1000) {
-						return
-					}
-					syncToolExecutionSettings(params.settings, { timeoutMs: parsed })
-					await params.saveSettings()
-				})
-		)
-
-	new Setting(sectionEl)
-		.setName(t('Debug mode'))
-		.setDesc(t('Debug mode description'))
-		.addToggle((toggle) =>
-			toggle.setValue(params.settings.debugMode ?? false).onChange(async (value) => {
-				params.settings.debugMode = value
-				await params.saveSettings()
-				DebugLogger.setDebugMode(value)
-			})
-		)
-
-	new Setting(sectionEl)
-		.setName(t('LLM console log'))
-		.setDesc(t('LLM console log description'))
-		.addToggle((toggle) =>
-			toggle.setValue(params.settings.enableLlmConsoleLog ?? false).onChange(async (value) => {
-				params.settings.enableLlmConsoleLog = value
-				await params.saveSettings()
-				DebugLogger.setLlmConsoleLogEnabled(value)
-			})
-		)
-
-	new Setting(sectionEl)
-		.setName(t('LLM response preview length'))
-		.setDesc(t('LLM response preview length description'))
-		.addText((text) =>
-			text
-				.setPlaceholder('100')
-				.setValue(String(params.settings.llmResponsePreviewChars ?? 100))
-				.onChange(async (value) => {
-					const parsed = Number.parseInt(value, 10)
-					const previewChars = Number.isFinite(parsed) && parsed >= 0 ? parsed : 100
-					params.settings.llmResponsePreviewChars = previewChars
-					await params.saveSettings()
-					DebugLogger.setLlmResponsePreviewChars(previewChars)
-				})
-		)
-
-	new Setting(sectionEl)
-		.setName(t('Debug log level'))
-		.setDesc(t('Debug log level description'))
-		.addDropdown((dropdown) =>
-			dropdown
-				.addOption('debug', t('Debug log level debug option'))
-				.addOption('info', t('Debug log level info option'))
-				.addOption('warn', t('Debug log level warn option'))
-				.addOption('error', t('Debug log level error option'))
-				.setValue(params.settings.debugLevel ?? 'error')
-				.onChange(async (value) => {
-					const debugLevel = value as AiRuntimeSettings['debugLevel']
-					params.settings.debugLevel = debugLevel
-					await params.saveSettings()
-					DebugLogger.setDebugLevel(debugLevel)
-				})
-		)
-}
-
 export const renderAiRuntimeSettingsPanelLayout = (
 	params: AiRuntimePanelLayoutParams,
 	expandLastProvider = false,
@@ -399,72 +328,80 @@ export const renderAiRuntimeSettingsPanelLayout = (
 ): void => {
 	params.containerEl.empty()
 
-	const { sectionEl: providersSectionEl } = createCollapsibleSection({
-		containerEl: params.containerEl,
-		name: t('New AI assistant'),
-		desc: t('For those compatible with the OpenAI protocol, you can select OpenAI.'),
-		sectionClassName: 'ai-providers-container',
-		isCollapsed: params.isProvidersCollapsed,
-		setCollapsed: params.setProvidersCollapsed,
-		buildHeaderControls: (wrapper) => {
-			const addButton = wrapper.createEl('button', { cls: 'mod-cta' })
-			addButton.textContent = t('Add AI Provider')
-			addButton.onclick = async () => {
-				const onChoose = async (vendor: Vendor) => {
-					const defaultTag = vendor.name
-					const isTagDuplicate = params.settings.providers
-						.map((provider) => provider.tag)
-						.includes(defaultTag)
-					const newTag = isTagDuplicate ? '' : defaultTag
-					const deepCopiedOptions = JSON.parse(JSON.stringify(vendor.defaultOptions))
-					if (vendor.name !== ollamaVendor.name) {
-						deepCopiedOptions.apiKey = params.getVendorApiKey(vendor.name)
-					}
-					params.settings.providers.push({
-						tag: newTag,
-						vendor: vendor.name,
-						options: deepCopiedOptions
-					})
-					await params.saveSettings()
-					params.setProvidersCollapsed(false)
-					params.rerender(true)
-				}
-				new SelectVendorModal(params.app, availableVendors, onChoose).open()
-			}
-		}
-	})
-	params.setProvidersContainerEl(providersSectionEl)
-
-	if (!params.settings.providers.length) {
-		const emptyTip = providersSectionEl.createEl('div', { cls: 'ai-providers-empty-tip' })
-		emptyTip.textContent = t('Please add at least one AI assistant to start using the plugin.')
-		emptyTip.style.cssText = `
-			padding: 12px;
-			color: var(--text-muted);
-			font-size: var(--font-ui-small);
-			text-align: center;
-			font-style: italic;
-		`
-	} else {
-		params.renderProvidersGroupedByVendor(expandLastProvider, keepOpenIndex)
+	if (params.showModelSelectionSection) {
+		renderModelSelectionSection(params)
 	}
 
-	renderVendorApiKeySection(params)
-	renderQuickActionsSettingsSection({
-		app: params.app,
-		containerEl: params.containerEl,
-		rootContainerEl: params.rootContainerEl,
-		chatSettings: params.chatSettings,
-		providers: params.settings.providers || [],
-		promptTemplateFolder: params.promptTemplateFolder,
-		quickActionGroupExpandedState: params.quickActionGroupExpandedState,
-		resolveActiveQuickActionsListContainer: params.resolveActiveQuickActionsListContainer,
-		setActiveQuickActionsListContainer: params.setActiveQuickActionsListContainer,
-		isSelectionToolbarCollapsed: params.isSelectionToolbarCollapsed(),
-		setSelectionToolbarCollapsed: params.setSelectionToolbarCollapsed,
-		updateChatSettings: params.updateChatSettings,
-		refreshQuickActionsCache: params.refreshQuickActionsCache
-	})
-	renderTabCompletionSection(params)
-	renderAdvancedSection(params)
+	if (params.showProvidersSection) {
+		let providersSectionEl: HTMLElement
+		if (params.showProvidersPlainSection) {
+			const headerSetting = new Setting(params.containerEl)
+				.setName(t('New AI assistant'))
+			headerSetting.addButton((btn) => {
+				btn.setButtonText(t('API key'))
+					.onClick(() => {
+						params.openVendorApiKeysModal()
+					})
+			})
+			headerSetting.addButton((btn) => {
+				btn.setButtonText(t('Add AI Provider'))
+					.setCta()
+					.onClick(() => {
+						params.openCreateProviderConfigModal()
+					})
+			})
+			providersSectionEl = createPlainSectionContainer(params.containerEl, 'ai-providers-container')
+		} else {
+			const section = createCollapsibleSection({
+				containerEl: params.containerEl,
+				name: t('New AI assistant'),
+				sectionClassName: 'ai-providers-container',
+				isCollapsed: params.isProvidersCollapsed,
+				setCollapsed: params.setProvidersCollapsed,
+				buildHeaderControls: (wrapper) => {
+					const apiKeyButton = wrapper.createEl('button')
+					apiKeyButton.textContent = t('API key')
+					apiKeyButton.onclick = () => {
+						params.openVendorApiKeysModal()
+					}
+					const addButton = wrapper.createEl('button', { cls: 'mod-cta' })
+					addButton.textContent = t('Add AI Provider')
+					addButton.onclick = () => {
+						params.openCreateProviderConfigModal()
+					}
+				}
+			})
+			providersSectionEl = section.sectionEl
+		}
+		params.setProvidersContainerEl(providersSectionEl)
+
+		if (params.settings.providers.length > 0) {
+			void expandLastProvider
+			void keepOpenIndex
+			params.renderProvidersGroupedByVendor()
+		}
+	}
+
+	if (params.showQuickActionsSection) {
+		renderQuickActionsSettingsSection({
+			app: params.app,
+			containerEl: params.containerEl,
+			rootContainerEl: params.rootContainerEl,
+			chatSettings: params.chatSettings,
+			providers: params.settings.providers || [],
+			promptTemplateFolder: params.promptTemplateFolder,
+			quickActionGroupExpandedState: params.quickActionGroupExpandedState,
+			resolveActiveQuickActionsListContainer: params.resolveActiveQuickActionsListContainer,
+			setActiveQuickActionsListContainer: params.setActiveQuickActionsListContainer,
+			isSelectionToolbarCollapsed: params.isSelectionToolbarCollapsed(),
+			setSelectionToolbarCollapsed: params.setSelectionToolbarCollapsed,
+			collapsible: !params.showQuickActionsPlainSection,
+			updateChatSettings: params.updateChatSettings,
+			refreshQuickActionsCache: params.refreshQuickActionsCache
+		})
+	}
+
+	if (params.showTabCompletionSection) {
+		renderTabCompletionSection(params)
+	}
 }

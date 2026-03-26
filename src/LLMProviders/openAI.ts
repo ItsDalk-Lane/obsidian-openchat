@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import {
 	buildReasoningBlockEnd,
 	buildReasoningBlockStart,
@@ -43,8 +43,7 @@ export const openAIMapResponsesParams = (params: Record<string, unknown>) => {
 const sendRequestFunc = (settings: OpenAIOptions): SendRequest =>
 	async function* (messages: readonly Message[], controller: AbortController, resolveEmbedAsBinary: ResolveEmbedAsBinary) {
 		try {
-			const { parameters, ...optionsExcludingParams } = settings
-			const options = { ...optionsExcludingParams, ...parameters }
+			const options = mergeProviderOptionsWithParameters(settings)
 			const { apiKey, baseURL, model, enableReasoning = false, ...remains } = options
 			if (!apiKey) throw new Error(t('API key is required'))
 			const client = new OpenAI({

@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import type { ChatMessage } from '../types/chat'
 import type { ParallelResponseEntry, ParallelResponseGroup } from '../types/multiModel'
 import type { ChatService } from './ChatService'
+import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata'
 
 export const queueParallelResponseUpdate = (
 	groupId: string,
@@ -143,8 +144,11 @@ export const getModelDisplayName = (
 	modelTag: string,
 	chatService: ChatService,
 ): string => {
+	const providers = chatService.getProviders()
 	const provider = chatService.findProviderByTagExact(modelTag)
-	return provider?.options.model || provider?.tag || modelTag
+	return provider
+		? getProviderModelDisplayName(provider, providers)
+		: modelTag
 }
 
 export const createErrorMessage = (

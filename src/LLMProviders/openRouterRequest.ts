@@ -2,6 +2,7 @@ import { Notice } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import type {
+	mergeProviderOptionsWithParameters,
 	Message,
 	ResolveEmbedAsBinary,
 	SaveAttachment,
@@ -23,8 +24,7 @@ export const createOpenRouterSendRequest = (settings: OpenRouterOptions): SendRe
 		saveAttachment?: SaveAttachment,
 	) {
 		try {
-			const { parameters, ...optionsExcludingParams } = settings
-			const options = { ...optionsExcludingParams, ...parameters }
+			const options = mergeProviderOptionsWithParameters(settings)
 			const {
 				apiKey,
 				baseURL,
@@ -89,7 +89,11 @@ export const createOpenRouterSendRequest = (settings: OpenRouterOptions): SendRe
 				Object.assign(data, remainsRecord)
 				if (enableReasoning) {
 					data.reasoning = { effort: reasoningEffort }
-					new Notice(`${getCapabilityEmoji('Reasoning')}推理模式 (${reasoningEffort}) - 模型: ${model}`)
+					new Notice(
+						`${getCapabilityEmoji('Reasoning')}${t('Reasoning mode notice')
+							.replace('{effort}', String(reasoningEffort))
+							.replace('{model}', String(model))}`
+					)
 				}
 			} else {
 				data.messages = formattedMessages
@@ -102,7 +106,7 @@ export const createOpenRouterSendRequest = (settings: OpenRouterOptions): SendRe
 				if (imageAspectRatio) {
 					data.image_config = { aspect_ratio: imageAspectRatio }
 				}
-				new Notice(`${getCapabilityEmoji('Image Generation')}图像生成模式`)
+				new Notice(`${getCapabilityEmoji('Image Generation')}${t('Image generation mode')}`)
 			}
 
 			if (enableWebSearch && !supportsImageGeneration) {
@@ -111,7 +115,7 @@ export const createOpenRouterSendRequest = (settings: OpenRouterOptions): SendRe
 				if (webSearchMaxResults !== 5) webPlugin.max_results = webSearchMaxResults
 				if (webSearchPrompt) webPlugin.search_prompt = webSearchPrompt
 				data.plugins = [webPlugin]
-				new Notice(`${getCapabilityEmoji('Web Search')}Web Search`)
+				new Notice(`${getCapabilityEmoji('Web Search')}${t('Web search mode')}`)
 			}
 
 			const response = await withRetry(

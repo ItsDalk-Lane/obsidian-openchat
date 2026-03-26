@@ -102,6 +102,7 @@ export const enPart1 = {
 	form: "Form",
 	full_text: "Full text",
 	general_setting: "General",
+	tab_models: "Models",
 	generate_form: "Generate form",
 	greater_than: "Greater than",
 	greater_than_or_equal: "Greater than or equal",

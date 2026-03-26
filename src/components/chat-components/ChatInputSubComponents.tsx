@@ -3,6 +3,7 @@ import { localInstance } from 'src/i18n/locals';
 import type { SelectedFile, SelectedFolder } from 'src/core/chat/types/chat';
 import { ModelTag } from './ModelTag';
 import { availableVendors } from 'src/settings/ai-runtime';
+import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';
 
 // ---- InfoTags ----
 
@@ -151,6 +152,9 @@ export const ChatInputFileTags = ({
 interface ProviderForHint {
         tag: string;
         vendor: string;
+        options?: {
+                parameters?: Record<string, unknown>;
+        };
 }
 
 interface ChatInputSelectedModelsHintProps {
@@ -174,10 +178,12 @@ export const ChatInputSelectedModelsHint = ({
                                 {selectedModels.map((tag) => {
                                         const p = providers.find((prov) => prov.tag === tag);
                                         const vendorName = p ? availableVendors.find((v) => v.name === p.vendor)?.name : undefined;
+                                                                                                                                                const displayName = p ? getProviderModelDisplayName(p, providers) : tag;
                                         return (
                                                 <ModelTag
                                                         key={tag}
                                                         modelTag={tag}
+                                                                                                                modelName={displayName}
                                                         vendor={vendorName}
                                                         size="sm"
                                                         onClick={() => onRemoveModel(tag)}

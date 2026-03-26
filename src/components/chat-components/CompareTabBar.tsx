@@ -1,5 +1,6 @@
 import { Loader2, X } from 'lucide-react';
 import { ChatService } from 'src/core/chat/services/ChatService';
+import { getModelDisplayNameByTag } from 'src/core/chat/services/chatProviderHelpers';
 import { availableVendors } from 'src/settings/ai-runtime';
 import { localInstance } from 'src/i18n/locals';
 
@@ -10,11 +11,6 @@ interface CompareTabBarProps {
 	streamingTags: Set<string>;
 	errorTags: Set<string>;
 	service: ChatService;
-}
-
-function getShortName(tag: string): string {
-	const parts = tag.split('/');
-	return parts[parts.length - 1];
 }
 
 function getVendorColor(vendor?: string) {
@@ -45,8 +41,7 @@ export const CompareTabBar = ({
 	};
 
 	const getModelName = (modelTag: string): string => {
-		const provider = service.getProviders().find((p) => p.tag === modelTag);
-		return provider?.options?.model || getShortName(modelTag);
+		return getModelDisplayNameByTag(service.getProviders(), modelTag);
 	};
 
 	if (models.length === 0) {
@@ -88,7 +83,7 @@ export const CompareTabBar = ({
 									: colors.bg,
 							}}
 						/>
-						<span className="tw-max-w-[120px] tw-truncate" title={modelTag}>
+						<span className="tw-max-w-[120px] tw-truncate" title={displayName}>
 							{displayName}
 						</span>
 						{isStreaming && (

@@ -5,6 +5,7 @@ import { useObsidianApp } from 'src/contexts/obsidianAppContext';
 import type { ChatMessage } from 'src/types/chat';
 import type { LayoutMode, ParallelResponseGroup } from 'src/core/chat/types/multiModel';
 import { ChatService } from 'src/core/chat/services/ChatService';
+import { getModelDisplayNameByTag } from 'src/core/chat/services/chatProviderHelpers';
 import { ModelTag } from './ModelTag';
 import { renderMarkdownContent, parseContentBlocks, ContentBlock } from 'src/core/chat/utils/markdown';
 import { availableVendors } from 'src/settings/ai-runtime';
@@ -24,6 +25,10 @@ function resolveVendor(tag: string, service: ChatService): string | undefined {
 	return p ? availableVendors.find((v) => v.name === p.vendor)?.name : undefined;
 }
 
+function resolveDisplayName(tag: string, service: ChatService, fallback?: string): string {
+	return getModelDisplayNameByTag(service.getProviders(), tag, fallback);
+}
+
 interface SingleResponseProps {
 	message: ChatMessage;
 	service: ChatService;
@@ -41,6 +46,7 @@ const SingleResponse = ({ message, service, isStreaming, isError, compact }: Sin
 	}, [message.content]);
 
 	const vendor = resolveVendor(message.modelTag ?? '', service);
+	const displayName = resolveDisplayName(message.modelTag ?? '', service, message.modelName);
 
 	return (
 		<div className={`parallel-response-item ${isError ? 'parallel-response-item--error' : ''}`}>
@@ -53,7 +59,7 @@ const SingleResponse = ({ message, service, isStreaming, isError, compact }: Sin
 				<div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
 					<ModelTag
 						modelTag={message.modelTag ?? ''}
-						modelName={message.modelName}
+						modelName={displayName}
 						vendor={vendor}
 						isGenerating={isStreaming}
 						isError={isError}
@@ -219,6 +225,7 @@ export const ParallelResponseViewer = ({
 					{messages.map((msg, idx) => {
 						const isActive = idx === safeIdx;
 						const vendor = resolveVendor(msg.modelTag ?? '', service);
+						const displayName = resolveDisplayName(msg.modelTag ?? '', service, msg.modelName);
 						return (
 							<button
 								key={msg.id}
@@ -234,7 +241,7 @@ export const ParallelResponseViewer = ({
 							>
 								<ModelTag
 									modelTag={msg.modelTag ?? ''}
-									modelName={msg.modelName}
+									modelName={displayName}
 									vendor={vendor}
 									isGenerating={streamingTags.has(msg.modelTag ?? '')}
 									isError={errorTags.has(msg.modelTag ?? '') || !!msg.isError}

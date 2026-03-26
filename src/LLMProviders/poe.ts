@@ -3,7 +3,7 @@
 import OpenAI from 'openai'
 import { Platform } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { resolveCurrentMcpTools } from 'src/services/mcp/mcpToolCallHandler'
 
 import {
@@ -141,8 +141,7 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 		resolveEmbedAsBinary: ResolveEmbedAsBinary
 	) {
 		try {
-			const { parameters, ...optionsExcludingParams } = settings
-			const options = { ...optionsExcludingParams, ...parameters }
+			const options = mergeProviderOptionsWithParameters(settings)
 			const {
 				apiKey,
 				baseURL,

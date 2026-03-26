@@ -20,6 +20,10 @@ export default class OpenChatPlugin extends Plugin {
 
 
 	async onload() {
+		// 在任何 await 之前同步注册聊天视图类型
+		// 确保 Obsidian 恢复工作区布局时能立即识别视图，消除标题栏占位图标
+		this.featureCoordinator.registerChatViewTypesEarly();
+
 		this.settings = await this.settingsController.loadSettings();
 		this.addSettingTab(new PluginSettingTab(this));
 		this.featureCoordinator.initializeAiRuntime(this.settings);

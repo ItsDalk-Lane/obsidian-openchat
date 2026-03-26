@@ -1,19 +1,23 @@
 import { Setting } from "obsidian";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { localInstance } from "src/i18n/locals";
 import FolderSuggest from "src/components/combobox/FolderSuggest";
 import OpenChatPlugin from "src/main";
 import { DEFAULT_SETTINGS } from "./PluginSettings";
+import { t } from "src/i18n/ai-runtime/helper";
+import { DebugLogger } from "src/utils/DebugLogger";
+import { resolveToolExecutionSettings, syncToolExecutionSettings } from "src/settings/ai-runtime";
 import "./GeneralSettingTabItem.css";
 
-export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin }) {
-	const { plugin } = props;
+export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?: ReactNode }) {
+	const { plugin, children } = props;
 	const settings = {
 		...DEFAULT_SETTINGS,
 		...plugin.settings,
 	};
 	const app = plugin.app;
 	const formRef = useRef<HTMLDivElement>(null);
+	const debugSettingsRef = useRef<HTMLDivElement>(null);
 
 	const [settingsValue, setSettingsValue] = useState(settings);
 	useEffect(() => {
@@ -70,6 +74,115 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin }) {
 				});
 			});
 
+		// Tool execution settings
+		const aiRuntime = plugin.settings.aiRuntime;
+		const sharedToolExecutionSettings = resolveToolExecutionSettings(aiRuntime);
+
+		new Setting(el)
+			.setName(localInstance.tool_execution_max_tool_calls)
+			.setDesc(localInstance.tool_execution_max_tool_calls_desc)
+			.addText((text) =>
+				text
+					.setPlaceholder(String(sharedToolExecutionSettings.maxToolCalls))
+					.setValue(String(sharedToolExecutionSettings.maxToolCalls))
+					.onChange(async (value) => {
+						const parsed = Number.parseInt(value, 10);
+						if (!Number.isFinite(parsed) || parsed < 1) {
+							return;
+						}
+						syncToolExecutionSettings(plugin.settings.aiRuntime, { maxToolCalls: parsed });
+						await plugin.saveSettings();
+					})
+			);
+
+		new Setting(el)
+			.setName(localInstance.tool_execution_timeout)
+			.setDesc(localInstance.tool_execution_timeout_desc)
+			.addText((text) =>
+				text
+					.setPlaceholder(String(sharedToolExecutionSettings.timeoutMs))
+					.setValue(String(sharedToolExecutionSettings.timeoutMs))
+					.onChange(async (value) => {
+						const parsed = Number.parseInt(value, 10);
+						if (!Number.isFinite(parsed) || parsed < 1000) {
+							return;
+						}
+						syncToolExecutionSettings(plugin.settings.aiRuntime, { timeoutMs: parsed });
+						await plugin.saveSettings();
+					})
+			);
+
+		return () => {
+			el.empty();
+		};
+	}, [plugin.manifest.version]);
+
+	// Debug settings - rendered after children
+	useEffect(() => {
+		if (!debugSettingsRef.current) {
+			return;
+		}
+		const el = debugSettingsRef.current;
+		el.empty();
+
+		const aiRuntime = plugin.settings.aiRuntime;
+
+		new Setting(el)
+			.setName(t('Debug mode'))
+			.setDesc(t('Debug mode description'))
+			.addToggle((toggle) =>
+				toggle.setValue(aiRuntime.debugMode ?? false).onChange(async (value) => {
+					plugin.settings.aiRuntime.debugMode = value;
+					await plugin.saveSettings();
+					DebugLogger.setDebugMode(value);
+				})
+			);
+
+		new Setting(el)
+			.setName(t('LLM console log'))
+			.setDesc(t('LLM console log description'))
+			.addToggle((toggle) =>
+				toggle.setValue(aiRuntime.enableLlmConsoleLog ?? false).onChange(async (value) => {
+					plugin.settings.aiRuntime.enableLlmConsoleLog = value;
+					await plugin.saveSettings();
+					DebugLogger.setLlmConsoleLogEnabled(value);
+				})
+			);
+
+		new Setting(el)
+			.setName(t('LLM response preview length'))
+			.setDesc(t('LLM response preview length description'))
+			.addText((text) =>
+				text
+					.setPlaceholder('100')
+					.setValue(String(aiRuntime.llmResponsePreviewChars ?? 100))
+					.onChange(async (value) => {
+						const parsed = Number.parseInt(value, 10);
+						const previewChars = Number.isFinite(parsed) && parsed >= 0 ? parsed : 100;
+						plugin.settings.aiRuntime.llmResponsePreviewChars = previewChars;
+						await plugin.saveSettings();
+						DebugLogger.setLlmResponsePreviewChars(previewChars);
+					})
+			);
+
+		new Setting(el)
+			.setName(t('Debug log level'))
+			.setDesc(t('Debug log level description'))
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption('debug', t('Debug log level debug option'))
+					.addOption('info', t('Debug log level info option'))
+					.addOption('warn', t('Debug log level warn option'))
+					.addOption('error', t('Debug log level error option'))
+					.setValue(aiRuntime.debugLevel ?? 'error')
+					.onChange(async (value) => {
+						const debugLevel = value as typeof aiRuntime.debugLevel;
+						plugin.settings.aiRuntime.debugLevel = debugLevel;
+						await plugin.saveSettings();
+						DebugLogger.setDebugLevel(debugLevel);
+					})
+			);
+
 		return () => {
 			el.empty();
 		};
@@ -78,6 +191,8 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin }) {
 	return (
 		<div>
 			<div ref={formRef}></div>
+			{children ? <div className="general-settings-embedded-sections">{children}</div> : null}
+			<div ref={debugSettingsRef}></div>
 		</div>
 	);
 }

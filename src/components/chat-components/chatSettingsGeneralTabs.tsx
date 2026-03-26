@@ -3,7 +3,6 @@ import type { App } from 'obsidian'
 import { Copy } from 'lucide-react'
 import { ToggleSwitch } from 'src/components/toggle-switch/ToggleSwitch'
 import { SystemPromptManagerPanel } from 'src/components/system-prompt-components/SystemPromptManagerModal'
-import type { ChatService } from 'src/core/chat/services/ChatService'
 import { localInstance } from 'src/i18n/locals'
 import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
 import type { McpSettings, McpToolInfo } from 'src/services/mcp'
@@ -13,18 +12,15 @@ import {
 	type ChatSettings,
 	type MessageManagementSettings,
 } from 'src/types/chat'
-import { getOpenModeAutoOpenDescription } from './chatSettingsHelpers'
-import type { ProviderOption } from './chatSettingsModalTypes'
+import './ChatSettingsModal.css'
 
 interface AiChatSettingsTabProps {
 	chatSettings: ChatSettings
-	providers: AiRuntimeSettings['providers']
-	providerOptions: ProviderOption[]
-	resolvedContextBudget: ReturnType<ChatService['getResolvedContextBudget']>
 	messageManagement: MessageManagementSettings
 	recentTurnsDraft: string | null
 	setRecentTurnsDraft: Dispatch<SetStateAction<string | null>>
 	persistChatSettings: (partial: Partial<ChatSettings>) => Promise<boolean>
+	embedded?: boolean
 }
 
 interface SystemPromptSettingsTabProps {
@@ -51,313 +47,199 @@ const getOpenModeOptions = (): Array<{ value: ChatOpenMode; label: string }> => 
 
 export const AiChatSettingsTab = ({
 	chatSettings,
-	providers,
-	providerOptions,
-	resolvedContextBudget,
 	messageManagement,
 	recentTurnsDraft,
 	setRecentTurnsDraft,
 	persistChatSettings,
+	embedded = false,
 }: AiChatSettingsTabProps) => (
-	<section className="chat-settings-panel">
+	<section className={`chat-settings-panel${embedded ? ' chat-settings-panel--embedded' : ''}`}>
 		<div className="chat-settings-fields">
-			<label className="chat-settings-field">
-				<span className="chat-settings-field__title">
-					{localInstance.chat_settings_default_model}
-				</span>
-				<span className="chat-settings-field__desc">
-					{localInstance.chat_settings_default_model_desc}
-				</span>
-				<select
-					className="chat-settings-input"
-					value={chatSettings.defaultModel || providers[0]?.tag || ''}
-					disabled={providers.length === 0}
-					onChange={(event) => {
-						void persistChatSettings({ defaultModel: event.target.value })
-					}}
-				>
-					{providers.length === 0 ? (
-						<option value="">{localInstance.chat_settings_no_models}</option>
-					) : (
-						providerOptions.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-						))
-					)}
-				</select>
-			</label>
-
-			<div className="chat-settings-switch">
-				<div>
-					<div className="chat-settings-field__title">
-						{localInstance.chat_settings_autosave}
+			<div className="chat-settings-card-group">
+				<div className="chat-settings-switch">
+					<div>
+						<div className="chat-settings-field__title">
+							{localInstance.chat_settings_show_ribbon_icon}
+						</div>
+						<div className="chat-settings-field__desc">
+							{localInstance.chat_settings_show_ribbon_icon_desc}
+						</div>
 					</div>
-					<div className="chat-settings-field__desc">
-						{localInstance.chat_settings_autosave_desc}
-					</div>
-				</div>
-				<ToggleSwitch
-					checked={chatSettings.autosaveChat}
-					onChange={(checked) => {
-						void persistChatSettings({ autosaveChat: checked })
-					}}
-					ariaLabel={localInstance.chat_settings_autosave}
-				/>
-			</div>
-
-			<label className="chat-settings-field">
-				<span className="chat-settings-field__title">
-					{localInstance.chat_settings_open_mode}
-				</span>
-				<span className="chat-settings-field__desc">
-					{localInstance.chat_settings_open_mode_desc}
-				</span>
-				<select
-					className="chat-settings-input"
-					value={chatSettings.openMode}
-					onChange={(event) => {
-						void persistChatSettings({
-							openMode: event.target.value as ChatOpenMode,
-						})
-					}}
-				>
-					{getOpenModeOptions().map((option) => (
-						<option key={option.value} value={option.value}>
-							{option.label}
-						</option>
-					))}
-				</select>
-			</label>
-
-			<div className="chat-settings-switch">
-				<div>
-					<div className="chat-settings-field__title">
-						{localInstance.chat_settings_auto_open}
-					</div>
-					<div className="chat-settings-field__desc">
-						{getOpenModeAutoOpenDescription(chatSettings.openMode, localInstance)}
-					</div>
-				</div>
-				<ToggleSwitch
-					checked={chatSettings.showSidebarByDefault}
-					onChange={(checked) => {
-						void persistChatSettings({ showSidebarByDefault: checked })
-					}}
-					ariaLabel={localInstance.chat_settings_auto_open}
-				/>
-			</div>
-
-			<div className="chat-settings-switch">
-				<div>
-					<div className="chat-settings-field__title">
-						{localInstance.chat_settings_auto_add_active_file}
-					</div>
-					<div className="chat-settings-field__desc">
-						{localInstance.chat_settings_auto_add_active_file_desc}
-					</div>
-				</div>
-				<ToggleSwitch
-					checked={chatSettings.autoAddActiveFile ?? true}
-					onChange={(checked) => {
-						void persistChatSettings({ autoAddActiveFile: checked })
-					}}
-					ariaLabel={localInstance.chat_settings_auto_add_active_file}
-				/>
-			</div>
-
-			<div className="chat-settings-switch">
-				<div>
-					<div className="chat-settings-field__title">
-						{localInstance.chat_settings_show_ribbon_icon}
-					</div>
-					<div className="chat-settings-field__desc">
-						{localInstance.chat_settings_show_ribbon_icon_desc}
-					</div>
-				</div>
-				<ToggleSwitch
-					checked={chatSettings.showRibbonIcon ?? true}
-					onChange={(checked) => {
-						void persistChatSettings({ showRibbonIcon: checked })
-					}}
-					ariaLabel={localInstance.chat_settings_show_ribbon_icon}
-				/>
-			</div>
-
-			<div className="chat-settings-grid">
-				<label className="chat-settings-field">
-					<span className="chat-settings-field__title">
-						{localInstance.chat_modal_width}
-					</span>
-					<span className="chat-settings-field__desc">
-						{localInstance.chat_modal_width_desc}
-					</span>
-					<input
-						className="chat-settings-input"
-						type="number"
-						min={1}
-						value={chatSettings.chatModalWidth ?? 700}
-						onChange={(event) => {
-							const nextValue = Number.parseInt(event.target.value, 10)
-							if (Number.isFinite(nextValue) && nextValue > 0) {
-								void persistChatSettings({ chatModalWidth: nextValue })
-							}
+					<ToggleSwitch
+						checked={chatSettings.showRibbonIcon ?? true}
+						onChange={(checked) => {
+							void persistChatSettings({ showRibbonIcon: checked })
 						}}
+						ariaLabel={localInstance.chat_settings_show_ribbon_icon}
 					/>
-				</label>
+				</div>
 
-				<label className="chat-settings-field">
-					<span className="chat-settings-field__title">
-						{localInstance.chat_modal_height}
-					</span>
-					<span className="chat-settings-field__desc">
-						{localInstance.chat_modal_height_desc}
-					</span>
-					<input
-						className="chat-settings-input"
-						type="number"
-						min={1}
-						value={chatSettings.chatModalHeight ?? 500}
-						onChange={(event) => {
-							const nextValue = Number.parseInt(event.target.value, 10)
-							if (Number.isFinite(nextValue) && nextValue > 0) {
-								void persistChatSettings({ chatModalHeight: nextValue })
-							}
+				<div className="chat-settings-switch">
+					<div>
+						<div className="chat-settings-field__title">
+							{localInstance.chat_settings_autosave}
+						</div>
+						<div className="chat-settings-field__desc">
+							{localInstance.chat_settings_autosave_desc}
+						</div>
+					</div>
+					<ToggleSwitch
+						checked={chatSettings.autosaveChat}
+						onChange={(checked) => {
+							void persistChatSettings({ autosaveChat: checked })
 						}}
+						ariaLabel={localInstance.chat_settings_autosave}
 					/>
-				</label>
-			</div>
+				</div>
 
 			<div className="chat-settings-switch">
-				<div>
-					<div className="chat-settings-field__title">
-						{localInstance.chat_settings_message_management}
+					<div>
+						<div className="chat-settings-field__title">
+							{localInstance.chat_settings_auto_add_active_file}
+						</div>
+						<div className="chat-settings-field__desc">
+							{localInstance.chat_settings_auto_add_active_file_desc}
+						</div>
 					</div>
-					<div className="chat-settings-field__desc">
-						{localInstance.chat_settings_message_management_desc}
-					</div>
+					<ToggleSwitch
+						checked={chatSettings.autoAddActiveFile ?? true}
+						onChange={(checked) => {
+							void persistChatSettings({ autoAddActiveFile: checked })
+						}}
+						ariaLabel={localInstance.chat_settings_auto_add_active_file}
+					/>
 				</div>
-				<ToggleSwitch
-					checked={messageManagement.enabled}
-					onChange={(checked) => {
-						void persistChatSettings({
-							messageManagement: {
-								...messageManagement,
-								enabled: checked,
-							},
-						})
-					}}
-					ariaLabel={localInstance.chat_settings_message_management}
-				/>
 			</div>
 
-			<div className="chat-settings-grid">
-				<label className="chat-settings-field chat-settings-field--section">
-					<span className="chat-settings-field__title">
-						{localInstance.chat_settings_auto_context_budget}
+			<div className="chat-settings-card-group">
+				<label className="chat-settings-card-row">
+					<span className="chat-settings-card-row__meta">
+						<span className="chat-settings-field__title">
+							{localInstance.chat_settings_open_mode}
+						</span>
+						<span className="chat-settings-field__desc">
+							{localInstance.chat_settings_open_mode_desc}
+						</span>
 					</span>
-					<span className="chat-settings-field__desc">
-						{localInstance.chat_settings_auto_context_budget_desc}
-					</span>
-					<div className="chat-settings-input">
-						<div>
-							{localInstance.chat_settings_auto_context_budget_usable}:{' '}
-							{resolvedContextBudget.usableInputTokens.toLocaleString()}
-						</div>
-						<div>
-							{localInstance.chat_settings_auto_context_budget_trigger}:{' '}
-							{resolvedContextBudget.triggerTokens.toLocaleString()}
-						</div>
-						<div>
-							{localInstance.chat_settings_auto_context_budget_target}:{' '}
-							{resolvedContextBudget.targetTokens.toLocaleString()}
-						</div>
-						<div>
-							{localInstance.chat_settings_auto_context_budget_reserve}:{' '}
-							{resolvedContextBudget.reserveForOutput.toLocaleString()}
-						</div>
-					</div>
-				</label>
-
-				<label className="chat-settings-field chat-settings-field--section">
-					<span className="chat-settings-field__title">
-						{localInstance.chat_settings_summary_model}
-					</span>
-					<span className="chat-settings-field__desc">
-						{localInstance.chat_settings_summary_model_desc}
-					</span>
-					<select
-						className="chat-settings-input"
-						value={messageManagement.summaryModelTag ?? ''}
-						onChange={(event) => {
-							void persistChatSettings({
-								messageManagement: {
-									...messageManagement,
-									summaryModelTag: event.target.value || undefined,
-								},
-							})
-						}}
-					>
-						<option value="">
-							{localInstance.chat_settings_summary_model_follow_current}
-						</option>
-						{providerOptions.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-						))}
-					</select>
-				</label>
-
-				<label className="chat-settings-field chat-settings-field--section">
-					<span className="chat-settings-field__title">
-						{localInstance.chat_settings_recent_turns}
-					</span>
-					<span className="chat-settings-field__desc">
-						{localInstance.chat_settings_recent_turns_desc}
-					</span>
-					<input
-						className="chat-settings-input"
-						type="number"
-						min={1}
-						step={1}
-						value={recentTurnsDraft ?? messageManagement.recentTurns}
-						onChange={(event) => {
-							setRecentTurnsDraft(event.target.value)
-						}}
-						onFocus={() => {
-							setRecentTurnsDraft(String(messageManagement.recentTurns))
-						}}
-						onBlur={() => {
-							if (recentTurnsDraft === null) {
-								return
-							}
-							const draft = recentTurnsDraft.trim()
-							if (draft === '') {
-								setRecentTurnsDraft(null)
-								return
-							}
-							const nextValue = Number.parseInt(draft, 10)
-							if (Number.isFinite(nextValue) && nextValue > 0) {
+					<span className="chat-settings-card-row__control">
+						<select
+							className="chat-settings-input"
+							value={chatSettings.openMode}
+							onChange={(event) => {
 								void persistChatSettings({
-									messageManagement: {
-										...messageManagement,
-										recentTurns: nextValue,
-									},
+									openMode: event.target.value as ChatOpenMode,
 								})
-							}
-							setRecentTurnsDraft(null)
-						}}
-						onKeyDown={(event) => {
-							if (event.key === 'Enter') {
-								event.currentTarget.blur()
-							}
-						}}
-						onWheel={(event) => {
-							event.currentTarget.blur()
-						}}
-					/>
+							}}
+						>
+							{getOpenModeOptions().map((option) => (
+								<option key={option.value} value={option.value}>
+									{option.label}
+								</option>
+							))}
+						</select>
+					</span>
 				</label>
+
+			</div>
+
+			<div className="chat-settings-card-group">
+				<label className="chat-settings-card-row">
+					<span className="chat-settings-card-row__meta">
+						<span className="chat-settings-field__title">
+							{localInstance.chat_settings_recent_turns}
+						</span>
+						<span className="chat-settings-field__desc">
+							{localInstance.chat_settings_recent_turns_desc}
+						</span>
+					</span>
+					<span className="chat-settings-card-row__control">
+						<input
+							className="chat-settings-input"
+							type="number"
+							min={1}
+							step={1}
+							value={recentTurnsDraft ?? messageManagement.recentTurns}
+							onChange={(event) => {
+								setRecentTurnsDraft(event.target.value)
+							}}
+							onFocus={() => {
+								setRecentTurnsDraft(String(messageManagement.recentTurns))
+							}}
+							onBlur={() => {
+								if (recentTurnsDraft === null) {
+									return
+								}
+								const draft = recentTurnsDraft.trim()
+								if (draft === '') {
+									setRecentTurnsDraft(null)
+									return
+								}
+								const nextValue = Number.parseInt(draft, 10)
+								if (Number.isFinite(nextValue) && nextValue > 0) {
+									void persistChatSettings({
+										messageManagement: {
+											...messageManagement,
+											recentTurns: nextValue,
+										},
+									})
+								}
+								setRecentTurnsDraft(null)
+							}}
+							onKeyDown={(event) => {
+								if (event.key === 'Enter') {
+									event.currentTarget.blur()
+								}
+							}}
+							onWheel={(event) => {
+								event.currentTarget.blur()
+							}}
+						/>
+					</span>
+				</label>
+
+				<div className="chat-settings-card-row">
+					<span className="chat-settings-card-row__meta">
+						<span className="chat-settings-field__title">
+							{localInstance.chat_modal_dimensions}
+						</span>
+					</span>
+					<span className="chat-settings-card-row__control chat-settings-dimensions-control">
+						<div className="chat-settings-dimension-input">
+							<span className="chat-settings-dimension-label">
+								{localInstance.chat_modal_width_label}
+							</span>
+							<input
+								className="chat-settings-input"
+								type="number"
+								min={1}
+								value={chatSettings.chatModalWidth ?? 700}
+								onChange={(event) => {
+									const nextValue = Number.parseInt(event.target.value, 10)
+									if (Number.isFinite(nextValue) && nextValue > 0) {
+										void persistChatSettings({ chatModalWidth: nextValue })
+									}
+								}}
+							/>
+						</div>
+						<div className="chat-settings-dimension-input">
+							<span className="chat-settings-dimension-label">
+								{localInstance.chat_modal_height_label}
+							</span>
+							<input
+								className="chat-settings-input"
+								type="number"
+								min={1}
+								value={chatSettings.chatModalHeight ?? 500}
+								onChange={(event) => {
+									const nextValue = Number.parseInt(event.target.value, 10)
+									if (Number.isFinite(nextValue) && nextValue > 0) {
+										void persistChatSettings({ chatModalHeight: nextValue })
+									}
+								}}
+							/>
+						</div>
+					</span>
+				</div>
 			</div>
 		</div>
 	</section>

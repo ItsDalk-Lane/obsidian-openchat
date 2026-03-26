@@ -1,32 +1,21 @@
 import { App } from 'obsidian'
 import { renderAiRuntimeSettingsPanelLayout } from 'src/components/settings-components/panelLayoutRenderer'
+import { AiRuntimeReasoningCapabilityManager, AiRuntimeVendorApiKeyManager } from 'src/components/settings-components/AiRuntimeSettingsPanelSupport'
 import { renderProvidersGroupedByVendor } from 'src/components/settings-components/provider-config/providerCards'
 import { renderProviderConfigForPanel } from 'src/components/settings-components/provider-config/panelRenderBridge'
 import { testProviderConfiguration } from 'src/components/settings-components/provider-config/providerTest'
+import { ProviderGroupConfigModal, createNewProviderGroupDraft } from 'src/components/settings-components/provider-config/ProviderGroupConfigModal'
+import { buildProviderGroups, buildProvidersFromDraft, createDraftFromGroup, type ProviderGroupDraft, type ProviderGroupRecord } from 'src/components/settings-components/provider-config/providerGroupAdapter'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { ProviderSettingModal } from 'src/components/modals/AiRuntimeProviderModals'
 import { BaseOptions, ProviderSettings, Vendor } from 'src/types/provider'
 import type { Message as ProviderMessage, ResolveEmbedAsBinary } from 'src/types/provider'
 import { ollamaVendor } from 'src/LLMProviders/ollama'
 import { getCapabilityDisplayText } from 'src/LLMProviders/utils'
-import {
-	type ModelCapabilityCache,
-	type ReasoningCapabilityRecord,
-	REASONING_CAPABILITY_CACHE_TTL_MS,
-	buildReasoningCapabilityCacheKey,
-	classifyReasoningProbeError,
-	createProbeCapabilityRecord,
-	inferReasoningCapabilityFromMetadata,
-	resolveReasoningCapability,
-	writeReasoningCapabilityCache
-} from 'src/LLMProviders/modelCapability'
-import {
-	availableVendors
-} from 'src/settings/ai-runtime'
+import { type ReasoningCapabilityRecord } from 'src/LLMProviders/modelCapability'
+import { availableVendors } from 'src/settings/ai-runtime'
 import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
-import {
-	McpClientManager,
-} from 'src/services/mcp'
+import { McpClientManager } from 'src/services/mcp'
 import type { ChatSettings } from 'src/types/chat'
 
 export interface AiRuntimeSettingsContext {
@@ -40,6 +29,30 @@ export interface AiRuntimeSettingsContext {
 	getMcpClientManager?: () => McpClientManager | null
 }
 
+export interface AiRuntimeSettingsPanelSections {
+	modelSelection?: boolean
+	providers?: boolean
+	vendorApiKeys?: boolean
+	quickActions?: boolean
+	tabCompletion?: boolean
+}
+
+export interface AiRuntimeSettingsPanelOptions {
+	sections?: AiRuntimeSettingsPanelSections
+	plainSections?: AiRuntimeSettingsPanelSections
+	initialCollapsed?: AiRuntimeSettingsPanelSections
+	state?: AiRuntimeSettingsPanelState
+}
+
+export interface AiRuntimeSettingsPanelState {
+	isProvidersCollapsed?: boolean
+	isVendorApiKeysCollapsed?: boolean
+	isQuickActionsCollapsed?: boolean
+	isTabCompletionCollapsed?: boolean
+	quickActionGroupExpandedState?: Map<string, boolean>
+	vendorGroupExpandedState?: Map<string, boolean>
+}
+
 export class AiRuntimeSettingsPanel {
 	private containerEl!: HTMLElement
 	private providersContainerEl!: HTMLElement
@@ -50,15 +63,68 @@ export class AiRuntimeSettingsPanel {
 	private isProvidersCollapsed = true // 默认折叠列表
 	private isSelectionToolbarCollapsed = true // 默认折叠AI划词设置
 	private isTabCompletionCollapsed = true // 默认折叠Tab补全设置
-	private isAdvancedCollapsed = true // 默认折叠高级设置
 	private isVendorApiKeysCollapsed = true // 默认折叠模型提供商密钥设置
 	private doubaoRenderers = new Map<unknown, () => void>()
 	private quickActionGroupExpandedState = new Map<string, boolean>()
 	private activeQuickActionsListContainer: HTMLElement | null = null
 	/** 各服务商分组的展开/折叠状态（vendorName → isExpanded） */
 	private vendorGroupExpandedState = new Map<string, boolean>()
+	private readonly sections: Required<AiRuntimeSettingsPanelSections>
+	private readonly plainSections: Required<AiRuntimeSettingsPanelSections>
+	private readonly sharedState?: AiRuntimeSettingsPanelState
+	private readonly reasoningCapabilityManager = new AiRuntimeReasoningCapabilityManager()
+	private readonly vendorApiKeyManager = new AiRuntimeVendorApiKeyManager()
 
-	constructor(private readonly app: App, private readonly settingsContext: AiRuntimeSettingsContext) {}
+	constructor(
+		private readonly app: App,
+		private readonly settingsContext: AiRuntimeSettingsContext,
+		options?: AiRuntimeSettingsPanelOptions
+	) {
+		this.sharedState = options?.state
+		this.sections = {
+			modelSelection: options?.sections?.modelSelection ?? false,
+			providers: options?.sections?.providers ?? true,
+			vendorApiKeys: options?.sections?.vendorApiKeys ?? true,
+			quickActions: options?.sections?.quickActions ?? true,
+			tabCompletion: options?.sections?.tabCompletion ?? true,
+		}
+		this.plainSections = {
+			modelSelection: options?.plainSections?.modelSelection ?? false,
+			providers: options?.plainSections?.providers ?? false,
+			vendorApiKeys: options?.plainSections?.vendorApiKeys ?? false,
+			quickActions: options?.plainSections?.quickActions ?? false,
+			tabCompletion: options?.plainSections?.tabCompletion ?? false,
+		}
+		if (this.sharedState) {
+			if (!this.sharedState.quickActionGroupExpandedState) {
+				this.sharedState.quickActionGroupExpandedState = new Map<string, boolean>()
+			}
+			if (!this.sharedState.vendorGroupExpandedState) {
+				this.sharedState.vendorGroupExpandedState = new Map<string, boolean>()
+			}
+			this.quickActionGroupExpandedState = this.sharedState.quickActionGroupExpandedState
+			this.vendorGroupExpandedState = this.sharedState.vendorGroupExpandedState
+		} else {
+			this.quickActionGroupExpandedState = new Map<string, boolean>()
+			this.vendorGroupExpandedState = new Map<string, boolean>()
+		}
+		this.isProvidersCollapsed =
+			this.sharedState?.isProvidersCollapsed
+			?? options?.initialCollapsed?.providers
+			?? true
+		this.isVendorApiKeysCollapsed =
+			this.sharedState?.isVendorApiKeysCollapsed
+			?? options?.initialCollapsed?.vendorApiKeys
+			?? true
+		this.isSelectionToolbarCollapsed =
+			this.sharedState?.isQuickActionsCollapsed
+			?? options?.initialCollapsed?.quickActions
+			?? true
+		this.isTabCompletionCollapsed =
+			this.sharedState?.isTabCompletionCollapsed
+			?? options?.initialCollapsed?.tabCompletion
+			?? true
+	}
 
 	private get settings() {
 		return this.settingsContext.getSettings()
@@ -78,174 +144,38 @@ export class AiRuntimeSettingsPanel {
 		await this.settingsContext.updateChatSettings(partial)
 	}
 
-	private ensureModelCapabilityCache(): ModelCapabilityCache {
-		if (!this.settings.modelCapabilityCache) {
-			this.settings.modelCapabilityCache = {}
-		}
-		return this.settings.modelCapabilityCache
-	}
-
-	private resolveModelReasoningCapability(
-		vendorName: string,
-		options: BaseOptions,
-		rawModel?: unknown
-	): ReasoningCapabilityRecord {
-		return resolveReasoningCapability({
-			vendorName,
-			baseURL: options.baseURL,
-			model: options.model,
-			rawModel,
-			cache: this.settings.modelCapabilityCache
-		})
-	}
-
-	private writeReasoningCapabilityRecord(
-		vendorName: string,
-		options: BaseOptions,
-		record: ReasoningCapabilityRecord
-	): void {
-		const key = buildReasoningCapabilityCacheKey(vendorName, options.baseURL, options.model)
-		this.settings.modelCapabilityCache = writeReasoningCapabilityCache(
-			this.ensureModelCapabilityCache(),
-			key,
-			record,
-			Date.now(),
-			REASONING_CAPABILITY_CACHE_TTL_MS
-		)
-	}
-
-	private cacheReasoningCapabilityFromMetadata(
-		vendorName: string,
-		options: BaseOptions,
-		rawModel?: unknown
-	): ReasoningCapabilityRecord | undefined {
-		const metadataRecord = inferReasoningCapabilityFromMetadata(vendorName, rawModel)
-		if (!metadataRecord || !options.model) return undefined
-		this.writeReasoningCapabilityRecord(vendorName, options, metadataRecord)
-		return metadataRecord
-	}
-
 	private getReasoningCapabilityHintText(record: ReasoningCapabilityRecord): string {
-		if (record.state === 'supported') {
-			if (record.source === 'metadata') return t('Reasoning is supported (metadata)')
-			if (record.source === 'probe') return t('Reasoning is supported (probe)')
-			return t('Reasoning is supported')
-		}
-
-		if (record.state === 'unsupported') {
-			if (record.source === 'metadata') return t('Reasoning is unsupported (metadata)')
-			if (record.source === 'probe') return t('Reasoning is unsupported (probe)')
-			return t('Reasoning is unsupported')
-		}
-
-		return t('Reasoning is unknown')
-	}
-
-	private createReasoningProbeOptions(vendorName: string, options: BaseOptions): BaseOptions {
-		const cloned = JSON.parse(JSON.stringify(options || {})) as BaseOptions & Record<string, unknown>
-		const normalizedVendor = vendorName.toLowerCase()
-
-		if (normalizedVendor === 'qwen' || normalizedVendor === 'claude' || normalizedVendor === 'qianfan') {
-			cloned.enableThinking = true
-		} else {
-			cloned.enableReasoning = true
-		}
-
-		if (normalizedVendor === 'doubao') {
-			cloned.enableReasoning = true
-			cloned.thinkingType = 'enabled'
-		}
-
-		if (normalizedVendor === 'zhipu') {
-			cloned.enableReasoning = true
-			cloned.thinkingType = 'enabled'
-		}
-
-		return cloned as BaseOptions
-	}
-
-	private async probeReasoningCapability(provider: ProviderSettings, vendor: Vendor): Promise<ReasoningCapabilityRecord> {
-		const probeOptions = this.createReasoningProbeOptions(vendor.name, provider.options)
-		const sendRequest = vendor.sendRequestFunc(probeOptions)
-		const controller = new AbortController()
-		const timeoutId = globalThis.setTimeout(() => controller.abort(), 12_000)
-		const probeMessages: ProviderMessage[] = [
-			{ role: 'system', content: 'Capability probe mode. Keep response short.' },
-			{ role: 'user', content: 'Reply with one short sentence.' }
-		]
-
-		const resolveEmbedAsBinary: ResolveEmbedAsBinary = async () => new ArrayBuffer(0)
-		const saveAttachment = async (_fileName: string, _data: ArrayBuffer) => {}
-
-		try {
-			let hasVisibleOutput = false
-			for await (const chunk of sendRequest(probeMessages, controller, resolveEmbedAsBinary, saveAttachment)) {
-				if (typeof chunk === 'string' && chunk.trim().length > 0) {
-					hasVisibleOutput = true
-					break
-				}
-			}
-			controller.abort()
-			if (hasVisibleOutput) {
-				return createProbeCapabilityRecord({
-					state: 'supported',
-					reason: 'Reasoning probe returned streamed output.'
-				})
-			}
-			return createProbeCapabilityRecord({
-				state: 'unknown',
-				reason: 'Reasoning probe completed without decisive output.'
-			})
-		} catch (error) {
-			return createProbeCapabilityRecord(classifyReasoningProbeError(error))
-		} finally {
-			globalThis.clearTimeout(timeoutId)
-		}
+		return t(this.reasoningCapabilityManager.getReasoningCapabilityHintText(record))
 	}
 
 	private normalizeProviderVendor(vendor: string): string {
-		return vendor === 'DoubaoImage' ? 'Doubao' : vendor
+		return this.vendorApiKeyManager.normalizeProviderVendor(vendor)
 	}
 
-	private ensureVendorApiKeys(): Record<string, string> {
-		if (!this.settings.vendorApiKeys) {
-			this.settings.vendorApiKeys = {}
-		}
-		return this.settings.vendorApiKeys
+	private isCustomProvider(provider: Pick<ProviderSettings, 'options'>): boolean {
+		return isCustomOpenChatProvider(provider.options?.parameters)
 	}
 
 	private getVendorApiKey(vendor: string): string {
-		const normalizedVendor = this.normalizeProviderVendor(vendor)
-		return this.settings.vendorApiKeys?.[normalizedVendor] ?? ''
+		return this.vendorApiKeyManager.getVendorApiKey(this.settings, vendor)
 	}
 
 	private setVendorApiKey(vendor: string, value: string): void {
-		const normalizedVendor = this.normalizeProviderVendor(vendor)
-		const map = this.ensureVendorApiKeys()
-		const trimmed = value.trim()
-		if (trimmed) {
-			map[normalizedVendor] = trimmed
-		} else {
-			delete map[normalizedVendor]
-		}
-		this.syncProviderApiKeysByVendor(normalizedVendor)
+		this.vendorApiKeyManager.setVendorApiKey(this.settings, vendor, value)
 	}
 
 	private syncProviderApiKeysByVendor(vendor: string): void {
-		const normalizedVendor = this.normalizeProviderVendor(vendor)
-		const resolvedApiKey = this.getVendorApiKey(normalizedVendor)
-		for (const provider of this.settings.providers) {
-			if (provider.vendor === ollamaVendor.name) continue
-			if (this.normalizeProviderVendor(provider.vendor) !== normalizedVendor) continue
-			provider.options.apiKey = resolvedApiKey
-		}
+		this.vendorApiKeyManager.syncProviderApiKeysByVendor(this.settings, vendor)
 	}
 
 	private syncAllProviderApiKeys(): void {
-		for (const provider of this.settings.providers) {
-			if (provider.vendor === ollamaVendor.name) continue
-			provider.options.apiKey = this.getVendorApiKey(provider.vendor)
-		}
+		this.vendorApiKeyManager.syncAllProviderApiKeys(this.settings)
+	}
+
+	private openVendorApiKeysModal(): void {
+		this.vendorApiKeyManager.openVendorApiKeysModal(this.app, this.settings, async () => {
+			await this.saveSettings()
+		})
 	}
 
 	render(containerEl: HTMLElement, expandLastProvider = false, keepOpenIndex = -1): void {
@@ -261,11 +191,20 @@ export class AiRuntimeSettingsPanel {
 				promptTemplateFolder: this.settingsContext.getPromptTemplateFolder(),
 				settings: this.settings,
 				chatSettings: this.chatSettings,
+				showModelSelectionSection: this.sections.modelSelection,
+				showProvidersSection: this.sections.providers,
+				showProvidersPlainSection: this.plainSections.providers,
+				showVendorApiKeysSection: this.sections.vendorApiKeys,
+				showQuickActionsSection: this.sections.quickActions,
+				showTabCompletionSection: this.sections.tabCompletion,
+				showQuickActionsPlainSection: this.plainSections.quickActions,
+				showTabCompletionPlainSection: this.plainSections.tabCompletion,
 				setProvidersContainerEl: (providersContainer) => {
 					this.providersContainerEl = providersContainer
 				},
-				renderProvidersGroupedByVendor: (shouldExpandLastProvider, nextKeepOpenIndex) =>
-					this.renderProvidersGroupedByVendor(shouldExpandLastProvider, nextKeepOpenIndex),
+				renderProvidersGroupedByVendor: () => this.renderProvidersGroupedByVendor(),
+				openCreateProviderConfigModal: () => this.openCreateProviderConfigModal(),
+				openVendorApiKeysModal: () => this.openVendorApiKeysModal(),
 				getVendorApiKey: (vendor) => this.getVendorApiKey(vendor),
 				setVendorApiKey: (vendor, value) => this.setVendorApiKey(vendor, value),
 				normalizeProviderVendor: (vendor) => this.normalizeProviderVendor(vendor),
@@ -289,27 +228,46 @@ export class AiRuntimeSettingsPanel {
 				isProvidersCollapsed: () => this.isProvidersCollapsed,
 				setProvidersCollapsed: (value) => {
 					this.isProvidersCollapsed = value
+					if (this.sharedState) {
+						this.sharedState.isProvidersCollapsed = value
+					}
 				},
 				isVendorApiKeysCollapsed: () => this.isVendorApiKeysCollapsed,
 				setVendorApiKeysCollapsed: (value) => {
 					this.isVendorApiKeysCollapsed = value
+					if (this.sharedState) {
+						this.sharedState.isVendorApiKeysCollapsed = value
+					}
 				},
 				isSelectionToolbarCollapsed: () => this.isSelectionToolbarCollapsed,
 				setSelectionToolbarCollapsed: (value) => {
 					this.isSelectionToolbarCollapsed = value
+					if (this.sharedState) {
+						this.sharedState.isQuickActionsCollapsed = value
+					}
 				},
 				isTabCompletionCollapsed: () => this.isTabCompletionCollapsed,
 				setTabCompletionCollapsed: (value) => {
 					this.isTabCompletionCollapsed = value
-				},
-				isAdvancedCollapsed: () => this.isAdvancedCollapsed,
-				setAdvancedCollapsed: (value) => {
-					this.isAdvancedCollapsed = value
+					if (this.sharedState) {
+						this.sharedState.isTabCompletionCollapsed = value
+					}
 				}
 			},
 			expandLastProvider,
 			keepOpenIndex
 		)
+	}
+
+	dispose(): void {
+		this.providerTitleEls.clear()
+		this.providerCapabilityEls.clear()
+		this.doubaoRenderers.clear()
+		this.activeQuickActionsListContainer = null
+		if (!this.sharedState) {
+			this.quickActionGroupExpandedState.clear()
+			this.vendorGroupExpandedState.clear()
+		}
 	}
 
 	/**
@@ -328,31 +286,122 @@ export class AiRuntimeSettingsPanel {
 	/**
 	 * 按提供商分组渲染 AI 助手列表
 	 */
-	private renderProvidersGroupedByVendor(expandLastProvider: boolean, keepOpenIndex: number) {
+	private renderProvidersGroupedByVendor() {
+		const groups = buildProviderGroups(this.settings.providers)
 		renderProvidersGroupedByVendor(
 			{
 				app: this.app,
 				containerEl: this.containerEl,
 				providersContainerEl: this.providersContainerEl,
-				providers: this.settings.providers,
+				groups,
 				providerTitleEls: this.providerTitleEls,
 				providerCapabilityEls: this.providerCapabilityEls,
 				vendorGroupExpandedState: this.vendorGroupExpandedState,
-				renderProviderConfig: (container, index, settings, vendor, modal) =>
-					this.renderProviderConfig(container, index, settings, vendor, modal),
-				onDeleteProvider: async (index, vendorName) => {
-					this.vendorGroupExpandedState.set(vendorName, true)
-					this.settings.providers.splice(index, 1)
-					await this.settingsContext.saveSettings()
-					this.render(this.containerEl)
+				onEditGroup: (group) => {
+					this.openEditProviderGroupModal(group)
 				},
-				setCurrentOpenProviderIndex: (index) => {
-					this.currentOpenProviderIndex = index
+				onDeleteGroup: async (group) => {
+					await this.deleteProviderGroup(group)
+				},
+				setCurrentOpenProviderIndex: (_index) => {
+					return
 				}
 			},
-			expandLastProvider,
-			keepOpenIndex
+			false,
+			-1
 		)
+	}
+
+	private async commitProviderGroupDraft(draft: ProviderGroupDraft): Promise<void> {
+		const vendor = availableVendors.find((item) => item.name === draft.protocolVendorName)
+		if (!vendor) {
+			return
+		}
+
+		const nextProviders = buildProvidersFromDraft(
+			draft,
+			vendor,
+			this.settings.providers,
+			draft.existingIndices
+		)
+		const existingIndices = [...draft.existingIndices].sort((left, right) => left - right)
+		const remainingProviders = this.settings.providers.filter((_, index) => !existingIndices.includes(index))
+		const insertIndex = existingIndices.length > 0 ? existingIndices[0] : remainingProviders.length
+		const before = remainingProviders.slice(0, insertIndex)
+		const after = remainingProviders.slice(insertIndex)
+		const removedTags = this.settings.providers
+			.filter((_, index) => existingIndices.includes(index))
+			.map((provider) => provider.tag)
+		const nextTags = new Set(nextProviders.map((provider) => provider.tag))
+		const deletedTags = removedTags.filter((tag) => !nextTags.has(tag))
+
+		this.settings.providers = [...before, ...nextProviders, ...after]
+		if (draft.source !== 'custom') {
+			this.setVendorApiKey(vendor.name, draft.apiKey)
+		}
+		if (deletedTags.includes(this.settings.tabCompletionProviderTag)) {
+			this.settings.tabCompletionProviderTag = ''
+		}
+		const chatSettingsUpdate: Partial<ChatSettings> = {}
+		if (deletedTags.includes(this.chatSettings.defaultModel)) {
+			chatSettingsUpdate.defaultModel = ''
+		}
+		const summaryModelTag = this.chatSettings.messageManagement?.summaryModelTag
+		if (summaryModelTag && deletedTags.includes(summaryModelTag)) {
+			chatSettingsUpdate.messageManagement = {
+				...this.chatSettings.messageManagement,
+				summaryModelTag: undefined,
+			}
+		}
+		if (Object.keys(chatSettingsUpdate).length > 0) {
+			await this.updateChatSettings(chatSettingsUpdate)
+		}
+		await this.settingsContext.saveSettings()
+		this.render(this.containerEl)
+	}
+
+	private async deleteProviderGroup(group: ProviderGroupRecord): Promise<void> {
+		const draft = createDraftFromGroup(group)
+		draft.models = []
+		await this.commitProviderGroupDraft(draft)
+	}
+
+	private openCreateProviderConfigModal(): void {
+		const draft = createNewProviderGroupDraft()
+		const modal = new ProviderGroupConfigModal(this.app, {
+			mode: 'create',
+			draft,
+			title: t('Add AI Provider'),
+			getVendorApiKey: (vendorName) => this.getVendorApiKey(vendorName),
+			onCommit: async (nextDraft) => {
+				if (nextDraft.models.length === 0) {
+					return
+				}
+				await this.commitProviderGroupDraft(nextDraft)
+			},
+			probeReasoningCapability: (provider, vendor) => this.probeReasoningCapability(provider, vendor),
+			testProviderConfiguration: (provider) => this.testProviderConfiguration(provider),
+		})
+		modal.open()
+	}
+
+	private openEditProviderGroupModal(group: ProviderGroupRecord): void {
+		const draft = createDraftFromGroup(group)
+		if (group.source !== 'custom') {
+			draft.apiKey = this.getVendorApiKey(group.protocolVendorName)
+		}
+		const modal = new ProviderGroupConfigModal(this.app, {
+			mode: 'edit',
+			draft,
+			title: group.displayName,
+			getVendorApiKey: (vendorName) => this.getVendorApiKey(vendorName),
+			onCommit: async (nextDraft) => {
+				await this.commitProviderGroupDraft(nextDraft)
+			},
+			probeReasoningCapability: (provider, vendor) => this.probeReasoningCapability(provider, vendor),
+			testProviderConfiguration: (provider) => this.testProviderConfiguration(provider),
+		})
+		modal.open()
 	}
 
 	/**
@@ -393,16 +442,31 @@ export class AiRuntimeSettingsPanel {
 				),
 			getVendorApiKey: (providerVendor) => this.getVendorApiKey(providerVendor),
 			cacheReasoningCapabilityFromMetadata: (providerVendor, providerOptions, rawModel) =>
-				this.cacheReasoningCapabilityFromMetadata(providerVendor, providerOptions, rawModel),
+				this.reasoningCapabilityManager.cacheReasoningCapabilityFromMetadata(
+					this.settings,
+					providerVendor,
+					providerOptions,
+					rawModel
+				),
 			getReasoningCapabilityHintText: (record) => this.getReasoningCapabilityHintText(record),
 			resolveModelReasoningCapability: (vendorName, options, rawModel) =>
-				this.resolveModelReasoningCapability(vendorName, options, rawModel),
+				this.reasoningCapabilityManager.resolveModelReasoningCapability(
+					this.settings,
+					vendorName,
+					options,
+					rawModel
+				),
 			updateProviderCapabilities: (providerIndex, providerSettings) =>
 				this.updateProviderCapabilities(providerIndex, providerSettings),
 			probeReasoningCapability: (providerSettings, providerVendor) =>
-				this.probeReasoningCapability(providerSettings, providerVendor),
+				this.reasoningCapabilityManager.probeReasoningCapability(providerSettings, providerVendor),
 			writeReasoningCapabilityRecord: (vendorName, options, record) =>
-				this.writeReasoningCapabilityRecord(vendorName, options, record),
+				this.reasoningCapabilityManager.writeReasoningCapabilityRecord(
+					this.settings,
+					vendorName,
+					options,
+					record
+				),
 			testProviderConfiguration: (providerSettings) =>
 				this.testProviderConfiguration(providerSettings)
 		})
