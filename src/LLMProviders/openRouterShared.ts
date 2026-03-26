@@ -22,9 +22,18 @@ export interface OpenRouterOptions extends BaseOptions {
 
 export interface WebSearchPlugin {
 	id: 'web'
+	enabled?: boolean
 	engine?: 'native' | 'exa'
-	max_results?: number
-	search_prompt?: string
+	maxResults?: number
+	searchPrompt?: string
+}
+
+export const normalizeOpenRouterBaseURL = (baseURL: string): string => {
+	const trimmed = baseURL.trim().replace(/\/+$/, '')
+	if (!trimmed) return 'https://openrouter.ai/api/v1'
+	return trimmed
+		.replace(/\/chat\/completions$/i, '')
+		.replace(/\/responses$/i, '')
 }
 
 export const isImageGenerationModel = (model: string): boolean => {

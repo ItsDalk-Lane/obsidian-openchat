@@ -50,6 +50,7 @@
 		"@google/generative-ai": "^0.21.0",
 		"@modelcontextprotocol/sdk": "^1.27.1",
 		"@mozilla/readability": "^0.6.0",
+		"@openrouter/sdk": "^0.9.11",
 		"@tanstack/react-virtual": "^3.13.5",
 		"axios": "^1.8.3",
 		"diff": "^8.0.3",

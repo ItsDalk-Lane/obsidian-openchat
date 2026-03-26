@@ -8,7 +8,47 @@ interface OpenRouterResponseContext {
 	saveAttachment?: SaveAttachment
 	imageDisplayWidth: number
 	supportsImageGeneration: boolean
+	imageStream?: boolean
 	controller: AbortController
+}
+
+interface OpenRouterModelResult {
+	getFullResponsesStream(): AsyncIterable<Record<string, unknown>>
+	getResponse(): Promise<Record<string, unknown>>
+	cancel(): Promise<void>
+}
+
+type ChatChunk = {
+	choices?: Array<{
+		delta?: Record<string, unknown>
+		message?: Record<string, unknown>
+	}>
+}
+
+type ChatResponseLike = ChatChunk | AsyncIterable<ChatChunk>
+
+const isAsyncIterable = <T>(value: unknown): value is AsyncIterable<T> =>
+	typeof value === 'object' && value !== null && Symbol.asyncIterator in value
+
+const normalizeGeneratedImageUrl = (value: string): string => {
+	if (!value) return value
+	if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('data:')) {
+		return value
+	}
+	return `data:image/png;base64,${value}`
+}
+
+const extractImageUrl = (image: unknown): string | undefined => {
+	if (!image || typeof image !== 'object') return undefined
+	const record = image as Record<string, unknown>
+	const nestedImageUrl = record.image_url
+	if (nestedImageUrl && typeof nestedImageUrl === 'object') {
+		const url = (nestedImageUrl as { url?: unknown }).url
+		return typeof url === 'string' ? url : undefined
+	}
+	const directImageUrl = record.imageUrl
+	if (typeof directImageUrl === 'string') return directImageUrl
+	return undefined
 }
 
 const yieldImageContent = async function* (
@@ -56,6 +96,134 @@ const yieldImageContent = async function* (
 		: `📷 生成的图片 URL：${imageUrl}\n\n`
 }
 
+const extractReasoningText = (response: Record<string, unknown>): string => {
+	const output = Array.isArray(response.output) ? response.output : []
+	const parts: string[] = []
+	for (const item of output) {
+		if (!item || typeof item !== 'object') continue
+		const record = item as Record<string, unknown>
+		if (record.type !== 'reasoning') continue
+		const summary = Array.isArray(record.summary) ? record.summary : []
+		for (const summaryItem of summary) {
+			if (!summaryItem || typeof summaryItem !== 'object') continue
+			const text = (summaryItem as { text?: unknown }).text
+			if (typeof text === 'string' && text) {
+				parts.push(text)
+			}
+		}
+	}
+	return parts.join('\n')
+}
+
+const extractResponseText = (response: Record<string, unknown>): string => {
+	if (typeof response.outputText === 'string' && response.outputText) {
+		return response.outputText
+	}
+	const output = Array.isArray(response.output) ? response.output : []
+	for (const item of output) {
+		if (!item || typeof item !== 'object') continue
+		const record = item as Record<string, unknown>
+		if (record.type !== 'message') continue
+		const text = extractOutputText(record.content)
+		if (text) return text
+	}
+	return ''
+}
+
+const extractGeneratedImages = (response: Record<string, unknown>): string[] => {
+	const output = Array.isArray(response.output) ? response.output : []
+	const images: string[] = []
+	for (const item of output) {
+		if (!item || typeof item !== 'object') continue
+		const record = item as Record<string, unknown>
+		if (record.type !== 'image_generation_call') continue
+		const result = typeof record.result === 'string' ? record.result : ''
+		if (result) {
+			images.push(normalizeGeneratedImageUrl(result))
+		}
+	}
+	return images
+}
+
+const extractStreamErrorMessage = (event: Record<string, unknown>): string => {
+	const directError = event.error
+	if (typeof directError === 'string' && directError) {
+		return directError
+	}
+	if (directError && typeof directError === 'object') {
+		const message = (directError as { message?: unknown }).message
+		if (typeof message === 'string' && message) {
+			return message
+		}
+	}
+	const response = event.response
+	if (response && typeof response === 'object') {
+		const responseError = (response as { error?: unknown }).error
+		if (typeof responseError === 'string' && responseError) {
+			return responseError
+		}
+		if (responseError && typeof responseError === 'object') {
+			const message = (responseError as { message?: unknown }).message
+			if (typeof message === 'string' && message) {
+				return message
+			}
+		}
+	}
+	return 'OpenRouter 响应失败'
+}
+
+const yieldResponseImages = async function* (
+	images: string[],
+	context: OpenRouterResponseContext,
+	prependBreak: boolean,
+): AsyncGenerator<string, void, undefined> {
+	if (images.length === 0) {
+		if (context.supportsImageGeneration) {
+			yield '⚠️ 图像生成请求完成，但 API 未返回图片数据。请检查模型配置或提示词。'
+		}
+		return
+	}
+
+	if (prependBreak) {
+		yield '\n\n'
+	}
+
+	for (const [index, image] of images.entries()) {
+		yield* yieldImageContent(image, index, images.length, context)
+	}
+}
+
+const getEmptyResponseWarning = (supportsImageGeneration: boolean): string =>
+	supportsImageGeneration
+		? '⚠️ 图像生成请求完成，但 API 未返回图片数据。请检查模型配置或提示词。'
+		: '⚠️ 收到空响应，请检查模型配置或稍后重试。'
+
+const yieldResponseFallbackContent = async function* (
+	response: Record<string, unknown>,
+	context: OpenRouterResponseContext,
+	hasStreamedText: boolean,
+): AsyncGenerator<string, void, undefined> {
+	const reasoningText = extractReasoningText(response)
+	if (!hasStreamedText && reasoningText) {
+		yield `${buildReasoningBlockStart(Date.now())}${reasoningText}${buildReasoningBlockEnd(10)}`
+	}
+
+	const finalText = extractResponseText(response)
+	if (!hasStreamedText && finalText) {
+		yield finalText
+	}
+
+	const images = extractGeneratedImages(response)
+	if (images.length > 0 || context.supportsImageGeneration) {
+		yield* yieldResponseImages(images, context, hasStreamedText || Boolean(finalText))
+		return
+	}
+
+	if (!hasStreamedText && !reasoningText && !finalText) {
+		yield getEmptyResponseWarning(context.supportsImageGeneration)
+	}
+}
+
 const extractOutputText = (content: unknown): string => {
 	if (!Array.isArray(content)) return ''
 	for (const item of content) {
@@ -68,107 +236,76 @@ const extractOutputText = (content: unknown): string => {
 	return ''
 }
 
-export async function* handleOpenRouterStreamingResponse(
-	response: Response,
+export async function* handleOpenRouterCallModelResult(
+	result: OpenRouterModelResult,
 	context: OpenRouterResponseContext,
 ): AsyncGenerator<string, void, undefined> {
-	const reader = response.body?.getReader()
-	if (!reader) {
-		throw new Error('Response body is not readable')
-	}
-
-	const decoder = new TextDecoder()
-	let buffer = ''
 	let reasoningActive = false
 	let reasoningStartMs: number | null = null
+	let hasStreamedText = false
+	const responsePromise = result.getResponse()
+
+	const cancelResult = () => {
+		void result.cancel().catch(() => {
+			// ignore cancellation cleanup failures
+		})
+	}
+	context.controller.signal.addEventListener('abort', cancelResult, { once: true })
 
 	try {
-		while (true) {
-			const { done, value } = await reader.read()
-			if (done) break
-			buffer += decoder.decode(value, { stream: true })
+		for await (const event of result.getFullResponsesStream()) {
+			if (context.controller.signal.aborted) {
+				break
+			}
+			const eventType = typeof event.type === 'string' ? event.type : ''
+			if (
+				eventType === 'response.reasoning.delta'
+				|| eventType === 'response.reasoning_text.delta'
+				|| eventType === 'response.reasoning_summary_text.delta'
+			) {
+				const delta = typeof event.delta === 'string'
+					? event.delta
+					: typeof event.text === 'string'
+						? event.text
+						: ''
+				if (!delta) continue
+				if (!reasoningActive) {
+					reasoningActive = true
+					reasoningStartMs = Date.now()
+					yield buildReasoningBlockStart(reasoningStartMs)
+				}
+				yield delta
+				continue
+			}
 
-			while (true) {
-				const lineEnd = buffer.indexOf('\n')
-				if (lineEnd === -1) break
-				const line = buffer.slice(0, lineEnd).trim()
-				buffer = buffer.slice(lineEnd + 1)
-				if (!line.startsWith('data: ')) continue
+			if (eventType === 'response.output_text.delta') {
+				if (reasoningActive) {
+					reasoningActive = false
+					yield buildReasoningBlockEnd(Date.now() - (reasoningStartMs ?? Date.now()))
+					reasoningStartMs = null
+				}
+				if (typeof event.delta === 'string' && event.delta) {
+					hasStreamedText = true
+					yield event.delta
+				}
+				continue
+			}
 
-				const lineData = line.slice(6)
-				if (lineData === '[DONE]') break
-
-				try {
-					const parsed = JSON.parse(lineData) as Record<string, unknown>
-
-					if (context.useResponsesAPI) {
-						const reasonContent = parsed.reasoning_content
-							|| ((parsed.delta as Record<string, unknown> | undefined)?.reasoning_content)
-						if (typeof reasonContent === 'string' && reasonContent) {
-							if (!reasoningActive) {
-								reasoningActive = true
-								reasoningStartMs = Date.now()
-								yield buildReasoningBlockStart(reasoningStartMs)
-							}
-							yield reasonContent
-							continue
-						}
-
-						if (typeof parsed.type === 'string') {
-							if (
-								parsed.type === 'response.reasoning.delta'
-								|| parsed.type === 'response.reasoning_text.delta'
-							) {
-								if (typeof parsed.delta === 'string' && parsed.delta) {
-									if (!reasoningActive) {
-										reasoningActive = true
-										reasoningStartMs = Date.now()
-										yield buildReasoningBlockStart(reasoningStartMs)
-									}
-									yield parsed.delta
-								}
-								continue
-							}
-
-							if (parsed.type === 'response.output_text.delta') {
-								if (reasoningActive) {
-									reasoningActive = false
-									yield buildReasoningBlockEnd(Date.now() - (reasoningStartMs ?? Date.now()))
-									reasoningStartMs = null
-								}
-								if (typeof parsed.delta === 'string' && parsed.delta) {
-									yield parsed.delta
-								}
-								continue
-							}
-
-							if (parsed.type === 'response.completed' && reasoningActive) {
-								reasoningActive = false
-								yield buildReasoningBlockEnd(Date.now() - (reasoningStartMs ?? Date.now()))
-								reasoningStartMs = null
-								continue
-							}
-						}
-					}
-
-					const content = (((parsed.choices as unknown[])?.[0] as Record<string, unknown> | undefined)?.delta as Record<string, unknown> | undefined)?.content
-					if (typeof content === 'string' && content) {
-						yield content
-					}
-
-					const delta = ((parsed.choices as unknown[])?.[0] as Record<string, unknown> | undefined)?.delta as {
-						images?: Array<{ image_url?: { url?: string } }>
-					} | undefined
-					if (Array.isArray(delta?.images)) {
-						for (const [index, image] of delta.images.entries()) {
-							const imageUrl = image.image_url?.url
-							if (imageUrl) {
-								yield* yieldImageContent(imageUrl, index, delta.images.length, context)
-							}
-						}
-					}
-				} catch {
-					// Ignore invalid JSON
+			if (
+				eventType === 'response.completed'
+				|| eventType === 'response.incomplete'
+				|| eventType === 'response.failed'
+			) {
+				if (reasoningActive) {
+					reasoningActive = false
+					yield buildReasoningBlockEnd(Date.now() - (reasoningStartMs ?? Date.now()))
+					reasoningStartMs = null
+				}
+				if (eventType === 'response.incomplete') {
+					yield '\n\n⚠️ API 返回了不完整的响应，内容可能被截断。'
+				}
+				if (eventType === 'response.failed') {
+					throw new Error(extractStreamErrorMessage(event))
 				}
 			}
 		}
@@ -176,85 +313,85 @@ export async function* handleOpenRouterStreamingResponse(
 		if (reasoningActive) {
 			yield buildReasoningBlockEnd(Date.now() - (reasoningStartMs ?? Date.now()))
 		}
-		void reader.cancel()
+		context.controller.signal.removeEventListener('abort', cancelResult)
 	}
+
+	const finalResponse = await responsePromise
+	yield* yieldResponseFallbackContent(finalResponse, context, hasStreamedText)
 }
 
-export async function* handleOpenRouterNonStreamingResponse(
-	response: Response,
+export async function* handleOpenRouterChatResponse(
+	response: ChatResponseLike,
 	context: OpenRouterResponseContext,
 ): AsyncGenerator<string, void, undefined> {
-	const responseText = await response.text()
-
 	try {
-		const parsed = JSON.parse(responseText) as Record<string, unknown>
+		if (isAsyncIterable<ChatChunk>(response)) {
+			let hasStreamedText = false
+			let emittedImage = false
+			for await (const chunk of response) {
+				if (context.controller.signal.aborted) {
+					break
+				}
+				const choice = Array.isArray(chunk.choices) ? chunk.choices[0] : undefined
+				const delta = choice?.delta
+				const content = typeof delta?.content === 'string' ? delta.content : ''
+				if (content) {
+					hasStreamedText = true
+					yield content
+				}
 
-		if (context.useResponsesAPI && Array.isArray(parsed.output)) {
-			let hasReasoning = false
-			let finalText = ''
-			let reasoningText = ''
-			for (const output of parsed.output as Array<Record<string, unknown>>) {
-				if (output.type === 'reasoning') {
-					if (!hasReasoning) {
-						hasReasoning = true
-						finalText += buildReasoningBlockStart(Date.now())
+				const images = Array.isArray(delta?.images)
+					? delta.images
+					: Array.isArray(delta?.imageUrls)
+						? delta.imageUrls
+						: []
+				if (images.length > 0) {
+					if (!hasStreamedText && !emittedImage) {
+						yield '\n\n'
 					}
-					if (Array.isArray(output.content)) {
-						for (const contentItem of output.content as Array<Record<string, unknown>>) {
-							if (contentItem.type === 'input_text' && typeof contentItem.text === 'string') {
-								reasoningText += contentItem.text
-							}
+					for (const [index, image] of images.entries()) {
+						const imageUrl = extractImageUrl(image)
+						if (imageUrl) {
+							emittedImage = true
+							yield* yieldImageContent(normalizeGeneratedImageUrl(imageUrl), index, images.length, context)
 						}
-					}
-					if (Array.isArray(output.summary)) {
-						for (const summaryItem of output.summary) {
-							reasoningText += `\n${String(summaryItem)}`
-						}
-					}
-					finalText += reasoningText
-				} else if (output.type === 'message') {
-					const textContent = extractOutputText(output.content)
-					if (textContent) {
-						if (hasReasoning) {
-							finalText += buildReasoningBlockEnd(10)
-						}
-						finalText += textContent
 					}
 				}
 			}
-			if (finalText) {
-				yield finalText
+			if (!hasStreamedText && !emittedImage) {
+				yield getEmptyResponseWarning(context.supportsImageGeneration)
 			}
-		} else {
-			const content = (((parsed.choices as unknown[])?.[0] as Record<string, unknown> | undefined)?.message as Record<string, unknown> | undefined)?.content
-			if (typeof content === 'string' && content) {
-				yield content
-			}
-		}
-
-		if (context.useResponsesAPI) {
 			return
 		}
 
-		const message = ((parsed.choices as unknown[])?.[0] as Record<string, unknown> | undefined)?.message as {
-			content?: string
-			images?: Array<{ image_url?: { url?: string } }>
-		} | undefined
-		if (Array.isArray(message?.images)) {
-			yield '\n\n'
-			for (const [index, image] of message.images.entries()) {
-				const imageUrl = image.image_url?.url
-				if (imageUrl) {
-					yield* yieldImageContent(imageUrl, index, message.images.length, context)
-				}
-			}
+		const choice = Array.isArray(response.choices) ? response.choices[0] : undefined
+		const message = choice?.message
+		const content = typeof message?.content === 'string' ? message.content : ''
+		if (content) {
+			yield content
 		}
 
-		if (!message?.content && !message?.images && context.supportsImageGeneration) {
-			yield '⚠️ 图像生成请求完成，但 API 未返回图片数据。请检查模型配置或提示词。'
+		const images = Array.isArray(message?.images)
+			? message.images
+			: Array.isArray(message?.imageUrls)
+				? message.imageUrls
+				: []
+		if (images.length > 0) {
+			yield '\n\n'
+			for (const [index, image] of images.entries()) {
+				const imageUrl = extractImageUrl(image)
+				if (imageUrl) {
+					yield* yieldImageContent(normalizeGeneratedImageUrl(imageUrl), index, images.length, context)
+				}
+			}
+			return
+		}
+
+		if (!content) {
+			yield getEmptyResponseWarning(context.supportsImageGeneration)
 		}
 	} catch (error) {
-		DebugLogger.error('解析非流式响应失败:', error)
+		DebugLogger.error('解析 OpenRouter SDK 响应失败:', error)
 		throw new Error(`解析响应失败: ${error instanceof Error ? error.message : String(error)}`)
 	}
 }
