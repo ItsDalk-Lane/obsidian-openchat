@@ -3,17 +3,13 @@ import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import {
-	arrayBufferToBase64,
 	buildReasoningBlockStart,
 	buildReasoningBlockEnd,
-	convertEmbedToImageUrl,
-	getMimeTypeFromFilename
+	convertEmbedToImageUrl
 } from './utils'
 import { withToolMessageContext } from './messageFormat'
 import {
 	OpenAILoopOptions,
-	resolveCurrentTools,
-	toClaudeTools,
 	withToolCallLoopSupport
 } from 'src/core/agents/loop'
 import { sendAnthropicRequestFunc } from './zhipuAnthropic'
@@ -25,7 +21,6 @@ import {
 	isZhipuAnthropicBaseURL,
 	type ZhipuAnthropicLoopOptions,
 	type ZhipuOptions,
-	type ZhipuThinkingType,
 	ZHIPU_SLOW_REQUEST_THRESHOLD_MS,
 } from './zhipuShared'
 

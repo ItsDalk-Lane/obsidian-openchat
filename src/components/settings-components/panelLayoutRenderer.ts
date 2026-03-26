@@ -3,7 +3,6 @@ import { t } from 'src/i18n/ai-runtime/helper'
 import { localInstance } from 'src/i18n/locals'
 import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
 import type { ChatSettings } from 'src/types/chat'
-import type { Vendor } from 'src/types/provider'
 import { renderQuickActionsSettingsSection } from 'src/components/settings-components/quick-actions/panelActions'
 import {
 	DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,

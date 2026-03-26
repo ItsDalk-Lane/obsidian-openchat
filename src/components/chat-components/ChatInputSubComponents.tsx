@@ -1,6 +1,7 @@
 import { X, FileText, Folder, Zap, Highlighter } from 'lucide-react';
 import { localInstance } from 'src/i18n/locals';
 import type { SelectedFile, SelectedFolder } from 'src/core/chat/types/chat';
+import type { ProviderSettings } from 'src/types/provider';
 import { ModelTag } from './ModelTag';
 import { availableVendors } from 'src/settings/ai-runtime';
 import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';
@@ -149,13 +150,7 @@ export const ChatInputFileTags = ({
 
 // ---- SelectedModelsHint ----
 
-interface ProviderForHint {
-        tag: string;
-        vendor: string;
-        options?: {
-                parameters?: Record<string, unknown>;
-        };
-}
+type ProviderForHint = Pick<ProviderSettings, 'tag' | 'vendor' | 'options'>;
 
 interface ChatInputSelectedModelsHintProps {
         multiModelMode: string;

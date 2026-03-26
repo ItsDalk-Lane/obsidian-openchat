@@ -208,7 +208,7 @@ export function validateFormValues(
         if (value && typeof value === 'object' && !Array.isArray(value)) {
             try {
                 JSON.stringify(value);
-            } catch (error) {
+            } catch {
                 errors.push(new TypeConversionError(
                     value,
                     'string',

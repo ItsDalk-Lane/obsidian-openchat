@@ -11,7 +11,6 @@ import {
 	buildReasoningBlockStart,
 	getMimeTypeFromFilename,
 } from './utils'
-import { withToolMessageContext } from './messageFormat'
 import { resolveCurrentTools, toClaudeTools } from 'src/core/agents/loop'
 import {
 	filterZhipuRequestExtras,

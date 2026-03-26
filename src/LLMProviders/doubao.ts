@@ -1,5 +1,5 @@
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
 import { buildReasoningBlockStart, buildReasoningBlockEnd } from './utils'
 import { normalizeProviderError } from './errors'
 import { withRetry } from './retry'

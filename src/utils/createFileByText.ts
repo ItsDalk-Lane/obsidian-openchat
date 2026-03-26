@@ -200,7 +200,7 @@ async function validateAndConvertTemplate(
         } else if (typeof originalValue === 'object') {
             try {
                 convertedValue = JSON.stringify(originalValue, null, 2);
-            } catch (jsonError) {
+            } catch {
                 convertedValue = String(originalValue);
             }
         } else {

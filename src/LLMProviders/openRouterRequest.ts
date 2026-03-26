@@ -1,8 +1,8 @@
 import { Notice } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { DebugLogger } from 'src/utils/DebugLogger'
+import { mergeProviderOptionsWithParameters } from '.'
 import type {
-	mergeProviderOptionsWithParameters,
 	Message,
 	ResolveEmbedAsBinary,
 	SaveAttachment,

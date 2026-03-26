@@ -7,17 +7,6 @@ import {
 	BUILTIN_SERVER_NAME,
 	type McpSettings,
 } from 'src/services/mcp';
-import type { ChatOpenMode } from 'src/types/chat';
-
-type OpenModeLocale = Pick<
-	Local,
-	| 'chat_settings_auto_open_desc_sidebar'
-	| 'chat_settings_auto_open_desc_left_sidebar'
-	| 'chat_settings_auto_open_desc_tab'
-	| 'chat_settings_auto_open_desc_window'
-	| 'chat_settings_auto_open_desc_persistent_modal'
-	| 'chat_settings_auto_open_desc_default'
->;
 
 type McpStatusLocale = Pick<
 	Local,

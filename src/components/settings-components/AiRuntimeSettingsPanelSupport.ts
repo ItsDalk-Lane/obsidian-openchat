@@ -12,7 +12,6 @@ import {
 	resolveReasoningCapability,
 	writeReasoningCapabilityCache,
 } from 'src/LLMProviders/modelCapability'
-import { availableVendors } from 'src/settings/ai-runtime'
 import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
 import type { Message as ProviderMessage, ResolveEmbedAsBinary } from 'src/types/provider'
 import type { BaseOptions, ProviderSettings, Vendor } from 'src/types/provider'

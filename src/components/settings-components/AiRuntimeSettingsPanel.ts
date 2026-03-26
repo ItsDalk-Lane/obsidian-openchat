@@ -8,15 +8,14 @@ import { ProviderGroupConfigModal, createNewProviderGroupDraft } from 'src/compo
 import { buildProviderGroups, buildProvidersFromDraft, createDraftFromGroup, type ProviderGroupDraft, type ProviderGroupRecord } from 'src/components/settings-components/provider-config/providerGroupAdapter'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { ProviderSettingModal } from 'src/components/modals/AiRuntimeProviderModals'
-import { BaseOptions, ProviderSettings, Vendor } from 'src/types/provider'
-import type { Message as ProviderMessage, ResolveEmbedAsBinary } from 'src/types/provider'
-import { ollamaVendor } from 'src/LLMProviders/ollama'
+import { ProviderSettings, Vendor } from 'src/types/provider'
 import { getCapabilityDisplayText } from 'src/LLMProviders/utils'
 import { type ReasoningCapabilityRecord } from 'src/LLMProviders/modelCapability'
 import { availableVendors } from 'src/settings/ai-runtime'
 import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
 import { McpClientManager } from 'src/services/mcp'
 import type { ChatSettings } from 'src/types/chat'
+import { isCustomOpenChatProvider } from 'src/utils/aiProviderMetadata'
 
 export interface AiRuntimeSettingsContext {
 	getSettings: () => AiRuntimeSettings
@@ -170,6 +169,13 @@ export class AiRuntimeSettingsPanel {
 
 	private syncAllProviderApiKeys(): void {
 		this.vendorApiKeyManager.syncAllProviderApiKeys(this.settings)
+	}
+
+	private async probeReasoningCapability(
+		provider: ProviderSettings,
+		vendor: Vendor
+	): Promise<ReasoningCapabilityRecord> {
+		return await this.reasoningCapabilityManager.probeReasoningCapability(provider, vendor)
 	}
 
 	private openVendorApiKeysModal(): void {

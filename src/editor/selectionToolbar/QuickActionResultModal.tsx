@@ -57,7 +57,7 @@ export const QuickActionResultModal = ({
 			new Notice(localInstance.copy_success);
 			setTimeout(() => setCopySuccess(false), 2000);
 			onCopy();
-		} catch (e) {
+		} catch {
 			new Notice(localInstance.copy_failed);
 		}
 	}, [result, onCopy]);

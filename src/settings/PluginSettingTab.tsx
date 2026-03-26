@@ -77,8 +77,6 @@ const GeneralSettingsTabContent = ({
 }) => {
 	const {
 		chatSettings,
-		providers,
-		providerOptions,
 		messageManagement,
 		recentTurnsDraft,
 		setRecentTurnsDraft,
@@ -93,8 +91,6 @@ const GeneralSettingsTabContent = ({
 			/>
 			<AiChatSettingsTab
 				chatSettings={chatSettings}
-				providers={providers}
-				providerOptions={providerOptions}
 				messageManagement={messageManagement}
 				recentTurnsDraft={recentTurnsDraft}
 				setRecentTurnsDraft={setRecentTurnsDraft}
