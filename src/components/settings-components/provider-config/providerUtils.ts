@@ -206,7 +206,10 @@ export const MODEL_FETCH_CONFIGS: Record<string, ModelFetchConfig> = {
 	[siliconFlowVendor.name]: {
 		requiresApiKey: true,
 		fallbackModels: [...siliconFlowVendor.models],
-		buildRequest: () => ({ url: 'https://api.siliconflow.cn/v1/models?type=text&sub_type=chat' }),
+		buildRequest: (options) => ({
+			url: `${appendPath(options.baseURL, '/models', 'https://api.siliconflow.cn/v1/models')}?type=text&sub_type=chat`,
+			headers: { Authorization: `Bearer ${options.apiKey}` }
+		}),
 		parseResponse: parseOpenAICompatibleModels
 	},
 	[openRouterVendor.name]: {
@@ -222,7 +225,7 @@ export const MODEL_FETCH_CONFIGS: Record<string, ModelFetchConfig> = {
 			url: resolvePoeModelListURL(options.baseURL),
 			headers: { Authorization: `Bearer ${options.apiKey}` }
 		}),
-		parseResponse: parseOpenAICompatibleModels
+		parseResponse: parseGenericModels
 	},
 	[kimiVendor.name]: {
 		requiresApiKey: true,

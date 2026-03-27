@@ -414,6 +414,10 @@ export default {
 	'Zhipu structured output': '结构化输出',
 	'Zhipu structured output description':
 		'启用后模型会强制输出 JSON 格式。适用于需要程序化处理响应的场景，如数据提取、API 集成等。',
+	'Structured output': '结构化输出',
+	'Structured output description':
+		'启用后模型会强制输出 JSON 格式。适用于需要程序化处理响应的场景，如数据提取、API 集成等。',
+	'Provider has API key': '已配置密钥',
 	'Model compatibility hint': '模型兼容性提示',
 	'Qwen thinking mode': '思考模式',
 	'Qwen thinking mode description':
@@ -450,4 +454,65 @@ export default {
 	'System message role': '系统消息',
 	'User message role': '用户消息',
 	'Delete provider': '删除此服务商',
-}
+	'No models available from remote endpoint or fallback list':
+		'远程接口和回退列表中都没有可用模型。',
+	'Failed to load models. Please try again later.':
+		'加载模型列表失败，请稍后重试。',
+	'Chat session saved': '聊天会话已保存',
+	'Generation failed. Please try again later.': '生成失败，请稍后再试。',
+	'{mode} mode does not support parameter {field}': '{mode} 模式不支持参数 {field}。',
+	'{mode} mode does not support start_line; it was removed automatically. Use segment mode for line-offset reads.':
+		'{mode} 模式不支持 start_line，已自动移除；如需按行偏移读取请改用 segment 模式。',
+	'Vault mode only supports traversing from the Vault root. Omit directory_path or pass /.':
+		'Vault 模式只支持从 Vault 根目录遍历；请省略 directory_path 或传入 /。',
+	'select.fields or select.aggregates must provide at least one item':
+		'select.fields 或 select.aggregates 至少需要提供一项。',
+	'{aggregate} aggregate requires field': '{aggregate} 聚合必须提供 field。',
+	'operator=in requires value to be an array': 'operator=in 时 value 必须是数组。',
+	'operator={operator} does not accept an array value': 'operator={operator} 时 value 不能是数组。',
+	'[Notice] {message}': '[提示] {message}',
+	'[More content available. Continue from line {line}]':
+		'[更多内容可用，下一次从第 {line} 行继续读取]',
+	'{mode} was converted to read_mode={mode} and line_count':
+		'已将 {mode} 转换为 read_mode={mode} 和 line_count。',
+	'{mode} mode does not accept start_line; it was removed automatically':
+		'{mode} 模式不接受 start_line，已自动移除。',
+	'full mode does not accept start_line; use segment for long files':
+		'full 模式不接受 start_line；长文件请改用 segment。',
+	'head mode does not accept start_line; use segment to read from a specific line':
+		'head 模式不接受 start_line；如需从指定行开始请改用 segment。',
+	'tail mode does not accept start_line; use segment to read from a specific line':
+		'tail 模式不接受 start_line；如需从指定行开始请改用 segment。',
+	'Read content once the file path is known. Use segment for long files; if you only know the name, call find_paths first.':
+		'已知文件路径后读取内容。长文优先使用 segment 分段读取；如果只知道名称，请先调用 find_paths。',
+	'max_chars has been removed; use read_mode + line_count to control the range':
+		'max_chars 已移除；请改用 read_mode + line_count 控制读取范围。',
+	'Use this to preview multiple known file paths. For a single long document, use read_file.':
+		'用于批量预览多个已知文件路径的部分内容；单篇长文请改用 read_file。',
+	'max_chars has been removed; batch reads now use read_mode + line_count':
+		'max_chars 已移除；批量读取现使用 read_mode + line_count。',
+	'Use this only for known media file paths.': '仅用于已知媒体文件路径的图片或音频读取。',
+	'Use this for whole-file writes or overwrites; use edit_file for partial edits.':
+		'整文件写入或覆盖时使用；局部编辑请用 edit_file。',
+	'Use this for partial edits to known files; read with read_file first.':
+		'局部编辑已知文件时使用；读取内容前先用 read_file。',
+	'Failed to move action. Please try again.': '移动动作失败，请重试。',
+	'Failed to keep child actions. Please try again.': '保留子动作失败，请重试。',
+	'Failed to delete child actions. Please try again.': '删除子动作失败，请重试。',
+	'MCP connection failed ({name})': 'MCP 连接失败（{name}）',
+	'Tool call failed: {message}': '工具调用失败：{message}',
+	'Poe Responses missing tool executor': 'Poe Responses 返回了函数调用，但当前未配置工具执行器。',
+	'Poe tool loop exceeded maximum iterations': 'Poe 工具循环超过最大迭代次数（{count}）。',
+	'Poe Responses missing response id': 'Poe Responses 未返回 response.id，无法继续工具循环。',
+	'Poe upstream provider returned 5xx. Try switching to Claude-Sonnet-4.5 or GPT-5.2 and retry.':
+		'Poe 上游 provider 返回了 5xx。建议切换到 Claude-Sonnet-4.5 或 GPT-5.2 后重试。',
+	'Poe response body is not readable': 'Poe 响应体不可读。',
+	'Invalid base64 data': '无效的 base64 数据',
+	'Image exceeds the 20MB limit': '图片过大，已超过 20MB 限制',
+	'Image download timed out': '图片下载超时',
+	'Failed to download image ({status})': '下载图片失败（{status}）',
+	'Image save failed: {message}': '图片保存失败：{message}',
+	'API returned an incomplete response. Content may be truncated.':
+		'API 返回了不完整的响应，内容可能被截断。',
+	'Failed to parse response: {message}': '解析响应失败：{message}',
+} as const

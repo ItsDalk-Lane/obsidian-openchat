@@ -7,10 +7,14 @@ import {
 	type DoubaoThinkingType,
 	doubaoVendor,
 } from 'src/LLMProviders/doubao';
-import { type DoubaoImageOptions } from 'src/LLMProviders/doubaoImage';
+import { type DoubaoImageOptions, isDoubaoImageGenerationModel } from 'src/LLMProviders/doubaoImage';
 import { gptImageVendor, type GptImageOptions } from 'src/LLMProviders/gptImage';
 import { isImageGenerationModel, openRouterVendor, type OpenRouterOptions } from 'src/LLMProviders/openRouter';
-import { qianFanVendor } from 'src/LLMProviders/qianFan';
+import {
+	qianFanIsImageGenerationModel,
+	qianFanVendor,
+	type QianFanOptions,
+} from 'src/LLMProviders/qianFan';
 import { qwenVendor } from 'src/LLMProviders/qwen';
 import {
 	DEFAULT_ZHIPU_THINKING_TYPE,
@@ -32,6 +36,21 @@ import type { ProviderGroupDraft, ProviderModelDraft } from './providerGroupAdap
 type ToggleOption<T extends string> = {
 	value: T;
 	label: string;
+};
+
+const DEFAULT_CONTEXT_LENGTH = 128000;
+
+const isModelImageGeneration = (vendorName: string, modelName: string): boolean => {
+	if (vendorName === gptImageVendor.name) return true;
+	if (vendorName === openRouterVendor.name) return isImageGenerationModel(modelName);
+	if (vendorName === doubaoVendor.name) return isDoubaoImageGenerationModel(modelName);
+	if (vendorName === qianFanVendor.name) return qianFanIsImageGenerationModel(modelName);
+	return false;
+};
+
+const vendorSupportsStructuredOutput = (vendorName: string): boolean => {
+	const vendor = availableVendors.find((item) => item.name === vendorName);
+	return vendor?.capabilities.includes('Structured Output') ?? false;
 };
 
 class SettingsSubModal extends Modal {
@@ -186,17 +205,6 @@ const renderReasoningSettings = (
 					options.enableReasoning = value !== 'disabled';
 				}
 			);
-
-			// 结构化输出开关
-			addToggleSetting(
-				container,
-				t('Zhipu structured output'),
-				t('Zhipu structured output description'),
-				options.enableStructuredOutput ?? false,
-				(value) => {
-					options.enableStructuredOutput = value;
-				}
-			);
 		}
 		return;
 	}
@@ -301,7 +309,83 @@ const renderImageSettingsSections = (
 		const options = modelDraft.options as DoubaoOptions & Partial<DoubaoImageOptions>;
 		ensureDoubaoImageDefaults(options);
 		renderDoubaoImageSections(container, options as DoubaoImageOptions, context);
+		return;
 	}
+	if (vendorName === qianFanVendor.name) {
+		const options = modelDraft.options as QianFanOptions;
+		addDropdownSetting<NonNullable<QianFanOptions['imageResponseFormat']>>(
+			container,
+			t('Image response format'),
+			t('Image response format description qianfan'),
+			options.imageResponseFormat ?? 'b64_json',
+			[
+				{ value: 'b64_json', label: t('Base64 JSON (recommended)') },
+				{ value: 'url', label: 'URL' },
+			],
+			(value) => {
+				options.imageResponseFormat = value;
+			}
+		);
+		new Setting(container)
+			.setName(t('Images per request'))
+			.setDesc(t('Images per request description'))
+			.addSlider((slider) =>
+				slider
+					.setLimits(1, 4, 1)
+					.setValue(options.imageCount ?? 1)
+					.setDynamicTooltip()
+					.onChange((value) => {
+						options.imageCount = value;
+					})
+			);
+		new Setting(container)
+			.setName(t('Image Display Width'))
+			.setDesc(t('Image display width description attachment only'))
+			.addSlider((slider) =>
+				slider
+					.setLimits(200, 800, 50)
+					.setValue(options.imageDisplayWidth ?? 400)
+					.setDynamicTooltip()
+					.onChange((value) => {
+						options.imageDisplayWidth = value;
+					})
+			);
+	}
+};
+
+const renderContextLengthSetting = (
+	container: HTMLElement,
+	modelDraft: ProviderModelDraft
+): void => {
+	new Setting(container)
+		.setName(t('Context length'))
+		.setDesc(t('Context length description'))
+		.addText((text) => {
+			text.inputEl.type = 'number';
+			text
+				.setPlaceholder(String(DEFAULT_CONTEXT_LENGTH))
+				.setValue(String(modelDraft.options.contextLength ?? DEFAULT_CONTEXT_LENGTH))
+				.onChange((value) => {
+					const parsed = Number.parseInt(value, 10);
+					modelDraft.options.contextLength =
+						Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_CONTEXT_LENGTH;
+				});
+		});
+};
+
+const renderStructuredOutputSetting = (
+	container: HTMLElement,
+	modelDraft: ProviderModelDraft
+): void => {
+	addToggleSetting(
+		container,
+		t('Structured output'),
+		t('Structured output description'),
+		modelDraft.options.enableStructuredOutput ?? false,
+		(value) => {
+			modelDraft.options.enableStructuredOutput = value;
+		}
+	);
 };
 
 const shouldShowImageSettingsButton = (vendorName: string, modelName: string): boolean => {
@@ -317,14 +401,15 @@ const shouldShowImageSettingsButton = (vendorName: string, modelName: string): b
 	if (vendorName === doubaoVendor.name) {
 		return modelName.toLowerCase().includes('seedream') || modelName.toLowerCase().includes('-t2i');
 	}
+	if (vendorName === qianFanVendor.name) {
+		return qianFanIsImageGenerationModel(modelName);
+	}
 	return false;
 };
 
 export const modelHasSettings = (vendorName: string, modelDraft: ProviderModelDraft): boolean => {
-	return vendorSupportsReasoning(vendorName)
-		|| (vendorSupportsWebSearch(vendorName)
-			&& !(vendorName === openRouterVendor.name && isImageGenerationModel(modelDraft.options.model ?? '')))
-		|| shouldShowImageSettingsButton(vendorName, modelDraft.options.model ?? '');
+	// 所有模型都需要上下文长度设置
+	return true;
 };
 
 export const openModelSettingsModal = (args: {
@@ -338,8 +423,21 @@ export const openModelSettingsModal = (args: {
 			? `${args.modelDraft.options.model} · ${t('Settings')}`
 			: t('Settings'),
 		(container) => {
-			if (vendorSupportsReasoning(args.vendor.name)) {
+			const modelName = args.modelDraft.options.model ?? '';
+			const isImageModel = isModelImageGeneration(args.vendor.name, modelName);
+			if (!isImageModel) {
+				renderContextLengthSetting(container, args.modelDraft);
+			} else {
+				delete args.modelDraft.options.contextLength;
+			}
+			if (vendorSupportsReasoning(args.vendor.name) && !isImageModel) {
 				renderReasoningSettings(container, args.vendor.name, args.modelDraft);
+			}
+			if (
+				vendorSupportsStructuredOutput(args.vendor.name)
+				&& !isImageModel
+			) {
+				renderStructuredOutputSetting(container, args.modelDraft);
 			}
 			if (
 				vendorSupportsWebSearch(args.vendor.name)

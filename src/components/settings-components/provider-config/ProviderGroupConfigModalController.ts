@@ -162,7 +162,6 @@ export class ProviderGroupConfigModalController {
 					const nextOptions = cloneValue(vendor.defaultOptions);
 					nextOptions.baseURL = this.draft.baseURL || vendor.defaultOptions.baseURL;
 					nextOptions.apiKey = this.draft.apiKey;
-					nextOptions.contextLength = this.draft.contextLength;
 					nextOptions.parameters = {};
 					const draftModel: ProviderModelDraft = {
 						id: createProviderGroupId(),
@@ -348,6 +347,12 @@ export class ProviderGroupConfigModalController {
 			return this.modelSuggestionCache;
 		}
 		const result = await fetchModels(modelConfig, options);
+		if (result.models.length === 0) {
+			this.modelSuggestionCache = [];
+			this.modelSuggestionCacheKey = cacheKey;
+			this.rawModelById = {};
+			return this.modelSuggestionCache;
+		}
 		this.modelSuggestionCache = result.models;
 		this.modelSuggestionCacheKey = cacheKey;
 		this.rawModelById = result.rawModelById;
@@ -355,21 +360,38 @@ export class ProviderGroupConfigModalController {
 	}
 
 	private async openModelPicker(modelDraft: ProviderModelDraft): Promise<void> {
-		const models = await this.getModelSuggestions();
-		new SelectModelModal(this.app, models, (selectedModel) => {
-			this.applySelectedModel(modelDraft, selectedModel);
-			this.options.render();
-		}).open();
+		try {
+			const models = await this.getModelSuggestions();
+			if (models.length === 0) {
+				new Notice(t('No models available from remote endpoint or fallback list'));
+				return;
+			}
+			new SelectModelModal(this.app, models, (selectedModel) => {
+				this.applySelectedModel(modelDraft, selectedModel);
+				this.options.render();
+			}).open();
+		} catch (error) {
+			if (error instanceof Error) {
+				const errorMessage = error.message.toLowerCase();
+				if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
+					new Notice(t('API key may be incorrect. Please check your API key.'));
+					return;
+				}
+				if (errorMessage.includes('403') || errorMessage.includes('forbidden')) {
+					new Notice(t('Access denied. Please check your API permissions.'));
+					return;
+				}
+				new Notice(t('Failed to load models. Please try again later.'));
+				return;
+			}
+			new Notice(t('Failed to load models. Please try again later.'));
+		}
 	}
 
 	private applySelectedModel(modelDraft: ProviderModelDraft, modelName: string): void {
 		modelDraft.options.model = modelName;
 		if (!modelDraft.tag) {
 			modelDraft.tag = '';
-		}
-		const rawModel = this.rawModelById?.[modelName];
-		if (rawModel) {
-			void rawModel;
 		}
 	}
 
@@ -387,7 +409,6 @@ export class ProviderGroupConfigModalController {
 				...cloneValue(modelDraft.options),
 				apiKey: this.isCustomMode ? this.draft.apiKey : this.params.getVendorApiKey(vendor.name),
 				baseURL: this.draft.baseURL,
-				contextLength: this.draft.contextLength,
 				parameters: mergeProviderParametersWithMetadata(cloneValue(this.draft.parameters), {
 					groupId: this.draft.groupId,
 					baseTag: this.draft.baseTag,

@@ -1,39 +1,14 @@
+import { t } from 'src/i18n/ai-runtime/helper'
+import type {
+	ToolDefinition,
+	ToolExecutionRecord,
+	ToolExecutor,
+} from 'src/core/agents/loop/types'
 import type { OpenAIToolCall } from 'src/services/mcp/mcpToolCallHandler'
 import { executeMcpToolCalls } from 'src/services/mcp/mcpToolCallHandler'
 
-import { requestChatCompletionStreamByFetch } from './poeRequests'
 import type { PoeFunctionCallItem, PoeToolResultMarker } from './poeTypes'
 import type { PoeRequestContext } from './poeRunnerShared'
-import { ensureCompletionEndpoint } from './poeUtils'
-import { formatMsg } from './poeMessageTransforms'
-import { feedChunk } from './sse'
-import { buildReasoningBlockEnd, buildReasoningBlockStart } from './utils'
-
-type PoeLoopMessage = {
-	role: string
-	content: unknown
-	tool_calls?: unknown
-	tool_call_id?: string
-	tool_name?: string
-}
-type PoeChatDelta = {
-	reasoning_content?: string
-	content?: string
-	tool_calls?: Array<{
-		index?: number
-		id?: string
-		function?: {
-			name?: string
-			arguments?: string
-		}
-	}>
-}
-
-type PoeChatPayload = {
-	choices?: Array<{
-		delta?: PoeChatDelta
-	}>
-}
 
 const mapFunctionCallsToOpenAI = (calls: PoeFunctionCallItem[]): OpenAIToolCall[] => {
 	return calls.map((call) => ({
@@ -46,14 +21,104 @@ const mapFunctionCallsToOpenAI = (calls: PoeFunctionCallItem[]): OpenAIToolCall[
 	}))
 }
 
+const parseToolArguments = (rawArguments: string): Record<string, unknown> => {
+	try {
+		const parsed = JSON.parse(rawArguments)
+		return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+			? parsed as Record<string, unknown>
+			: {}
+	} catch {
+		return {}
+	}
+}
+
+const resolveFunctionCallResponseId = (call: PoeFunctionCallItem): string => {
+	return call.call_id || call.id
+}
+
 export const executePoeMcpToolCalls = async (
 	functionCalls: PoeFunctionCallItem[],
 	mcpTools: Awaited<ReturnType<PoeRequestContext['getCurrentMcpTools']>>,
-	mcpCallTool: NonNullable<PoeRequestContext['mcpCallTool']>
+	mcpCallTool: NonNullable<PoeRequestContext['mcpCallTool']> | undefined,
+	options?: {
+		tools?: ToolDefinition[]
+		toolExecutor?: ToolExecutor
+		abortSignal?: AbortSignal
+		onToolCallResult?: (record: ToolExecutionRecord) => void
+	}
 ): Promise<{
 	nextInputItems: Array<{ type: 'function_call_output'; call_id: string; output: string }>
 	markers: PoeToolResultMarker[]
 }> => {
+	const activeTools = Array.isArray(options?.tools) ? options.tools : []
+	const toolExecutor = options?.toolExecutor
+	if (toolExecutor && activeTools.length > 0) {
+		const nextInputItems: Array<{ type: 'function_call_output'; call_id: string; output: string }> = []
+		const markers: PoeToolResultMarker[] = []
+
+		for (const call of functionCalls) {
+			const parsedArguments = parseToolArguments(call.arguments)
+			try {
+				const result = await toolExecutor.execute(
+					{
+						id: call.id,
+						name: call.name,
+						arguments: call.arguments || '{}'
+					},
+					activeTools,
+					{ abortSignal: options?.abortSignal }
+				)
+				const outputText = typeof result.content === 'string' ? result.content : String(result.content)
+				options?.onToolCallResult?.({
+					id: result.toolCallId,
+					name: result.name,
+					arguments: parsedArguments,
+					result: outputText,
+					status: 'completed',
+					timestamp: Date.now(),
+				})
+				nextInputItems.push({
+					type: 'function_call_output',
+					call_id: resolveFunctionCallResponseId(call),
+					output: outputText
+				})
+				markers.push({
+					toolName: result.name,
+					content: outputText
+				})
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error)
+				const outputText = t('Tool call failed: {message}').replace('{message}', errorMessage)
+				options?.onToolCallResult?.({
+					id: call.id,
+					name: call.name,
+					arguments: parsedArguments,
+					result: outputText,
+					status: 'failed',
+					timestamp: Date.now(),
+				})
+				nextInputItems.push({
+					type: 'function_call_output',
+					call_id: resolveFunctionCallResponseId(call),
+					output: outputText
+				})
+				markers.push({
+					toolName: call.name,
+					content: outputText
+				})
+			}
+		}
+
+		return {
+			nextInputItems,
+			markers
+		}
+	}
+
+	if (!mcpCallTool) {
+		throw new Error(t('Poe Responses missing tool executor'))
+	}
+
 	const openAIToolCalls = mapFunctionCallsToOpenAI(functionCalls)
 	const results = await executeMcpToolCalls(openAIToolCalls, mcpTools, mcpCallTool)
 	const resultMap = new Map<string, { name?: string; content?: unknown }>()
@@ -79,7 +144,7 @@ export const executePoeMcpToolCalls = async (
 
 		nextInputItems.push({
 			type: 'function_call_output',
-			call_id: call.call_id,
+			call_id: resolveFunctionCallResponseId(call),
 			output: outputText
 		})
 		markers.push({
@@ -91,190 +156,5 @@ export const executePoeMcpToolCalls = async (
 	return {
 		nextInputItems,
 		markers
-	}
-}
-
-export const runPureChatCompletionsMcpLoop = async function* (
-	context: PoeRequestContext,
-	prebuiltMessages?: PoeLoopMessage[]
-) {
-	if (!context.mcpCallTool) {
-		throw new Error('Poe MCP 工具循环缺少 mcpCallTool。')
-	}
-
-	const loopMessages: PoeLoopMessage[] = prebuiltMessages
-		? [...prebuiltMessages]
-		: await Promise.all(context.messages.map((msg) => formatMsg(msg, context.resolveEmbedAsBinary))) as PoeLoopMessage[]
-
-	const streamOneChatRound = async function* (
-		roundMessages: PoeLoopMessage[],
-		tools?: unknown[]
-	): AsyncGenerator<string, { toolCalls: OpenAIToolCall[]; contentText: string }, undefined> {
-		const body: Record<string, unknown> = {
-			model: context.model,
-			messages: roundMessages,
-			...context.chatFallbackParams
-		}
-		if (tools && tools.length > 0) {
-			body.tools = tools
-		}
-		if (context.enableReasoning) {
-			body.reasoning_effort = 'medium'
-		}
-
-		const reader = await requestChatCompletionStreamByFetch(
-			ensureCompletionEndpoint(context.baseURL),
-			context.apiKey,
-			body,
-			context.controller.signal
-		)
-
-		let sseRest = ''
-		let reading = true
-		let contentText = ''
-		const toolCallAccum: Map<number, { id: string; name: string; arguments: string }> = new Map()
-		let reasoningActive = false
-		let reasoningStartMs: number | null = null
-		let reasoningBuffer = ''
-
-		const processDelta = function* (delta: PoeChatDelta | undefined) {
-			if (!delta) return
-
-			const reasoningText = delta.reasoning_content
-			if (reasoningText && context.enableReasoning) {
-				if (!reasoningActive) {
-					reasoningActive = true
-					reasoningStartMs = Date.now()
-					yield buildReasoningBlockStart(reasoningStartMs)
-				}
-				reasoningBuffer += reasoningText
-				yield reasoningText
-			}
-
-			const text = delta.content
-			if (typeof text === 'string' && text) {
-				if (reasoningActive && reasoningBuffer.length > 0) {
-					const durationMs = Date.now() - (reasoningStartMs ?? Date.now())
-					yield buildReasoningBlockEnd(durationMs)
-					reasoningActive = false
-					reasoningBuffer = ''
-					reasoningStartMs = null
-				}
-				contentText += text
-				yield text
-			}
-
-			if (Array.isArray(delta.tool_calls)) {
-				if (reasoningActive && reasoningBuffer.length > 0) {
-					const durationMs = Date.now() - (reasoningStartMs ?? Date.now())
-					yield buildReasoningBlockEnd(durationMs)
-					reasoningActive = false
-					reasoningBuffer = ''
-					reasoningStartMs = null
-				}
-				for (const tc of delta.tool_calls) {
-					const idx = tc.index ?? 0
-					if (!toolCallAccum.has(idx)) {
-						toolCallAccum.set(idx, { id: '', name: '', arguments: '' })
-					}
-					const acc = toolCallAccum.get(idx)
-					if (!acc) {
-						continue
-					}
-					if (tc.id) acc.id = tc.id
-					if (tc.function?.name) acc.name += tc.function.name
-					if (tc.function?.arguments) acc.arguments += tc.function.arguments
-				}
-			}
-		}
-
-		while (reading) {
-			const { done, value } = await reader.read()
-			const parsed = feedChunk(sseRest, done ? '\n\n' : value ?? '')
-			sseRest = parsed.rest
-
-			for (const event of parsed.events) {
-				if (event.isDone) {
-					reading = false
-					break
-				}
-				const payload = event.json as PoeChatPayload | undefined
-				const delta = payload?.choices?.[0]?.delta
-				yield* processDelta(delta)
-			}
-
-			if (done) {
-				reading = false
-			}
-		}
-
-		if (reasoningActive && reasoningBuffer.length > 0) {
-			const durationMs = Date.now() - (reasoningStartMs ?? Date.now())
-			yield buildReasoningBlockEnd(durationMs)
-		}
-
-		const toolCalls: OpenAIToolCall[] = []
-		for (const [, acc] of [...toolCallAccum.entries()].sort((a, b) => a[0] - b[0])) {
-			if (acc.name) {
-				toolCalls.push({
-					id: acc.id || `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-					type: 'function' as const,
-					function: { name: acc.name, arguments: acc.arguments || '{}' }
-				})
-			}
-		}
-
-		return { toolCalls, contentText }
-	}
-
-	for (let loop = 0; loop < context.maxToolCallLoops; loop++) {
-		if (context.controller.signal.aborted) return
-		const activeMcpTools = await context.getCurrentMcpTools()
-		const chatTools = activeMcpTools.map((tool) => ({
-			type: 'function' as const,
-			function: {
-				name: tool.name,
-				description: tool.description || '',
-				parameters: tool.inputSchema as Record<string, unknown>
-			}
-		}))
-
-		const gen = streamOneChatRound(loopMessages, chatTools)
-		let result = await gen.next()
-		while (!result.done) {
-			yield result.value
-			result = await gen.next()
-		}
-		const { toolCalls, contentText } = result.value
-
-		if (toolCalls.length === 0) {
-			return
-		}
-
-		loopMessages.push({
-			role: 'assistant',
-			content: contentText,
-			tool_calls: toolCalls.map((tc) => ({
-				id: tc.id,
-				type: 'function',
-				function: { name: tc.function.name, arguments: tc.function.arguments }
-			}))
-		})
-
-		const results = await executeMcpToolCalls(toolCalls, activeMcpTools, context.mcpCallTool)
-		await context.refreshToolCandidates()
-
-		for (const result of results) {
-			loopMessages.push(result)
-			const resultContent = typeof result.content === 'string' ? result.content : ''
-			yield `{{FF_MCP_TOOL_START}}:${result.name || ''}:${resultContent}{{FF_MCP_TOOL_END}}:`
-		}
-	}
-
-	const finalGen = streamOneChatRound(loopMessages)
-	let finalResult = await finalGen.next()
-	while (!finalResult.done) {
-		yield finalResult.value
-		finalResult = await finalGen.next()
 	}
 }

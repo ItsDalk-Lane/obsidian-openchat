@@ -41,7 +41,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 		const cleanedParameters = { ...rawParameters }
 		delete cleanedParameters.__ff_deepseek
 		const options = { ...mergeProviderOptionsWithParameters(settings), ...cleanedParameters }
-		const { apiKey, baseURL, model, ...remains } = options
+		const { apiKey, baseURL, model, enableStructuredOutput, ...remains } = options
 		if (!apiKey) throw new Error(t('API key is required'))
 
 		const client = new OpenAI({
@@ -77,13 +77,17 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest =>
 
 		const preparedMessages = applyPrefixContinuation(messages, internalConfig)
 		const transformedMessages = transformMessagesForDeepSeek(preparedMessages)
+		const requestParams = {
+			model,
+			messages: transformedMessages as OpenAI.ChatCompletionMessageParam[],
+			stream: true,
+			...remains
+		} as OpenAI.ChatCompletionCreateParamsStreaming & Record<string, unknown>
+		if (enableStructuredOutput && !requestParams.response_format) {
+			requestParams.response_format = { type: 'json_object' }
+		}
 		const stream = await client.chat.completions.create(
-			{
-				model,
-				messages: transformedMessages as OpenAI.ChatCompletionMessageParam[],
-				stream: true,
-				...remains
-			} as OpenAI.ChatCompletionCreateParamsStreaming,
+			requestParams,
 			{ signal: controller.signal }
 		)
 
@@ -271,7 +275,7 @@ export const deepSeekVendor: Vendor = {
 		baseURL: 'https://api.deepseek.com',
 		model: DEEPSEEK_MODELS[0],
 		parameters: {},
-		enableReasoning: false // 默认关闭推理功能
+		enableReasoning: false
 	} as DeepSeekOptions,
 	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc as (settings: BaseOptions) => SendRequest, deepSeekLoopOptions),
 	models: DEEPSEEK_MODELS,

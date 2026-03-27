@@ -282,7 +282,7 @@ export const kimiVendor: Vendor = {
 		baseURL: 'https://api.moonshot.cn/v1/chat/completions',
 		model: '',
 		parameters: {},
-		enableReasoning: false // 默认关闭推理功能
+		enableReasoning: false
 	} as KimiOptions,
 	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc, kimiLoopOptions),
 

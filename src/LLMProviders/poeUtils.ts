@@ -1,4 +1,19 @@
 const DEFAULT_POE_BASE_URL = 'https://api.poe.com/v1'
+const ZDR_ORGANIZATION_KEYS = new Set<string>()
+
+const buildPoeOrganizationKey = (baseURL: string, apiKey: string): string => {
+	return `${normalizePoeBaseURL(baseURL)}::${apiKey}`
+}
+
+export const markPoeOrganizationAsZdr = (baseURL: string, apiKey: string): void => {
+	if (!apiKey) return
+	ZDR_ORGANIZATION_KEYS.add(buildPoeOrganizationKey(baseURL, apiKey))
+}
+
+export const isPoeOrganizationKnownZdr = (baseURL: string, apiKey: string): boolean => {
+	if (!apiKey) return false
+	return ZDR_ORGANIZATION_KEYS.has(buildPoeOrganizationKey(baseURL, apiKey))
+}
 
 export const isReasoningDeltaEvent = (eventType: string): boolean => {
 	return eventType.includes('reasoning') && eventType.includes('delta')
@@ -63,6 +78,17 @@ export const shouldRetryContinuationWithoutReasoning = (error: unknown): boolean
 	return /connection\s*error|err_connection_closed|socket|stream|network/i.test(message)
 }
 
+export const shouldRetryWithoutPreviousResponseId = (error: unknown): boolean => {
+	const status = resolveErrorStatus(error)
+	if (status !== 400) return false
+	const message = (error instanceof Error ? error.message : String(error)).toLowerCase()
+	return (
+		message.includes('previous response cannot be used')
+		|| message.includes('previous_response_id')
+		|| message.includes('zero data retention')
+	)
+}
+
 export const normalizeErrorText = (prefix: string, error: unknown): Error => {
 	const message = error instanceof Error ? error.message : String(error)
 	return new Error(`${prefix}: ${message}`)
@@ -94,6 +120,7 @@ export const poeMapResponsesParams = (params: Record<string, unknown>) => {
 		mapped.max_output_tokens = mapped.max_tokens
 		delete mapped.max_tokens
 	}
+	delete mapped.previous_response_id
 	return mapped
 }
 

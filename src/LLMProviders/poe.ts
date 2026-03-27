@@ -1,36 +1,23 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
 import OpenAI from 'openai'
-import { Platform } from 'obsidian'
+import { resolveCurrentTools, type ToolDefinition } from 'src/core/agents/loop'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import { mcpToolToToolDefinition, McpToolExecutor } from 'src/services/mcp'
 import { resolveCurrentMcpTools } from 'src/services/mcp/mcpToolCallHandler'
+import { DebugLogger } from 'src/utils/DebugLogger'
 
-import {
-	runChatCompletionFallback,
-	runStreamingChatCompletion,
-	runStreamingChatCompletionByFetch
-} from './poeChatRunners'
 import { normalizeProviderError } from './errors'
-import { runMcpHybridToolLoop } from './poeHybridRunner'
 import { formatMsgForResponses } from './poeMessageTransforms'
 import type { PoeRequestContext } from './poeRunnerShared'
-import {
-	runResponsesWithDesktopFetchSse,
-	runResponsesWithOpenAISdk
-} from './poeResponsesRunners'
-import {
-	runResponsesStreamByFetch,
-	runResponsesWithDesktopRequestUrl
-} from './poeResponsesRequestRunners'
+import { runResponsesWithOpenAISdk } from './poeResponsesRunners'
 import { smoothStream, wrapWithThinkTagDetection } from './poeStreaming'
 import type { PoeOptions } from './poeTypes'
 import {
-	mapResponsesParamsToChatParams,
 	normalizePoeBaseURL,
 	poeMapResponsesParams,
-	resolveErrorStatus,
-	shouldFallbackToChatCompletions
+	resolveErrorStatus
 } from './poeUtils'
 
 export type { PoeOptions } from './poeTypes'
@@ -43,6 +30,8 @@ const POE_RETRY_OPTIONS = {
 	maxDelayMs: 3000,
 	jitterRatio: 0.2
 } as const
+
+const POE_SDK_BLOCKED_HEADER_PATTERN = /^x-stainless-/i
 
 const dedupeTools = (tools: any[]): any[] => {
 	const seen = new Set<string>()
@@ -101,9 +90,8 @@ const normalizeResponsesFunctionTool = (tool: unknown): any | null => {
 					: { type: 'object', properties: {} }
 	}
 }
-
-const toResponsesFunctionToolsFromMcp = (mcpTools: NonNullable<BaseOptions['mcpTools']>) => {
-	return mcpTools.map((tool) => ({
+const toResponsesFunctionToolsFromGeneric = (tools: ToolDefinition[]) => {
+	return tools.map((tool) => ({
 		type: 'function' as const,
 		name: tool.name,
 		description: tool.description,
@@ -111,10 +99,73 @@ const toResponsesFunctionToolsFromMcp = (mcpTools: NonNullable<BaseOptions['mcpT
 	}))
 }
 
+const dedupeToolDefinitions = (tools: ToolDefinition[]): ToolDefinition[] => {
+	const seen = new Set<string>()
+	return tools.filter((tool) => {
+		const key = `${tool.source}:${tool.sourceId}:${tool.name}`
+		if (seen.has(key)) return false
+		seen.add(key)
+		return true
+	})
+}
+
+const resolveLegacyMcpToolsAsGeneric = async (
+	mcpTools: BaseOptions['mcpTools'],
+	mcpGetTools?: BaseOptions['mcpGetTools']
+): Promise<ToolDefinition[]> => {
+	const legacyTools = await resolveCurrentMcpTools(mcpTools, mcpGetTools)
+	return legacyTools.map(mcpToolToToolDefinition)
+}
+
+const resolveActiveTools = async (options: {
+	tools?: ToolDefinition[]
+	getTools?: BaseOptions['getTools']
+	mcpTools?: BaseOptions['mcpTools']
+	mcpGetTools?: BaseOptions['mcpGetTools']
+}): Promise<ToolDefinition[]> => {
+	const [genericTools, legacyMcpTools] = await Promise.all([
+		resolveCurrentTools(options.tools, options.getTools),
+		resolveLegacyMcpToolsAsGeneric(options.mcpTools, options.mcpGetTools),
+	])
+	return dedupeToolDefinitions([...genericTools, ...legacyMcpTools])
+}
+
+const createPoeBrowserSafeFetch = (stage: string): typeof globalThis.fetch => {
+	return async (input, init) => {
+		const headers = new Headers(input instanceof Request ? input.headers : undefined)
+		if (init?.headers) {
+			new Headers(init.headers).forEach((value, key) => {
+				headers.set(key, value)
+			})
+		}
+
+		const strippedHeaders: string[] = []
+		const headerKeys: string[] = []
+		headers.forEach((_, key) => {
+			headerKeys.push(key)
+		})
+		for (const key of headerKeys) {
+			if (POE_SDK_BLOCKED_HEADER_PATTERN.test(key)) {
+				strippedHeaders.push(key)
+				headers.delete(key)
+			}
+		}
+
+		if (strippedHeaders.length > 0) {
+			DebugLogger.debug(`[Poe][${stage}] 已移除浏览器不兼容请求头`, { strippedHeaders })
+		}
+
+		return await globalThis.fetch(input, {
+			...init,
+			headers,
+		})
+	}
+}
+
 const mergeResponseTools = (
 	apiParamTools: unknown,
 	enableWebSearch: boolean,
-	mcpTools: BaseOptions['mcpTools']
+	tools: ToolDefinition[]
 ) => {
 	const merged: any[] = []
 	if (Array.isArray(apiParamTools)) {
@@ -128,8 +179,8 @@ const mergeResponseTools = (
 	if (enableWebSearch) {
 		merged.push({ type: 'web_search_preview' })
 	}
-	if (Array.isArray(mcpTools) && mcpTools.length > 0) {
-		merged.push(...toResponsesFunctionToolsFromMcp(mcpTools))
+	if (tools.length > 0) {
+		merged.push(...toResponsesFunctionToolsFromGeneric(tools))
 	}
 	return dedupeTools(merged)
 }
@@ -148,6 +199,11 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 				model,
 				enableReasoning = false,
 				enableWebSearch = false,
+				tools,
+				toolExecutor,
+				maxToolCallLoops,
+				getTools,
+				onToolCallResult,
 				mcpTools,
 				mcpGetTools,
 				mcpCallTool,
@@ -158,30 +214,52 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 			if (!apiKey) throw new Error(t('API key is required'))
 			if (!model) throw new Error(t('Model is required'))
 
-			const hasMcpToolRuntime = (
-				(Array.isArray(mcpTools) && mcpTools.length > 0)
+			const resolvedToolExecutor = toolExecutor
+				?? (typeof mcpCallTool === 'function' ? new McpToolExecutor(mcpCallTool) : undefined)
+
+			const hasToolRuntime = (
+				(Array.isArray(tools) && tools.length > 0)
+				|| typeof getTools === 'function'
+				|| (Array.isArray(mcpTools) && mcpTools.length > 0)
 				|| typeof mcpGetTools === 'function'
-			) && typeof mcpCallTool === 'function'
+			) && Boolean(resolvedToolExecutor)
+
+			const getCurrentTools = async () => {
+				return hasToolRuntime
+					? await resolveActiveTools({ tools, getTools, mcpTools, mcpGetTools })
+					: []
+			}
 
 			const getCurrentMcpTools = async () => {
-				return hasMcpToolRuntime
-					? await resolveCurrentMcpTools(mcpTools, mcpGetTools)
-					: []
+				const currentTools = await getCurrentTools()
+				return currentTools.map((tool) => ({
+					name: tool.name,
+					title: tool.title,
+					description: tool.description,
+					inputSchema: tool.inputSchema,
+					outputSchema: tool.outputSchema,
+					annotations: tool.annotations,
+					serverId: tool.sourceId,
+				}))
 			}
 
 			const responseBaseParams = poeMapResponsesParams(remains as Record<string, unknown>)
 			const responseApiTools = responseBaseParams.tools
 			delete responseBaseParams.tools
 
+			const initialTools = await getCurrentTools()
 			const toolCandidateState = {
 				current: mergeResponseTools(
 					responseApiTools,
 					enableWebSearch,
-					hasMcpToolRuntime ? await getCurrentMcpTools() : undefined
+					initialTools
 				)
 			}
 
-			const maxToolCallLoops =
+			const resolvedMaxToolCallLoops =
+				typeof maxToolCallLoops === 'number' && maxToolCallLoops > 0
+					? maxToolCallLoops
+					:
 				typeof mcpMaxToolCallLoops === 'number' && mcpMaxToolCallLoops > 0
 					? mcpMaxToolCallLoops
 					: DEFAULT_MCP_TOOL_LOOP_LIMIT
@@ -193,14 +271,16 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 			const client = new OpenAI({
 				apiKey: String(apiKey),
 				baseURL: normalizedBaseURL,
-				dangerouslyAllowBrowser: true
+				dangerouslyAllowBrowser: true,
+				fetch: createPoeBrowserSafeFetch('responses-sdk')
 			})
 
 			const refreshToolCandidates = async () => {
+				const currentTools = await getCurrentTools()
 				toolCandidateState.current = mergeResponseTools(
 					responseApiTools,
 					enableWebSearch,
-					hasMcpToolRuntime ? await getCurrentMcpTools() : undefined
+					currentTools
 				)
 				return toolCandidateState.current
 			}
@@ -216,166 +296,29 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 				enableReasoning,
 				enableWebSearch,
 				responseBaseParams,
-				chatFallbackParams: mapResponsesParamsToChatParams(responseBaseParams),
 				responseInput,
-				hasMcpToolRuntime,
+				hasToolRuntime,
+				toolExecutor: resolvedToolExecutor,
+				onToolCallResult,
 				mcpCallTool,
-				maxToolCallLoops,
+				maxToolCallLoops: resolvedMaxToolCallLoops,
 				retryOptions: POE_RETRY_OPTIONS,
+				getCurrentTools,
 				getCurrentMcpTools,
 				getToolCandidates: () => toolCandidateState.current,
 				refreshToolCandidates
 			}
 
-			try {
-				if (hasMcpToolRuntime) {
-					yield* smoothStream(
-						wrapWithThinkTagDetection(runMcpHybridToolLoop(requestContext), enableReasoning)
-					)
-					return
-				}
-
-				if (!enableReasoning && !enableWebSearch) {
-					yield* smoothStream(
-						wrapWithThinkTagDetection(
-							runStreamingChatCompletionByFetch(requestContext),
-							enableReasoning
-						)
-					)
-					return
-				}
-
-				yield* smoothStream(
-					wrapWithThinkTagDetection(runResponsesStreamByFetch(requestContext), enableReasoning)
-				)
-				return
-			} catch (error) {
-				if (hasMcpToolRuntime) {
-					if (Platform.isDesktopApp) {
-						try {
-							yield* smoothStream(
-								wrapWithThinkTagDetection(
-									runResponsesWithDesktopFetchSse(requestContext),
-									enableReasoning
-								)
-							)
-							return
-						} catch {
-							yield* smoothStream(
-								wrapWithThinkTagDetection(
-									runResponsesWithDesktopRequestUrl(requestContext),
-									enableReasoning
-								)
-							)
-							return
-						}
-					}
-					throw error
-				}
-
-				const errorStatus = resolveErrorStatus(error)
-				if (errorStatus === 429) {
-					throw error
-				}
-
-				if (!enableReasoning && !enableWebSearch) {
-					try {
-						yield* smoothStream(
-							wrapWithThinkTagDetection(
-								runStreamingChatCompletion(requestContext),
-								enableReasoning
-							)
-						)
-						return
-					} catch (sdkChatError) {
-						if (resolveErrorStatus(sdkChatError) === 429) {
-							throw sdkChatError
-						}
-					}
-
-					try {
-						yield* smoothStream(
-							wrapWithThinkTagDetection(
-								runResponsesWithOpenAISdk(requestContext),
-								enableReasoning
-							)
-						)
-						return
-					} catch (responsesError) {
-						if (resolveErrorStatus(responsesError) === 429) {
-							throw responsesError
-						}
-					}
-				} else {
-					try {
-						yield* smoothStream(
-							wrapWithThinkTagDetection(
-								runResponsesWithOpenAISdk(requestContext),
-								enableReasoning
-							)
-						)
-						return
-					} catch (sdkResponsesError) {
-						if (resolveErrorStatus(sdkResponsesError) === 429) {
-							throw sdkResponsesError
-						}
-					}
-				}
-
-				if (Platform.isDesktopApp) {
-					try {
-						yield* smoothStream(
-							wrapWithThinkTagDetection(
-								runResponsesWithDesktopFetchSse(requestContext),
-								enableReasoning
-							)
-						)
-						return
-					} catch (desktopStreamError) {
-						if (resolveErrorStatus(desktopStreamError) === 429) {
-							throw desktopStreamError
-						}
-						try {
-							yield* smoothStream(
-								wrapWithThinkTagDetection(
-									runResponsesWithDesktopRequestUrl(requestContext),
-									enableReasoning
-								)
-							)
-							return
-						} catch (desktopError) {
-							if (resolveErrorStatus(desktopError) === 429) {
-								throw desktopError
-							}
-							if (shouldFallbackToChatCompletions(desktopError)) {
-								yield* smoothStream(
-									wrapWithThinkTagDetection(
-										runChatCompletionFallback(requestContext),
-										enableReasoning
-									)
-								)
-								return
-							}
-							throw desktopError
-						}
-					}
-				}
-
-				if (shouldFallbackToChatCompletions(error)) {
-					yield* smoothStream(
-						wrapWithThinkTagDetection(runChatCompletionFallback(requestContext), enableReasoning)
-					)
-					return
-				}
-
-				throw error
-			}
+			yield* smoothStream(
+				wrapWithThinkTagDetection(runResponsesWithOpenAISdk(requestContext), enableReasoning)
+			)
+			return
 		} catch (error) {
 			const status = resolveErrorStatus(error)
 			if (status !== undefined && status >= 500) {
 				const detail = error instanceof Error ? error.message : String(error)
 				const enriched = new Error(
-					`${detail}\nPoe 上游 provider 返回 5xx（临时故障或模型工具链不稳定）。建议切换到 Claude-Sonnet-4.5 或 GPT-5.2 后重试。`
+					`${detail}\n${t('Poe upstream provider returned 5xx. Try switching to Claude-Sonnet-4.5 or GPT-5.2 and retry.')}`
 				) as Error & { status?: number }
 				enriched.status = status
 				throw normalizeProviderError(enriched, 'Poe request failed')

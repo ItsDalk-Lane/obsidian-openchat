@@ -280,6 +280,7 @@ const buildBaseResponsesParams = (
 	delete mapped.enableReasoning
 	delete mapped.reasoningEffort
 	delete mapped.effort
+	delete mapped.enableStructuredOutput
 	delete mapped.tools
 	delete mapped.parallel_tool_calls
 	delete mapped.tool_choice
@@ -292,6 +293,10 @@ const buildBaseResponsesParams = (
 		&& 'type' in options.response_format
 	) {
 		mapped.response_format = options.response_format
+	}
+
+	if (options.enableStructuredOutput && !mapped.response_format) {
+		mapped.response_format = { type: 'json_object' }
 	}
 
 	return mapped

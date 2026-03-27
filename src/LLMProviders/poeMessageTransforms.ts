@@ -168,11 +168,12 @@ export const formatMsgForResponses = async (
 	const formatted = await formatMsg(msg, resolveEmbedAsBinary)
 	const formattedRecord = formatted as Record<string, unknown>
 	const role = toResponseRole(String(formattedRecord.role ?? msg.role))
+	const textContentType = role === 'assistant' ? 'output_text' : 'input_text'
 
 	if (!Array.isArray(formattedRecord.content)) {
 		return {
 			role,
-			content: [{ type: 'input_text' as const, text: String(formattedRecord.content ?? '') }]
+			content: [{ type: textContentType, text: String(formattedRecord.content ?? '') }]
 		}
 	}
 
@@ -184,13 +185,13 @@ export const formatMsgForResponses = async (
 			}
 		}
 		return {
-			type: 'input_text' as const,
+			type: textContentType,
 			text: String(part.text ?? '')
 		}
 	})
 
 	return {
 		role,
-		content: content.length > 0 ? content : [{ type: 'input_text' as const, text: '' }]
+		content: content.length > 0 ? content : [{ type: textContentType, text: '' }]
 	}
 }

@@ -95,7 +95,6 @@ export class ProviderGroupConfigModal extends Modal {
 		if (this.isCustomMode) {
 			this.renderApiKeyRow();
 		}
-		this.renderContextLengthRow();
 		this.controller.renderModelToolbarRow();
 		this.controller.renderModelList();
 		this.controller.renderAddModelButton();
@@ -107,7 +106,9 @@ export class ProviderGroupConfigModal extends Modal {
 			.addDropdown((dropdown) => {
 				dropdown.addOption('', t('Please select an option'));
 				for (const vendor of availableVendors) {
-					dropdown.addOption(vendor.name, vendor.name);
+					const hasKey = !!this.params.getVendorApiKey(vendor.name);
+					const displayName = hasKey ? `${vendor.name} 🔑` : vendor.name;
+					dropdown.addOption(vendor.name, displayName);
 				}
 				dropdown.addOption('Custom', t('Custom'));
 				dropdown.setValue(this.draft.source === 'custom' ? 'Custom' : this.draft.selectedVendorName);

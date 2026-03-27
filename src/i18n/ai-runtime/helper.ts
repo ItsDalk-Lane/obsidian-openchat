@@ -3,7 +3,9 @@ import zhCN from './locale/zh-cn';
 import zhTW from './locale/zh-tw';
 import { DebugLogger } from 'src/utils/DebugLogger';
 
-const localeMap: { [key: string]: Partial<typeof en> } = {
+type LocaleDictionary = Partial<Record<keyof typeof en, string>>;
+
+const localeMap: Record<string, LocaleDictionary> = {
 	en,
 	'en-US': en,
 	'zh-TW': zhTW,

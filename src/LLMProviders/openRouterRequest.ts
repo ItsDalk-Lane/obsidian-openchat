@@ -26,11 +26,34 @@ const OPENROUTER_X_TITLE = 'obsidian-openchat'
 
 type OpenRouterCallModelRequest = Parameters<OpenRouter['callModel']>[0]
 type OpenRouterRequestOptions = NonNullable<Parameters<OpenRouter['callModel']>[1]>
-type OpenRouterChatRequest = {
-	chatGenerationParams: Record<string, unknown>
-}
+type OpenRouterChatRequest = Parameters<OpenRouter['chat']['send']>[0]
+type OpenRouterChatGenerationParams = OpenRouterChatRequest['chatGenerationParams']
 
 const IMAGE_GENERATION_PROMPT_PATTERNS = ['生成图片', '生成图像', 'generate image']
+
+const OPENROUTER_INTERNAL_CHAT_PARAM_KEYS = [
+	'tools',
+	'toolChoice',
+	'parallelToolCalls',
+	'plugins',
+	'responseFormat',
+	'toolExecutor',
+	'getTools',
+	'maxToolCallLoops',
+	'mcpTools',
+	'mcpCallTool',
+	'mcpGetTools',
+	'mcpMaxToolCallLoops',
+	'imageSaveAsAttachment',
+	'imageDisplayWidth',
+	'imageResponseFormat',
+	'imageStream',
+	'imageAspectRatio',
+	'enableWebSearch',
+	'webSearchEngine',
+	'webSearchMaxResults',
+	'webSearchPrompt',
+] as const
 
 const isPromptingImageGeneration = (messages: readonly Message[]): boolean =>
 	messages.some((message) => {
@@ -64,6 +87,16 @@ const normalizeRequestParameters = (parameters: Record<string, unknown>): Record
 	}
 
 	return normalized
+}
+
+const sanitizeChatGenerationParameters = (
+	parameters: Record<string, unknown>
+): Record<string, unknown> => {
+	const sanitized = normalizeRequestParameters(parameters)
+	for (const key of OPENROUTER_INTERNAL_CHAT_PARAM_KEYS) {
+		delete sanitized[key]
+	}
+	return sanitized
 }
 
 const createOpenRouterClient = (apiKey: string) =>
@@ -179,38 +212,13 @@ const createOpenRouterChatRequest = async (
 		supportsImageGeneration: boolean
 	},
 ): Promise<OpenRouterChatRequest> => {
-	const normalizedParameters = normalizeRequestParameters(parameters)
-	// SDK 聊天请求不接受插件内部的工具循环、MCP 和图片/UI 设置字段。
-	const {
-		tools: _tools,
-		toolChoice: _toolChoice,
-		parallelToolCalls: _parallelToolCalls,
-		plugins: _plugins,
-		responseFormat: _responseFormat,
-		toolExecutor: _toolExecutor,
-		getTools: _getTools,
-		maxToolCallLoops: _maxToolCallLoops,
-		mcpTools: _mcpTools,
-		mcpCallTool: _mcpCallTool,
-		mcpGetTools: _mcpGetTools,
-		mcpMaxToolCallLoops: _mcpMaxToolCallLoops,
-		imageSaveAsAttachment: _imageSaveAsAttachment,
-		imageDisplayWidth: _imageDisplayWidth,
-		imageResponseFormat: _imageResponseFormat,
-		imageStream: _imageStream,
-		imageAspectRatio: _imageAspectRatio,
-		enableWebSearch: _enableWebSearch,
-		webSearchEngine: _webSearchEngine,
-		webSearchMaxResults: _webSearchMaxResults,
-		webSearchPrompt: _webSearchPrompt,
-		...sanitizedParameters
-	} = normalizedParameters
-	const chatGenerationParams: Record<string, unknown> = {
+	const sanitizedParameters = sanitizeChatGenerationParameters(parameters)
+	const chatGenerationParams = {
 		...sanitizedParameters,
 		model,
 		messages: await toChatMessages(messages, resolveEmbedAsBinary),
 		stream: options.imageStream || !options.isImageGenerationRequest,
-	}
+	} as OpenRouterChatGenerationParams & Record<string, unknown>
 
 	if (options.supportsImageGeneration) {
 		chatGenerationParams.modalities = ['image', 'text']

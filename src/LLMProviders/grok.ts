@@ -254,7 +254,7 @@ export const grokVendor: Vendor = {
 		baseURL: 'https://api.x.ai/v1/chat/completions',
 		model: '',
 		parameters: {},
-		enableReasoning: false // 默认关闭推理功能
+		enableReasoning: false
 	} as GrokOptions,
 	sendRequestFunc: (settings: GrokOptions): SendRequest => {
 		const merged = { ...settings, ...(settings.parameters || {}) } as GrokOptions

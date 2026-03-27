@@ -8,6 +8,7 @@ import type {
 } from 'src/types/provider';
 import type { ToolDefinition, ToolExecutionRecord } from 'src/types/tool';
 import { availableVendors } from 'src/settings/ai-runtime';
+import { t } from 'src/i18n/ai-runtime/helper';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { ResolvedToolRuntime, SubAgentStateCallback } from 'src/tools/sub-agents';
@@ -121,12 +122,7 @@ export const handleAssistantGenerationError = (
 	deps.state.isGenerating = false;
 	deps.setController(null);
 
-	let errorMessage = '生成失败，请稍后再试。';
-	if (error instanceof Error) {
-		errorMessage = error.message;
-	} else {
-		errorMessage = `生成过程中发生未知错误: ${String(error)}`;
-	}
+	const errorMessage = t('Generation failed. Please try again later.');
 
 	deps.state.error = errorMessage;
 	if (session.messages.length > 0) {

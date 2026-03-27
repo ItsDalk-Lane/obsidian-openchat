@@ -166,6 +166,10 @@ const buildOllamaChatRequest = (
 		requestParams.format = options.format
 	}
 
+	if (options.enableStructuredOutput && requestParams.format === undefined) {
+		requestParams.format = 'json'
+	}
+
 	return requestParams
 }
 
@@ -363,7 +367,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 						}
 					} catch (err) {
 						const errorMsg = err instanceof Error ? err.message : String(err)
-						const errorContent = `工具调用失败: ${errorMsg}`
+						const errorContent = t('Tool call failed: {message}').replace('{message}', errorMsg)
 						settings.onToolCallResult?.({
 							id: call.id,
 							name: call.function.name,

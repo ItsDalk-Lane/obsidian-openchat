@@ -5,6 +5,7 @@
  */
 import { Notice } from 'obsidian';
 import type { App } from 'obsidian';
+import { t } from 'src/i18n/ai-runtime/helper';
 import { HistoryService, ChatHistoryEntry } from './HistoryService';
 import type { ChatSession, ChatState } from '../types/chat';
 import type { MultiModelMode, LayoutMode } from '../types/multiModel';
@@ -63,7 +64,7 @@ export class ChatSessionManager {
 	async saveSession(session: ChatSession): Promise<void> {
 		if (!session) return;
 		await this.historyService.saveSession(session);
-		new Notice('聊天会话已保存');
+		new Notice(t('Chat session saved'));
 	}
 
 	/**

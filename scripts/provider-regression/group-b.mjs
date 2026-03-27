@@ -147,106 +147,249 @@ export const runPR9 = () => {
 	)
 }
 
-export const runPR10 = () => {
+export const runPR10 = async () => {
 	const poePath = path.resolve(PROVIDERS_ROOT, 'poe.ts')
-	const poeModule = loadTsModule(poePath, {
-		openai: class MockOpenAI {},
-		obsidian: {
-			Platform: { isDesktopApp: false },
-			requestUrl: async () => ({ status: 200, json: {}, text: '' }),
-		},
-		'tars/lang/helper': { t: (text) => text },
-		'.': {},
-		'../mcp/mcpToolCallHandler': MCP_HANDLER_MOCK,
-		'./errors': {
-			normalizeProviderError: (error, prefix = 'error') =>
-				error instanceof Error ? new Error(`${prefix}: ${error.message}`) : new Error(String(error)),
-		},
-		'./retry': {
-			withRetry: async (operation) => operation(),
-		},
-		'./sse': { feedChunk: () => ({ events: [], rest: '', done: false }) },
-		'./utils': {
-			buildReasoningBlockEnd: () => '',
-			buildReasoningBlockStart: () => '',
-			convertEmbedToImageUrl: async () => ({ type: 'image_url', image_url: { url: '' } }),
-		},
-	})
+	const poeMessageTransformsPath = path.resolve(PROVIDERS_ROOT, 'poeMessageTransforms.ts')
+	const poeUtilsPath = path.resolve(PROVIDERS_ROOT, 'poeUtils.ts')
+	const poeRunnerSharedPath = path.resolve(PROVIDERS_ROOT, 'poeRunnerShared.ts')
+	const poeResponsesRunnersPath = path.resolve(PROVIDERS_ROOT, 'poeResponsesRunners.ts')
+	const providerUtilsPath = path.resolve(
+		ROOT,
+		'src/components/settings-components/provider-config/providerUtils.ts'
+	)
+	const toolRegistryPath = path.resolve(ROOT, 'src/tools/runtime/tool-registry.ts')
+	const poeUtilsModule = loadTsModule(poeUtilsPath)
 
-	const mapped = poeModule.poeMapResponsesParams({ max_tokens: 2048, temperature: 0.3 })
+	const mapped = poeUtilsModule.poeMapResponsesParams({
+		max_tokens: 2048,
+		temperature: 0.3,
+		previous_response_id: 'resp_123'
+	})
 	assert(mapped.max_output_tokens === 2048, 'PR10-1: Poe max_tokens should map to max_output_tokens')
 	assert(mapped.max_tokens === undefined, 'PR10-1: Poe mapped params should drop max_tokens')
 	assert(
-		poeModule.poeResolveResponsesURL('https://api.poe.com/v1/chat/completions') ===
-			'https://api.poe.com/v1/responses',
-		'PR10-2: Poe responses URL should convert from chat/completions',
+		mapped.previous_response_id === undefined,
+		'PR10-1: Poe mapped params should drop previous_response_id to avoid implicit ZDR-incompatible continuation state',
 	)
 	assert(
-		poeModule.poeResolveChatCompletionsURL('https://api.poe.com/v1/responses') ===
-			'https://api.poe.com/v1/chat/completions',
-		'PR10-2: Poe chat URL should convert from responses',
+		poeUtilsModule.normalizePoeBaseURL('https://api.poe.com/v1/chat/completions') ===
+			'https://api.poe.com/v1',
+		'PR10-2: Poe baseURL normalization should strip chat/completions suffixes',
 	)
 	assert(
-		poeModule.poeVendor.defaultOptions.enableReasoning === false,
+		poeUtilsModule.normalizePoeBaseURL('https://api.poe.com/v1/responses') ===
+			'https://api.poe.com/v1',
+		'PR10-2: Poe baseURL normalization should strip responses suffixes',
+	)
+	assert(
+		poeUtilsModule.shouldRetryWithoutPreviousResponseId(
+			new Error('400 Previous response cannot be used for this organization due to Zero Data Retention.')
+		) === true,
+		'PR10-2: Poe should detect Zero Data Retention previous_response_id errors and retry without previous_response_id',
+	)
+	assert(
+		poeUtilsModule.isPoeOrganizationKnownZdr('https://api.poe.com/v1', 'test-key') === false,
+		'PR10-2: Poe should not treat organizations as ZDR before detection',
+	)
+	poeUtilsModule.markPoeOrganizationAsZdr('https://api.poe.com/v1', 'test-key')
+	assert(
+		poeUtilsModule.isPoeOrganizationKnownZdr('https://api.poe.com/v1/responses', 'test-key') === true,
+		'PR10-2: Poe should remember ZDR organizations across future requests after detection',
+	)
+
+	const poeSource = fs.readFileSync(poePath, 'utf-8')
+	const poeResponsesRunnersSource = fs.readFileSync(poeResponsesRunnersPath, 'utf-8')
+	assert(
+		poeSource.includes('enableReasoning: false'),
 		'PR10-3: Poe default options should disable reasoning by default',
 	)
 	assert(
-		poeModule.poeVendor.defaultOptions.enableWebSearch === false,
+		poeSource.includes('enableWebSearch: false'),
 		'PR10-3: Poe default options should disable web search by default',
 	)
 	assert(
-		poeModule.poeVendor.capabilities.includes('Web Search') &&
-			poeModule.poeVendor.capabilities.includes('Reasoning'),
+		poeSource.includes("'Web Search'") &&
+			poeSource.includes("'Reasoning'"),
 		'PR10-3: Poe capabilities should include Web Search and Reasoning',
 	)
-	const poeSource = fs.readFileSync(poePath, 'utf-8')
 	assert(
-		poeSource.includes('shouldRetryFunctionOutputTurn400'),
+		fs.readFileSync(poeRunnerSharedPath, 'utf-8').includes('shouldRetryFunctionOutputTurn400'),
 		'PR10-3: Poe should include 400 compatibility retry for function_call_output turns',
 	)
 	assert(
-		poeSource.includes('toToolResultContinuationInput'),
-		'PR10-3: Poe should convert function_call_output turns to message input when provider requires protocol messages',
+		fs.readFileSync(poeRunnerSharedPath, 'utf-8').includes('toToolResultContinuationInput'),
+		'PR10-3: Poe should retain tool result continuation compatibility inside Responses flow',
 	)
 	assert(
-		poeSource.includes("message.includes('protocol_messages')"),
+		fs.readFileSync(poeRunnerSharedPath, 'utf-8').includes("message.includes('protocol_messages')"),
 		'PR10-3: Poe should detect protocol_messages compatibility errors for function_call_output retry',
 	)
 	assert(
-		poeSource.includes('throw: false'),
-		'PR10-3: Poe requestUrl path should keep non-2xx response body for diagnostics',
+		fs.readFileSync(poeResponsesRunnersPath, 'utf-8').includes('shouldRetryFunctionOutputTurn400'),
+		'PR10-3: Poe responses runner should wire the 400 compatibility retry helper into continuation requests',
 	)
 	assert(
-		poeSource.includes('error.status = response.status'),
-		'PR10-3: Poe requestUrl errors should expose status for retry classification',
+		poeResponsesRunnersSource.includes('shouldRetryWithoutPreviousResponseId'),
+		'PR10-3: Poe responses runner should retry continuation requests without previous_response_id when ZDR blocks response chaining',
 	)
 	assert(
-		poeSource.includes('parsePoeJsonResponseText'),
-		'PR10-3: Poe requestUrl path should parse response text safely without relying on response.json',
+		poeResponsesRunnersSource.includes('const createResponsesStream = async'),
+		'PR10-3: Poe responses runner should route all continuation create calls through a shared ZDR fallback wrapper',
 	)
 	assert(
-		poeSource.includes('if (hasMcpToolRuntime)') &&
-			poeSource.includes('runResponsesWithDesktopRequestUrl()'),
-		'PR10-3: Poe should route MCP runtime through requestUrl responses loop for stable continuation handling',
+		poeResponsesRunnersSource.includes('isPoeOrganizationKnownZdr(context.baseURL, context.apiKey)'),
+		'PR10-3: Poe responses runner should preemptively use message continuation for organizations already known to require ZDR-safe flow',
+	)
+	assert(
+		poeResponsesRunnersSource.includes('markPoeOrganizationAsZdr(context.baseURL, context.apiKey)'),
+		'PR10-3: Poe responses runner should persist ZDR detection after the first previous_response_id rejection',
+	)
+	assert(
+		poeResponsesRunnersSource.includes('appendZdrSafeContinuationMessages'),
+		'PR10-3: Poe should build ZDR-safe plain-message continuation state after tool execution',
+	)
+	assert(
+		poeResponsesRunnersSource.includes('accumulatedMessageInput'),
+		'PR10-3: Poe should maintain a message-based accumulated input for Zero Data Retention continuation',
+	)
+	assert(
+		poeResponsesRunnersSource.includes('toToolResultContinuationInput(toolResultInput)'),
+		'PR10-3: Poe ZDR continuation should convert tool results into plain user continuation messages',
+	)
+	assert(
+		poeSource.includes('runResponsesWithOpenAISdk(requestContext)'),
+		'PR10-3: Poe should route requests through the OpenAI SDK Responses runner',
+	)
+	assert(
+		!poeSource.includes('runStreamingChatCompletionByFetch'),
+		'PR10-3: Poe should not retain Chat Completions fetch runners in the main provider flow',
+	)
+	assert(
+		!poeSource.includes('runStreamingChatCompletion('),
+		'PR10-3: Poe should not retain Chat Completions SDK runners in the main provider flow',
+	)
+	assert(
+		!poeSource.includes('runChatCompletionFallback'),
+		'PR10-3: Poe should not retain Chat Completions fallback in the main provider flow',
+	)
+	assert(
+		!poeSource.includes('runResponsesStreamByFetch'),
+		'PR10-3: Poe should not retain fetch-based Responses runners in the main provider flow',
+	)
+	assert(
+		!poeSource.includes('runResponsesWithDesktopFetchSse'),
+		'PR10-3: Poe should not retain desktop SSE fallback in the main provider flow',
+	)
+	assert(
+		!poeSource.includes('runResponsesWithDesktopRequestUrl'),
+		'PR10-3: Poe should not retain requestUrl fallback in the main provider flow',
+	)
+	assert(
+		!poeSource.includes('runMcpHybridToolLoop'),
+		'PR10-3: Poe should not retain hybrid Chat/Responses runners in the main provider flow',
+	)
+	assert(
+		fs.readFileSync(poeResponsesRunnersPath, 'utf-8').includes("summary: 'auto'"),
+		'PR10-3: Poe should request reasoning summaries when reasoning mode is enabled',
+	)
+	assert(
+		poeResponsesRunnersSource.includes('extractReasoningTextFromResponse(completedResponse)'),
+		'PR10-3: Poe should fall back to completed-response reasoning extraction when reasoning deltas are absent',
+	)
+	assert(
+		poeSource.includes('toResponsesFunctionToolsFromMcp'),
+		'PR10-3: Poe should convert MCP tools into Responses function tools',
 	)
 	assert(
 		poeSource.includes('POE_RETRY_OPTIONS') &&
-			poeSource.includes('baseDelayMs: 250') &&
-			poeSource.includes('withRetry('),
-		'PR10-3: Poe should apply exponential retry for transient 429/5xx errors',
+			poeSource.includes('baseDelayMs: 250'),
+		'PR10-3: Poe should retain exponential retry configuration for transient upstream errors',
 	)
 
-	const settingTabSource = fs.readFileSync(SETTINGS_PANEL_PATH, 'utf-8')
+	const providerUtilsSource = fs.readFileSync(providerUtilsPath, 'utf-8')
 	assert(
-		settingTabSource.includes('[poeVendor.name]'),
+		providerUtilsSource.includes('[poeVendor.name]'),
 		'PR10-4: MODEL_FETCH_CONFIGS should include Poe',
 	)
 	assert(
-		settingTabSource.includes('resolvePoeModelListURL'),
-		'PR10-4: settingTab should define resolvePoeModelListURL helper',
+		providerUtilsSource.includes('resolvePoeModelListURL'),
+		'PR10-4: providerUtils should define resolvePoeModelListURL helper',
 	)
 	assert(
-		settingTabSource.includes('https://api.poe.com/v1/models'),
+		providerUtilsSource.includes('https://api.poe.com/v1/models'),
 		'PR10-4: Poe model list should fall back to official /v1/models endpoint',
+	)
+
+	const poeMessageTransformsModule = loadTsModule(poeMessageTransformsPath, {
+		'./poeUtils': { toResponseRole: (role) => (role === 'assistant' || role === 'system' ? role : 'user') },
+		'./utils': {
+			convertEmbedToImageUrl: async () => ({ type: 'image_url', image_url: { url: 'https://example.com/image.png' } }),
+		},
+	})
+	const assistantMessage = await poeMessageTransformsModule.formatMsgForResponses(
+		{ role: 'assistant', content: 'assistant reply' },
+		async () => new ArrayBuffer(0)
+	)
+	const userMessage = await poeMessageTransformsModule.formatMsgForResponses(
+		{ role: 'user', content: 'user request' },
+		async () => new ArrayBuffer(0)
+	)
+	const systemMessage = await poeMessageTransformsModule.formatMsgForResponses(
+		{ role: 'system', content: 'system prompt' },
+		async () => new ArrayBuffer(0)
+	)
+	const emptyUserMessage = await poeMessageTransformsModule.formatMsgForResponses(
+		{ role: 'user', content: '' },
+		async () => new ArrayBuffer(0)
+	)
+	assert(
+		assistantMessage.content?.[0]?.type === 'output_text',
+		'PR10-5: Poe assistant history messages should use output_text content blocks in Responses input',
+	)
+	assert(
+		userMessage.content?.[0]?.type === 'input_text',
+		'PR10-5: Poe user history messages should continue using input_text content blocks in Responses input',
+	)
+	assert(
+		systemMessage.content?.[0]?.type === 'input_text',
+		'PR10-5: Poe system messages should use input_text content blocks in Responses input',
+	)
+	assert(
+		emptyUserMessage.content?.length === 1
+			&& emptyUserMessage.content?.[0]?.type === 'input_text'
+			&& emptyUserMessage.content?.[0]?.text === '',
+		'PR10-5: Poe empty user messages should keep a fallback empty input_text content block',
+	)
+
+	const { z } = await import('zod')
+	const { zodToJsonSchema } = await import('zod-to-json-schema')
+	const toolRegistryModule = loadTsModule(toolRegistryPath, {
+		zod: { z },
+		'zod-to-json-schema': { zodToJsonSchema },
+		'src/services/mcp/types': {},
+		'./types': {},
+	})
+	const registry = new toolRegistryModule.BuiltinToolRegistry()
+	registry.register({
+		name: 'read_file',
+		title: '读取文本文件',
+		description: 'test',
+		inputSchema: z.object({
+			start_line: z.number().int().positive().optional(),
+			line_count: z.number().int().positive().max(1000),
+		}).strict(),
+		execute: async () => ({}),
+	})
+	const registeredTools = registry.listTools('builtin')
+	const readFileSchema = registeredTools[0]?.inputSchema?.properties
+	const startLineSchema = readFileSchema?.start_line
+	const lineCountSchema = readFileSchema?.line_count
+	assert(
+		typeof startLineSchema?.exclusiveMinimum === 'number' && startLineSchema.exclusiveMinimum === 0,
+		'PR10-6: built-in tool schemas should normalize exclusiveMinimum to numeric OpenAPI-compatible form',
+	)
+	assert(
+		typeof lineCountSchema?.exclusiveMinimum === 'number' && lineCountSchema.exclusiveMinimum === 0,
+		'PR10-6: positive numeric tool args should not emit boolean exclusiveMinimum in function tool schema',
 	)
 }

@@ -3,6 +3,7 @@ import { QuickActionDataService } from 'src/editor/selectionToolbar/QuickActionD
 import { t } from 'src/i18n/ai-runtime/helper'
 import { localInstance } from 'src/i18n/locals'
 import type { QuickAction } from 'src/types/chat'
+import { DebugLogger } from 'src/utils/DebugLogger'
 import type { QuickActionListContext } from './types'
 
 export const renderQuickActionsList = async (
@@ -76,7 +77,8 @@ export const renderQuickActionsList = async (
 			await quickActionDataService.moveQuickActionToGroup(movedId, targetParentId, insertAt)
 			await context.refreshQuickActionsCache?.()
 		} catch (error) {
-			new Notice(error instanceof Error ? error.message : String(error))
+			DebugLogger.error('[QuickActions] Failed to move action', error)
+			new Notice(t('Failed to move action. Please try again.'))
 		}
 	}
 
@@ -340,7 +342,8 @@ export const renderQuickActionsList = async (
 						overlay.remove()
 						await renderQuickActionsList(context, container)
 					} catch (error) {
-						new Notice(error instanceof Error ? error.message : String(error))
+						DebugLogger.error('[QuickActions] Failed to keep child actions', error)
+						new Notice(t('Failed to keep child actions. Please try again.'))
 					}
 				}
 				const deleteChildren = document.createElement('button')
@@ -356,7 +359,8 @@ export const renderQuickActionsList = async (
 						overlay.remove()
 						await renderQuickActionsList(context, container)
 					} catch (error) {
-						new Notice(error instanceof Error ? error.message : String(error))
+						DebugLogger.error('[QuickActions] Failed to delete child actions', error)
+						new Notice(t('Failed to delete child actions. Please try again.'))
 					}
 				}
 				footer.append(cancel, deleteChildren, keepChildren)

@@ -1,3 +1,5 @@
+
+import { t } from 'src/i18n/ai-runtime/helper';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { App, TFile } from 'obsidian';
 import { registerBuiltinTool } from '../runtime/register-tool';
@@ -95,40 +97,63 @@ export function registerReadWriteHandlers(
 		},
 		async (input: ReadTextFileArgs) => {
 			const {
-			file_path,
-			read_mode = 'segment',
-			start_line,
-			line_count = DEFAULT_READ_SEGMENT_LINES,
-			response_format = 'json',
+				file_path,
+				read_mode = 'segment',
+				start_line,
+				line_count = DEFAULT_READ_SEGMENT_LINES,
+				response_format = 'json',
 			} = input;
-			parseReadTextFileArgs({
+			const {
+				args: normalizedArgs,
+				warning: parseWarning,
+			} = parseReadTextFileArgs({
 				file_path,
 				read_mode,
 				start_line,
 				line_count,
 				response_format,
 			});
-			const normalizedPath = normalizeFilePath(file_path, 'file_path');
+			const {
+				file_path: normalizedFilePath,
+				read_mode: normalizedReadMode = 'segment',
+				start_line: normalizedStartLine,
+				line_count: normalizedLineCount = DEFAULT_READ_SEGMENT_LINES,
+				response_format: normalizedResponseFormat = 'json',
+			} = normalizedArgs;
+			const normalizedPath = normalizeFilePath(normalizedFilePath, 'file_path');
 			const file = getFileOrThrow(app, normalizedPath);
 			const content = await app.vault.cachedRead(file);
-			const payload = createReadFilePayload(
+			const basePayload = createReadFilePayload(
 				normalizedPath,
 				content,
-				read_mode,
-				line_count,
-				start_line ?? 1
-			);
+				normalizedReadMode,
+				normalizedLineCount,
+				normalizedStartLine ?? 1
+			) as Record<string, unknown> & {
+				content?: string;
+				has_more?: boolean;
+				next_start_line?: number | null;
+				warning?: string | null;
+			};
+			const payload: typeof basePayload = {
+				...basePayload,
+				warning: [basePayload.warning, parseWarning].filter(Boolean).join('；') || null,
+			};
 			return asStructuredOrText(
-				response_format,
+				normalizedResponseFormat,
 				payload,
 				(structured) => {
-					const parts = [String(structured.content ?? '')];
-					if (structured.warning) {
-						parts.push(`[提示] ${String(structured.warning)}`);
-					}
-					if (structured.has_more && structured.next_start_line) {
+					const typedStructured = structured as typeof payload;
+					const parts = [String(typedStructured.content ?? '')];
+					if (typedStructured.warning) {
 						parts.push(
-							`[更多内容可用，下一次从第 ${String(structured.next_start_line)} 行继续读取]`
+							t('[Notice] {message}').replace('{message}', String(typedStructured.warning))
+						);
+					}
+					if (typedStructured.has_more && typedStructured.next_start_line) {
+						parts.push(
+							t('[More content available. Continue from line {line}]')
+								.replace('{line}', String(typedStructured.next_start_line))
 						);
 					}
 					return parts.filter(Boolean).join('\n');
@@ -171,21 +196,31 @@ export function registerReadWriteHandlers(
 		},
 		async (input: ReadMultipleFilesArgs) => {
 			const {
-			file_paths,
-			read_mode = 'segment',
-			start_line,
-			line_count = Math.min(80, DEFAULT_READ_SEGMENT_LINES),
-			response_format = 'json',
+				file_paths,
+				read_mode = 'segment',
+				start_line,
+				line_count = Math.min(80, DEFAULT_READ_SEGMENT_LINES),
+				response_format = 'json',
 			} = input;
-			parseReadMultipleFilesArgs({
+			const {
+				args: normalizedArgs,
+				warning: parseWarning,
+			} = parseReadMultipleFilesArgs({
 				file_paths,
 				read_mode,
 				start_line,
 				line_count,
 				response_format,
 			});
+			const {
+				file_paths: normalizedFilePaths,
+				read_mode: normalizedReadMode = 'segment',
+				start_line: normalizedStartLine,
+				line_count: normalizedLineCount = Math.min(80, DEFAULT_READ_SEGMENT_LINES),
+				response_format: normalizedResponseFormat = 'json',
+			} = normalizedArgs;
 				const files = await Promise.all(
-					file_paths.map(async (filePath: string) => {
+					normalizedFilePaths.map(async (filePath: string) => {
 					try {
 						const normalizedPath = normalizeFilePath(filePath);
 						const file = getFileOrThrow(app, normalizedPath);
@@ -194,9 +229,9 @@ export function registerReadWriteHandlers(
 							...createReadFilePayload(
 								normalizedPath,
 								content,
-								read_mode === 'head' ? 'head' : 'segment',
-								line_count,
-								start_line ?? 1
+								normalizedReadMode === 'head' ? 'head' : 'segment',
+								normalizedLineCount,
+								normalizedStartLine ?? 1
 							),
 							error: null,
 						};
@@ -219,26 +254,33 @@ export function registerReadWriteHandlers(
 				})
 			);
 			return asStructuredOrText(
-				response_format,
+				normalizedResponseFormat,
 				{
 					files,
 					meta: {
 						returned: files.length,
-						read_mode,
-						line_count,
+						read_mode: normalizedReadMode,
+						line_count: normalizedLineCount,
+						warning: parseWarning,
 					},
 				},
 				(structured) =>
-					(structured.files as Array<{
-						file_path: string;
-						content: string;
-						error: string | null;
-					}>)
-						.map((file) =>
-							file.error
-								? `${file.file_path}: Error - ${file.error}`
-								: `${file.file_path}:\n${file.content}`
-						)
+					[
+						typeof structured.meta?.warning === 'string' && structured.meta.warning
+							? `[提示] ${structured.meta.warning}`
+							: '',
+						...(structured.files as Array<{
+							file_path: string;
+							content: string;
+							error: string | null;
+						}>)
+							.map((file) =>
+								file.error
+									? `${file.file_path}: Error - ${file.error}`
+									: `${file.file_path}:\n${file.content}`
+							),
+					]
+						.filter(Boolean)
 						.join('\n---\n')
 			);
 		}

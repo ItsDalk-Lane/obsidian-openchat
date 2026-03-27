@@ -175,7 +175,6 @@ export const buildProvidersFromDraft = (
 			apiKey: resolvedApiKey,
 			baseURL: draft.baseURL,
 			model: modelDraft.options.model,
-			contextLength: draft.contextLength,
 			parameters: mergeProviderParametersWithMetadata(draft.parameters, {
 				groupId: draft.groupId,
 				baseTag: draft.baseTag,

@@ -120,6 +120,7 @@ export const doubaoVendor: Vendor = {
 		baseURL: 'https://ark.cn-beijing.volces.com/api/v3/responses',
 		model: '',
 		parameters: {},
+		thinkingType: DEFAULT_DOUBAO_THINKING_TYPE,
 		enableWebSearch: false // 默认不启用 Web Search
 	},
 	sendRequestFunc: (settings: DoubaoOptions): SendRequest => sendRequestFunc(settings as BaseOptions),

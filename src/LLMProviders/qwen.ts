@@ -173,6 +173,7 @@ export const qwenVendor: Vendor = {
 		apiKey: '',
 		baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
 		model: QWEN_MODELS[0],
+		enableThinking: false,
 		parameters: {}
 	},
 	sendRequestFunc: withToolCallLoopSupport(sendRequestFunc),

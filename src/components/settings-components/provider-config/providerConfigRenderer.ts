@@ -347,7 +347,7 @@ export const renderProviderConfigContent = (params: RenderProviderConfigParams) 
 	if (vendor.name === ollamaVendor.name) {
 		renderOllamaSections(
 			container,
-			settings.options as { enableReasoning?: boolean },
+			settings.options as BaseOptions & { enableReasoning?: boolean },
 			index,
 			settings,
 			modelReasoningCapability,

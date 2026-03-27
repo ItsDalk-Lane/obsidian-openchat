@@ -41,6 +41,16 @@ export const renderDoubaoSections = (
 	context.registerDoubaoRenderer(options, renderThinkingControls)
 
 	new Setting(details)
+		.setName(t('Structured output'))
+		.setDesc(t('Structured output description'))
+		.addToggle((toggle) =>
+			toggle.setValue(options.enableStructuredOutput ?? false).onChange(async (value) => {
+				options.enableStructuredOutput = value
+				await context.saveSettings()
+			})
+		)
+
+	new Setting(details)
 		.setName(t('Doubao image detail'))
 		.setDesc(t('Doubao image detail description'))
 		.addDropdown((dropdown) =>

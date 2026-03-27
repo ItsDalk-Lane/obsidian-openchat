@@ -1,3 +1,4 @@
+import { t } from 'src/i18n/ai-runtime/helper'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import type { SaveAttachment } from '.'
 import { buildReasoningBlockEnd, buildReasoningBlockStart } from './utils'
@@ -103,7 +104,7 @@ const inferImageExtensionFromUrl = (imageUrl: string): string => {
 const decodeDataUriToArrayBuffer = (imageUrl: string): ArrayBuffer => {
 	const base64Data = imageUrl.split(',')[1]
 	if (!base64Data || base64Data.trim().length === 0) {
-		throw new Error('无效的 base64 数据')
+		throw new Error(t('Invalid base64 data'))
 	}
 
 	const binaryString = atob(base64Data)
@@ -121,7 +122,7 @@ const resolveGeneratedImageAsset = async (
 	if (imageUrl.startsWith('data:')) {
 		const data = decodeDataUriToArrayBuffer(imageUrl)
 		if (data.byteLength > OPENROUTER_MAX_IMAGE_BYTES) {
-			throw new Error('图片过大，已超过 20MB 限制')
+			throw new Error(t('Image exceeds the 20MB limit'))
 		}
 		return {
 			data,
@@ -132,7 +133,7 @@ const resolveGeneratedImageAsset = async (
 	const timeoutController = new AbortController()
 	const abortOnParentSignal = () => timeoutController.abort(signal.reason)
 	const timeoutId = window.setTimeout(() => {
-		timeoutController.abort(new Error('图片下载超时'))
+		timeoutController.abort(new Error(t('Image download timed out')))
 	}, OPENROUTER_IMAGE_DOWNLOAD_TIMEOUT_MS)
 	signal.addEventListener('abort', abortOnParentSignal, { once: true })
 
@@ -145,18 +146,20 @@ const resolveGeneratedImageAsset = async (
 	}
 
 	if (!response.ok) {
-		throw new Error(`下载图片失败 (${response.status})`)
+		throw new Error(
+			t('Failed to download image ({status})').replace('{status}', String(response.status))
+		)
 	}
 
 	const contentLengthHeader = response.headers.get('content-length')
 	const contentLength = contentLengthHeader ? Number(contentLengthHeader) : Number.NaN
 	if (Number.isFinite(contentLength) && contentLength > OPENROUTER_MAX_IMAGE_BYTES) {
-		throw new Error('图片过大，已超过 20MB 限制')
+		throw new Error(t('Image exceeds the 20MB limit'))
 	}
 
 	const data = await response.arrayBuffer()
 	if (data.byteLength > OPENROUTER_MAX_IMAGE_BYTES) {
-		throw new Error('图片过大，已超过 20MB 限制')
+		throw new Error(t('Image exceeds the 20MB limit'))
 	}
 
 	return {
@@ -198,7 +201,7 @@ const yieldImageContent = async function* (
 		} catch (error) {
 			DebugLogger.error('[OpenRouter] 处理图片 URL 时出错', error)
 			const errorMsg = error instanceof Error ? error.message : String(error)
-			yield `❌ 图片保存失败: ${errorMsg}\n\n`
+			yield `${t('Image save failed: {message}').replace('{message}', errorMsg)}\n\n`
 		}
 		return
 	}
@@ -412,7 +415,7 @@ export async function* handleOpenRouterCallModelResult(
 					reasoningStartMs = null
 				}
 				if (eventType === 'response.incomplete') {
-					yield '\n\n⚠️ API 返回了不完整的响应，内容可能被截断。'
+					yield `\n\n${t('API returned an incomplete response. Content may be truncated.')}`
 				}
 				if (eventType === 'response.failed') {
 					throw new Error(extractStreamErrorMessage(event))
@@ -518,6 +521,11 @@ export async function* handleOpenRouterChatResponse(
 		}
 	} catch (error) {
 		DebugLogger.error('解析 OpenRouter SDK 响应失败:', error)
-		throw new Error(`解析响应失败: ${error instanceof Error ? error.message : String(error)}`)
+		throw new Error(
+			t('Failed to parse response: {message}').replace(
+				'{message}',
+				error instanceof Error ? error.message : String(error)
+			)
+		)
 	}
 }

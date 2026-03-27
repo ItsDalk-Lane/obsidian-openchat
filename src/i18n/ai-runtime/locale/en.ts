@@ -472,4 +472,76 @@ export default {
 	'System message role': 'System message',
 	'User message role': 'User message',
 	'Delete provider': 'Delete provider',
-}
+	'No models available from remote endpoint or fallback list':
+		'No models available from the remote endpoint or fallback list.',
+	'Failed to load models. Please try again later.':
+		'Failed to load models. Please try again later.',
+	'Chat session saved': 'Chat session saved',
+	'Generation failed. Please try again later.': 'Generation failed. Please try again later.',
+	'{mode} mode does not support parameter {field}': '{mode} mode does not support parameter {field}',
+	'{mode} mode does not support start_line; it was removed automatically. Use segment mode for line-offset reads.':
+		'{mode} mode does not support start_line; it was removed automatically. Use segment mode for line-offset reads.',
+	'Vault mode only supports traversing from the Vault root. Omit directory_path or pass /.':
+		'Vault mode only supports traversing from the Vault root. Omit directory_path or pass /.',
+	'select.fields or select.aggregates must provide at least one item':
+		'select.fields or select.aggregates must provide at least one item',
+	'{aggregate} aggregate requires field': '{aggregate} aggregate requires field',
+	'operator=in requires value to be an array': 'operator=in requires value to be an array',
+	'operator={operator} does not accept an array value':
+		'operator={operator} does not accept an array value',
+	'[Notice] {message}': '[Notice] {message}',
+	'[More content available. Continue from line {line}]':
+		'[More content available. Continue from line {line}]',
+	'{mode} was converted to read_mode={mode} and line_count':
+		'{mode} was converted to read_mode={mode} and line_count',
+	'{mode} mode does not accept start_line; it was removed automatically':
+		'{mode} mode does not accept start_line; it was removed automatically',
+	'full mode does not accept start_line; use segment for long files':
+		'full mode does not accept start_line; use segment for long files',
+	'head mode does not accept start_line; use segment to read from a specific line':
+		'head mode does not accept start_line; use segment to read from a specific line',
+	'tail mode does not accept start_line; use segment to read from a specific line':
+		'tail mode does not accept start_line; use segment to read from a specific line',
+	'Read content once the file path is known. Use segment for long files; if you only know the name, call find_paths first.':
+		'Read content once the file path is known. Use segment for long files; if you only know the name, call find_paths first.',
+	'max_chars has been removed; use read_mode + line_count to control the range':
+		'max_chars has been removed; use read_mode + line_count to control the range',
+	'Use this to preview multiple known file paths. For a single long document, use read_file.':
+		'Use this to preview multiple known file paths. For a single long document, use read_file.',
+	'max_chars has been removed; batch reads now use read_mode + line_count':
+		'max_chars has been removed; batch reads now use read_mode + line_count',
+	'Use this only for known media file paths.': 'Use this only for known media file paths.',
+	'Use this for whole-file writes or overwrites; use edit_file for partial edits.':
+		'Use this for whole-file writes or overwrites; use edit_file for partial edits.',
+	'Use this for partial edits to known files; read with read_file first.':
+		'Use this for partial edits to known files; read with read_file first.',
+	'Failed to move action. Please try again.':
+		'Failed to move action. Please try again.',
+	'Failed to keep child actions. Please try again.':
+		'Failed to keep child actions. Please try again.',
+	'Failed to delete child actions. Please try again.':
+		'Failed to delete child actions. Please try again.',
+	'MCP connection failed ({name})': 'MCP connection failed ({name})',
+	'Tool call failed: {message}': 'Tool call failed: {message}',
+	'Poe Responses missing tool executor':
+		'Poe Responses returned function_call, but no tool executor is configured.',
+	'Poe tool loop exceeded maximum iterations':
+		'Poe tool loop exceeded maximum iterations ({count}).',
+	'Poe Responses missing response id':
+		'Poe Responses did not return response.id, so the tool loop cannot continue.',
+	'Poe upstream provider returned 5xx. Try switching to Claude-Sonnet-4.5 or GPT-5.2 and retry.':
+		'Poe upstream provider returned 5xx. Try switching to Claude-Sonnet-4.5 or GPT-5.2 and retry.',
+	'Poe response body is not readable': 'Poe response body is not readable',
+	'Invalid base64 data': 'Invalid base64 data',
+	'Image exceeds the 20MB limit': 'Image exceeds the 20MB limit',
+	'Image download timed out': 'Image download timed out',
+	'Failed to download image ({status})': 'Failed to download image ({status})',
+	'Image save failed: {message}': 'Image save failed: {message}',
+	'API returned an incomplete response. Content may be truncated.':
+		'API returned an incomplete response. Content may be truncated.',
+	'Failed to parse response: {message}': 'Failed to parse response: {message}',
+	'Structured output': 'Structured Output',
+	'Structured output description':
+		'When enabled, the model will output JSON format. Useful for programmatic processing, data extraction, and API integration.',
+	'Provider has API key': 'API key configured',
+} as const

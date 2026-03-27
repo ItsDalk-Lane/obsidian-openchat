@@ -1,4 +1,9 @@
 import OpenAI from 'openai'
+import type {
+	ToolDefinition,
+	ToolExecutionRecord,
+	ToolExecutor,
+} from 'src/core/agents/loop/types'
 
 import type { BaseOptions, Message, ResolveEmbedAsBinary } from '.'
 
@@ -22,12 +27,14 @@ export interface PoeRequestContext {
 	enableReasoning: boolean
 	enableWebSearch: boolean
 	responseBaseParams: Record<string, unknown>
-	chatFallbackParams: Record<string, unknown>
 	responseInput: unknown[]
-	hasMcpToolRuntime: boolean
+	hasToolRuntime: boolean
+	toolExecutor?: ToolExecutor
+	onToolCallResult?: (record: ToolExecutionRecord) => void
 	mcpCallTool?: NonNullable<BaseOptions['mcpCallTool']>
 	maxToolCallLoops: number
 	retryOptions: PoeRetryOptions
+	getCurrentTools: () => Promise<ToolDefinition[]>
 	getCurrentMcpTools: () => Promise<NonNullable<BaseOptions['mcpTools']>>
 	getToolCandidates: () => unknown[]
 	refreshToolCandidates: () => Promise<unknown[]>

@@ -67,6 +67,8 @@ export interface BaseOptions {
 	model: string
 	parameters?: Record<string, unknown>
 	enableWebSearch?: boolean
+	/** 启用结构化输出，自动添加 response_format: { type: 'json_object' } */
+	enableStructuredOutput?: boolean
 	/** 模型上下文长度（tokens），用于上下文管理 */
 	contextLength?: number
 

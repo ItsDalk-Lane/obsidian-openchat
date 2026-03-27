@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { requestResponsesStreamByFetch } from './poeRequests'
+import { t } from 'src/i18n/ai-runtime/helper'
 import type { PoeRequestContext } from './poeRunnerShared'
 import {
 	isFunctionCallOutputInput,
@@ -8,18 +8,20 @@ import {
 	toToolResultContinuationInput
 } from './poeRunnerShared'
 import {
-	ensureResponseEndpoint,
 	isReasoningDeltaEvent,
+	isPoeOrganizationKnownZdr,
+	markPoeOrganizationAsZdr,
 	resolveErrorStatus,
+	shouldRetryWithoutPreviousResponseId,
 	shouldRetryContinuationWithoutReasoning
 } from './poeUtils'
 import {
+	extractOutputTextFromResponse,
 	extractResponseFunctionCalls,
+	extractReasoningTextFromResponse,
 	extractResponseOutputItems
 } from './poeMessageTransforms'
 import { executePoeMcpToolCalls } from './poeMcpRunners'
-import { withRetry } from './retry'
-import { feedChunk } from './sse'
 import { buildReasoningBlockEnd, buildReasoningBlockStart } from './utils'
 
 export const buildResponsesRequestData = (
@@ -53,7 +55,7 @@ export const buildResponsesRequestData = (
 		&& data.reasoning === undefined
 		&& (!isToolContinuation || (continuationReasoningEnabled && allowContinuationReasoning))
 	if (shouldAttachReasoning) {
-		data.reasoning = { effort: 'medium' }
+		data.reasoning = { effort: 'medium', summary: 'auto' }
 	}
 	return data
 }
@@ -74,10 +76,7 @@ export const buildAccumulatedRequestData = (
 		data.tools = toolCandidates
 	}
 	if (context.enableReasoning && continuationReasoningEnabled && data.reasoning === undefined) {
-		data.reasoning = { effort: 'medium' }
-	}
-	if (!continuationReasoningEnabled) {
-		delete data.reasoning
+		data.reasoning = { effort: 'medium', summary: 'auto' }
 	}
 	return data
 }
@@ -85,10 +84,16 @@ export const buildAccumulatedRequestData = (
 export const emitToolMarkers = async function* (
 	context: PoeRequestContext,
 	functionCalls: ReturnType<typeof extractResponseFunctionCalls>,
-	mcpCallTool: NonNullable<PoeRequestContext['mcpCallTool']>
+	mcpCallTool: PoeRequestContext['mcpCallTool']
 ) {
+	const activeTools = await context.getCurrentTools()
 	const activeMcpTools = await context.getCurrentMcpTools()
-	const executed = await executePoeMcpToolCalls(functionCalls, activeMcpTools, mcpCallTool)
+	const executed = await executePoeMcpToolCalls(functionCalls, activeMcpTools, mcpCallTool, {
+		tools: activeTools,
+		toolExecutor: context.toolExecutor,
+		abortSignal: context.controller.signal,
+		onToolCallResult: context.onToolCallResult,
+	})
 	await context.refreshToolCandidates()
 	for (const marker of executed.markers) {
 		yield `{{FF_MCP_TOOL_START}}:${marker.toolName}:${marker.content}{{FF_MCP_TOOL_END}}:`
@@ -96,49 +101,94 @@ export const emitToolMarkers = async function* (
 	return executed
 }
 
+const appendZdrSafeContinuationMessages = (
+	accumulatedMessages: unknown[],
+	completedResponse: unknown,
+	toolResultInput: Array<{ type: 'function_call_output'; call_id: string; output: string }>
+) => {
+	const outputText = extractOutputTextFromResponse(completedResponse)
+	if (outputText) {
+		accumulatedMessages.push({
+			role: 'assistant',
+			content: [{ type: 'output_text', text: outputText }]
+		})
+	}
+	const continuationInput = toToolResultContinuationInput(toolResultInput)
+	if (Array.isArray(continuationInput)) {
+		accumulatedMessages.push(...continuationInput)
+	}
+}
+
 export const runResponsesWithOpenAISdk = async function* (context: PoeRequestContext) {
 	let currentInput: unknown = context.responseInput
 	let previousResponseId: string | undefined
 	let continuationReasoningEnabled = context.enableReasoning
-	const accumulatedInput: unknown[] = [...context.responseInput]
+	let shouldUseAccumulatedContinuation = isPoeOrganizationKnownZdr(context.baseURL, context.apiKey)
+	const accumulatedProtocolInput: unknown[] = [...context.responseInput]
+	const accumulatedMessageInput: unknown[] = [...context.responseInput]
+
+	const createResponsesStream = async (requestData: Record<string, unknown>) => {
+		try {
+			return await context.client.responses.create(requestData as any, {
+				signal: context.controller.signal,
+			})
+		} catch (error) {
+			if (!previousResponseId || !shouldRetryWithoutPreviousResponseId(error)) {
+				throw error
+			}
+
+			markPoeOrganizationAsZdr(context.baseURL, context.apiKey)
+			shouldUseAccumulatedContinuation = true
+			previousResponseId = undefined
+			return await context.client.responses.create(
+				buildAccumulatedRequestData(context, accumulatedMessageInput, continuationReasoningEnabled) as any,
+				{ signal: context.controller.signal }
+			)
+		}
+	}
 
 	for (let loop = 0; loop <= context.maxToolCallLoops; loop++) {
 		if (context.controller.signal.aborted) return
 
 		const isToolContinuationTurn = isFunctionCallOutputInput(currentInput)
+		const shouldUseAccumulatedRequest = shouldUseAccumulatedContinuation
 		let stream: Awaited<ReturnType<typeof context.client.responses.create>> | undefined
 
 		try {
-			stream = await context.client.responses.create(
-				buildResponsesRequestData(
-					context,
-					currentInput,
-					previousResponseId,
-					'default',
-					continuationReasoningEnabled
-				) as any,
-				{ signal: context.controller.signal }
+			stream = await createResponsesStream(
+				(shouldUseAccumulatedRequest
+					? buildAccumulatedRequestData(context, accumulatedMessageInput, continuationReasoningEnabled)
+					: buildResponsesRequestData(
+						context,
+						currentInput,
+						previousResponseId,
+						'default',
+						continuationReasoningEnabled
+					)) as any,
 			)
 		} catch (error) {
 			let requestError: unknown = error
 
 			if (
+				!stream
+				&&
 				isToolContinuationTurn
 				&& continuationReasoningEnabled
 				&& shouldRetryContinuationWithoutReasoning(requestError)
 			) {
 				continuationReasoningEnabled = false
 				try {
-					stream = await context.client.responses.create(
-						buildResponsesRequestData(
-							context,
-							currentInput,
-							previousResponseId,
-							'default',
-							continuationReasoningEnabled,
-							false
-						) as any,
-						{ signal: context.controller.signal }
+					stream = await createResponsesStream(
+						(shouldUseAccumulatedContinuation
+							? buildAccumulatedRequestData(context, accumulatedMessageInput, continuationReasoningEnabled)
+							: buildResponsesRequestData(
+								context,
+								currentInput,
+								previousResponseId,
+								'default',
+								continuationReasoningEnabled,
+								false
+							)) as any,
 					)
 				} catch (retryWithoutReasoningError) {
 					requestError = retryWithoutReasoningError
@@ -147,36 +197,51 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 
 			if (!stream) {
 				const errorStatus = resolveErrorStatus(requestError)
-				if (errorStatus !== undefined && errorStatus >= 500 && loop > 0) {
-					stream = await context.client.responses.create(
-						buildAccumulatedRequestData(context, accumulatedInput, continuationReasoningEnabled) as any,
-						{ signal: context.controller.signal }
+				if (errorStatus !== undefined && errorStatus >= 500 && (loop > 0 || shouldUseAccumulatedContinuation)) {
+					stream = await createResponsesStream(
+						buildAccumulatedRequestData(
+							context,
+							shouldUseAccumulatedContinuation ? accumulatedMessageInput : accumulatedProtocolInput,
+							continuationReasoningEnabled
+						) as any,
 					)
 				} else if (shouldRetryFunctionOutputTurn400(requestError, currentInput)) {
 					try {
-						stream = await context.client.responses.create(
-							buildResponsesRequestData(
-								context,
-								currentInput,
-								previousResponseId,
-								'compat',
-								continuationReasoningEnabled
-							) as any,
-							{ signal: context.controller.signal }
+						stream = await createResponsesStream(
+							(shouldUseAccumulatedContinuation
+								? buildAccumulatedRequestData(context, accumulatedMessageInput, continuationReasoningEnabled)
+								: buildResponsesRequestData(
+									context,
+									currentInput,
+									previousResponseId,
+									'compat',
+									continuationReasoningEnabled
+								)) as any,
 						)
 					} catch (compatError) {
 						if (!shouldRetryFunctionOutputTurn400(compatError, currentInput)) {
 							throw compatError
 						}
-						stream = await context.client.responses.create(
-							buildResponsesRequestData(
-								context,
-								toToolResultContinuationInput(currentInput),
-								previousResponseId,
-								'default',
-								continuationReasoningEnabled
-							) as any,
-							{ signal: context.controller.signal }
+						stream = await createResponsesStream(
+							(shouldUseAccumulatedContinuation
+								? (() => {
+									const continuationInput = toToolResultContinuationInput(currentInput)
+									const nextAccumulatedMessageInput = Array.isArray(continuationInput)
+										? [...accumulatedMessageInput, ...continuationInput]
+										: accumulatedMessageInput
+									return buildAccumulatedRequestData(
+										context,
+										nextAccumulatedMessageInput,
+										continuationReasoningEnabled
+									)
+								})()
+								: buildResponsesRequestData(
+									context,
+									toToolResultContinuationInput(currentInput),
+									previousResponseId,
+									'default',
+									continuationReasoningEnabled
+								)) as any,
 						)
 					}
 				} else {
@@ -188,17 +253,27 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 		let completedResponse: any = null
 		let reasoningActive = false
 		let reasoningStartMs: number | null = null
+		let hasStreamedText = false
+		let hasStreamedReasoning = false
 
 		for await (const event of stream as AsyncIterable<Record<string, unknown>>) {
 			if (isReasoningDeltaEvent(String(event.type ?? ''))) {
 				if (!context.enableReasoning) continue
-				const text = String((event as any).delta ?? '')
-				if (!text) continue
+				const text = typeof (event as any).delta === 'string'
+					? String((event as any).delta)
+					: typeof (event as any).text === 'string'
+						? String((event as any).text)
+						: ''
+				if (!text) {
+					hasStreamedReasoning = true
+					continue
+				}
 				if (!reasoningActive) {
 					reasoningActive = true
 					reasoningStartMs = Date.now()
 					yield buildReasoningBlockStart(reasoningStartMs)
 				}
+				hasStreamedReasoning = true
 				yield text
 				continue
 			}
@@ -212,6 +287,7 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 					reasoningStartMs = null
 					yield buildReasoningBlockEnd(durationMs)
 				}
+				hasStreamedText = true
 				yield text
 				continue
 			}
@@ -232,217 +308,41 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 			yield buildReasoningBlockEnd(durationMs)
 		}
 
+		if (context.enableReasoning && !hasStreamedReasoning) {
+			const reasoningText = extractReasoningTextFromResponse(completedResponse)
+			if (reasoningText) {
+				const startMs = Date.now()
+				yield buildReasoningBlockStart(startMs)
+				yield reasoningText
+				yield buildReasoningBlockEnd(Math.max(10, Date.now() - startMs))
+			}
+		}
+
+		if (!hasStreamedText) {
+			const outputText = extractOutputTextFromResponse(completedResponse)
+			if (outputText) {
+				yield outputText
+			}
+		}
+
 		const functionCalls = extractResponseFunctionCalls(completedResponse)
 		if (functionCalls.length === 0) {
 			return
 		}
 
-		if (!context.hasMcpToolRuntime || !context.mcpCallTool) {
-			throw new Error('Poe Responses 返回了 function_call，但未配置 MCP 工具执行器。')
+		if (!context.hasToolRuntime || (!context.toolExecutor && !context.mcpCallTool)) {
+			throw new Error(t('Poe Responses missing tool executor'))
 		}
 		if (loop >= context.maxToolCallLoops) {
-			throw new Error(`Poe MCP tool loop exceeded maximum iterations (${context.maxToolCallLoops})`)
-		}
-		if (!completedResponse?.id) {
-			throw new Error('Poe Responses 缺少 response.id，无法继续工具循环。')
-		}
-
-		const executedGen = emitToolMarkers(context, functionCalls, context.mcpCallTool)
-		let executedResult = await executedGen.next()
-		while (!executedResult.done) {
-			yield executedResult.value
-			executedResult = await executedGen.next()
-		}
-		const executed = executedResult.value
-		previousResponseId = String(completedResponse.id)
-		currentInput = executed.nextInputItems
-		accumulatedInput.push(...extractResponseOutputItems(completedResponse))
-		accumulatedInput.push(...executed.nextInputItems)
-	}
-}
-
-export const runResponsesWithDesktopFetchSse = async function* (context: PoeRequestContext) {
-	let currentInput: unknown = context.responseInput
-	let previousResponseId: string | undefined
-	let continuationReasoningEnabled = context.enableReasoning
-	const accumulatedInput: unknown[] = [...context.responseInput]
-	const requestResponsesStreamWithRetry = (body: Record<string, unknown>) =>
-		withRetry(
-			() => requestResponsesStreamByFetch(ensureResponseEndpoint(context.baseURL), context.apiKey, body, context.controller.signal),
-			{
-				...context.retryOptions,
-				signal: context.controller.signal
-			}
-		)
-
-	for (let loop = 0; loop <= context.maxToolCallLoops; loop++) {
-		if (context.controller.signal.aborted) return
-
-		const isToolContinuationTurn = isFunctionCallOutputInput(currentInput)
-		let reader: ReadableStreamDefaultReader<string> | undefined
-
-		try {
-			reader = await requestResponsesStreamWithRetry(
-				buildResponsesRequestData(
-					context,
-					currentInput,
-					previousResponseId,
-					'default',
-					continuationReasoningEnabled
+			throw new Error(
+				t('Poe tool loop exceeded maximum iterations').replace(
+					'{count}',
+					String(context.maxToolCallLoops)
 				)
 			)
-		} catch (error) {
-			let requestError: unknown = error
-
-			if (
-				isToolContinuationTurn
-				&& continuationReasoningEnabled
-				&& shouldRetryContinuationWithoutReasoning(requestError)
-			) {
-				continuationReasoningEnabled = false
-				try {
-					reader = await requestResponsesStreamWithRetry(
-						buildResponsesRequestData(
-							context,
-							currentInput,
-							previousResponseId,
-							'default',
-							continuationReasoningEnabled,
-							false
-						)
-					)
-				} catch (retryWithoutReasoningError) {
-					requestError = retryWithoutReasoningError
-				}
-			}
-
-			if (!reader) {
-				const errorStatus = resolveErrorStatus(requestError)
-				if (errorStatus !== undefined && errorStatus >= 500 && loop > 0) {
-					reader = await requestResponsesStreamWithRetry(
-						buildAccumulatedRequestData(context, accumulatedInput, continuationReasoningEnabled)
-					)
-				} else if (shouldRetryFunctionOutputTurn400(requestError, currentInput)) {
-					try {
-						reader = await requestResponsesStreamWithRetry(
-							buildResponsesRequestData(
-								context,
-								currentInput,
-								previousResponseId,
-								'compat',
-								continuationReasoningEnabled
-							)
-						)
-					} catch (compatError) {
-						if (!shouldRetryFunctionOutputTurn400(compatError, currentInput)) {
-							throw compatError
-						}
-						reader = await requestResponsesStreamWithRetry(
-							buildResponsesRequestData(
-								context,
-								toToolResultContinuationInput(currentInput),
-								previousResponseId,
-								'default',
-								continuationReasoningEnabled
-							)
-						)
-					}
-				} else {
-					throw requestError
-				}
-			}
-		}
-
-		let completedResponse: any = null
-		let reasoningActive = false
-		let reasoningStartMs: number | null = null
-		let reading = true
-		let sseRest = ''
-
-		const processEvents = async function* (
-			events: Array<{ isDone: boolean; parseError?: string; json?: unknown }>
-		) {
-			for (const event of events) {
-				if (event.isDone) {
-					reading = false
-					break
-				}
-				const payload = event.json as Record<string, unknown> | undefined
-				if (!payload) continue
-				const eventType = String(payload.type ?? '')
-
-				if (isReasoningDeltaEvent(eventType)) {
-					if (!context.enableReasoning) continue
-					const text = String((payload as any).delta ?? '')
-					if (!text) continue
-					if (!reasoningActive) {
-						reasoningActive = true
-						reasoningStartMs = Date.now()
-						yield buildReasoningBlockStart(reasoningStartMs)
-					}
-					yield text
-					continue
-				}
-
-				if (eventType === 'response.output_text.delta') {
-					const text = String((payload as any).delta ?? '')
-					if (!text) continue
-					if (reasoningActive) {
-						reasoningActive = false
-						const durationMs = Date.now() - (reasoningStartMs ?? Date.now())
-						reasoningStartMs = null
-						yield buildReasoningBlockEnd(durationMs)
-					}
-					yield text
-					continue
-				}
-
-				if (eventType === 'response.completed') {
-					completedResponse = (payload as any).response
-					if (reasoningActive) {
-						reasoningActive = false
-						const durationMs = Date.now() - (reasoningStartMs ?? Date.now())
-						reasoningStartMs = null
-						yield buildReasoningBlockEnd(durationMs)
-					}
-				}
-			}
-		}
-
-		while (reading) {
-			const { done, value } = await reader.read()
-			const parsed = feedChunk(sseRest, done ? '\n\n' : value ?? '')
-			sseRest = parsed.rest
-			for await (const text of processEvents(parsed.events)) {
-				yield text
-			}
-			if (done) {
-				reading = false
-			}
-		}
-
-		if (reasoningActive) {
-			const durationMs = Date.now() - (reasoningStartMs ?? Date.now())
-			yield buildReasoningBlockEnd(durationMs)
-		}
-
-		if (!completedResponse) {
-			throw new Error('Poe Responses stream ended without response.completed payload')
-		}
-
-		const functionCalls = extractResponseFunctionCalls(completedResponse)
-		if (functionCalls.length === 0) {
-			return
-		}
-
-		if (!context.hasMcpToolRuntime || !context.mcpCallTool) {
-			throw new Error('Poe Responses 返回了 function_call，但未配置 MCP 工具执行器。')
-		}
-		if (loop >= context.maxToolCallLoops) {
-			throw new Error(`Poe MCP tool loop exceeded maximum iterations (${context.maxToolCallLoops})`)
 		}
 		if (!completedResponse?.id) {
-			throw new Error('Poe Responses 缺少 response.id，无法继续工具循环。')
+			throw new Error(t('Poe Responses missing response id'))
 		}
 
 		const executedGen = emitToolMarkers(context, functionCalls, context.mcpCallTool)
@@ -452,9 +352,10 @@ export const runResponsesWithDesktopFetchSse = async function* (context: PoeRequ
 			executedResult = await executedGen.next()
 		}
 		const executed = executedResult.value
-		previousResponseId = String(completedResponse.id)
+		previousResponseId = shouldUseAccumulatedContinuation ? undefined : String(completedResponse.id)
 		currentInput = executed.nextInputItems
-		accumulatedInput.push(...extractResponseOutputItems(completedResponse))
-		accumulatedInput.push(...executed.nextInputItems)
+		accumulatedProtocolInput.push(...extractResponseOutputItems(completedResponse))
+		accumulatedProtocolInput.push(...executed.nextInputItems)
+		appendZdrSafeContinuationMessages(accumulatedMessageInput, completedResponse, executed.nextInputItems)
 	}
 }

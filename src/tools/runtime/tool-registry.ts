@@ -16,6 +16,33 @@ export interface BuiltinToolInfo {
 export class BuiltinToolRegistry {
 	private readonly tools = new Map<string, BuiltinTool<unknown>>();
 
+	private normalizeJsonSchema(value: unknown): unknown {
+		if (Array.isArray(value)) {
+			return value.map((item) => this.normalizeJsonSchema(item));
+		}
+		if (!value || typeof value !== 'object') {
+			return value;
+		}
+
+		const record = value as Record<string, unknown>;
+		const next: Record<string, unknown> = {};
+		for (const [key, child] of Object.entries(record)) {
+			next[key] = this.normalizeJsonSchema(child);
+		}
+
+		if (next.exclusiveMinimum === true && typeof next.minimum === 'number') {
+			next.exclusiveMinimum = next.minimum;
+			delete next.minimum;
+		}
+
+		if (next.exclusiveMaximum === true && typeof next.maximum === 'number') {
+			next.exclusiveMaximum = next.maximum;
+			delete next.maximum;
+		}
+
+		return next;
+	}
+
 	register<TArgs>(tool: BuiltinTool<TArgs>): void {
 		this.tools.set(tool.name, tool as BuiltinTool<unknown>);
 	}
@@ -71,9 +98,11 @@ export class BuiltinToolRegistry {
 	}
 
 	private zodSchemaToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
-		return zodToJsonSchema(schema as unknown as Parameters<typeof zodToJsonSchema>[0], {
+		return this.normalizeJsonSchema(
+			zodToJsonSchema(schema as unknown as Parameters<typeof zodToJsonSchema>[0], {
 			target: 'openApi3',
 			$refStrategy: 'none',
-		}) as Record<string, unknown>;
+			}) as Record<string, unknown>
+		) as Record<string, unknown>;
 	}
 }

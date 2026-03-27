@@ -6,6 +6,7 @@
  */
 
 import { Notice } from 'obsidian'
+import { t } from 'src/i18n/ai-runtime/helper'
 import { serializeMcpToolResult } from 'src/tools/runtime/tool-result'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import type { McpServerConfig, McpServerStatus, McpToolInfo } from './types'
@@ -126,7 +127,7 @@ export class McpClient {
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err)
 			DebugLogger.error(`[MCP] 连接失败: ${this.config.name}`, err)
-			new Notice(`MCP 连接失败 (${this.config.name}): ${errorMsg}`, 5000)
+			new Notice(t('MCP connection failed ({name})').replace('{name}', this.config.name), 5000)
 			this.updateStatus('error', errorMsg)
 			throw err
 		}

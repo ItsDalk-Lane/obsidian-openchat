@@ -1,3 +1,5 @@
+import { t } from 'src/i18n/ai-runtime/helper'
+
 export type ToolHintCoercion = 'number' | 'integer' | 'boolean' | 'string_array';
 
 export interface ToolConditionalRule {
@@ -36,7 +38,26 @@ const normalizeLegacyReadModeArgs = (
 			next.line_count = legacyCount;
 		}
 		delete next[mode];
-		notes.push(`${mode} 已转换为 read_mode=${mode} 和 line_count`);
+		notes.push(
+			t('{mode} was converted to read_mode={mode} and line_count').replaceAll('{mode}', mode)
+		);
+	}
+	return { args: next, notes };
+};
+
+const normalizeUnsupportedStartLineArgs = (
+	args: Record<string, unknown>,
+	unsupportedModes: readonly string[]
+): { args: Record<string, unknown>; notes: string[] } => {
+	const next = { ...args };
+	const notes: string[] = [];
+	const readMode = typeof next.read_mode === 'string' ? next.read_mode : undefined;
+	if (readMode && unsupportedModes.includes(readMode) && 'start_line' in next) {
+		delete next.start_line;
+		notes.push(
+			t('{mode} mode does not accept start_line; it was removed automatically')
+				.replace('{mode}', readMode)
+		);
 	}
 	return { args: next, notes };
 };
@@ -60,7 +81,19 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 				field: 'read_mode',
 				when: 'full',
 				forbids: ['start_line'],
-				message: 'full 模式不接受 start_line；文件过长时会返回改用 segment 的提示',
+				message: t('full mode does not accept start_line; use segment for long files'),
+			},
+			{
+				field: 'read_mode',
+				when: 'head',
+				forbids: ['start_line'],
+				message: t('head mode does not accept start_line; use segment to read from a specific line'),
+			},
+			{
+				field: 'read_mode',
+				when: 'tail',
+				forbids: ['start_line'],
+				message: t('tail mode does not accept start_line; use segment to read from a specific line'),
 			},
 			{
 				field: 'read_mode',
@@ -68,7 +101,7 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 				requires: ['file_path'],
 			},
 		],
-		usageHint: '已知文件路径后读取内容。长文优先使用 segment 分段读取；如果只知道名称，请先用 find_paths。',
+		usageHint: t('Read content once the file path is known. Use segment for long files; if you only know the name, call find_paths first.'),
 		fallbackTool: 'find_paths',
 		normalize(args) {
 			let next = { ...args };
@@ -78,9 +111,12 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 				next = normalized.args;
 				notes.push(...normalized.notes);
 			}
+			const normalizedStartLine = normalizeUnsupportedStartLineArgs(next, ['full', 'head', 'tail']);
+			next = normalizedStartLine.args;
+			notes.push(...normalizedStartLine.notes);
 			if ('max_chars' in next) {
 				delete next.max_chars;
-				notes.push('max_chars 已移除；请改用 read_mode + line_count 控制读取范围');
+				notes.push(t('max_chars has been removed; use read_mode + line_count to control the range'));
 			}
 			return { args: next, notes };
 		},
@@ -99,14 +135,25 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 			start_line: 'integer',
 			line_count: 'integer',
 		},
-		usageHint: '用于批量预览多个已知文件路径的部分内容；单篇长文请改用 read_file。',
+		conditionalRules: [
+			{
+				field: 'read_mode',
+				when: 'head',
+				forbids: ['start_line'],
+				message: t('head mode does not accept start_line; use segment to read from a specific line'),
+			},
+		],
+		usageHint: t('Use this to preview multiple known file paths. For a single long document, use read_file.'),
 		fallbackTool: 'read_file',
 		normalize(args) {
-			const next = { ...args };
+			let next = { ...args };
 			const notes: string[] = [];
+			const normalizedStartLine = normalizeUnsupportedStartLineArgs(next, ['head']);
+			next = normalizedStartLine.args;
+			notes.push(...normalizedStartLine.notes);
 			if ('max_chars' in next) {
 				delete next.max_chars;
-				notes.push('max_chars 已移除；批量读取现使用 read_mode + line_count');
+				notes.push(t('max_chars has been removed; batch reads now use read_mode + line_count'));
 			}
 			return { args: next, notes };
 		},
@@ -116,7 +163,7 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 			path: 'file_path',
 			filePath: 'file_path',
 		},
-		usageHint: '仅用于已知媒体文件路径的图片或音频读取。',
+		usageHint: t('Use this only for known media file paths.'),
 		fallbackTool: 'find_paths',
 	},
 	write_file: {
@@ -124,7 +171,7 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 			path: 'file_path',
 			filePath: 'file_path',
 		},
-		usageHint: '整文件写入或覆盖时使用；局部编辑请用 edit_file。',
+		usageHint: t('Use this for whole-file writes or overwrites; use edit_file for partial edits.'),
 	},
 	edit_file: {
 		aliases: {
@@ -135,7 +182,7 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 		valueCoercions: {
 			dry_run: 'boolean',
 		},
-		usageHint: '局部编辑已知文件时使用；读取内容前先用 read_file。',
+		usageHint: t('Use this for partial edits to known files; read with read_file first.'),
 	},
 	create_directory: {
 		aliases: {

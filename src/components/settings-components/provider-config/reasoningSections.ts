@@ -2,11 +2,13 @@ import { Setting } from 'obsidian'
 import type { AzureOptions } from 'src/LLMProviders/azure'
 import type { DeepSeekOptions } from 'src/LLMProviders/deepSeek'
 import type { GrokOptions } from 'src/LLMProviders/grok'
+import type { BaseOptions } from 'src/LLMProviders/index'
 import type { KimiOptions } from 'src/LLMProviders/kimi'
 import type { ReasoningCapabilityRecord } from 'src/LLMProviders/modelCapability'
 import type { OpenAIOptions } from 'src/LLMProviders/openAI'
 import type { PoeOptions } from 'src/LLMProviders/poe'
 import type { QianFanOptions } from 'src/LLMProviders/qianFan'
+import { qianFanIsImageGenerationModel } from 'src/LLMProviders/qianFan'
 import { DEFAULT_ZHIPU_THINKING_TYPE, ZHIPU_THINKING_TYPE_OPTIONS, type ZhipuOptions, type ZhipuThinkingType } from 'src/LLMProviders/zhipu'
 import type { QwenOptions } from 'src/LLMProviders/qwen'
 import { t } from 'src/i18n/ai-runtime/helper'
@@ -131,25 +133,28 @@ export const renderQianFanSections = (
 	capability: ReasoningCapabilityRecord,
 	context: ProviderSectionContext
 ) => {
-	const unsupported = capability.state === 'unsupported'
-	new Setting(details)
-		.setName(t('Enable deep thinking'))
-		.setDesc(
-			t('QianFan deep thinking description') +
-				' ' +
-				context.getReasoningCapabilityHintText(capability)
-		)
-		.addToggle((toggle) =>
-			toggle
-				.setValue(unsupported ? false : options.enableThinking ?? false)
-				.setDisabled(unsupported)
-				.onChange(async (value) => {
-					if (unsupported) return
-					options.enableThinking = value
-					await context.saveSettings()
-					context.updateProviderCapabilities(index, settings)
-				})
-		)
+	const isImageModel = qianFanIsImageGenerationModel(options.model ?? '')
+	if (!isImageModel) {
+		const unsupported = capability.state === 'unsupported'
+		new Setting(details)
+			.setName(t('Enable deep thinking'))
+			.setDesc(
+				t('QianFan deep thinking description') +
+					' ' +
+					context.getReasoningCapabilityHintText(capability)
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(unsupported ? false : options.enableThinking ?? false)
+					.setDisabled(unsupported)
+					.onChange(async (value) => {
+						if (unsupported) return
+						options.enableThinking = value
+						await context.saveSettings()
+						context.updateProviderCapabilities(index, settings)
+					})
+			)
+	}
 
 	new Setting(details)
 		.setName(t('Image response format'))
@@ -232,11 +237,21 @@ export const renderDeepSeekSections = (
 		description: t('Enable reasoning feature description'),
 		context
 	})
+
+	new Setting(details)
+		.setName(t('Structured output'))
+		.setDesc(t('Structured output description'))
+		.addToggle((toggle) =>
+			toggle.setValue(options.enableStructuredOutput ?? false).onChange(async (value) => {
+				options.enableStructuredOutput = value
+				await context.saveSettings()
+			})
+		)
 }
 
 export const renderOllamaSections = (
 	details: HTMLElement,
-	options: ReasoningToggleOptions,
+	options: BaseOptions & ReasoningToggleOptions,
 	index: number,
 	settings: ProviderSettings,
 	capability: ReasoningCapabilityRecord,
@@ -251,6 +266,16 @@ export const renderOllamaSections = (
 		description: t('Enable reasoning feature description'),
 		context
 	})
+
+	new Setting(details)
+		.setName(t('Structured output'))
+		.setDesc(t('Structured output description'))
+		.addToggle((toggle) =>
+			toggle.setValue(options.enableStructuredOutput ?? false).onChange(async (value) => {
+				options.enableStructuredOutput = value
+				await context.saveSettings()
+			})
+		)
 }
 
 export const renderGrokSections = (
