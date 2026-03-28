@@ -8,16 +8,10 @@ import type { ChatImageResolver } from './ChatImageResolver';
 import type { ChatSessionManager } from './ChatSessionManager';
 import type { MessageService } from './MessageService';
 import type { MultiModelChatService } from './MultiModelChatService';
-import type { PreparedChatRequest } from './ChatServiceCore';
+import type { ChatTriggerSource, PreparedChatRequest } from './ChatServiceCore';
 import type { ChatSession, ChatState } from '../types/chat';
 
-type ChatTriggerSource =
-	| 'chat_input'
-	| 'selection_toolbar'
-	| 'at_trigger'
-	| 'command_palette';
-
-interface ChatMessageOperationDeps {
+export interface ChatMessageOperationDeps {
 	app: import('obsidian').App;
 	state: ChatState;
 	imageResolver: ChatImageResolver;

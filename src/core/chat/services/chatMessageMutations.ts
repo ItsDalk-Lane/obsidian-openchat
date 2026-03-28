@@ -8,7 +8,7 @@ import type { ChatSessionManager } from './ChatSessionManager';
 import type { PreparedChatRequest } from './ChatServiceCore';
 import type { ChatSession, ChatState } from '../types/chat';
 
-interface ChatMessageMutationDeps {
+export interface ChatMessageMutationDeps {
 	app: import('obsidian').App;
 	state: ChatState;
 	sessionManager: ChatSessionManager;

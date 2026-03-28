@@ -13,7 +13,7 @@ import {
 import type { App } from 'obsidian'
 import { localInstance } from 'src/i18n/locals'
 import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
-import type { SkillScanResult } from 'src/services/skills'
+import type { SkillScanResult } from 'src/domains/skills/types'
 import type { SubAgentScanResult } from 'src/tools/sub-agents'
 import { BUILTIN_SERVER_ID } from 'src/tools/runtime/constants'
 import {

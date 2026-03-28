@@ -1,35 +1,56 @@
 import { Notice, TFile } from 'obsidian';
 import { normalizeBuiltinServerId } from 'src/tools/runtime/constants';
 import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
+import type { Message as ProviderMessage } from 'src/types/provider';
+import type { ToolDefinition } from 'src/types/tool';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { localInstance } from 'src/i18n/locals';
 import { getChatHistoryPath } from 'src/utils/AIPathManager';
-import type { ChatSettings, McpToolMode, SelectedFile, SelectedFolder } from '../types/chat';
+import type { ResolvedContextBudget } from 'src/core/chat/utils/contextBudget';
+import type {
+	ChatMessage,
+	ChatSettings,
+	ChatSession,
+	McpToolMode,
+	MessageManagementSettings,
+	SelectedFile,
+	SelectedFolder,
+} from '../types/chat';
 import { normalizeMessageManagementSettings } from '../types/chat';
-import type { ChatSession } from '../types/chat';
 import type { CompareGroup, LayoutMode, MultiModelMode } from '../types/multiModel';
 import type { MultiModelConfigService } from './MultiModelConfigService';
+import type { FileContentOptions } from './FileContentService';
 import type { ChatHistoryEntry } from './HistoryService';
-import type { ToolDefinition } from 'src/types/tool';
 import {
+	type GenerateAssistantOptions,
 	type PreparedChatRequest,
 } from './ChatServiceCore';
 import { ChatServiceMid } from './ChatServiceMid';
-import {
-	prepareChatRequest as prepareChatRequestHelper,
-	sendMessage as sendMessageHelper,
-} from './chatMessageOperations';
-import {
-	deleteMessage as deleteMessageHelper,
-	editAndRegenerate as editAndRegenerateHelper,
-	editMessage as editMessageHelper,
-	insertMessageToEditor as insertMessageToEditorHelper,
-	refreshProviderSettings as refreshProviderSettingsHelper,
-	regenerateFromMessage as regenerateFromMessageHelper,
-	togglePinnedMessage as togglePinnedMessageHelper,
-} from './chatMessageMutations';
+import type { ChatCommandFacade } from './chatCommandFacade';
+import type { ChatGenerationFacade } from './chatGenerationFacade';
+import type {
+	ChatMessageMutationFacade,
+	ChatMessageOperationFacade,
+} from './chatMessageFacade';
+import type { ChatPersistenceFacade } from './chatPersistenceFacade';
+import type {
+	ChatProviderMessageBuildOptions,
+	ChatProviderMessageFacade,
+} from './chatProviderMessageFacade';
+import type { McpSettings } from 'src/types/mcp';
 
 export abstract class ChatServiceOps extends ChatServiceMid {
+	protected abstract getCommandFacade(): ChatCommandFacade;
+
+	protected abstract getGenerationFacade(): ChatGenerationFacade;
+
+	protected abstract getMessageOperationFacade(): ChatMessageOperationFacade;
+
+	protected abstract getMessageMutationFacade(): ChatMessageMutationFacade;
+
+	protected abstract getPersistenceFacade(): ChatPersistenceFacade;
+
+	protected abstract getProviderMessageFacade(): ChatProviderMessageFacade;
 
 	removeSelectedFolder(folderId: string) {
 		this.attachmentSelectionService.removeSelectedFolder(folderId);
@@ -210,15 +231,93 @@ export abstract class ChatServiceOps extends ChatServiceMid {
 		content?: string,
 		options?: { skipImageSupportValidation?: boolean }
 	): Promise<PreparedChatRequest | null> {
-		return await prepareChatRequestHelper(
-			this.getMessageOperationDeps(),
-			content,
+		return await this.getMessageOperationFacade().prepareChatRequest(content, options);
+	}
+
+	async sendMessage(content?: string) {
+		await this.getMessageOperationFacade().sendMessage(content);
+	}
+
+	protected async generateAssistantResponse(session: ChatSession) {
+		await this.getGenerationFacade().generateAssistantResponse(session);
+	}
+
+	async generateAssistantResponseForModel(
+		session: ChatSession,
+		modelTag: string,
+		options?: GenerateAssistantOptions
+	): Promise<ChatMessage> {
+		return await this.getGenerationFacade().generateAssistantResponseForModel(
+			session,
+			modelTag,
 			options
 		);
 	}
 
-	async sendMessage(content?: string) {
-		await sendMessageHelper(this.getMessageOperationDeps(), content);
+	async buildProviderMessages(session: ChatSession): Promise<ProviderMessage[]> {
+		return await this.getProviderMessageFacade().buildProviderMessages(session);
+	}
+
+	async buildProviderMessagesWithOptions(
+		session: ChatSession,
+		options?: ChatProviderMessageBuildOptions
+	): Promise<ProviderMessage[]> {
+		return await this.getProviderMessageFacade().buildProviderMessagesWithOptions(
+			session,
+			options
+		);
+	}
+
+	async buildProviderMessagesForAgent(
+		messages: ChatMessage[],
+		session: ChatSession,
+		systemPrompt?: string,
+		modelTag?: string,
+		requestTools: ToolDefinition[] = []
+	): Promise<ProviderMessage[]> {
+		return await this.getProviderMessageFacade().buildProviderMessagesForAgent(
+			messages,
+			session,
+			systemPrompt,
+			modelTag,
+			requestTools
+		);
+	}
+
+	protected getMessageManagementSettings(): MessageManagementSettings {
+		return this.getProviderMessageFacade().getMessageManagementSettings();
+	}
+
+	protected getDefaultFileContentOptions(): FileContentOptions {
+		return this.getProviderMessageFacade().getDefaultFileContentOptions();
+	}
+
+	getResolvedContextBudget(modelTag?: string | null): ResolvedContextBudget {
+		return this.getProviderMessageFacade().resolveContextBudget(modelTag);
+	}
+
+	async persistChatSettings(partial: Partial<ChatSettings>): Promise<void> {
+		await this.getPersistenceFacade().persistChatSettings(partial);
+	}
+
+	async persistGlobalSystemPromptsEnabled(enabled: boolean): Promise<void> {
+		await this.getPersistenceFacade().persistGlobalSystemPromptsEnabled(enabled);
+	}
+
+	async persistMcpSettings(mcpSettings: McpSettings): Promise<void> {
+		await this.getPersistenceFacade().persistMcpSettings(mcpSettings);
+	}
+
+	async rewriteSessionMessages(session: ChatSession) {
+		await this.getPersistenceFacade().rewriteSessionMessages(session);
+	}
+
+	async executeSkillCommand(skillName: string): Promise<void> {
+		await this.getCommandFacade().executeSkillCommand(skillName);
+	}
+
+	async executeSubAgentCommand(agentName: string, task?: string): Promise<void> {
+		await this.getCommandFacade().executeSubAgentCommand(agentName, task);
 	}
 
 	stopGeneration() {
@@ -326,44 +425,31 @@ export abstract class ChatServiceOps extends ChatServiceMid {
 	}
 
 	async editMessage(messageId: string, content: string) {
-		await editMessageHelper(this.getMessageMutationDeps(), messageId, content);
+		await this.getMessageMutationFacade().editMessage(messageId, content);
 	}
 
 	async editAndRegenerate(messageId: string, content: string) {
-		await editAndRegenerateHelper(
-			this.getMessageMutationDeps(),
-			messageId,
-			content
-		);
+		await this.getMessageMutationFacade().editAndRegenerate(messageId, content);
 	}
 
 	async deleteMessage(messageId: string) {
-		await deleteMessageHelper(this.getMessageMutationDeps(), messageId);
+		await this.getMessageMutationFacade().deleteMessage(messageId);
 	}
 
 	async togglePinnedMessage(messageId: string) {
-		await togglePinnedMessageHelper(
-			this.getMessageMutationDeps(),
-			messageId
-		);
+		await this.getMessageMutationFacade().togglePinnedMessage(messageId);
 	}
 
 	insertMessageToEditor(messageId: string) {
-		insertMessageToEditorHelper(this.getMessageMutationDeps(), messageId);
+		this.getMessageMutationFacade().insertMessageToEditor(messageId);
 	}
 
 	async regenerateFromMessage(messageId: string) {
-		await regenerateFromMessageHelper(
-			this.getMessageMutationDeps(),
-			messageId
-		);
+		await this.getMessageMutationFacade().regenerateFromMessage(messageId);
 	}
 
 	async refreshProviderSettings(aiRuntimeSettings: AiRuntimeSettings) {
-		refreshProviderSettingsHelper(
-			this.getMessageMutationDeps(),
-			aiRuntimeSettings
-		);
+		this.getMessageMutationFacade().refreshProviderSettings(aiRuntimeSettings);
 	}
 
 	dispose() {
@@ -379,73 +465,6 @@ export abstract class ChatServiceOps extends ChatServiceMid {
 
 	protected emitState(): void {
 		this.stateStore.emit();
-	}
-
-	protected getProviderMessageDeps() {
-		return {
-			app: this.app,
-			state: this.state,
-			settings: this.settings,
-			pluginChatSettings: this.plugin.settings.chat,
-			messageService: this.messageService,
-			messageContextOptimizer: this.messageContextOptimizer,
-			contextCompactionService: this.contextCompactionService,
-			getDefaultProviderTag: () => this.getDefaultProviderTag(),
-			resolveProviderByTag: (tag?: string) => this.resolveProviderByTag(tag),
-			findProviderByTagExact: (tag?: string) => this.findProviderByTagExact(tag),
-			resolveSkillsSystemPromptBlock: (requestTools: ToolDefinition[]) =>
-				this.resolveSkillsSystemPromptBlock(requestTools),
-			persistSessionContextCompactionFrontmatter: (session: ChatSession) =>
-				this.persistSessionContextCompactionFrontmatter(session),
-		};
-	}
-
-	protected getMessageOperationDeps() {
-		return {
-			app: this.app,
-			state: this.state,
-			imageResolver: this.imageResolver,
-			attachmentSelectionService: this.attachmentSelectionService,
-			messageService: this.messageService,
-			sessionManager: this.sessionManager,
-			multiModelService: this.multiModelService,
-			emitState: () => this.emitState(),
-			createNewSession: () => this.createNewSession(),
-			syncSessionMultiModelState: (session?: ChatSession) =>
-				this.syncSessionMultiModelState(session),
-			consumePendingTriggerSource: () => this.consumePendingTriggerSource(),
-			resolveProvider: () => this.resolveProvider(),
-			detectImageGenerationIntent: (content: string) =>
-				this.detectImageGenerationIntent(content),
-			isCurrentModelSupportImageGeneration: () =>
-				this.isCurrentModelSupportImageGeneration(),
-			ensurePlanSyncReady: () => this.ensurePlanSyncReady(),
-			generateAssistantResponse: async (session: ChatSession) => {
-				await this.generateAssistantResponse(session);
-			},
-		};
-	}
-
-	protected getMessageMutationDeps() {
-		return {
-			app: this.app,
-
-			state: this.state,
-			sessionManager: this.sessionManager,
-			multiModelService: this.multiModelService,
-			emitState: () => this.emitState(),
-			invalidateSessionContextCompaction: (session: ChatSession) =>
-				this.invalidateSessionContextCompaction(session),
-			queueSessionPlanSync: (session: ChatSession | null) =>
-				this.queueSessionPlanSync(session),
-			generateAssistantResponse: async (session: ChatSession) => {
-				await this.generateAssistantResponse(session);
-			},
-			detectImageGenerationIntent: (content: string) =>
-				this.detectImageGenerationIntent(content),
-			isCurrentModelSupportImageGeneration: () =>
-				this.isCurrentModelSupportImageGeneration(),
-		};
 	}
 
 	// Methods continue in ChatService.ts

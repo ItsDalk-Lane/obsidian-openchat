@@ -19,7 +19,7 @@ import type { MessageService } from './MessageService';
 import type { OllamaCapabilityCacheEntry } from './chatProviderHelpers';
 import type { ChatMessage, ChatSession, ChatState } from '../types/chat';
 
-interface ChatGenerationDeps {
+export interface ChatGenerationDeps {
 	app: App;
 	state: ChatState;
 	messageService: MessageService;

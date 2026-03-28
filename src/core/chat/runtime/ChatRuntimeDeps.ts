@@ -1,7 +1,7 @@
 import type { ToolExecutor } from 'src/types/tool';
-import type { McpClientManager } from 'src/services/mcp';
-import type { SkillScanResult } from 'src/services/skills';
-import type { SkillScannerService } from 'src/services/skills';
+import type { McpRuntimeManager } from 'src/domains/mcp/types';
+import type { SkillScanResult } from 'src/domains/skills/types';
+import type { SkillScannerService } from 'src/domains/skills/service';
 
 export interface ChatRuntimeDeps {
 	ensureSkillsInitialized(): Promise<void>;
@@ -11,6 +11,6 @@ export interface ChatRuntimeDeps {
 	refreshSkills(): Promise<SkillScanResult>;
 	onSkillsChange(listener: (result: SkillScanResult) => void): () => void;
 	ensureMcpInitialized(): Promise<void>;
-	getMcpClientManager(): McpClientManager | null;
+	getMcpClientManager(): McpRuntimeManager | null;
 	getCustomToolExecutors(): ToolExecutor[];
 }

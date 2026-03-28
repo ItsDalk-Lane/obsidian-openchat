@@ -1,121 +1,55 @@
+import {
+	ChatStateStore as DomainChatStateStore,
+	type ChatStateSubscriber,
+} from 'src/domains/chat/service-state-store'
 import type {
 	ChatSession,
 	ChatState,
 	McpToolMode,
 	SelectedFile,
 	SelectedFolder,
-} from '../types/chat';
-import type { ParallelResponseGroup } from '../types/multiModel';
+} from '../types/chat'
 
-export type ChatStateSubscriber = (state: ChatState) => void;
+export type { ChatStateSubscriber }
 
-const cloneState = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-
-export class ChatStateStore {
-	private readonly subscribers = new Set<ChatStateSubscriber>();
-
-	constructor(private state: ChatState) {}
-
-	getMutableState(): ChatState {
-		return this.state;
+export class ChatStateStore extends DomainChatStateStore {
+	constructor(state: ChatState) {
+		super(state)
 	}
 
-	getState(): ChatState {
-		return cloneState(this.state);
-	}
-
-	snapshot(): ChatState {
-		return this.getState();
-	}
-
-	subscribe(callback: ChatStateSubscriber): () => void {
-		this.subscribers.add(callback);
-		callback(this.getState());
-		return () => {
-			this.subscribers.delete(callback);
-		};
-	}
-
-	emit(): void {
-		const snapshot = this.getState();
-		for (const subscriber of this.subscribers) {
-			subscriber(snapshot);
-		}
-	}
-
-	dispose(): void {
-		this.subscribers.clear();
-	}
-
-	mutate(mutator: (state: ChatState) => void, emit = false): void {
-		mutator(this.state);
-		if (emit) {
-			this.emit();
-		}
-	}
-
-	/**
-	 * 批量写入状态并自动 emit 一次
-	 * 用于替代散落在各处的 `this.state.xxx = ...` + `this.emitState()` 组合
-	 */
 	batchUpdate(updater: (state: ChatState) => void): void {
-		updater(this.state);
-		this.emit();
+		this.updateBatch(updater)
 	}
 
 	setActiveSession(session: ChatSession | null, emit = false): void {
-		this.state.activeSession = session;
-		if (emit) {
-			this.emit();
-		}
+		this.updateActiveSession(session, emit)
 	}
 
 	setGenerating(isGenerating: boolean, emit = false): void {
-		this.state.isGenerating = isGenerating;
-		if (emit) {
-			this.emit();
-		}
+		this.updateGenerating(isGenerating, emit)
 	}
 
 	setError(error: string | undefined, emit = false): void {
-		this.state.error = error;
-		if (emit) {
-			this.emit();
-		}
+		this.updateError(error, emit)
 	}
 
 	setSelectedFiles(files: SelectedFile[], emit = false): void {
-		this.state.selectedFiles = files;
-		if (emit) {
-			this.emit();
-		}
+		this.updateSelectedFiles(files, emit)
 	}
 
 	setSelectedFolders(folders: SelectedFolder[], emit = false): void {
-		this.state.selectedFolders = folders;
-		if (emit) {
-			this.emit();
-		}
+		this.updateSelectedFolders(folders, emit)
 	}
 
 	setMcpToolMode(mode: McpToolMode, emit = false): void {
-		this.state.mcpToolMode = mode;
-		if (emit) {
-			this.emit();
-		}
+		this.updateMcpToolMode(mode, emit)
 	}
 
-	setParallelResponses(group: ParallelResponseGroup | undefined, emit = false): void {
-		this.state.parallelResponses = group;
-		if (emit) {
-			this.emit();
-		}
+	setParallelResponses(group: ChatState['parallelResponses'], emit = false): void {
+		this.updateParallelResponses(group, emit)
 	}
 
 	setShouldSaveHistory(shouldSaveHistory: boolean, emit = false): void {
-		this.state.shouldSaveHistory = shouldSaveHistory;
-		if (emit) {
-			this.emit();
-		}
+		this.updateShouldSaveHistory(shouldSaveHistory, emit)
 	}
 }

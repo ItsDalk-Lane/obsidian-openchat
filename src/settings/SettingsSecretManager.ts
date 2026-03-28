@@ -1,5 +1,5 @@
-import { cloneAiRuntimeSettings } from 'src/settings/ai-runtime';
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
+import { cloneAiRuntimeSettings } from 'src/settings/ai-runtime/core';
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/core';
 import { encryptApiKey, decryptApiKey, generateDeviceFingerprint } from 'src/settings/ai-runtime/utils/cryptoUtils';
 import type { BaseOptions, ProviderSettings } from 'src/types/provider';
 import { DebugLogger } from 'src/utils/DebugLogger';
@@ -36,7 +36,7 @@ export class SettingsSecretManager {
             try {
                 plain = encrypted ? decryptApiKey(encrypted) : '';
             } catch (error) {
-                DebugLogger.warn('[SettingsManager] 解密供应商 API 密钥失败', {
+                DebugLogger.warn('[SettingsDomain] 解密供应商 API 密钥失败', {
                     vendor,
                     error,
                 });
@@ -74,7 +74,7 @@ export class SettingsSecretManager {
                 try {
                     slots[this.currentDeviceFingerprint] = encryptApiKey(plain);
                 } catch (error) {
-                    DebugLogger.warn('[SettingsManager] 加密供应商 API 密钥失败', {
+                    DebugLogger.warn('[SettingsDomain] 加密供应商 API 密钥失败', {
                         vendor,
                         error,
                     });
@@ -174,7 +174,7 @@ export class SettingsSecretManager {
                 options: nextOptions,
             };
         });
-        DebugLogger.debug('[SettingsManager] API 密钥按供应商解密完成');
+        DebugLogger.debug('[SettingsDomain] API 密钥按供应商解密完成');
         return cloneAiRuntimeSettings({
             ...settings,
             vendorApiKeys,
@@ -210,7 +210,7 @@ export class SettingsSecretManager {
                 options: encrypted,
             };
         });
-        DebugLogger.debug('[SettingsManager] API 密钥按供应商加密完成');
+        DebugLogger.debug('[SettingsDomain] API 密钥按供应商加密完成');
         return cloneAiRuntimeSettings({
             ...settings,
             vendorApiKeys: {},

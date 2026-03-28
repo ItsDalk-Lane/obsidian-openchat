@@ -1,4 +1,14 @@
 import type { App } from 'obsidian';
+import {
+	compactProviderMessages,
+} from 'src/domains/chat/service-provider-message-compaction';
+import {
+	buildRequestTokenState,
+	getChatDefaultFileContentOptions as getChatDefaultFileContentOptionsFromDomain,
+	getChatMessageManagementSettings as getChatMessageManagementSettingsFromDomain,
+	hasContextCompactionChanged,
+	hasRequestTokenStateChanged,
+} from 'src/domains/chat/service-provider-message-support';
 import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler';
 import { composeChatSystemPrompt } from 'src/core/services/PromptBuilder';
 import { resolveContextBudget, type ResolvedContextBudget } from 'src/core/chat/utils/contextBudget';
@@ -15,18 +25,12 @@ import type { ChatContextCompactionService } from './ChatContextCompactionServic
 import type { FileContentOptions } from './FileContentService';
 import type { MessageContextOptimizer } from './MessageContextOptimizer';
 import type { MessageService } from './MessageService';
+import type { ChatProviderMessageBuildOptions } from './chatProviderMessageFacade';
 import type {
-	ChatContextCompactionState,
 	ChatMessage,
-	ChatRequestTokenState,
 	ChatSession,
 	ChatSettings,
 	ChatState,
-	MessageManagementSettings,
-} from '../types/chat';
-import {
-	DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
-	normalizeMessageManagementSettings,
 } from '../types/chat';
 import {
 	buildResolvedSelectionContext,
@@ -35,10 +39,10 @@ import {
 	getLatestContextSourceMessage,
 	getStringMetadata,
 	hasBuildableContextPayload,
-	mergeCompactionState,
 } from './chatContextHelpers';
 import { buildLivePlanGuidance, buildLivePlanUserContext } from './chatPlanPrompts';
-interface ChatProviderMessageDeps {
+
+export interface ChatProviderMessageDeps {
 	app: App;
 	state: Pick<ChatState, 'contextNotes' | 'multiModelMode' | 'selectedModelId'>;
 	settings: ChatSettings;
@@ -56,35 +60,13 @@ interface ChatProviderMessageDeps {
 		session: ChatSession
 	) => Promise<void>;
 }
-const serializeContextCompaction = (
-	compaction: ChatContextCompactionState | null | undefined
-): string => JSON.stringify(compaction ?? null);
-const serializeRequestTokenState = (
-	state: ChatRequestTokenState | null | undefined
-): string => JSON.stringify(state ?? null);
+
 export const getChatMessageManagementSettings = (
 	settings: ChatSettings,
 	pluginChatSettings: ChatSettings
-): MessageManagementSettings => {
-	return normalizeMessageManagementSettings({
-		...DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
-		...(settings.messageManagement ?? {}),
-		...(pluginChatSettings.messageManagement ?? {}),
-	});
-};
+) => getChatMessageManagementSettingsFromDomain(settings, pluginChatSettings);
 export const getChatDefaultFileContentOptions = (): FileContentOptions => {
-	return {
-		maxFileSize: 1024 * 1024,
-		maxContentLength: 10000,
-		includeExtensions: [],
-		excludeExtensions: ['exe', 'dll', 'bin', 'zip', 'rar', 'tar', 'gz'],
-		excludePatterns: [
-			/node_modules/,
-			/\.git/,
-			/\.DS_Store/,
-			/Thumbs\.db/,
-		],
-	};
+	return getChatDefaultFileContentOptionsFromDomain();
 };
 export const resolveChatContextBudget = (
 	deps: Pick<ChatProviderMessageDeps, 'resolveProviderByTag' | 'state'>,
@@ -110,13 +92,7 @@ export const buildProviderMessages = async (
 export const buildProviderMessagesWithOptions = async (
 	deps: ChatProviderMessageDeps,
 	session: ChatSession,
-	options?: {
-		context?: string;
-		taskDescription?: string;
-		systemPrompt?: string;
-		modelTag?: string;
-		requestTools?: ToolDefinition[];
-	}
+	options?: ChatProviderMessageBuildOptions
 ): Promise<ProviderMessage[]> => {
 	const visibleMessages =
 		(session.multiModelMode ?? deps.state.multiModelMode) === 'compare' && options?.modelTag
@@ -260,166 +236,48 @@ export const buildProviderMessagesForAgent = async (
 		tools: requestTools,
 	});
 
-	// 消息压缩功能始终启用
 	const rawContextTokens = rawContextMessage
 		? estimateProviderMessagesTokens([rawContextMessage])
 		: 0;
-		let contextTokenEstimate = rawContextTokens;
-		let historyTokenEstimate = deps.messageContextOptimizer.estimateChatTokens(
-			requestMessages
-		);
-		let totalTokenEstimate = requestEstimate.totalTokens;
-		const shouldCompact = totalTokenEstimate > resolvedBudget.triggerTokens;
-
-		if (shouldCompact) {
-			const summaryGenerator = createHistorySummaryGenerator({
+	const compactionResult = await compactProviderMessages(
+		{
+			messageContextOptimizer: deps.messageContextOptimizer,
+			buildProviderPayload,
+			estimateRequestPayload: estimateRequestPayloadTokens,
+			compactContextProviderMessage: (params) =>
+				deps.contextCompactionService.compactContextProviderMessage(params),
+		},
+		{
+			requestMessages,
+			providerMessages,
+			requestEstimate,
+			rawContextMessage,
+			rawContextTokenEstimate: rawContextTokens,
+			nextCompaction,
+			messageManagement,
+			requestTools,
+			resolvedBudget,
+			systemTokenEstimate,
+			toolTokenEstimate,
+			session,
+			modelTag,
+			summaryGenerator: createHistorySummaryGenerator({
 				modelTag,
 				session,
 				messageManagement,
 				selectedModelId: deps.state.selectedModelId,
 				getDefaultProviderTag: deps.getDefaultProviderTag,
 				findProviderByTagExact: deps.findProviderByTagExact,
-			});
-			let optimized = await deps.messageContextOptimizer.optimize(
-				requestMessages,
-				messageManagement,
-				nextCompaction,
-				{
-					targetHistoryBudgetTokens: Math.max(
-						1,
-						resolvedBudget.targetTokens
-							- systemTokenEstimate
-							- contextTokenEstimate
-							- toolTokenEstimate
-					),
-					summaryGenerator,
-				}
-			);
-			requestMessages = optimized.messages;
-			historyTokenEstimate = optimized.historyTokenEstimate;
-			providerMessages = await buildProviderPayload(
-				requestMessages,
-				prebuiltContextMessage
-			);
-			requestEstimate = estimateRequestPayloadTokens({
-				messages: providerMessages,
-				tools: requestTools,
-			});
-			totalTokenEstimate = requestEstimate.totalTokens;
+			}),
+		},
+	);
+	requestMessages = compactionResult.requestMessages;
+	providerMessages = compactionResult.providerMessages;
+	requestEstimate = compactionResult.requestEstimate;
+	prebuiltContextMessage = compactionResult.contextMessage;
+	nextCompaction = compactionResult.nextCompaction;
 
-			if (rawContextMessage && totalTokenEstimate > resolvedBudget.targetTokens) {
-				const contextCompaction =
-					await deps.contextCompactionService.compactContextProviderMessage({
-						contextMessage: rawContextMessage,
-						existingCompaction: nextCompaction,
-						session,
-						modelTag,
-						targetBudgetTokens: Math.max(
-							256,
-							resolvedBudget.targetTokens
-								- systemTokenEstimate
-								- historyTokenEstimate
-								- toolTokenEstimate
-						),
-					});
-				prebuiltContextMessage = contextCompaction.message;
-				contextTokenEstimate = contextCompaction.tokenEstimate;
-				providerMessages = await buildProviderPayload(
-					requestMessages,
-					prebuiltContextMessage
-				);
-				requestEstimate = estimateRequestPayloadTokens({
-					messages: providerMessages,
-					tools: requestTools,
-				});
-				totalTokenEstimate = requestEstimate.totalTokens;
-
-				if (totalTokenEstimate > resolvedBudget.targetTokens) {
-					optimized = await deps.messageContextOptimizer.optimize(
-						messages.filter((message) => message.role !== 'system'),
-						messageManagement,
-						optimized.contextCompaction ?? nextCompaction,
-						{
-							targetHistoryBudgetTokens: Math.max(
-								1,
-								resolvedBudget.targetTokens
-									- systemTokenEstimate
-									- contextTokenEstimate
-									- toolTokenEstimate
-							),
-							summaryGenerator,
-						}
-					);
-					requestMessages = optimized.messages;
-					historyTokenEstimate = optimized.historyTokenEstimate;
-					providerMessages = await buildProviderPayload(
-						requestMessages,
-						prebuiltContextMessage
-					);
-					requestEstimate = estimateRequestPayloadTokens({
-						messages: providerMessages,
-						tools: requestTools,
-					});
-					totalTokenEstimate = requestEstimate.totalTokens;
-				}
-
-				nextCompaction = mergeCompactionState(
-					optimized.contextCompaction,
-					contextCompaction.summary,
-					contextCompaction.signature,
-					contextTokenEstimate,
-					totalTokenEstimate
-				);
-			} else if (optimized.contextCompaction) {
-				nextCompaction = {
-					...optimized.contextCompaction,
-					totalTokenEstimate,
-					contextTokenEstimate,
-				};
-			} else if (nextCompaction) {
-				nextCompaction = {
-					...nextCompaction,
-					historyTokenEstimate,
-					totalTokenEstimate,
-					contextTokenEstimate,
-				};
-			} else {
-				nextCompaction = null;
-			}
-		} else if (nextCompaction) {
-			nextCompaction = {
-				...nextCompaction,
-				historyTokenEstimate,
-				totalTokenEstimate: requestEstimate.totalTokens,
-				contextTokenEstimate,
-			};
-		} else {
-			nextCompaction = null;
-		}
-
-	if (!rawContextMessage && nextCompaction) {
-		nextCompaction = {
-			...nextCompaction,
-			contextSummary: undefined,
-			contextSourceSignature: undefined,
-			contextTokenEstimate: undefined,
-		};
-	}
-
-	if (
-		nextCompaction
-		&& nextCompaction.coveredRange.messageCount === 0
-		&& !nextCompaction.summary.trim()
-		&& !nextCompaction.contextSummary
-		&& !nextCompaction.overflowedProtectedLayers
-	) {
-		nextCompaction = null;
-	}
-
-	if (
-		serializeContextCompaction(session.contextCompaction)
-		!== serializeContextCompaction(nextCompaction)
-	) {
+	if (hasContextCompactionChanged(session.contextCompaction, nextCompaction)) {
 		session.contextCompaction = nextCompaction;
 		void deps.persistSessionContextCompactionFrontmatter(session);
 	}
@@ -478,18 +336,14 @@ const updateRequestTokenState = async (
 		};
 	}
 
-	const nextState: ChatRequestTokenState = {
+	const nextState = buildRequestTokenState({
 		totalTokenEstimate: params.requestEstimate.totalTokens,
 		messageTokenEstimate: params.requestEstimate.messageTokens,
 		toolTokenEstimate: params.requestEstimate.toolTokens,
 		userTurnTokenEstimate,
-		updatedAt: Date.now(),
-	};
+	});
 
-	if (
-		serializeRequestTokenState(session.requestTokenState)
-		!== serializeRequestTokenState(nextState)
-	) {
+	if (hasRequestTokenStateChanged(session.requestTokenState, nextState)) {
 		session.requestTokenState = nextState;
 		void deps.persistSessionContextCompactionFrontmatter(session);
 	}

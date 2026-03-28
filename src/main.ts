@@ -1,22 +1,33 @@
 import { Notice, Plugin } from 'obsidian';
 import { localInstance } from 'src/i18n/locals';
-import { PluginSettings, DEFAULT_SETTINGS } from './settings/PluginSettings';
-import { SettingsManager } from './settings/SettingsManager';
+import type { PluginSettings } from 'src/domains/settings/types';
+import { DEFAULT_SETTINGS } from 'src/domains/settings/config';
+import { SettingsDomainService } from 'src/domains/settings/service';
 import { FeatureCoordinator } from './core/FeatureCoordinator';
 import { PluginSettingTab } from './settings/PluginSettingTab';
 import { DebugLogger } from './utils/DebugLogger';
 import './styles/base.css';
 import './styles/chat.css';
-import { PluginSettingsController } from './settings/PluginSettingsController';
+import { PluginSettingsController } from 'src/domains/settings/ui';
 import { PluginStartupCoordinator } from './core/PluginStartupCoordinator';
+import { createObsidianApiProvider } from 'src/providers/obsidian-api';
 
 export default class OpenChatPlugin extends Plugin {
 	settings: PluginSettings = DEFAULT_SETTINGS;
 
-	private settingsManager = new SettingsManager(this);
 	featureCoordinator = new FeatureCoordinator(this);
-	private settingsController = new PluginSettingsController(this, this.settingsManager, this.featureCoordinator);
-	private startupCoordinator = new PluginStartupCoordinator(this.app, this.settingsManager, this.featureCoordinator);
+	private settingsDomainService = new SettingsDomainService(
+		this,
+		createObsidianApiProvider(this.app, async () => ''),
+		DebugLogger,
+	);
+	private settingsController = new PluginSettingsController(
+		this.settingsDomainService,
+		this.featureCoordinator,
+		DebugLogger,
+		DebugLogger,
+	);
+	private startupCoordinator = new PluginStartupCoordinator(this.settingsDomainService, this.featureCoordinator);
 
 
 	async onload() {

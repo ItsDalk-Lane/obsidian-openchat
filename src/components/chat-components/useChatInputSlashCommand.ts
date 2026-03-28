@@ -4,7 +4,7 @@ import type { SlashCommandItem } from 'src/core/chat/types/slashCommand';
 import { Notice } from 'obsidian';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import type { SkillDefinition } from 'src/services/skills';
+import type { SkillDefinition } from 'src/domains/skills/types';
 import type { SubAgentDefinition } from 'src/tools/sub-agents';
 
 export interface UseChatInputSlashCommandReturn {

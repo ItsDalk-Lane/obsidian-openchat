@@ -10,9 +10,9 @@ export type {
 	McpCallToolFn,
 	McpSettings,
 	McpConfigFile,
-} from 'src/services/mcp/types';
+} from 'src/domains/mcp/types';
 
 export {
 	DEFAULT_BUILTIN_TIME_TIMEZONE,
 	DEFAULT_MCP_SETTINGS,
-} from 'src/services/mcp/types';
+} from 'src/domains/mcp/config';

@@ -11,6 +11,7 @@ import type { ParallelResponseGroup } from '../types/multiModel';
 import type { MultiModelChatService } from './MultiModelChatService';
 import type { MultiModelConfigService } from './MultiModelConfigService';
 import type { ChatStateSubscriber } from './ChatStateStore';
+import type { ChatPersistenceFacade } from './chatPersistenceFacade';
 import type { MessageService } from './MessageService';
 import {
 	type ChatTriggerSource,
@@ -20,6 +21,8 @@ import {
 
 export abstract class ChatServiceMid extends ChatServiceCore {
 	private _coreInitialized = false;
+
+	protected abstract getPersistenceFacade(): ChatPersistenceFacade;
 
 	protected bindLivePlanStateSync(): void {
 		void this.toolRuntimeResolver.ensureBuiltinToolsRuntime(this.state.activeSession).catch((error) => {
@@ -53,6 +56,30 @@ export abstract class ChatServiceMid extends ChatServiceCore {
 
 	protected async ensurePlanSyncReady(): Promise<void> {
 		await this.planSyncService.ensureReady();
+	}
+
+	protected readPersistedLayoutMode() {
+		return this.getPersistenceFacade().readPersistedLayoutMode();
+	}
+
+	protected persistLayoutMode(mode: 'horizontal' | 'tabs' | 'vertical'): void {
+		this.getPersistenceFacade().persistLayoutMode(mode);
+	}
+
+	protected syncSessionMultiModelState(session = this.state.activeSession): void {
+		this.getPersistenceFacade().syncSessionMultiModelState(session);
+	}
+
+	protected async persistActiveSessionMultiModelFrontmatter(): Promise<void> {
+		await this.getPersistenceFacade().persistActiveSessionMultiModelFrontmatter();
+	}
+
+	protected async persistSessionMultiModelFrontmatter(session: ChatSession): Promise<void> {
+		await this.getPersistenceFacade().persistSessionMultiModelFrontmatter(session);
+	}
+
+	protected restoreMultiModelStateFromSession(session: ChatSession) {
+		return this.getPersistenceFacade().restoreMultiModelStateFromSession(session);
 	}
 
 	initialize(initialSettings?: Partial<ChatSettings>): void {

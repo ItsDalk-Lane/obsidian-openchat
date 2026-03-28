@@ -11,9 +11,9 @@ import { ProviderSettingModal } from 'src/components/modals/AiRuntimeProviderMod
 import { ProviderSettings, Vendor } from 'src/types/provider'
 import { getCapabilityDisplayText } from 'src/LLMProviders/utils'
 import { type ReasoningCapabilityRecord } from 'src/LLMProviders/modelCapability'
+import type { McpRuntimeManager } from 'src/domains/mcp/types'
 import { availableVendors } from 'src/settings/ai-runtime'
 import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
-import { McpClientManager } from 'src/services/mcp'
 import type { ChatSettings } from 'src/types/chat'
 import { isCustomOpenChatProvider } from 'src/utils/aiProviderMetadata'
 
@@ -25,7 +25,7 @@ export interface AiRuntimeSettingsContext {
 	saveSettings: () => Promise<void>
 	updateChatSettings: (partial: Partial<ChatSettings>) => Promise<void>
 	refreshQuickActionsCache?: () => Promise<void>
-	getMcpClientManager?: () => McpClientManager | null
+	getMcpClientManager?: () => McpRuntimeManager | null
 }
 
 export interface AiRuntimeSettingsPanelSections {

@@ -1,30 +1,12 @@
-export type PlanTaskStatus = 'todo' | 'in_progress' | 'done' | 'skipped';
+import type { PlanSnapshot, PlanTask, PlanTaskStatus } from 'src/types/chat';
+
+export type { PlanSnapshot, PlanTask, PlanTaskStatus };
 
 export interface PlanTaskInput {
 	name: string;
 	status: PlanTaskStatus;
 	acceptance_criteria?: string[];
 	outcome?: string;
-}
-
-export interface PlanTask {
-	name: string;
-	status: PlanTaskStatus;
-	acceptance_criteria: string[];
-	outcome?: string;
-}
-
-export interface PlanSnapshot {
-	title: string;
-	description?: string;
-	tasks: PlanTask[];
-	summary: {
-		total: number;
-		todo: number;
-		inProgress: number;
-		done: number;
-		skipped: number;
-	};
 }
 
 export interface PlanUpdateInput {

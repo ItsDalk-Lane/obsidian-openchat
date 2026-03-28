@@ -1,4 +1,4 @@
-import type { McpServerConfig } from 'src/services/mcp'
+import type { McpServerConfig } from 'src/types/mcp'
 
 export interface ExternalMcpEntry {
 	server: McpServerConfig

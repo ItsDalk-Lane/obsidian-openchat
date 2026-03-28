@@ -1,7 +1,7 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { ToggleSwitch } from 'src/components/toggle-switch/ToggleSwitch'
 import { localInstance } from 'src/i18n/locals'
-import type { SkillScanResult } from 'src/services/skills'
+import type { SkillScanResult } from 'src/domains/skills/types'
 import type { McpServerState } from 'src/services/mcp'
 import type { SubAgentScanResult } from 'src/tools/sub-agents'
 import { getMcpStatusColor, getMcpStatusText } from './chatSettingsHelpers'

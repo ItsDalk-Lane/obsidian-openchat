@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { localInstance } from "src/i18n/locals";
 import FolderSuggest from "src/components/combobox/FolderSuggest";
 import OpenChatPlugin from "src/main";
-import { DEFAULT_SETTINGS } from "./PluginSettings";
+import { DEFAULT_SETTINGS } from "src/domains/settings/config";
 import { t } from "src/i18n/ai-runtime/helper";
 import { DebugLogger } from "src/utils/DebugLogger";
 import { resolveToolExecutionSettings, syncToolExecutionSettings } from "src/settings/ai-runtime";

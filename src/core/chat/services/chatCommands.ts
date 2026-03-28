@@ -3,12 +3,12 @@ import { availableVendors } from 'src/settings/ai-runtime'
 import { localInstance } from 'src/i18n/locals'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import type { SubAgentScanResult } from 'src/tools/sub-agents'
-import type { SkillScanResult } from 'src/services/skills'
+import type { SkillScanResult } from 'src/domains/skills/types'
 import type { ChatSession, ChatState } from '../types/chat'
 import type { PreparedChatRequest } from './ChatServiceCore'
 import type { ProviderSettings } from 'src/types/provider'
 
-interface ExecuteSkillCommandParams {
+export interface ExecuteSkillCommandParams {
 	app: App
 	state: ChatState
 	emitState: () => void
@@ -16,7 +16,7 @@ interface ExecuteSkillCommandParams {
 	sendMessage: (content?: string) => Promise<void>
 }
 
-interface ExecuteSubAgentCommandParams {
+export interface ExecuteSubAgentCommandParams {
 	state: ChatState
 	providers: ProviderSettings[]
 	loadInstalledSubAgents: () => Promise<SubAgentScanResult>

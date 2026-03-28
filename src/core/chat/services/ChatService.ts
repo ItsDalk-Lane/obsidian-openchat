@@ -1,40 +1,66 @@
 import { Notice } from 'obsidian';
+import type { McpRuntimeManager } from 'src/domains/mcp/types';
 import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
-import type { Message as ProviderMessage, ProviderSettings } from 'src/types/provider';
+import type { ProviderSettings } from 'src/types/provider';
 import type { ToolDefinition, ToolExecutionRecord } from 'src/types/tool';
-import type { McpClientManager, McpSettings } from 'src/services/mcp';
+import type { McpSettings } from 'src/types/mcp';
 import type {
 	ChatMessage,
 	ChatSession,
 	ChatSettings,
-	MessageManagementSettings,
 } from '../types/chat';
 import type { LayoutMode, MultiModelMode } from '../types/multiModel';
-import type { ResolvedContextBudget } from 'src/core/chat/utils/contextBudget';
-import type { SkillScanResult } from 'src/services/skills';
+import type { SkillScanResult } from 'src/domains/skills/types';
 import type { SubAgentScanResult } from 'src/tools/sub-agents';
-import type { FileContentOptions } from './FileContentService';
-import {
-	type GenerateAssistantOptions,
-} from './ChatServiceCore';
 import { ChatServiceOps } from './ChatServiceOps';
+import {
+	createChatGenerationFacade,
+	type ChatGenerationFacade,
+} from './chatGenerationFacade';
+import {
+	createChatMessageMutationFacade,
+	createChatMessageOperationFacade,
+	type ChatMessageMutationFacade,
+	type ChatMessageOperationFacade,
+} from './chatMessageFacade';
 import {
 	executeSkillCommand as executeSkillCommandHelper,
 	executeSubAgentCommand as executeSubAgentCommandHelper,
 } from './chatCommands';
 import {
+	type ChatGenerationDeps,
 	generateAssistantResponse as generateAssistantResponseHelper,
 	generateAssistantResponseForModel as generateAssistantResponseForModelHelper,
 } from './chatGeneration';
 import { detectImageGenerationIntent } from './chatImageIntent';
 import {
-	buildProviderMessages,
-	buildProviderMessagesForAgent,
-	buildProviderMessagesWithOptions,
-	getChatDefaultFileContentOptions,
-	getChatMessageManagementSettings,
-	resolveChatContextBudget,
+	type ChatProviderMessageDeps,
+	buildProviderMessages as buildProviderMessagesHelper,
+	buildProviderMessagesForAgent as buildProviderMessagesForAgentHelper,
+	buildProviderMessagesWithOptions as buildProviderMessagesWithOptionsHelper,
+	getChatDefaultFileContentOptions as getChatDefaultFileContentOptionsHelper,
+	getChatMessageManagementSettings as getChatMessageManagementSettingsHelper,
+	resolveChatContextBudget as resolveChatContextBudgetHelper,
 } from './chatProviderMessages';
+import {
+	type ChatMessageOperationDeps,
+	prepareChatRequest as prepareChatRequestHelper,
+	sendMessage as sendMessageHelper,
+} from './chatMessageOperations';
+import {
+	type ChatMessageMutationDeps,
+	deleteMessage as deleteMessageHelper,
+	editAndRegenerate as editAndRegenerateHelper,
+	editMessage as editMessageHelper,
+	insertMessageToEditor as insertMessageToEditorHelper,
+	refreshProviderSettings as refreshProviderSettingsHelper,
+	regenerateFromMessage as regenerateFromMessageHelper,
+	togglePinnedMessage as togglePinnedMessageHelper,
+} from './chatMessageMutations';
+import {
+	createChatProviderMessageFacade,
+	type ChatProviderMessageFacade,
+} from './chatProviderMessageFacade';
 import {
 	findProviderByTagExact as findProviderByTagExactHelper,
 	getDefaultProviderTag as getDefaultProviderTagHelper,
@@ -63,8 +89,12 @@ import {
 } from './chatSettingsPersistence';
 
 export class ChatService extends ChatServiceOps {
+	private generationFacade: ChatGenerationFacade | null = null;
+	private messageOperationFacade: ChatMessageOperationFacade | null = null;
+	private messageMutationFacade: ChatMessageMutationFacade | null = null;
+	private providerMessageFacade: ChatProviderMessageFacade | null = null;
 
-	protected getGenerationDeps() {
+	private getGenerationDeps(): ChatGenerationDeps {
 		return {
 			app: this.app,
 			state: this.state,
@@ -187,23 +217,6 @@ export class ChatService extends ChatServiceOps {
 		});
 	}
 
-	protected async generateAssistantResponse(session: ChatSession) {
-		await generateAssistantResponseHelper(this.getGenerationDeps(), session);
-	}
-
-	async generateAssistantResponseForModel(
-		session: ChatSession,
-		modelTag: string,
-		options?: GenerateAssistantOptions
-	): Promise<ChatMessage> {
-		return await generateAssistantResponseForModelHelper(
-			this.getGenerationDeps(),
-			session,
-			modelTag,
-			options
-		);
-	}
-
 	protected showMcpNoticeOnce(message: string): void {
 		const now = Date.now()
 		if (now - this.lastMcpNoticeAt < 10000) return
@@ -244,76 +257,135 @@ export class ChatService extends ChatServiceOps {
 		return getModelDisplayNameHelper(provider);
 	}
 
-	/**
-	 * 构建发送给 Provider 的消息列表
-	 * @param session 当前会话
-	 */
-	async buildProviderMessages(session: ChatSession): Promise<ProviderMessage[]> {
-		return await buildProviderMessages(
-			this.getProviderMessageDeps(),
-			session
-		);
-	}
-
-	async buildProviderMessagesWithOptions(
-		session: ChatSession,
-		options?: {
-			context?: string;
-			taskDescription?: string;
-			systemPrompt?: string;
-			modelTag?: string;
-			requestTools?: ToolDefinition[];
+	protected getGenerationFacade(): ChatGenerationFacade {
+		if (!this.generationFacade) {
+			this.generationFacade = createChatGenerationFacade(
+				() => this.getGenerationDeps(),
+				{
+					generateAssistantResponse: generateAssistantResponseHelper,
+					generateAssistantResponseForModel: generateAssistantResponseForModelHelper,
+				}
+			);
 		}
-	): Promise<ProviderMessage[]> {
-		return await buildProviderMessagesWithOptions(
-			this.getProviderMessageDeps(),
-			session,
-			options
-		);
+
+		return this.generationFacade;
 	}
 
-	/**
-	 * 构建 Agent 循环所需的 Provider 消息列表
-	 * @param messages 待发送的消息列表
-	 * @param session 当前会话
-	 * @param systemPrompt 系统提示词
-	 */
-	async buildProviderMessagesForAgent(
-		messages: ChatMessage[],
-		session: ChatSession,
-		systemPrompt?: string,
-		modelTag?: string,
-		requestTools: ToolDefinition[] = []
-	): Promise<ProviderMessage[]> {
-		return await buildProviderMessagesForAgent(
-			this.getProviderMessageDeps(),
-			messages,
-			session,
-			systemPrompt,
-			modelTag,
-			requestTools
-		);
+	protected getMessageOperationFacade(): ChatMessageOperationFacade {
+		if (!this.messageOperationFacade) {
+			this.messageOperationFacade = createChatMessageOperationFacade(
+				() => this.getMessageOperationDeps(),
+				{
+					prepareChatRequest: prepareChatRequestHelper,
+					sendMessage: sendMessageHelper,
+				}
+			);
+		}
+
+		return this.messageOperationFacade;
 	}
 
-	protected getMessageManagementSettings(): MessageManagementSettings {
-		return getChatMessageManagementSettings(
-			this.settings,
-			this.plugin.settings.chat
-		);
+	protected getMessageMutationFacade(): ChatMessageMutationFacade {
+		if (!this.messageMutationFacade) {
+			this.messageMutationFacade = createChatMessageMutationFacade(
+				() => this.getMessageMutationDeps(),
+				{
+					editMessage: editMessageHelper,
+					editAndRegenerate: editAndRegenerateHelper,
+					deleteMessage: deleteMessageHelper,
+					togglePinnedMessage: togglePinnedMessageHelper,
+					insertMessageToEditor: insertMessageToEditorHelper,
+					regenerateFromMessage: regenerateFromMessageHelper,
+					refreshProviderSettings: refreshProviderSettingsHelper,
+				}
+			);
+		}
+
+		return this.messageMutationFacade;
 	}
 
-	protected getDefaultFileContentOptions(): FileContentOptions {
-		return getChatDefaultFileContentOptions();
+	protected getProviderMessageFacade(): ChatProviderMessageFacade {
+		if (!this.providerMessageFacade) {
+			this.providerMessageFacade = createChatProviderMessageFacade(
+				() => this.getProviderMessageDeps(),
+				{
+					buildProviderMessages: buildProviderMessagesHelper,
+					buildProviderMessagesWithOptions: buildProviderMessagesWithOptionsHelper,
+					buildProviderMessagesForAgent: buildProviderMessagesForAgentHelper,
+					getMessageManagementSettings: getChatMessageManagementSettingsHelper,
+					getDefaultFileContentOptions: getChatDefaultFileContentOptionsHelper,
+					resolveContextBudget: resolveChatContextBudgetHelper,
+				}
+			);
+		}
+
+		return this.providerMessageFacade;
 	}
 
-	getResolvedContextBudget(modelTag?: string | null): ResolvedContextBudget {
-		return resolveChatContextBudget(
-			{
-				resolveProviderByTag: (tag?: string) => this.resolveProviderByTag(tag),
-				state: this.state,
+	private getMessageOperationDeps(): ChatMessageOperationDeps {
+		return {
+			app: this.app,
+			state: this.state,
+			imageResolver: this.imageResolver,
+			attachmentSelectionService: this.attachmentSelectionService,
+			messageService: this.messageService,
+			sessionManager: this.sessionManager,
+			multiModelService: this.multiModelService,
+			emitState: () => this.emitState(),
+			createNewSession: () => this.createNewSession(),
+			syncSessionMultiModelState: (session?: ChatSession) =>
+				this.syncSessionMultiModelState(session),
+			consumePendingTriggerSource: () => this.consumePendingTriggerSource(),
+			resolveProvider: () => this.resolveProvider(),
+			detectImageGenerationIntent: (content: string) =>
+				this.detectImageGenerationIntent(content),
+			isCurrentModelSupportImageGeneration: () =>
+				this.isCurrentModelSupportImageGeneration(),
+			ensurePlanSyncReady: () => this.ensurePlanSyncReady(),
+			generateAssistantResponse: async (session: ChatSession) => {
+				await this.generateAssistantResponse(session);
 			},
-			modelTag
-		);
+		};
+	}
+
+	private getMessageMutationDeps(): ChatMessageMutationDeps {
+		return {
+			app: this.app,
+			state: this.state,
+			sessionManager: this.sessionManager,
+			multiModelService: this.multiModelService,
+			emitState: () => this.emitState(),
+			invalidateSessionContextCompaction: (session: ChatSession) =>
+				this.invalidateSessionContextCompaction(session),
+			queueSessionPlanSync: (session: ChatSession | null) =>
+				this.queueSessionPlanSync(session),
+			generateAssistantResponse: async (session: ChatSession) => {
+				await this.generateAssistantResponse(session);
+			},
+			detectImageGenerationIntent: (content: string) =>
+				this.detectImageGenerationIntent(content),
+			isCurrentModelSupportImageGeneration: () =>
+				this.isCurrentModelSupportImageGeneration(),
+		};
+	}
+
+	private getProviderMessageDeps(): ChatProviderMessageDeps {
+		return {
+			app: this.app,
+			state: this.state,
+			settings: this.settings,
+			pluginChatSettings: this.plugin.settings.chat,
+			messageService: this.messageService,
+			messageContextOptimizer: this.messageContextOptimizer,
+			contextCompactionService: this.contextCompactionService,
+			getDefaultProviderTag: () => this.getDefaultProviderTag(),
+			resolveProviderByTag: (tag?: string) => this.resolveProviderByTag(tag),
+			findProviderByTagExact: (tag?: string) => this.findProviderByTagExact(tag),
+			resolveSkillsSystemPromptBlock: (requestTools: ToolDefinition[]) =>
+				this.resolveSkillsSystemPromptBlock(requestTools),
+			persistSessionContextCompactionFrontmatter: (session: ChatSession) =>
+				this.persistSessionContextCompactionFrontmatter(session),
+		};
 	}
 
 	getProviders(): ProviderSettings[] {
@@ -328,7 +400,7 @@ export class ChatService extends ChatServiceOps {
 		return cloneValueHelper(this.plugin.settings.aiRuntime);
 	}
 
-	getMcpClientManager(): McpClientManager | null {
+	getMcpClientManager(): McpRuntimeManager | null {
 		return this.runtimeDeps.getMcpClientManager();
 	}
 

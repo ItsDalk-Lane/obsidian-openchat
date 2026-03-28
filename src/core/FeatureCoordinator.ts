@@ -1,20 +1,23 @@
 import type OpenChatPlugin from 'src/main';
-import type { PluginSettings } from 'src/settings/PluginSettings';
+import type { PluginSettings } from 'src/domains/settings/types';
+import type { McpRuntimeManager } from 'src/domains/mcp/types';
+import {
+    McpRuntimeCoordinator,
+    createMcpRuntimeManagerFactory,
+} from 'src/domains/mcp/ui';
 import { AiRuntimeCommandManager } from 'src/commands/ai-runtime';
 import { ChatFeatureManager } from 'src/core/chat';
 import type { ChatRuntimeDeps } from 'src/core/chat/runtime/ChatRuntimeDeps';
-import type { McpClientManager } from 'src/services/mcp';
 import type { ToolExecutor } from 'src/types/tool';
 import { ChatService } from 'src/core/chat/services/ChatService';
 import { ChatViewCoordinator } from 'src/commands/chat';
-import {
-	SkillsRuntimeCoordinator,
-	SkillScannerService,
-	SkillWatcherService,
-	type SkillScanResult,
-} from 'src/services/skills';
+import { createObsidianApiProvider } from 'src/providers/obsidian-api';
+import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler';
+import { DebugLogger } from 'src/utils/DebugLogger';
+import { SkillsRuntimeCoordinator } from 'src/domains/skills/ui';
+import { SkillScannerService } from 'src/domains/skills/service';
+import type { SkillScanResult } from 'src/domains/skills/types';
 import { ToolExecutorRegistry } from 'src/tools/runtime/ToolExecutorRegistry';
-import { McpRuntimeCoordinator } from 'src/services/mcp/McpRuntimeCoordinator';
 
 export class FeatureCoordinator {
     private aiRuntimeCommandManager: AiRuntimeCommandManager | null = null;
@@ -22,15 +25,46 @@ export class FeatureCoordinator {
     private earlyChatService: ChatService | null = null;
     private earlyChatViewCoordinator: ChatViewCoordinator | null = null;
     private readonly skillsRuntime: SkillsRuntimeCoordinator;
+    private readonly systemPromptAssembler: SystemPromptAssembler;
+    private readonly obsidianApiProvider;
     private readonly toolExecutorRegistry = new ToolExecutorRegistry();
     private readonly mcpRuntime: McpRuntimeCoordinator;
     private readonly chatRuntimeDeps: ChatRuntimeDeps;
 
     constructor(private plugin: OpenChatPlugin) {
-        this.skillsRuntime = new SkillsRuntimeCoordinator(this.plugin.app, {
+        this.systemPromptAssembler = new SystemPromptAssembler(this.plugin.app);
+        this.obsidianApiProvider = createObsidianApiProvider(
+            this.plugin.app,
+            async (featureId) => await this.systemPromptAssembler.buildGlobalSystemPrompt(featureId as never),
+        );
+        this.skillsRuntime = new SkillsRuntimeCoordinator(this.obsidianApiProvider, {
             getAiDataFolder: () => this.plugin.settings.aiDataFolder,
+            logger: {
+                warn(message: string, metadata?: unknown): void {
+                    DebugLogger.warn(message, metadata);
+                },
+            },
         });
-        this.mcpRuntime = new McpRuntimeCoordinator(this.plugin.app);
+        this.mcpRuntime = new McpRuntimeCoordinator(
+            createMcpRuntimeManagerFactory({
+                notify: (message, timeout) => this.obsidianApiProvider.notify(message, timeout),
+                requestHttp: (options) => this.obsidianApiProvider.requestHttp(options),
+                logger: {
+                    debug(message: string, metadata?: unknown): void {
+                        DebugLogger.debug(message, metadata);
+                    },
+                    info(message: string, metadata?: unknown): void {
+                        DebugLogger.info(message, metadata);
+                    },
+                    warn(message: string, metadata?: unknown): void {
+                        DebugLogger.warn(message, metadata);
+                    },
+                    error(message: string, metadata?: unknown): void {
+                        DebugLogger.error(message, metadata);
+                    },
+                },
+            }),
+        );
         this.chatRuntimeDeps = this.createChatRuntimeDeps();
     }
 
@@ -81,7 +115,7 @@ export class FeatureCoordinator {
     }
 
     async initializeMcp(settings: PluginSettings) {
-        await this.mcpRuntime.initialize(settings);
+		await this.mcpRuntime.initialize(settings.aiRuntime.mcp);
     }
 
     async initializeSkills(): Promise<void> {
@@ -100,7 +134,7 @@ export class FeatureCoordinator {
         return this.chatFeatureManager;
     }
 
-    getMcpClientManager(): McpClientManager | null {
+    getMcpClientManager(): McpRuntimeManager | null {
         return this.mcpRuntime.getManager();
     }
 
@@ -118,10 +152,6 @@ export class FeatureCoordinator {
 
     getSkillScannerService(): SkillScannerService | null {
         return this.skillsRuntime.getSkillScannerService();
-    }
-
-    getSkillWatcherService(): SkillWatcherService | null {
-        return this.skillsRuntime.getSkillWatcherService();
     }
 
     async scanSkills(): Promise<SkillScanResult> {

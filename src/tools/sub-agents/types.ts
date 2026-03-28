@@ -1,4 +1,9 @@
-import type { ChatMessage, ChatSession } from 'src/types/chat';
+import type {
+	ChatMessage,
+	ChatSession,
+	SubAgentExecutionState,
+	SubAgentExecutionStatus,
+} from 'src/types/chat';
 import type {
 	ToolDefinition,
 	ToolExecutionRecord,
@@ -8,7 +13,7 @@ import type {
 export const SUB_AGENT_TOOL_PREFIX = 'sub_agent_';
 export const DEFAULT_SUB_AGENT_MAX_TOKENS = 4096;
 
-export type SubAgentExecutionStatus = 'running' | 'completed' | 'failed' | 'cancelled';
+export type { SubAgentExecutionState, SubAgentExecutionStatus };
 
 export interface SubAgentMetadata {
 	name: string;
@@ -34,15 +39,6 @@ export interface SubAgentScanError {
 export interface SubAgentScanResult {
 	agents: SubAgentDefinition[];
 	errors: SubAgentScanError[];
-}
-
-export interface SubAgentExecutionState {
-	name: string;
-	status: SubAgentExecutionStatus;
-	internalMessages: ChatMessage[];
-	folded: boolean;
-	toolCallId?: string;
-	task?: string;
 }
 
 export interface SubAgentStateUpdate {

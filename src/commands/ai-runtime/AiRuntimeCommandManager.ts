@@ -3,13 +3,21 @@ import { Notice, Plugin } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { AiRuntimeSettings } from 'src/settings/ai-runtime'
 import { StatusBarManager } from './StatusBarManager'
-import {
-	createTabCompletionExtension,
-	updateTabCompletionSettings,
-	updateTabCompletionProviders,
-	disposeTabCompletionService,
-	TabCompletionSettings
-} from 'src/editor/tabCompletion'
+import { availableVendors } from 'src/settings/ai-runtime'
+import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils'
+import { localInstance } from 'src/i18n/locals'
+import { createObsidianApiProvider } from 'src/providers/obsidian-api'
+import { createEventBus } from 'src/providers/event-bus'
+import { createEditorDomainExtension, EditorDomainController } from 'src/domains/editor/ui'
+import { normalizeEditorTabCompletionSettings } from 'src/domains/editor/config'
+import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler'
+import type {
+	EditorCompletionMessage,
+	EditorCompletionProvider,
+	EditorTabCompletionEvents,
+	EditorTabCompletionRuntime,
+} from 'src/domains/editor/types'
+import { DebugLogger } from 'src/utils/DebugLogger'
 
 export class AiRuntimeCommandManager {
 	private statusBarManager: StatusBarManager | null = null
@@ -17,18 +25,30 @@ export class AiRuntimeCommandManager {
 	private registeredCommandIds: Set<string> = new Set()
 	private tabCompletionExtensions: Extension[] = []
 	private tabCompletionRegistered = false
+	private readonly editorEventBus = createEventBus<EditorTabCompletionEvents>()
+	private readonly obsidianApiProvider
+	private tabCompletionController: EditorDomainController | null = null
+	private readonly systemPromptAssembler: SystemPromptAssembler
 
 	constructor(
 		private readonly plugin: Plugin,
 		private settings: AiRuntimeSettings
-	) {}
+	) {
+		this.systemPromptAssembler = new SystemPromptAssembler(this.plugin.app)
+		this.obsidianApiProvider = createObsidianApiProvider(
+			this.plugin.app,
+			async (featureId) =>
+				await this.systemPromptAssembler.buildGlobalSystemPrompt(featureId as never),
+		)
+	}
 
 	initialize() {
 		this.settings.editorStatus = this.settings.editorStatus ?? { isTextInserting: false }
 		const statusBarItem = this.plugin.addStatusBarItem()
 		this.statusBarManager = new StatusBarManager(this.plugin.app, statusBarItem)
 
-		this.syncTabCompletion()
+		this.ensureTabCompletionRegistered()
+		this.syncTabCompletionRuntime()
 
 		this.registerCommand('cancelGeneration', {
 			id: 'cancelGeneration',
@@ -62,21 +82,8 @@ export class AiRuntimeCommandManager {
 	}
 
 	updateSettings(settings: AiRuntimeSettings) {
-		// 检测 Tab 补全设置是否有变化
-		const hasTabCompletionChanges = this.hasTabCompletionChanges(this.settings, settings)
-
 		this.settings = settings
-
-		// 无论怎样都同步 providers 到 TabCompletionService，避免某些场景下内存中的 providers 不跟随设置变化（导致需要重启才能生效）
-		updateTabCompletionProviders(settings.providers)
-		
-		// 处理 Tab 补全设置变化
-		if (hasTabCompletionChanges) {
-			this.syncTabCompletion()
-		} else {
-			// 只更新设置，不重新注册扩展
-			updateTabCompletionSettings(this.getTabCompletionSettings())
-		}
+		this.syncTabCompletionRuntime()
 	}
 
 	private registerCommand(
@@ -90,59 +97,74 @@ export class AiRuntimeCommandManager {
 		}
 	}
 
-	/**
-	 * 从 AiRuntimeSettings 提取 Tab 补全设置
-	 */
-	private getTabCompletionSettings(): TabCompletionSettings {
-		return {
-			enabled: this.settings.enableTabCompletion ?? false,
-			triggerKey: this.settings.tabCompletionTriggerKey ?? 'Alt',
-			contextLengthBefore: this.settings.tabCompletionContextLengthBefore ?? 1000,
-			contextLengthAfter: this.settings.tabCompletionContextLengthAfter ?? 500,
-			timeout: this.settings.tabCompletionTimeout ?? 5000,
-			providerTag: this.settings.tabCompletionProviderTag ?? '',
-			promptTemplate: this.settings.tabCompletionPromptTemplate ?? '{{rules}}\n\n{{context}}'
-		}
-	}
-
-	/**
-	 * 检测 Tab 补全设置是否有实质性变化
-	 */
-	private hasTabCompletionChanges(oldSettings: AiRuntimeSettings, newSettings: AiRuntimeSettings): boolean {
-		return (
-			oldSettings.enableTabCompletion !== newSettings.enableTabCompletion ||
-			oldSettings.tabCompletionTriggerKey !== newSettings.tabCompletionTriggerKey
-		)
-	}
-
-	/**
-	 * 同步 Tab 补全功能
-	 */
-	private syncTabCompletion(): void {
-		const tabCompletionSettings = this.getTabCompletionSettings()
-
-		if (!tabCompletionSettings.enabled) {
-			// 功能被禁用，移除扩展
-			this.disposeTabCompletion()
+	private ensureTabCompletionRegistered(): void {
+		if (this.tabCompletionRegistered) {
 			return
 		}
-
-		// 如果已经注册，需要先移除（因为快捷键可能变化）
-		if (this.tabCompletionRegistered) {
-			this.disposeTabCompletion()
-		}
-
-		// 创建并注册新的扩展
-		this.tabCompletionExtensions = createTabCompletionExtension(
-			this.plugin.app,
-			this.settings.providers,
-			tabCompletionSettings
+		this.tabCompletionController = new EditorDomainController(
+			this.obsidianApiProvider,
+			this.editorEventBus,
+			this.createTabCompletionRuntime(),
 		)
-
-		// 注册到 Obsidian
+		this.tabCompletionExtensions = createEditorDomainExtension(this.tabCompletionController)
 		this.plugin.registerEditorExtension(this.tabCompletionExtensions)
 		this.tabCompletionRegistered = true
+	}
 
+	private syncTabCompletionRuntime(): void {
+		this.ensureTabCompletionRegistered()
+		this.tabCompletionController?.updateRuntime(this.createTabCompletionRuntime())
+	}
+
+	private createTabCompletionRuntime(): EditorTabCompletionRuntime {
+		return {
+			providers: this.createCompletionProviders(),
+			settings: normalizeEditorTabCompletionSettings({
+				enabled: this.settings.enableTabCompletion,
+				triggerKey: this.settings.tabCompletionTriggerKey,
+				contextLengthBefore: this.settings.tabCompletionContextLengthBefore,
+				contextLengthAfter: this.settings.tabCompletionContextLengthAfter,
+				timeout: this.settings.tabCompletionTimeout,
+				providerTag: this.settings.tabCompletionProviderTag,
+				promptTemplate: this.settings.tabCompletionPromptTemplate,
+			}),
+			messages: {
+				readOnly: localInstance.tab_completion_read_only,
+				noProvider: localInstance.tab_completion_no_provider,
+				failedDefaultReason: localInstance.tab_completion_failed_default_reason,
+				failedPrefix: localInstance.tab_completion_failed_prefix,
+			},
+			logger: {
+				debug(message: string, metadata?: unknown): void {
+					DebugLogger.debug(message, metadata)
+				},
+				error(message: string, metadata?: unknown): void {
+					DebugLogger.error(message, metadata)
+				},
+			},
+		}
+	}
+
+	private createCompletionProviders(): EditorCompletionProvider[] {
+		return this.settings.providers.flatMap((providerSettings) => {
+			const vendor = availableVendors.find((candidate) => candidate.name === providerSettings.vendor)
+			if (!vendor) {
+				DebugLogger.error('[AiRuntimeCommandManager] Tab Completion 找不到 vendor', providerSettings.vendor)
+				return []
+			}
+			const sendRequest = vendor.sendRequestFunc(
+				buildProviderOptionsWithReasoningDisabled(providerSettings.options, providerSettings.vendor),
+			)
+			return [{
+				tag: providerSettings.tag,
+				vendor: providerSettings.vendor,
+				async *sendCompletion(messages: readonly EditorCompletionMessage[], controller: AbortController): AsyncGenerator<string, void, unknown> {
+					for await (const chunk of sendRequest(messages, controller, async () => new ArrayBuffer(0))) {
+						yield chunk
+					}
+				},
+			}]
+		})
 	}
 
 	/**
@@ -150,10 +172,9 @@ export class AiRuntimeCommandManager {
 	 */
 	private disposeTabCompletion(): void {
 		if (this.tabCompletionRegistered) {
-			disposeTabCompletionService()
-			// 注意：Obsidian 的 registerEditorExtension 没有提供取消注册的方法
-			// 扩展会在插件卸载时自动清理
-			// 但我们可以通过清空扩展数组来标记状态
+			this.tabCompletionController?.dispose()
+			this.tabCompletionController = null
+			this.editorEventBus.clear()
 			this.tabCompletionExtensions = []
 			this.tabCompletionRegistered = false
 		}

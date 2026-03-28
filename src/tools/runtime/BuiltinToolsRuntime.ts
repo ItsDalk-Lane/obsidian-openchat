@@ -1,5 +1,5 @@
 import { moment, type App } from 'obsidian';
-import type { SkillScannerService } from 'src/services/skills/SkillScannerService';
+import type { SkillScannerService } from 'src/domains/skills/service';
 import type { McpSettings } from 'src/services/mcp';
 import { DEFAULT_MCP_SETTINGS } from 'src/services/mcp/types';
 import {

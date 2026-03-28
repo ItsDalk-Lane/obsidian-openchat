@@ -1,7 +1,6 @@
-import type { SkillToolInput } from 'src/services/skills/types';
-import { loadSkillContent, formatSkillToolResult } from 'src/services/skills/skillContent';
+import type { SkillToolInput } from 'src/domains/skills/types';
+import { loadSkillContent, formatSkillToolResult, type SkillScannerService } from 'src/domains/skills/service';
 import { z } from 'zod';
-import type { SkillScannerService } from 'src/services/skills/SkillScannerService';
 import type { BuiltinTool } from '../runtime/types';
 
 export const SKILL_TOOL_NAME = 'Skill';
@@ -91,10 +90,11 @@ export function createSkillTools(
 				if (!definition) {
 					return `Skill 工具调用失败：未找到名为 "${skillName}" 的 Skill，请检查 system prompt 中的 <skills> 列表。`;
 				}
-				const loaded = await loadSkillContent(context.app, scanner, definition.skillFilePath);
+				const loaded = await loadSkillContent(scanner, definition.skillFilePath);
 				const result = formatSkillToolResult(
 					loaded.definition.basePath,
-					loaded.bodyContent
+					loaded.bodyContent,
+					(path) => scanner.normalizePath(path)
 				);
 				return result
 					+ buildInvocationArgsBlock(args.args)

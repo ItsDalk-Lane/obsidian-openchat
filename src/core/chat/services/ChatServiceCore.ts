@@ -26,9 +26,8 @@ import type { MultiModelChatService } from './MultiModelChatService';
 import type { MultiModelConfigService } from './MultiModelConfigService';
 import {
 	buildSkillsSystemPromptBlock,
-	type SkillDefinition,
-	type SkillScanResult,
-} from 'src/services/skills';
+} from 'src/domains/skills/service';
+import type { SkillDefinition, SkillScanResult } from 'src/domains/skills/types';
 import { MessageContextOptimizer } from './MessageContextOptimizer';
 import {
 	type ResolvedToolRuntime,

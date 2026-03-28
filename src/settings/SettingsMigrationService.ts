@@ -1,5 +1,6 @@
 import { Plugin } from 'obsidian';
-import { PluginSettings, DEFAULT_SETTINGS } from './PluginSettings';
+import type { PluginSettings } from 'src/domains/settings/types';
+import { DEFAULT_SETTINGS } from 'src/domains/settings/config';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { SettingsSecretManager, type VendorApiKeysByDevice } from './SettingsSecretManager';
 import {
@@ -86,7 +87,7 @@ export class SettingsMigrationService {
         await this.plugin.saveData(nextData);
 
         if (movedCount > 0) {
-            DebugLogger.info(`[SettingsManager] AI数据目录迁移完成，迁移文件数量: ${movedCount}`);
+            DebugLogger.info(`[SettingsDomain] AI数据目录迁移完成，迁移文件数量: ${movedCount}`);
         }
     }
 
@@ -174,7 +175,7 @@ export class SettingsMigrationService {
             nextData.chat = nextChat;
             nextData.aiRuntime = nextAiRuntime;
             await this.plugin.saveData(nextData);
-            DebugLogger.info('[SettingsManager] 已清理 data.json 中的旧快捷操作/系统提示词/MCP 服务器存储位点');
+            DebugLogger.info('[SettingsDomain] 已清理 data.json 中的旧快捷操作/系统提示词/MCP 服务器存储位点');
         }
 
         await this.removeLegacyFileIfExists(LEGACY_QUICK_ACTIONS_DATA_FILE);
@@ -275,9 +276,9 @@ export class SettingsMigrationService {
                 return;
             }
             await this.plugin.app.vault.adapter.remove(path);
-            DebugLogger.info('[SettingsManager] 已删除旧数据文件', path);
+            DebugLogger.info('[SettingsDomain] 已删除旧数据文件', path);
         } catch (error) {
-            DebugLogger.warn('[SettingsManager] 删除旧数据文件失败（忽略）', { path, error });
+            DebugLogger.warn('[SettingsDomain] 删除旧数据文件失败（忽略）', { path, error });
         }
     }
 

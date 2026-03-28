@@ -20,7 +20,7 @@ import {
 } from 'src/tools/sub-agents';
 import { CompositeToolExecutor } from 'src/core/agents/loop/CompositeToolExecutor';
 import type { ToolDefinition, ToolExecutor } from 'src/core/agents/loop/types';
-import type { McpClientManager } from 'src/services/mcp';
+import type { McpRuntimeManager } from 'src/domains/mcp/types';
 import { McpToolExecutor, mcpToolToToolDefinition } from 'src/services/mcp/McpToolExecutor';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type OpenChatPlugin from 'src/main';
@@ -324,7 +324,7 @@ export class ChatToolRuntimeResolver {
 	}
 
 	private createActualMcpCallTool(
-		mcpManager?: McpClientManager | null,
+		mcpManager?: McpRuntimeManager | null,
 	): ((serverId: string, name: string, args: Record<string, unknown>) => Promise<string>) | null {
 		if (!mcpManager) {
 			return null;

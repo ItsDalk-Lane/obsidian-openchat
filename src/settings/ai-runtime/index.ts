@@ -1,4 +1,4 @@
-export type { AiRuntimeSettings, EditorStatus, ToolExecutionSettings } from './settings';
+export type { AiRuntimeSettings, EditorStatus, ToolExecutionSettings } from './core';
 export {
 	APP_FOLDER,
 	DEFAULT_AI_RUNTIME_SETTINGS,
