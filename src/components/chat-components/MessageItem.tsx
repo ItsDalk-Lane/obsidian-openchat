@@ -2,11 +2,11 @@ import { Check, Copy, PenSquare, RotateCw, TextCursorInput, Trash2, X, Highlight
 import { useEffect, useMemo, useState } from 'react';
 import { useObsidianApp } from 'src/contexts/obsidianAppContext';
 import type { ChatMessage, ChatMessageMetadata } from 'src/types/chat';
-import type { ChatService } from 'src/core/chat/services/ChatService';
-import { getModelDisplayNameByTag } from 'src/core/chat/services/chatProviderHelpers';
-import { MessageService } from 'src/core/chat/services/MessageService';
+import type { ChatService } from 'src/core/chat/services/chat-service';
+import { getModelDisplayNameByTag } from 'src/core/chat/services/chat-provider-helpers';
+import { MessageService } from 'src/core/chat/services/message-service';
 import { parseContentBlocks, ContentBlock } from 'src/core/chat/utils/markdown';
-import { getEditableUserMessageContent } from 'src/core/chat/utils/userMessageEditing';
+import { getEditableUserMessageContent } from 'src/core/chat/utils/user-message-editing';
 import { Notice } from 'obsidian';
 import { ModelTag } from './ModelTag';
 import { availableVendors } from 'src/settings/ai-runtime';

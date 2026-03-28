@@ -2,7 +2,7 @@ import { countTokens } from 'gpt-tokenizer';
 import type { ToolDefinition } from 'src/types/tool';
 import type { Message as ProviderMessage } from 'src/types/provider';
 import type { ChatMessage } from '../types/chat';
-import { parseContentBlocks } from './markdown';
+import { parseContentBlocks } from 'src/domains/chat/service-content-blocks';
 
 export const EMBED_TOKEN_ESTIMATE = 256;
 

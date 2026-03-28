@@ -7,8 +7,17 @@
  * @invariants 不向域层泄露 App 或 Plugin 实例。
  */
 
-import type { App, EventRef } from 'obsidian';
-import { Notice, TFile, TFolder, normalizePath as normalizeVaultPath, parseYaml, requestUrl } from 'obsidian';
+import type { App, EventRef, TAbstractFile } from 'obsidian';
+import {
+	MarkdownView,
+	Notice,
+	TFile,
+	TFolder,
+	normalizePath as normalizeVaultPath,
+	parseYaml,
+	requestUrl,
+	stringifyYaml,
+} from 'obsidian';
 import { ensureAIDataFolders } from 'src/utils/AIPathManager';
 import { createObsidianApiProviderFromRuntime, type ObsidianApiRuntime, type ObsidianVaultNode } from './obsidian-api-core';
 import type {
@@ -54,6 +63,8 @@ function createObsidianApiRuntime(app: App): ObsidianApiRuntime {
 			readonly status: number;
 			readonly text?: string;
 			readonly headers: Record<string, string>;
+			readonly json?: unknown;
+			readonly arrayBuffer?: ArrayBuffer;
 		}> {
 			const response = await requestUrl({
 				url: options.url,
@@ -65,6 +76,8 @@ function createObsidianApiRuntime(app: App): ObsidianApiRuntime {
 				status: response.status,
 				text: response.text,
 				headers: { ...response.headers },
+				json: response.json,
+				arrayBuffer: response.arrayBuffer,
 			};
 		},
 		getAbstractFileByPath(path: string): ObsidianVaultNode | null {
@@ -88,6 +101,26 @@ function createObsidianApiRuntime(app: App): ObsidianApiRuntime {
 				};
 			}
 			return null;
+		},
+		getVaultName(): string {
+			return app.vault.getName();
+		},
+		getActiveFilePath(): string | null {
+			return app.workspace.getActiveFile()?.path ?? null;
+		},
+		async getAvailablePathForAttachment(filename: string): Promise<string> {
+			return await app.fileManager.getAvailablePathForAttachment(filename);
+		},
+		getFrontmatter(path: string): Record<string, unknown> | null {
+			const entry = app.vault.getAbstractFileByPath(path);
+			if (!(entry instanceof TFile)) {
+				return null;
+			}
+			const frontmatter = app.metadataCache.getFileCache(entry)?.frontmatter;
+			if (!frontmatter) {
+				return null;
+			}
+			return JSON.parse(JSON.stringify(frontmatter)) as Record<string, unknown>;
 		},
 		async readVaultFile(path: string): Promise<string> {
 			const entry = app.vault.getAbstractFileByPath(path);
@@ -157,6 +190,46 @@ function createObsidianApiRuntime(app: App): ObsidianApiRuntime {
 		parseYaml(content: string): unknown {
 			return parseYaml(content);
 		},
+		stringifyYaml(content: unknown): string {
+			return stringifyYaml(content);
+		},
+		readLocalStorage(key: string): string | null {
+			return window.localStorage.getItem(key);
+		},
+		writeLocalStorage(key: string, value: string): void {
+			window.localStorage.setItem(key, value);
+		},
+		openSettingsTab(tabId: string): void {
+			const settingApp = app as typeof app & {
+				setting?: { open: () => void; openTabById: (id: string) => boolean };
+			};
+			settingApp.setting?.open();
+			settingApp.setting?.openTabById(tabId);
+		},
+		insertTextIntoMarkdownEditor(content: string) {
+			const activeMarkdownView = app.workspace.getActiveViewOfType(MarkdownView);
+			if (activeMarkdownView?.editor) {
+				activeMarkdownView.editor.replaceSelection(content);
+				return {
+					inserted: true,
+					fileName: activeMarkdownView.file?.basename,
+				};
+			}
+
+			const markdownLeaves = app.workspace.getLeavesOfType('markdown');
+			const targetLeaf = markdownLeaves.find((leaf) => leaf === app.workspace.activeLeaf)
+				?? markdownLeaves[0];
+			const targetView = targetLeaf?.view;
+			if (targetView instanceof MarkdownView && targetView.editor) {
+				targetView.editor.replaceSelection(content);
+				return {
+					inserted: true,
+					fileName: targetView.file?.basename,
+				};
+			}
+
+			return { inserted: false };
+		},
 		onVaultChange(type: VaultChangeEvent['type'], listener: (path: string, oldPath?: string) => void): EventRef {
 			switch (type) {
 				case 'create':
@@ -202,7 +275,7 @@ async function ensureVaultFolderPath(app: App, folderPath: string): Promise<void
 	}
 }
 
-function mapVaultNode(entry: TFile | TFolder): ObsidianVaultNode | null {
+function mapVaultNode(entry: TAbstractFile): ObsidianVaultNode | null {
 	if (entry instanceof TFolder) {
 		return {
 			path: entry.path,

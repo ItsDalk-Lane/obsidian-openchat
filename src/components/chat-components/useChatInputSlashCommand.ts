@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useCallback, useEffect, type RefObject } from 'react';
-import type { ChatService } from 'src/core/chat/services/ChatService';
+import type { ChatService } from 'src/core/chat/services/chat-service';
 import type { SlashCommandItem } from 'src/core/chat/types/slashCommand';
 import { Notice } from 'obsidian';
 import { localInstance } from 'src/i18n/locals';

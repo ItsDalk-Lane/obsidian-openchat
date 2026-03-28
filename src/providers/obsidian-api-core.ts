@@ -1,4 +1,5 @@
 import type {
+	EditorInsertResult,
 	HttpRequestOptions,
 	HttpResponseData,
 	ObsidianApiProvider,
@@ -23,8 +24,14 @@ export interface ObsidianApiRuntime {
 		readonly status: number;
 		readonly text?: string;
 		readonly headers: Record<string, string>;
+		readonly json?: unknown;
+		readonly arrayBuffer?: ArrayBuffer;
 	}>;
 	getAbstractFileByPath(path: string): ObsidianVaultNode | null;
+	getVaultName(): string;
+	getActiveFilePath(): string | null;
+	getAvailablePathForAttachment(filename: string): Promise<string>;
+	getFrontmatter(path: string): Record<string, unknown> | null;
 	pathExists(path: string): Promise<boolean>;
 	statPath(path: string): Promise<VaultStat | null>;
 	readVaultFile(path: string): Promise<string>;
@@ -33,6 +40,11 @@ export interface ObsidianApiRuntime {
 	writeVaultBinary(path: string, content: ArrayBuffer): Promise<void>;
 	deleteVaultPath(path: string): Promise<void>;
 	parseYaml(content: string): unknown;
+	stringifyYaml(content: unknown): string;
+	readLocalStorage(key: string): string | null;
+	writeLocalStorage(key: string, value: string): void;
+	openSettingsTab(tabId: string): void;
+	insertTextIntoMarkdownEditor(content: string): EditorInsertResult;
 	onVaultChange(type: VaultChangeEvent['type'], listener: (path: string, oldPath?: string) => void): unknown;
 	offVaultChange(ref: unknown): void;
 }
@@ -63,10 +75,24 @@ export function createObsidianApiProviderFromRuntime(
 				status: response.status,
 				text: typeof response.text === 'string' ? response.text : '',
 				headers: { ...response.headers },
+				json: response.json,
+				arrayBuffer: response.arrayBuffer,
 			};
 		},
 		getVaultEntry(path: string): VaultEntry | null {
 			return toVaultEntry(runtime.getAbstractFileByPath(runtime.normalizePath(path)));
+		},
+		getVaultName(): string {
+			return runtime.getVaultName();
+		},
+		getActiveFilePath(): string | null {
+			return runtime.getActiveFilePath();
+		},
+		async getAvailableAttachmentPath(filename: string): Promise<string> {
+			return await runtime.getAvailablePathForAttachment(filename);
+		},
+		getFrontmatter(filePath: string): Record<string, unknown> | null {
+			return runtime.getFrontmatter(runtime.normalizePath(filePath));
 		},
 		async pathExists(path: string): Promise<boolean> {
 			return await runtime.pathExists(runtime.normalizePath(path));
@@ -108,6 +134,21 @@ export function createObsidianApiProviderFromRuntime(
 		},
 		parseYaml(content: string): unknown {
 			return runtime.parseYaml(content);
+		},
+		stringifyYaml(content: unknown): string {
+			return runtime.stringifyYaml(content);
+		},
+		readLocalStorage(key: string): string | null {
+			return runtime.readLocalStorage(key);
+		},
+		writeLocalStorage(key: string, value: string): void {
+			runtime.writeLocalStorage(key, value);
+		},
+		openSettingsTab(tabId: string): void {
+			runtime.openSettingsTab(tabId);
+		},
+		insertTextIntoMarkdownEditor(content: string): EditorInsertResult {
+			return runtime.insertTextIntoMarkdownEditor(content);
 		},
 		onVaultChange(listener: (event: VaultChangeEvent) => void): () => void {
 			const refs = (['create', 'modify', 'delete', 'rename'] as const).map((type) =>

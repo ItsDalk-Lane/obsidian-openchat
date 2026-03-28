@@ -7,10 +7,11 @@ import {
 } from 'src/domains/mcp/ui';
 import { AiRuntimeCommandManager } from 'src/commands/ai-runtime';
 import { ChatFeatureManager } from 'src/core/chat';
-import type { ChatRuntimeDeps } from 'src/core/chat/runtime/ChatRuntimeDeps';
+import type { ChatRuntimeDeps } from 'src/core/chat/runtime/chat-runtime-deps';
 import type { ToolExecutor } from 'src/types/tool';
-import { ChatService } from 'src/core/chat/services/ChatService';
-import { ChatViewCoordinator } from 'src/commands/chat';
+import { ChatService } from 'src/core/chat/services/chat-service';
+import { createChatServiceDeps } from 'src/core/chat/services/create-chat-service-deps';
+import { ChatViewCoordinator } from 'src/commands/chat/chat-view-coordinator';
 import { createObsidianApiProvider } from 'src/providers/obsidian-api';
 import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler';
 import { DebugLogger } from 'src/utils/DebugLogger';
@@ -30,6 +31,7 @@ export class FeatureCoordinator {
     private readonly toolExecutorRegistry = new ToolExecutorRegistry();
     private readonly mcpRuntime: McpRuntimeCoordinator;
     private readonly chatRuntimeDeps: ChatRuntimeDeps;
+    private chatServiceDeps: ReturnType<typeof createChatServiceDeps> | null = null;
 
     constructor(private plugin: OpenChatPlugin) {
         this.systemPromptAssembler = new SystemPromptAssembler(this.plugin.app);
@@ -66,6 +68,11 @@ export class FeatureCoordinator {
             }),
         );
         this.chatRuntimeDeps = this.createChatRuntimeDeps();
+        this.chatServiceDeps = createChatServiceDeps(
+            this.plugin,
+            this.chatRuntimeDeps,
+            this.obsidianApiProvider,
+        );
     }
 
     initializeAiRuntime(settings: PluginSettings) {
@@ -86,7 +93,7 @@ export class FeatureCoordinator {
      */
     registerChatViewTypesEarly(): void {
         if (this.earlyChatService) return;
-        this.earlyChatService = new ChatService(this.plugin, this.chatRuntimeDeps);
+        this.earlyChatService = new ChatService(this.getChatServiceDeps());
         this.earlyChatViewCoordinator = new ChatViewCoordinator(this.plugin, this.earlyChatService);
         this.earlyChatViewCoordinator.registerViewTypesOnly();
         // 提前初始化 Service（使用默认设置），确保 Obsidian 恢复视图时 activeSession 不为 null，
@@ -100,7 +107,7 @@ export class FeatureCoordinator {
         if (!this.chatFeatureManager) {
             this.chatFeatureManager = new ChatFeatureManager(
                 this.plugin,
-                this.chatRuntimeDeps,
+                this.getChatServiceDeps(),
                 this.earlyChatService ?? undefined,
                 this.earlyChatViewCoordinator ?? undefined,
             );
@@ -203,5 +210,16 @@ export class FeatureCoordinator {
             getMcpClientManager: () => this.getMcpClientManager(),
             getCustomToolExecutors: () => this.getCustomToolExecutors(),
         };
+    }
+
+    private getChatServiceDeps(): ReturnType<typeof createChatServiceDeps> {
+        if (!this.chatServiceDeps) {
+            this.chatServiceDeps = createChatServiceDeps(
+                this.plugin,
+                this.chatRuntimeDeps,
+                this.obsidianApiProvider,
+            );
+        }
+        return this.chatServiceDeps;
     }
 }

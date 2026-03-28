@@ -3,16 +3,17 @@ import test from 'node:test';
 import { DEFAULT_CHAT_SETTINGS } from 'src/domains/chat/config';
 import {
 	createChatProviderMessageFacade,
-} from './chatProviderMessageFacade';
+} from './chat-provider-message-facade';
 import { getChatMessageManagementSettings } from 'src/domains/chat/service-provider-message-support';
-import type { ChatProviderMessageDeps } from './chatProviderMessages';
+import type { ChatProviderMessageDeps } from './chat-provider-messages';
 import type { ChatSettings, ChatState } from '../types/chat';
 
 const createProviderMessageDeps = (
 	settings: ChatSettings,
 	pluginChatSettings: ChatSettings,
 ): ChatProviderMessageDeps => ({
-	app: null as never,
+	buildGlobalSystemPrompt: async () => '',
+	getActiveFilePath: () => null,
 	state: {
 		contextNotes: [],
 		multiModelMode: 'single',

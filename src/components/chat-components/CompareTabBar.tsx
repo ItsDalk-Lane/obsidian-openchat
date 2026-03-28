@@ -1,6 +1,6 @@
 import { Loader2, X } from 'lucide-react';
-import { ChatService } from 'src/core/chat/services/ChatService';
-import { getModelDisplayNameByTag } from 'src/core/chat/services/chatProviderHelpers';
+import { ChatService } from 'src/core/chat/services/chat-service';
+import { getModelDisplayNameByTag } from 'src/core/chat/services/chat-provider-helpers';
 import { availableVendors } from 'src/settings/ai-runtime';
 import { localInstance } from 'src/i18n/locals';
 

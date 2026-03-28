@@ -1,5 +1,5 @@
 import { Brain, Search, FileText } from 'lucide-react';
-import { ChatService } from 'src/core/chat/services/ChatService';
+import { ChatService } from 'src/core/chat/services/chat-service';
 import type { ChatState } from 'src/types/chat';
 import { localInstance } from 'src/i18n/locals';
 

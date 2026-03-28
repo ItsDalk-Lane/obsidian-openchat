@@ -31,7 +31,7 @@ import {
 	type ChatSettings,
 } from 'src/types/chat'
 import { formatProviderOptionLabel } from './chatSettingsHelpers'
-import type { ChatService } from 'src/core/chat/services/ChatService'
+import type { ChatService } from 'src/core/chat/services/chat-service'
 import type { ExternalMcpEntry, ProviderOption } from './chatSettingsTypes'
 
 const cloneValue = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T

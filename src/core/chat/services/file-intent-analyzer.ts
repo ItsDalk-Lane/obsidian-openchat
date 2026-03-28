@@ -1,0 +1,3 @@
+import { FileIntentAnalyzer } from 'src/domains/chat/service-file-intent'
+
+export { FileIntentAnalyzer }

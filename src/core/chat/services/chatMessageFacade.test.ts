@@ -3,21 +3,22 @@ import test from 'node:test';
 import {
 	createChatMessageMutationFacade,
 	createChatMessageOperationFacade,
-} from './chatMessageFacade';
-import type { ChatMessageOperationDeps } from './chatMessageOperations';
-import type { ChatMessageMutationDeps } from './chatMessageMutations';
-import type { MultiModelChatService } from './MultiModelChatService';
+} from './chat-message-facade';
+import type { ChatMessageOperationDeps } from './chat-message-operations';
+import type { ChatMessageMutationDeps } from './chat-message-mutations';
+import type { MultiModelChatService } from './multi-model-chat-service';
 
 const createOperationDeps = (
 	multiModelService: MultiModelChatService | null,
 ): ChatMessageOperationDeps => ({
-	app: null as never,
 	state: null as never,
 	imageResolver: null as never,
 	attachmentSelectionService: null as never,
 	messageService: null as never,
 	sessionManager: null as never,
 	multiModelService,
+	notify: () => {},
+	buildGlobalSystemPrompt: async () => '',
 	emitState: () => {},
 	createNewSession: () => null as never,
 	syncSessionMultiModelState: () => {},

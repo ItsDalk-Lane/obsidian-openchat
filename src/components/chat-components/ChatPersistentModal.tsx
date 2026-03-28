@@ -3,7 +3,7 @@ import { StrictMode } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { ObsidianAppContext } from 'src/contexts/obsidianAppContext';
 import { localInstance } from 'src/i18n/locals';
-import { ChatService } from 'src/core/chat/services/ChatService';
+import { ChatService } from 'src/core/chat/services/chat-service';
 import { ChatPersistentModalApp } from './ChatPersistentModalApp';
 import { setupModalDragging } from './chatPersistentModalDrag';
 

@@ -5,7 +5,7 @@ import type { ProviderSettings } from 'src/types/provider';
 import { getCapabilityDisplayText } from 'src/LLMProviders/utils';
 import { availableVendors } from 'src/settings/ai-runtime';
 import type { CompareGroup } from 'src/core/chat/types/multiModel';
-import { ChatService } from 'src/core/chat/services/ChatService';
+import { ChatService } from 'src/core/chat/services/chat-service';
 import { localInstance } from 'src/i18n/locals';
 import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';
 

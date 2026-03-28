@@ -1,8 +1,8 @@
 import { History, MessageCirclePlus, Settings, Zap, Paperclip, ImageUp } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
-import { ChatService } from 'src/core/chat/services/ChatService';
+import { ChatService } from 'src/core/chat/services/chat-service';
 import type { ChatState } from 'src/types/chat';
-import type { ChatHistoryEntry } from 'src/core/chat/services/HistoryService';
+import type { ChatHistoryEntry } from 'src/core/chat/services/history-service';
 import { ChatHistoryPanel } from './ChatHistory';
 import { FileMenuPopup } from './FileMenuPopup';
 import { ModeSelector } from './ModeSelector';

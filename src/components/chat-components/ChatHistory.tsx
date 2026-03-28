@@ -1,7 +1,7 @@
 import { X, RotateCcw, ExternalLink, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
-import { ChatHistoryEntry } from 'src/core/chat/services/HistoryService';
+import { ChatHistoryEntry } from 'src/core/chat/services/history-service';
 import { localInstance } from 'src/i18n/locals';
 
 interface ChatHistoryPanelProps {

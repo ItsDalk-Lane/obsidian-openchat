@@ -86,6 +86,18 @@ test('createChatVaultPort 会把 provider 的 vault 原语收敛成 chat 域端�
 			calls.push(`entry:${path}`);
 			return { path, name: 'note.md', kind: 'file' as const };
 		},
+		getVaultName(): string {
+			return 'vault';
+		},
+		getActiveFilePath(): string | null {
+			return null;
+		},
+		async getAvailableAttachmentPath(filename: string): Promise<string> {
+			return filename;
+		},
+		getFrontmatter() {
+			return null;
+		},
 		async pathExists(path: string): Promise<boolean> {
 			calls.push(`exists:${path}`);
 			return true;
@@ -118,6 +130,17 @@ test('createChatVaultPort 会把 provider 的 vault 原语收敛成 chat 域端�
 		parseYaml(content: string): unknown {
 			calls.push(`yaml:${content}`);
 			return { raw: content };
+		},
+		stringifyYaml(content: unknown): string {
+			return JSON.stringify(content);
+		},
+		readLocalStorage(): string | null {
+			return null;
+		},
+		writeLocalStorage(): void {},
+		openSettingsTab(): void {},
+		insertTextIntoMarkdownEditor() {
+			return { inserted: false };
 		},
 		onVaultChange(): () => void {
 			calls.push('watch');
@@ -187,6 +210,18 @@ test('createChatHostPorts 仅暴露 chat 域需要的宿主原语与 vault 子�
 		getVaultEntry() {
 			return null;
 		},
+		getVaultName(): string {
+			return 'vault';
+		},
+		getActiveFilePath(): string | null {
+			return null;
+		},
+		async getAvailableAttachmentPath(filename: string): Promise<string> {
+			return filename;
+		},
+		getFrontmatter() {
+			return null;
+		},
 		async pathExists(): Promise<boolean> {
 			return false;
 		},
@@ -207,6 +242,17 @@ test('createChatHostPorts 仅暴露 chat 域需要的宿主原语与 vault 子�
 		async deleteVaultPath(): Promise<void> {},
 		parseYaml(): unknown {
 			return {};
+		},
+		stringifyYaml(): string {
+			return '';
+		},
+		readLocalStorage(): string | null {
+			return null;
+		},
+		writeLocalStorage(): void {},
+		openSettingsTab(): void {},
+		insertTextIntoMarkdownEditor() {
+			return { inserted: false };
 		},
 		onVaultChange(): () => void {
 			return () => {};

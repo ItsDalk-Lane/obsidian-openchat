@@ -2,15 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
 	createChatGenerationFacade,
-} from './chatGenerationFacade';
-import type { GenerateAssistantOptions } from './ChatServiceCore';
-import type { ChatGenerationDeps } from './chatGeneration';
+} from './chat-generation-facade';
+import type { GenerateAssistantOptions } from './chat-service-types';
+import type { ChatGenerationDeps } from './chat-generation';
 
 const createGenerationDeps = (
 	selectedModelId: string | null,
 	controller: AbortController | null,
 ): ChatGenerationDeps => ({
-	app: null as never,
 	state: {
 		selectedModelId,
 	} as never,
@@ -18,6 +17,9 @@ const createGenerationDeps = (
 	imageResolver: null as never,
 	sessionManager: null as never,
 	ollamaCapabilityCache: new Map(),
+	notify: () => {},
+	getAvailableAttachmentPath: async () => '',
+	writeVaultBinary: async () => {},
 	getDefaultProviderTag: () => selectedModelId,
 	findProviderByTagExact: () => null,
 	getModelDisplayName: () => '',

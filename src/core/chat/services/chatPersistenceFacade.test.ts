@@ -3,20 +3,30 @@ import test from 'node:test'
 import { DEFAULT_CHAT_SETTINGS } from 'src/domains/chat/config'
 import {
 	createChatPersistenceFacade,
-} from './chatPersistenceFacade'
-import type { ChatPersistenceDeps } from './chatSettingsPersistence'
+} from './chat-persistence-facade'
+import type { ChatPersistenceDeps } from './chat-settings-persistence'
 import type { ChatSettings } from '../types/chat'
 
 const createPersistenceDeps = (
 	chatSettings: ChatSettings,
 	layoutModeStorageKey: string,
 ): ChatPersistenceDeps => ({
-	plugin: {
-		settings: {
-			chat: chatSettings,
-			aiRuntime: null,
-		},
-	} as never,
+	settingsAccessor: {
+		getManifestId: () => 'openchat',
+		getAiDataFolder: () => 'System/AI Data',
+		getPluginSettings: () => null as never,
+		getChatSettings: () => chatSettings,
+		setChatSettings: () => {},
+		getAiRuntimeSettings: () => null as never,
+		setAiRuntimeSettings: () => {},
+		saveSettings: async () => {},
+		openSettingsTab: () => {},
+	},
+	obsidianApi: {
+		notify: () => {},
+		readLocalStorage: () => null,
+		writeLocalStorage: () => {},
+	},
 	runtimeDeps: null as never,
 	state: {
 		layoutMode: 'horizontal',
@@ -53,7 +63,7 @@ test('createChatPersistenceFacade 每次调用都读取最新 deps', async () =>
 		},
 		{
 			persistChatSettings: async (deps) => {
-				capturedRecentTurns = deps.plugin.settings.chat.messageManagement.recentTurns
+				capturedRecentTurns = deps.settingsAccessor.getChatSettings().messageManagement.recentTurns
 			},
 			persistGlobalSystemPromptsEnabled: async () => {},
 			persistMcpSettings: async () => {},

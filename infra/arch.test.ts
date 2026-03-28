@@ -136,6 +136,26 @@ test('阻止非 obsidian-api provider 直接导入 obsidian', () => {
 	assert.equal(violations[0].rule, 'arch/provider-obsidian-boundary');
 });
 
+test('允许 chat consumer 导入宿主类与 provider 实现', () => {
+	const files = [
+		createManagedFile('src/providers/obsidian-api.ts', 'import { Notice } from "obsidian";\nexport function createObsidianApiProvider(): object { return new Notice("ok"); }'),
+		createManagedFile('src/core/chat/chat-feature-manager.tsx', 'import { createObsidianApiProvider } from "src/providers/obsidian-api";\nexport class ChatFeatureManager { provider = createObsidianApiProvider(); }'),
+		createManagedFile('src/commands/chat/chat-view-coordinator.ts', 'import { WorkspaceLeaf } from "obsidian";\nexport class ChatViewCoordinator { leaf: WorkspaceLeaf | null = null; }'),
+	];
+	assert.equal(lintArchitectureFiles(files).length, 0);
+});
+
+test('阻止 chat service 直接依赖 obsidian 或 consumer 壳层', () => {
+	const files = [
+		createManagedFile('src/core/chat/services/chat-service.ts', 'export class ChatService { notify(): void {} }'),
+		createManagedFile('src/commands/chat/chat-view-coordinator.ts', 'export class ChatViewCoordinator {}'),
+		createManagedFile('src/core/chat/services/chat-helper.ts', 'import { Notice } from "obsidian";\nimport type { ChatViewCoordinator } from "src/commands/chat/chat-view-coordinator";\nexport function buildHelper(_coordinator: ChatViewCoordinator): void { new Notice("boom"); }'),
+	];
+	const violations = lintArchitectureFiles(files);
+	assert.ok(violations.some((violation) => violation.rule === 'arch/chat-no-direct-obsidian'));
+	assert.ok(violations.some((violation) => violation.rule === 'arch/chat-service-boundary'));
+});
+
 test('将域内 service 支撑文件归类为 service 层', () => {
 	assert.deepEqual(classifyManagedFile('src/domains/editor/service-helpers.ts'), {
 		kind: 'domain',
@@ -157,6 +177,9 @@ test('将域内 service 支撑文件归类为 service 层', () => {
 		role: 'implementation',
 		moduleName: 'obsidian-api',
 	});
+	assert.deepEqual(classifyManagedFile('src/core/chat/chat-feature-manager.tsx'), {
+		kind: 'consumer',
+	});
 	assert.deepEqual(classifyManagedFile('src/main.ts'), {
 		kind: 'consumer',
 	});
@@ -169,6 +192,22 @@ test('将域内 service 支撑文件归类为 service 层', () => {
 		kind: 'domain',
 		domainName: 'mcp',
 		layer: 'service',
+	});
+	assert.deepEqual(classifyManagedFile('src/core/chat/services/chat-service.ts'), {
+		kind: 'chat',
+		role: 'service',
+	});
+	assert.deepEqual(classifyManagedFile('src/core/chat/services/file-content-service.ts'), {
+		kind: 'chat',
+		role: 'host-adapter',
+	});
+	assert.deepEqual(classifyManagedFile('src/core/chat/services/chat-provider-messages.ts'), {
+		kind: 'chat',
+		role: 'service',
+	});
+	assert.deepEqual(classifyManagedFile('src/commands/chat/chat-view-coordinator.ts'), {
+		kind: 'chat',
+		role: 'consumer',
 	});
 });
 

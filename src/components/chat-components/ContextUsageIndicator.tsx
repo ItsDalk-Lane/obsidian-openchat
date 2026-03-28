@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import type { ChatMessage, ChatSession } from 'src/types/chat';
 import type { ProviderSettings } from 'src/types/provider';
-import { resolveContextBudget } from 'src/core/chat/utils/contextBudget';
+import { resolveContextBudget } from 'src/core/chat/utils/context-budget';
 import { countMessageTokens, countTextTokens } from 'src/core/chat/utils/token';
 
 interface ContextUsageIndicatorProps {

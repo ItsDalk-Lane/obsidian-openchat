@@ -34,8 +34,32 @@ function createFakeObsidianApiProvider(globalPrompt = ''): ObsidianApiProvider &
 			return path.replace(/\\/gu, '/');
 		},
 		async ensureAiDataFolders(): Promise<void> {},
+		async ensureVaultFolder(folderPath: string): Promise<string> {
+			return folderPath;
+		},
 		async requestHttp() {
 			return { status: 200, text: '', headers: {} };
+		},
+		getVaultEntry() {
+			return null;
+		},
+		getVaultName(): string {
+			return 'vault';
+		},
+		getActiveFilePath(): string | null {
+			return null;
+		},
+		async getAvailableAttachmentPath(filename: string): Promise<string> {
+			return filename;
+		},
+		getFrontmatter() {
+			return null;
+		},
+		async pathExists(): Promise<boolean> {
+			return false;
+		},
+		async statPath() {
+			return null;
 		},
 		listFolderEntries() {
 			return [];
@@ -43,8 +67,25 @@ function createFakeObsidianApiProvider(globalPrompt = ''): ObsidianApiProvider &
 		async readVaultFile(): Promise<string> {
 			return '';
 		},
+		async readVaultBinary(): Promise<ArrayBuffer> {
+			return new Uint8Array().buffer;
+		},
+		async writeVaultFile(): Promise<void> {},
+		async writeVaultBinary(): Promise<void> {},
+		async deleteVaultPath(): Promise<void> {},
 		parseYaml(): unknown {
 			return {};
+		},
+		stringifyYaml(): string {
+			return '';
+		},
+		readLocalStorage(): string | null {
+			return null;
+		},
+		writeLocalStorage(): void {},
+		openSettingsTab(): void {},
+		insertTextIntoMarkdownEditor() {
+			return { inserted: false };
 		},
 		onVaultChange(): () => void {
 			return () => {};

@@ -1,1 +1,0 @@
-export { ChatViewCoordinator } from './ChatViewCoordinator';

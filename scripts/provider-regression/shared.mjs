@@ -19,7 +19,7 @@ export const AGENT_LOOP_HANDLER_PATH = path.resolve(
 	ROOT,
 	'src/core/agents/loop/OpenAILoopHandler.ts',
 )
-export const CHAT_SERVICE_PATH = path.resolve(ROOT, 'src/core/chat/services/ChatService.ts')
+export const CHAT_SERVICE_PATH = path.resolve(ROOT, 'src/core/chat/services/chat-service.ts')
 
 const I18N_HELPER_MOCK = { t: (text) => text }
 const DEBUG_LOGGER_MOCK = {

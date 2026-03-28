@@ -1,4 +1,4 @@
-import { App, normalizePath, TFolder } from 'obsidian';
+import type { ObsidianApiProvider, VaultEntry } from 'src/providers/providers.types';
 
 export const sanitizeFileName = (name: string): string => {
 	const trimmed = name.trim();
@@ -6,26 +6,18 @@ export const sanitizeFileName = (name: string): string => {
 	return sanitized.length > 0 ? sanitized : 'chat-session';
 };
 
-export const ensureFolderExists = async (app: App, folderPath: string): Promise<TFolder> => {
-	const normalized = normalizePath(folderPath);
-	const abstract = app.vault.getAbstractFileByPath(normalized);
-	if (abstract && abstract instanceof TFolder) {
-		return abstract;
+export const ensureFolderExists = async (
+	obsidianApi: Pick<ObsidianApiProvider, 'ensureVaultFolder' | 'getVaultEntry'>,
+	folderPath: string,
+): Promise<VaultEntry> => {
+	const normalized = await obsidianApi.ensureVaultFolder(folderPath);
+	const entry = obsidianApi.getVaultEntry(normalized);
+	if (entry?.kind === 'folder') {
+		return entry;
 	}
-
-	if (abstract && !(abstract instanceof TFolder)) {
-		throw new Error(`Path ${normalized} 已存在且不是文件夹`);
-	}
-
-	await app.vault.createFolder(normalized);
-	const created = app.vault.getAbstractFileByPath(normalized);
-	if (!created || !(created instanceof TFolder)) {
-		throw new Error(`无法创建聊天历史文件夹: ${normalized}`);
-	}
-	return created;
+	throw new Error(`无法创建聊天历史文件夹: ${normalized}`);
 };
 
 export const joinPath = (folder: string, fileName: string): string => {
-	return normalizePath(`${folder.replace(/\\$/g, '').replace(/\/$/g, '')}/${fileName}`);
+	return `${folder.replace(/[\\/]+$/gu, '')}/${fileName}`.replace(/\\/gu, '/').replace(/\/+/gu, '/');
 };
-

@@ -13,11 +13,13 @@ export interface ManagedFile {
 
 export type DomainLayer = 'types' | 'config' | 'service' | 'ui';
 export type ProviderRole = 'contract' | 'implementation';
+export type ChatRole = 'service' | 'host-adapter' | 'consumer';
 
 export type ManagedFileCategory =
 	| { kind: 'infra' }
 	| { kind: 'provider'; role: ProviderRole; moduleName: string }
 	| { kind: 'consumer' }
+	| { kind: 'chat'; role: ChatRole }
 	| { kind: 'domain'; domainName: string; layer: DomainLayer }
 	| { kind: 'unknown' };
 
@@ -28,12 +30,8 @@ export interface LintViolation {
 	rule: string;
 }
 
-const MANAGED_ROOTS = ['infra', 'src/providers', 'src/domains'];
-const MANAGED_EXPLICIT_FILES = [
-	'src/main.ts',
-	'src/core/FeatureCoordinator.ts',
-	'src/commands/ai-runtime/AiRuntimeCommandManager.ts',
-];
+const MANAGED_ROOTS = ['infra', 'src/providers', 'src/domains', 'src/core/chat/services', 'src/core/chat/utils', 'src/core/chat/runtime', 'src/commands/chat'];
+const MANAGED_EXPLICIT_FILES = ['src/main.ts', 'src/core/FeatureCoordinator.ts', 'src/core/chat/chat-feature-manager.tsx', 'src/commands/ai-runtime/AiRuntimeCommandManager.ts'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
 
 export const DOMAIN_LAYER_ORDER: Record<DomainLayer, number> = {
@@ -124,9 +122,29 @@ export function classifyManagedFile(relativePath: string): ManagedFileCategory {
 	if (
 		normalized === 'src/main.ts'
 		|| normalized === 'src/core/FeatureCoordinator.ts'
+		|| normalized === 'src/core/chat/chat-feature-manager.tsx'
 		|| normalized === 'src/commands/ai-runtime/AiRuntimeCommandManager.ts'
 	) {
 		return { kind: 'consumer' };
+	}
+	if (
+		normalized === 'src/core/chat/services/file-content-service.ts'
+		|| normalized === 'src/core/chat/services/message-service.ts'
+	) {
+		return { kind: 'chat', role: 'host-adapter' };
+	}
+	if (normalized === 'src/core/chat/utils/markdown.ts') {
+		return { kind: 'chat', role: 'consumer' };
+	}
+	if (
+		normalized.startsWith('src/core/chat/services/')
+		|| normalized.startsWith('src/core/chat/runtime/')
+		|| normalized.startsWith('src/core/chat/utils/')
+	) {
+		return { kind: 'chat', role: 'service' };
+	}
+	if (normalized.startsWith('src/commands/chat/')) {
+		return { kind: 'chat', role: 'consumer' };
 	}
 	const domainMatch = normalized.match(/^src\/domains\/([^/]+)\/(types|config|service|ui)\.tsx?$/u);
 	if (domainMatch) {
@@ -169,13 +187,20 @@ export function classifyManagedFile(relativePath: string): ManagedFileCategory {
 	return { kind: 'unknown' };
 }
 
-export function getImportSpecifiers(sourceFile: ts.SourceFile): Array<{ specifier: string; line: number }> {
-	const specifiers: Array<{ specifier: string; line: number }> = [];
+export function getImportSpecifiers(sourceFile: ts.SourceFile): Array<{
+	specifier: string;
+	line: number;
+	isTypeOnly: boolean;
+}> {
+	const specifiers: Array<{ specifier: string; line: number; isTypeOnly: boolean }> = [];
 	const visit = (node: ts.Node): void => {
 		if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
 			const text = node.moduleSpecifier.getText(sourceFile).slice(1, -1);
 			const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-			specifiers.push({ specifier: text, line });
+			const isTypeOnly = ts.isImportDeclaration(node)
+				? Boolean(node.importClause?.isTypeOnly)
+				: Boolean(node.isTypeOnly);
+			specifiers.push({ specifier: text, line, isTypeOnly });
 		}
 		ts.forEachChild(node, visit);
 	};

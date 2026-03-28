@@ -33,8 +33,30 @@ function createFakeProvider(options?: {
 		async buildGlobalSystemPrompt(): Promise<string> { return ''; },
 		normalizePath(path: string): string { return path.replace(/\\/gu, '/').replace(/\/+/gu, '/'); },
 		async ensureAiDataFolders(): Promise<void> {},
+		async ensureVaultFolder(folderPath: string): Promise<string> { return folderPath; },
 		async requestHttp() {
 			return { status: 200, text: '', headers: {} };
+		},
+		getVaultEntry() {
+			return null;
+		},
+		getVaultName(): string {
+			return 'vault';
+		},
+		getActiveFilePath(): string | null {
+			return null;
+		},
+		async getAvailableAttachmentPath(filename: string): Promise<string> {
+			return filename;
+		},
+		getFrontmatter() {
+			return null;
+		},
+		async pathExists(): Promise<boolean> {
+			return false;
+		},
+		async statPath() {
+			return null;
 		},
 		listFolderEntries(folderPath: string): readonly VaultEntry[] { return folders.get(folderPath) ?? []; },
 		async readVaultFile(filePath: string): Promise<string> {
@@ -48,6 +70,12 @@ function createFakeProvider(options?: {
 			}
 			return content;
 		},
+		async readVaultBinary(): Promise<ArrayBuffer> {
+			return new Uint8Array().buffer;
+		},
+		async writeVaultFile(): Promise<void> {},
+		async writeVaultBinary(): Promise<void> {},
+		async deleteVaultPath(): Promise<void> {},
 		parseYaml(content: string): unknown {
 			if (failYaml) {
 				failYaml = false;
@@ -57,6 +85,17 @@ function createFakeProvider(options?: {
 				const separatorIndex = line.indexOf(':');
 				return [line.slice(0, separatorIndex).trim(), line.slice(separatorIndex + 1).trim()];
 			}));
+		},
+		stringifyYaml(): string {
+			return '';
+		},
+		readLocalStorage(): string | null {
+			return null;
+		},
+		writeLocalStorage(): void {},
+		openSettingsTab(): void {},
+		insertTextIntoMarkdownEditor() {
+			return { inserted: false };
 		},
 		onVaultChange(listener): () => void {
 			listeners.add(listener);

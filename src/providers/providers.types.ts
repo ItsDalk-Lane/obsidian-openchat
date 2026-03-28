@@ -15,6 +15,10 @@ export interface ObsidianApiProvider {
 	ensureVaultFolder(folderPath: string): Promise<string>;
 	requestHttp(options: HttpRequestOptions): Promise<HttpResponseData>;
 	getVaultEntry(path: string): VaultEntry | null;
+	getVaultName(): string;
+	getActiveFilePath(): string | null;
+	getAvailableAttachmentPath(filename: string): Promise<string>;
+	getFrontmatter(filePath: string): Record<string, unknown> | null;
 	pathExists(path: string): Promise<boolean>;
 	statPath(path: string): Promise<VaultStat | null>;
 	listFolderEntries(folderPath: string): readonly VaultEntry[];
@@ -24,6 +28,11 @@ export interface ObsidianApiProvider {
 	writeVaultBinary(filePath: string, content: ArrayBuffer): Promise<void>;
 	deleteVaultPath(path: string): Promise<void>;
 	parseYaml(content: string): unknown;
+	stringifyYaml(content: unknown): string;
+	readLocalStorage(key: string): string | null;
+	writeLocalStorage(key: string, value: string): void;
+	openSettingsTab(tabId: string): void;
+	insertTextIntoMarkdownEditor(content: string): EditorInsertResult;
 	onVaultChange(listener: (event: VaultChangeEvent) => void): () => void;
 }
 
@@ -38,6 +47,8 @@ export interface HttpResponseData {
 	readonly status: number;
 	readonly text: string;
 	readonly headers: Record<string, string>;
+	readonly json?: unknown;
+	readonly arrayBuffer?: ArrayBuffer;
 }
 
 export interface VaultEntry {
@@ -56,6 +67,11 @@ export interface VaultChangeEvent {
 	readonly type: 'create' | 'modify' | 'delete' | 'rename';
 	readonly path: string;
 	readonly oldPath?: string;
+}
+
+export interface EditorInsertResult {
+	readonly inserted: boolean;
+	readonly fileName?: string;
 }
 
 export interface SettingsProvider<TSettings> {

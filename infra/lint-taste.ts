@@ -11,7 +11,7 @@ import {
 const FILE_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*$/u;
 const PASCAL_CASE_PATTERN = /^[A-Z][A-Za-z0-9]*$/u;
 const CAMEL_CASE_PATTERN = /^[a-z][A-Za-z0-9]*$/u;
-const SIDE_EFFECT_VERBS = /^(save|mutate|register|delete|create|update|emit|dispatch|dispose|cancel|ensure|build|run|initialize|open|close|refresh|sync|handle|trigger|start|stop|connect|disconnect|confirm|resolve|send|report|wait|schedule|request|cleanup|load|notify|onload|on[A-Z])/u;
+const SIDE_EFFECT_VERBS = /^(save|mutate|register|delete|create|update|emit|dispatch|dispose|cancel|ensure|build|run|initialize|open|close|refresh|sync|handle|trigger|start|stop|connect|disconnect|confirm|resolve|send|report|wait|schedule|request|cleanup|load|notify|show|execute|generate|regenerate|edit|toggle|insert|retry|attach|restore|select|queue|flush|clear|prepare|onload|on[A-Z])/u;
 const SIDE_EFFECT_CALLS = /(dispatch\(|abort\(|setTimeout\(|clearTimeout\(|notify\(|emit\(|register[A-Z]|open\(|close\(|writeFile\(|readFile\()/u;
 
 export function lintTaste(workspaceRoot: string): LintViolation[] {

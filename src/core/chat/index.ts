@@ -1,1 +1,1 @@
-export { ChatFeatureManager } from './ChatFeatureManager';
+export { ChatFeatureManager } from './chat-feature-manager';

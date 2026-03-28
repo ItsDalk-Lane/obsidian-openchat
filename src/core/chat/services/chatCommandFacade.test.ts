@@ -2,14 +2,14 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
 	createChatCommandFacade,
-} from './chatCommandFacade'
+} from './chat-command-facade'
 import type {
 	ExecuteSkillCommandParams,
 	ExecuteSubAgentCommandParams,
-} from './chatCommands'
+} from './chat-commands'
 
 const createSkillParams = (inputValue: string): ExecuteSkillCommandParams => ({
-	app: null as never,
+	obsidianApi: null as never,
 	state: { inputValue } as never,
 	emitState: () => {},
 	loadInstalledSkills: async () => null as never,
@@ -21,6 +21,7 @@ const createSubAgentParams = (
 	selectedModelId: string | null,
 ): ExecuteSubAgentCommandParams => ({
 	state: { selectedModelId } as never,
+	notify: () => {},
 	providers: Array.from({ length: providerCount }, (_, index) => ({
 		tag: `provider-${index}`,
 	})) as never,

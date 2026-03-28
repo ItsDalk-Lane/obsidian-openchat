@@ -1,8 +1,8 @@
 import type { App, EmbedCache } from 'obsidian';
 import type { Message as ProviderMessage } from 'src/types/provider';
 import type { ChatMessage, SelectedFile, SelectedFolder, FileIntentAnalysis } from 'src/types/chat';
-import type { FileContentOptions, FileContentService, FileContent } from 'src/core/chat/services/FileContentService';
-import { FileIntentAnalyzer } from 'src/core/chat/services/FileIntentAnalyzer';
+import type { FileContentOptions, FileContentService, FileContent } from 'src/core/chat/services/file-content-service';
+import { FileIntentAnalyzer } from 'src/core/chat/services/file-intent-analyzer';
 import { parseContentBlocks } from 'src/core/chat/utils/markdown';
 
 export const DEFAULT_HISTORY_ROUNDS = 10;

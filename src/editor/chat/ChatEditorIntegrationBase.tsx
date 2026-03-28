@@ -9,7 +9,7 @@ import { EditorView } from '@codemirror/view';
 import { createRoot, Root } from 'react-dom/client';
 import { StrictMode } from 'react';
 import OpenChatPlugin from 'src/main';
-import type { ChatService } from 'src/core/chat/services/ChatService';
+import type { ChatService } from 'src/core/chat/services/chat-service';
 import { createChatTriggerExtension, updateChatTriggerSettings } from './ChatTriggerExtension';
 import {
 	createSelectionToolbarExtension,

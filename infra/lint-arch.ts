@@ -31,11 +31,15 @@ export function lintArchitectureFiles(files: readonly ManagedFile[]): LintViolat
 		for (const imported of getImportSpecifiers(file.sourceFile)) {
 			const resolved = resolveWorkspaceImport(file.relativePath, imported.specifier);
 			if (file.category.kind === 'domain') {
-				lintDomainImport(file, imported.line, resolved, violations);
+				lintDomainImport(file, imported.line, resolved, imported.isTypeOnly, violations);
+				continue;
+			}
+			if (file.category.kind === 'chat') {
+				lintChatImport(file, imported.line, resolved, imported.isTypeOnly, violations);
 				continue;
 			}
 			if (file.category.kind === 'provider') {
-				lintProviderImport(file, imported.line, resolved, violations);
+				lintProviderImport(file, imported.line, resolved, imported.isTypeOnly, violations);
 			}
 		}
 	}
@@ -46,9 +50,10 @@ function lintDomainImport(
 	file: ManagedFile & { category: Extract<ManagedFile['category'], { kind: 'domain' }> },
 	line: number,
 	resolved: string | null,
+	isTypeOnly: boolean,
 	violations: LintViolation[],
 ): void {
-	if (resolved === 'obsidian') {
+	if (resolved === 'obsidian' && !isTypeOnly) {
 		violations.push({
 			filePath: file.relativePath,
 			line,
@@ -117,10 +122,67 @@ function lintDomainImport(
 	}
 }
 
+function lintChatImport(
+	file: ManagedFile & { category: Extract<ManagedFile['category'], { kind: 'chat' }> },
+	line: number,
+	resolved: string | null,
+	isTypeOnly: boolean,
+	violations: LintViolation[],
+): void {
+	if (resolved === 'obsidian') {
+		if (file.category.role === 'service' && !isTypeOnly) {
+			violations.push({
+				filePath: file.relativePath,
+				line,
+				rule: 'arch/chat-no-direct-obsidian',
+				message:
+					'chat service/helper 不能直接导入 obsidian。\n修复方法：\n1. 宿主能力收敛到 src/providers/obsidian-api.ts。\n2. 若只是类型，请改为 type-only import；若是行为，请通过 provider 或 consumer 壳层注入。',
+			});
+		}
+		return;
+	}
+	if (!resolved) {
+		return;
+	}
+	const importedCategory = classifyManagedFile(resolved);
+	if (
+		file.category.role === 'service'
+		&& (
+			resolved.startsWith('src/components/')
+			|| resolved.startsWith('src/editor/')
+			|| resolved.startsWith('src/commands/')
+			|| (importedCategory.kind === 'chat' && importedCategory.role === 'consumer')
+		)
+	) {
+		violations.push({
+			filePath: file.relativePath,
+			line,
+			rule: 'arch/chat-service-boundary',
+			message:
+				'chat service/helper 不得反向依赖 commands、components、editor 或 chat 组合根 consumer。\n修复方法：\n1. 将宿主/UI 交互保留在 ChatFeatureManager、ChatViewCoordinator 等 consumer 壳层。\n2. service 只依赖 provider、domain pure helper 与同层 service 协作者。',
+		});
+		return;
+	}
+	if (
+		file.category.role === 'service'
+		&& importedCategory.kind === 'provider'
+		&& resolved !== PROVIDER_CONTRACT_PATH
+	) {
+		violations.push({
+			filePath: file.relativePath,
+			line,
+			rule: 'arch/chat-provider-contract-only',
+			message:
+				'chat service/helper 只能依赖 provider 契约，不能直接导入 provider 实现。\n修复方法：\n1. 从 src/providers/providers.types.ts 导入接口类型。\n2. 在 FeatureCoordinator 或 ChatFeatureManager 中创建 provider 后注入。',
+		});
+	}
+}
+
 function lintProviderImport(
 	file: ManagedFile & { category: Extract<ManagedFile['category'], { kind: 'provider' }> },
 	line: number,
 	resolved: string | null,
+	isTypeOnly: boolean,
 	violations: LintViolation[],
 ): void {
 	if (resolved === 'obsidian') {

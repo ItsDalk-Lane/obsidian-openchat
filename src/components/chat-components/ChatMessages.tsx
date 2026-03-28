@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useCallback, useState } from 'react';
 import type { ChatState, ChatMessage } from 'src/types/chat';
-import { ChatService } from 'src/core/chat/services/ChatService';
+import { ChatService } from 'src/core/chat/services/chat-service';
 import { MessageItem } from './MessageItem';
 import { ParallelResponseViewer } from './ParallelResponseViewer';
 import { CompareTabBar } from './CompareTabBar';
-import { mergeMessagesWithParallelResponses } from 'src/core/chat/utils/parallelMessages';
+import { mergeMessagesWithParallelResponses } from 'src/core/chat/utils/parallel-messages';
 
 interface ChatMessagesProps {
 	service: ChatService;
