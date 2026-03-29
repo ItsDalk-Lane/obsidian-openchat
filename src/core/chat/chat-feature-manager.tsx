@@ -4,7 +4,6 @@
  * 已拆分为：ChatViewCoordinator（视图管理）、ChatEditorIntegration（编辑器扩展）
  */
 import { ChatService } from 'src/core/chat/services/chat-service';
-import { MultiModelConfigService } from 'src/core/chat/services/multi-model-config-service';
 import { MultiModelChatService } from 'src/core/chat/services/multi-model-chat-service';
 import type {
 	ChatConsumerHost,
@@ -19,7 +18,6 @@ import { ChatEditorIntegration } from 'src/editor/chat/ChatEditorIntegration';
 
 export class ChatFeatureManager {
 	private readonly service: ChatService;
-	private multiModelConfigService: MultiModelConfigService | null = null;
 	private multiModelChatService: MultiModelChatService | null = null;
 	private readonly viewCoordinator: ChatViewCoordinator;
 	private readonly editorIntegration: ChatEditorIntegration;
@@ -41,13 +39,7 @@ export class ChatFeatureManager {
 		this.service.initialize(initialSettings);
 
 		// 2. 初始化多模型服务
-		this.multiModelConfigService = new MultiModelConfigService(
-			this.service.getObsidianApiProvider(),
-			this.host.getAiDataFolder(),
-		);
-		await this.multiModelConfigService.initialize();
-		this.multiModelChatService = new MultiModelChatService(this.service, this.multiModelConfigService);
-		this.service.setMultiModelConfigService(this.multiModelConfigService);
+		this.multiModelChatService = new MultiModelChatService(this.service);
 		this.service.setMultiModelService(this.multiModelChatService);
 
 		// 3. 初始化视图协调器
@@ -100,10 +92,7 @@ export class ChatFeatureManager {
 	dispose(): void {
 		this.multiModelChatService?.stopAllGeneration();
 		this.multiModelChatService = null;
-		this.multiModelConfigService?.dispose();
-		this.multiModelConfigService = null;
 		this.service.setMultiModelService(null);
-		this.service.setMultiModelConfigService(null);
 
 		this.viewCoordinator.dispose();
 		this.editorIntegration.dispose();

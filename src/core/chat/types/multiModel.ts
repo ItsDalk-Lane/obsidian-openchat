@@ -1,5 +1,4 @@
 export type {
-	CompareGroup,
 	LayoutMode,
 	MultiModelMode,
 	ParallelResponseEntry,

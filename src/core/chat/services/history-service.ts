@@ -145,7 +145,6 @@ export class HistoryService {
 				selectedImages: [],
 				enableTemplateAsSystemPrompt: this.parser.parseBoolean(frontmatter.enableTemplateAsSystemPrompt, false),
 				multiModelMode: this.parser.parseMultiModelMode(frontmatter.multiModelMode),
-				activeCompareGroupId: this.parser.parseOptionalString(frontmatter.activeCompareGroupId),
 				layoutMode: this.parser.parseLayoutMode(frontmatter.layoutMode),
 				livePlan: this.planResolver.resolveLivePlan(persistedPlan, messagePlan),
 				contextCompaction: this.parser.parseContextCompaction(frontmatter.contextCompaction),

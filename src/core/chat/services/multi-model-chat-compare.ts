@@ -17,17 +17,9 @@ import {
 	runWithConcurrency,
 } from './multi-model-chat-helpers';
 
-const resolveCompareModelTags = async (
+const resolveCompareModelTags = (
 	deps: MultiModelChatWorkflowDeps,
-): Promise<string[]> => {
-	const state = deps.chatService.getState();
-	if (state.activeCompareGroupId) {
-		const groups = await deps.configService.loadCompareGroups();
-		const group = groups.find((item) => item.id === state.activeCompareGroupId);
-		if (group?.modelTags.length) {
-			return group.modelTags;
-		}
-	}
+): string[] => {
 	return deps.chatService.getSelectedModels();
 };
 
@@ -116,7 +108,7 @@ export const sendCompareMessageImpl = async (
 ): Promise<void> => {
 	deps.setCompareStopRequested(false);
 	const session = prepared.session;
-	const requestedModelTags = await resolveCompareModelTags(deps);
+	const requestedModelTags = resolveCompareModelTags(deps);
 	const modelTags = await resolveAvailableCompareModels(
 		deps,
 		requestedModelTags,

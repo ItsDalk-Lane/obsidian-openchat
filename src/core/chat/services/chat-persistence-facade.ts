@@ -15,7 +15,6 @@ export interface ChatPersistenceFacade {
 	persistSessionMultiModelFrontmatter(session: ChatSession): Promise<void>
 	restoreMultiModelStateFromSession(session: ChatSession): {
 		multiModelMode: MultiModelMode
-		activeCompareGroupId?: string
 		selectedModels: string[]
 		layoutMode: LayoutMode
 	}
@@ -56,7 +55,6 @@ export interface ChatPersistenceFacadeOperations {
 		session: ChatSession,
 	): {
 		multiModelMode: MultiModelMode
-		activeCompareGroupId?: string
 		selectedModels: string[]
 		layoutMode: LayoutMode
 	}

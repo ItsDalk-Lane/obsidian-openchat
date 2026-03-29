@@ -1,11 +1,14 @@
-import { User, GitCompareArrows, ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { MultiModelMode } from 'src/core/chat/types/multiModel';
-import { localInstance } from 'src/i18n/locals';
 
 interface ModeSelectorProps {
 	mode: MultiModelMode;
 	onModeChange: (mode: MultiModelMode) => void;
+}
+
+interface ModeOption {
+	mode: MultiModelMode;
+	label: string;
 }
 
 export const ModeSelector = ({ mode, onModeChange }: ModeSelectorProps) => {
@@ -13,13 +16,11 @@ export const ModeSelector = ({ mode, onModeChange }: ModeSelectorProps) => {
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	const buttonRef = useRef<HTMLSpanElement>(null);
 
-	const modeOptions: { mode: MultiModelMode; icon: typeof User; label: string }[] = [
-		{ mode: 'single', icon: User, label: localInstance.multi_model_mode_single || '单模型' },
-		{ mode: 'compare', icon: GitCompareArrows, label: localInstance.multi_model_mode_compare || '对比模式' },
+	const modeOptions: ModeOption[] = [
+		{ mode: 'single', label: 'Chat' },
 	];
 
 	const currentMode = modeOptions.find((m) => m.mode === mode) || modeOptions[0];
-	const CurrentIcon = currentMode.icon;
 
 	// 点击外部关闭
 	useEffect(() => {
@@ -59,8 +60,7 @@ export const ModeSelector = ({ mode, onModeChange }: ModeSelectorProps) => {
 				title={currentMode.label}
 				className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-gap-1"
 			>
-				<CurrentIcon className="tw-size-4" />
-				<ChevronDown className="tw-size-3" style={{ transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none' }} />
+				<span className="tw-text-sm">{currentMode.label}</span>
 			</span>
 
 			{isOpen && (
@@ -81,7 +81,7 @@ export const ModeSelector = ({ mode, onModeChange }: ModeSelectorProps) => {
 						minWidth: '120px',
 					}}
 				>
-					{modeOptions.map(({ mode: m, icon: Icon, label }) => {
+					{modeOptions.map(({ mode: m, label }) => {
 						const isActive = mode === m;
 						return (
 							<div
@@ -103,7 +103,6 @@ export const ModeSelector = ({ mode, onModeChange }: ModeSelectorProps) => {
 									}
 								}}
 							>
-								<Icon className="tw-size-4" />
 								<span className="tw-text-sm">{label}</span>
 							</div>
 						);

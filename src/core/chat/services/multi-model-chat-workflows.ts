@@ -2,7 +2,6 @@ import type { ChatMessage } from '../types/chat';
 import type {
 	ParallelResponseEntry,
 } from '../types/multiModel';
-import type { MultiModelConfigService } from './multi-model-config-service';
 
 export interface MultiModelChatServicePort {
 	getObsidianApiProvider(): import('src/providers/providers.types').ObsidianApiProvider;
@@ -32,7 +31,6 @@ export interface MultiModelChatServicePort {
 
 export interface MultiModelChatWorkflowDeps {
 	chatService: MultiModelChatServicePort;
-	configService: MultiModelConfigService;
 	abortControllers: Map<string, AbortController>;
 	pendingResponsePatches: Map<string, Map<string, Partial<ParallelResponseEntry>>>;
 	pendingFlushTimers: Map<string, number>;

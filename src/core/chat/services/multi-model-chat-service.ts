@@ -1,6 +1,5 @@
 import type { ParallelResponseEntry } from '../types/multiModel';
 import type { PreparedChatRequest } from './chat-service-types';
-import { MultiModelConfigService } from './multi-model-config-service';
 import { clearAllPendingParallelUpdates } from './multi-model-chat-helpers';
 import {
 	type MultiModelChatServicePort,
@@ -26,7 +25,6 @@ export class MultiModelChatService {
 
 	constructor(
 		private readonly chatService: MultiModelChatServicePort,
-		private readonly configService: MultiModelConfigService,
 	) {}
 
 	private notify(message: string, timeout?: number): void {
@@ -68,7 +66,6 @@ export class MultiModelChatService {
 	private buildWorkflowDeps(): MultiModelChatWorkflowDeps {
 		return {
 			chatService: this.chatService,
-			configService: this.configService,
 			abortControllers: this.abortControllers,
 			pendingResponsePatches: this.pendingResponsePatches,
 			pendingFlushTimers: this.pendingFlushTimers,

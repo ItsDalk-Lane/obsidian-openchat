@@ -8,7 +8,7 @@ import type {
 } from 'src/domains/chat/service-attachment-selection';
 import { normalizeMessageManagementSettings } from '../types/chat';
 import type { ChatSession, ChatSettings, McpToolMode, SelectedFile, SelectedFolder } from '../types/chat';
-import type { CompareGroup, LayoutMode, MultiModelMode, ParallelResponseGroup } from '../types/multiModel';
+import type { LayoutMode, MultiModelMode, ParallelResponseGroup } from '../types/multiModel';
 import type { ChatServiceInternals } from './chat-service-internals';
 import { getDefaultProviderTag } from './chat-service-deps-support';
 
@@ -60,12 +60,6 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 	setMultiModelService(service: typeof internals.multiModelService): void {
 		internals.multiModelService = service;
 	},
-	setMultiModelConfigService(service: typeof internals.multiModelConfigService): void {
-		internals.multiModelConfigService = service;
-	},
-	getMultiModelConfigService() {
-		return internals.multiModelConfigService;
-	},
 	notifyStateChange(): void {
 		internals.stateStore.emit();
 	},
@@ -99,7 +93,6 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 			selectedImages: [],
 			enableTemplateAsSystemPrompt: false,
 			multiModelMode: state.multiModelMode,
-			activeCompareGroupId: state.activeCompareGroupId,
 			layoutMode: state.layoutMode,
 			livePlan: null,
 			contextCompaction: null,
@@ -116,7 +109,6 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 			mutableState.showTemplateSelector = false;
 			mutableState.mcpToolMode = 'auto';
 			mutableState.mcpSelectedServerIds = [];
-			mutableState.activeCompareGroupId = undefined;
 			mutableState.parallelResponses = undefined;
 		});
 		internals.attachmentSelectionService.clearSelection(false);
@@ -258,18 +250,6 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 		internals.service.persistLayoutMode(mode);
 		void internals.service.persistActiveSessionMultiModelFrontmatter();
 		internals.service.emitState();
-	},
-	setActiveCompareGroup(groupId?: string): void {
-		internals.stateStore.getMutableState().activeCompareGroupId = groupId;
-		internals.service.syncSessionMultiModelState();
-		void internals.service.persistActiveSessionMultiModelFrontmatter();
-		internals.service.emitState();
-	},
-	async loadCompareGroups(): Promise<CompareGroup[]> { return internals.multiModelConfigService ? await internals.multiModelConfigService.loadCompareGroups() : []; },
-	async saveCompareGroup(group: CompareGroup): Promise<string | null> { return internals.multiModelConfigService ? await internals.multiModelConfigService.saveCompareGroup(group) : null; },
-	async deleteCompareGroup(id: string): Promise<void> { if (internals.multiModelConfigService) await internals.multiModelConfigService.deleteCompareGroup(id); },
-	watchMultiModelConfigs(callback: Parameters<NonNullable<typeof internals.multiModelConfigService>['watchConfigs']>[0]) {
-		return internals.multiModelConfigService ? internals.multiModelConfigService.watchConfigs(callback) : null;
 	},
 	stopGeneration(): void {
 		if (internals.stateStore.getMutableState().multiModelMode !== 'single' && internals.multiModelService) {

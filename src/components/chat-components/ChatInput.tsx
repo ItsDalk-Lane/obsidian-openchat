@@ -1,9 +1,8 @@
 import { CornerDownLeft, StopCircle, Palette, RotateCw } from 'lucide-react';
-import { FormEvent, useEffect, useState, useRef, Fragment, useMemo, lazy, Suspense } from 'react';
+import { FormEvent, useEffect, useState, useRef, Fragment, useMemo } from 'react';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import type { ChatState } from 'src/domains/chat/types';
-import type { CompareGroup } from 'src/core/chat/types/multiModel';
-import { MultiModelSelector } from './MultiModelSelector';
+import { ModelSelector } from './ModelSelector';
 import { TemplateSelector } from './TemplateSelector';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { SlashCommandMenu } from './SlashCommandMenu';
@@ -16,19 +15,12 @@ interface ChatInputProps {
 	state: ChatState;
 }
 
-const CompareGroupManagerDialog = lazy(async () => import('./CompareGroupManagerDialog').then((module) => ({
-	default: module.CompareGroupManagerDialog
-})));
-
 export const ChatInput = ({ service, state }: ChatInputProps) => {
 	const [value, setValue] = useState(state.inputValue);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const [maxHeight, setMaxHeight] = useState(80);
 
 	const [isImageGenerationIntent, setIsImageGenerationIntent] = useState(false);
-	const [compareGroups, setCompareGroups] = useState<CompareGroup[]>([]);
-	const [isLoadingConfigs, setIsLoadingConfigs] = useState(false);
-	const [showGroupManager, setShowGroupManager] = useState(false);
 	const isMultiModel = state.multiModelMode !== 'single';
 
 	// 斜杠命令状态（来自 hook）
@@ -67,26 +59,9 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 		setValue(state.inputValue);
 	}, [state.inputValue]);
 
-	// 加载多模型配置
-	useEffect(() => {
-		const loadConfigs = async () => {
-			setIsLoadingConfigs(true);
-			const groups = await service.loadCompareGroups();
-			setCompareGroups(groups);
-			setIsLoadingConfigs(false);
-		};
-		void loadConfigs();
-		const unwatch = service.watchMultiModelConfigs?.(() => { void loadConfigs(); });
-		return () => { unwatch?.(); };
-	}, [service]);
-
 	useEffect(() => {
 		const handleShortcut = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') {
-				if (showGroupManager) {
-					setShowGroupManager(false);
-					return;
-				}
 				// 关闭斜杠命令菜单
 				if (slashCommandVisible) {
 					setSlashCommandVisible(false);
@@ -111,7 +86,7 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 		};
 		window.addEventListener('keydown', handleShortcut);
 		return () => window.removeEventListener('keydown', handleShortcut);
-	}, [isMultiModel, service, showGroupManager, slashCommandVisible]);
+	}, [isMultiModel, service, slashCommandVisible]);
 
 
 	const handleSubmit = async (event?: FormEvent) => {
@@ -189,18 +164,11 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 
 	// 模型选择器区域
 	const renderModelSelector = () => (
-		isLoadingConfigs ? (
-			<div className="parallel-response-skeleton" style={{ width: '180px', height: '26px' }} />
-		) : (
-		<MultiModelSelector
+		<ModelSelector
 			providers={providers}
-			selectedModelId={state.selectedModelId ?? ''}
+			value={state.selectedModelId ?? ''}
+			onChange={(modelId) => service.setModel(modelId)}
 			selectedModels={state.selectedModels}
-			multiModelMode={state.multiModelMode}
-			layoutMode={state.layoutMode}
-			compareGroups={compareGroups}
-			activeCompareGroupId={state.activeCompareGroupId}
-			onSingleModelChange={(modelId) => service.setModel(modelId)}
 			onModelToggle={(tag) => {
 				if (state.selectedModels.includes(tag)) {
 					service.removeSelectedModel(tag);
@@ -208,18 +176,9 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 					service.addSelectedModel(tag);
 				}
 			}}
+			multiModelMode={state.multiModelMode}
 			onModeChange={(mode) => service.setMultiModelMode(mode)}
-			onLayoutChange={(mode) => service.setLayoutMode(mode)}
-			onCompareGroupSelect={(groupId) => {
-				service.setActiveCompareGroup(groupId);
-				if (groupId) {
-					const group = compareGroups.find((g) => g.id === groupId);
-					if (group) service.setSelectedModels(group.modelTags);
-				}
-			}}
-			onOpenGroupManager={() => setShowGroupManager(true)}
 		/>
-		)
 	);
 
 
@@ -284,7 +243,6 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 										title={state.activeSession?.messages.some((msg) => msg.role !== 'system') ? localInstance.chat_send_button_label : localInstance.chat_save_button_label}
 								>
 									<CornerDownLeft className="tw-size-4" />
-										<span className="tw-ml-1 tw-text-xs">{state.activeSession?.messages.some((msg) => msg.role !== 'system') ? localInstance.chat_send_button_label : localInstance.chat_save_button_label}</span>
 								</span>
 							</div>
 						</div>
@@ -337,7 +295,6 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 											title={localInstance.stop_all}
 										>
 											<StopCircle className="tw-size-4" />
-											<span className="tw-ml-1 tw-text-xs">{localInstance.stop_all}</span>
 										</span>
 										{multiModelProgress.errors > 0 && (
 											<span
@@ -360,7 +317,6 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 										title={localInstance.chat_stop_button_label}
 									>
 										<StopCircle className="tw-size-4" />
-										<span className="tw-ml-1 tw-text-xs">{localInstance.chat_stop_button_label}</span>
 									</span>
 								)}
 
@@ -396,17 +352,6 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 				onClose={closeSlashCommandMenu}
 			/>
 
-			{/* 管理弹窗 */}
-			<Suspense fallback={null}>
-				{showGroupManager && (
-					<CompareGroupManagerDialog
-						isOpen={showGroupManager}
-						onClose={() => setShowGroupManager(false)}
-						service={service}
-						providers={providers}
-					/>
-				)}
-			</Suspense>
 		</Fragment>
 	);
 };

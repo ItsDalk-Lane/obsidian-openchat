@@ -43,7 +43,6 @@ export const buildHistorySessionFrontmatter = (
 	contextNotes: session.contextNotes ?? [],
 	enableTemplateAsSystemPrompt: session.enableTemplateAsSystemPrompt ?? false,
 	multiModelMode: session.multiModelMode ?? 'single',
-	activeCompareGroupId: session.activeCompareGroupId,
 	layoutMode: session.layoutMode,
 	livePlan: clonePlanSnapshot(session.livePlan ?? null),
 	contextCompaction: session.contextCompaction ?? null,

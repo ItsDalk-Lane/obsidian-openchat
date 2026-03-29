@@ -87,7 +87,6 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 		state.selectedModelId = session.modelId || internals.settings.defaultModel || internals.service.getDefaultProviderTag();
 		const restored = internals.service.restoreMultiModelStateFromSession(session);
 		state.multiModelMode = restored.multiModelMode;
-		state.activeCompareGroupId = restored.activeCompareGroupId;
 		state.selectedModels = restored.selectedModels;
 		state.layoutMode = restored.layoutMode;
 		state.parallelResponses = undefined;
@@ -130,7 +129,7 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 	syncSessionMultiModelState(session = internals.stateStore.getMutableState().activeSession): void { getPersistenceFacade(internals).syncSessionMultiModelState(session); },
 	async persistActiveSessionMultiModelFrontmatter(): Promise<void> { await getPersistenceFacade(internals).persistActiveSessionMultiModelFrontmatter(); },
 	async persistSessionMultiModelFrontmatter(session: ChatSession): Promise<void> { await getPersistenceFacade(internals).persistSessionMultiModelFrontmatter(session); },
-	restoreMultiModelStateFromSession(session: ChatSession): { multiModelMode: MultiModelMode; activeCompareGroupId?: string; selectedModels: string[]; layoutMode: LayoutMode } { return getPersistenceFacade(internals).restoreMultiModelStateFromSession(session); },
+	restoreMultiModelStateFromSession(session: ChatSession): { multiModelMode: MultiModelMode; selectedModels: string[]; layoutMode: LayoutMode } { return getPersistenceFacade(internals).restoreMultiModelStateFromSession(session); },
 	bindLivePlanStateSync(): void { void internals.toolRuntimeResolver.ensureBuiltinToolsRuntime(internals.stateStore.getMutableState().activeSession).catch((error) => DebugLogger.warn('[ChatService] 初始化内置工具运行时失败', error)); },
 	async persistSessionContextCompactionFrontmatter(session: ChatSession): Promise<void> {
 		if (!internals.stateStore.getMutableState().shouldSaveHistory || !session.filePath) return;

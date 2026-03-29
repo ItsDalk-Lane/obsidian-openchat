@@ -152,7 +152,6 @@ export class ChatSessionManager {
 	 */
 	restoreMultiModelStateFromSession(session: ChatSession): {
 		multiModelMode: MultiModelMode;
-		activeCompareGroupId?: string;
 		selectedModels: string[];
 		layoutMode: LayoutMode;
 	} {
@@ -171,7 +170,6 @@ export class ChatSessionManager {
 
 		return {
 			multiModelMode,
-			activeCompareGroupId: session.activeCompareGroupId,
 			selectedModels: multiModelMode === 'single'
 				? [session.modelId || this.deps.getDefaultProviderTag() || ''].filter(Boolean)
 				: selectedModels,
@@ -188,7 +186,6 @@ export class ChatSessionManager {
 	): void {
 		if (!session) return;
 		session.multiModelMode = state.multiModelMode;
-		session.activeCompareGroupId = state.activeCompareGroupId;
 		session.layoutMode = state.layoutMode;
 	}
 
@@ -203,7 +200,6 @@ export class ChatSessionManager {
 		this.syncSessionMultiModelState(session, state);
 		await this.updateSessionFrontmatter(session.filePath, {
 			multiModelMode: session.multiModelMode ?? 'single',
-			activeCompareGroupId: session.activeCompareGroupId,
 			layoutMode: session.layoutMode ?? state.layoutMode
 		});
 	}

@@ -164,7 +164,6 @@ export const syncSessionMultiModelState = (
 		return;
 	}
 	session.multiModelMode = state.multiModelMode;
-	session.activeCompareGroupId = state.activeCompareGroupId;
 	session.layoutMode = state.layoutMode;
 };
 
@@ -187,7 +186,6 @@ export const persistSessionMultiModelFrontmatter = async (
 	}
 	await deps.sessionManager.updateSessionFrontmatter(session.filePath, {
 		multiModelMode: session.multiModelMode ?? 'single',
-		activeCompareGroupId: session.activeCompareGroupId,
 		layoutMode: session.layoutMode ?? deps.state.layoutMode,
 	});
 };
@@ -197,7 +195,6 @@ export const restoreMultiModelStateFromSession = (
 	session: ChatSession
 ): {
 	multiModelMode: MultiModelMode;
-	activeCompareGroupId?: string;
 	selectedModels: string[];
 	layoutMode: LayoutMode;
 } => {
@@ -218,7 +215,6 @@ export const restoreMultiModelStateFromSession = (
 
 	return {
 		multiModelMode,
-		activeCompareGroupId: session.activeCompareGroupId,
 		selectedModels: multiModelMode === 'single'
 			? [session.modelId || deps.getDefaultProviderTag() || ''].filter(Boolean)
 			: selectedModels,

@@ -142,7 +142,7 @@ export interface ChatSession {
 	systemPrompt?: string;
 	enableTemplateAsSystemPrompt?: boolean;
 	multiModelMode?: MultiModelMode;
-	activeCompareGroupId?: string;
+
 	layoutMode?: LayoutMode;
 	livePlan?: PlanSnapshot | null;
 	contextCompaction?: ChatContextCompactionState | null;
@@ -225,14 +225,12 @@ export interface ChatState {
 	shouldSaveHistory: boolean;
 	mcpToolMode: McpToolMode;
 	mcpSelectedServerIds: string[];
-	activeCompareGroupId?: string;
 	multiModelMode: MultiModelMode;
 	parallelResponses?: ParallelResponseGroup;
 	layoutMode: LayoutMode;
 }
 
 export type {
-	CompareGroup,
 	LayoutMode,
 	MultiModelMode,
 	ParallelResponseEntry,

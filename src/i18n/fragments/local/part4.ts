@@ -177,6 +177,7 @@ export interface LocalPart4 {
 	trigger_default_name: string;
 	trigger_startup_conditions: string;
 	trigger_section_title: string;
+	enable_multi_model: string;
 	multi_model_mode_single: string;
 	multi_model_mode_compare: string;
 	layout_horizontal: string;
@@ -185,13 +186,6 @@ export interface LocalPart4 {
 	selected_models: string;
 	no_models_selected: string;
 	tab_completion_failed_default_reason: string;
-	compare_group: string;
-	new_compare_group: string;
-	edit_compare_group: string;
-	delete_compare_group: string;
-	compare_group_name: string;
-	compare_group_description: string;
-	compare_group_models: string;
 	stop_all: string;
 	retry_failed: string;
 	generating_progress: string;
@@ -204,10 +198,6 @@ export interface LocalPart4 {
 	all_models_excluded: string;
 	partial_success: string;
 	retrying_failed: string;
-	select_compare_models: string;
-	no_compare_configs: string;
-	manage_compare_group: string;
-	compare_group_empty_state: string;
 	model_reasoning: string;
 	web_search: string;
 	clear_template: string;

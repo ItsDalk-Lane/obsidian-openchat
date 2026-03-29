@@ -12,7 +12,6 @@ import { MessageService } from './message-service';
 import { HistoryService } from './history-service';
 import { FileContentService } from './file-content-service';
 import type { MultiModelChatService } from './multi-model-chat-service';
-import type { MultiModelConfigService } from './multi-model-config-service';
 import { MessageContextOptimizer } from './message-context-optimizer';
 import { ChatStateStore } from './chat-state-store';
 import { ChatAttachmentSelectionService } from './chat-attachment-selection-service';
@@ -55,7 +54,6 @@ export interface ChatServiceInternals {
 	imageResolver: ChatImageResolver;
 	contextCompactionService: ChatContextCompactionService;
 	multiModelService: MultiModelChatService | null;
-	multiModelConfigService: MultiModelConfigService | null;
 	controller: AbortController | null;
 	ollamaCapabilityCache: Map<string, OllamaCapabilityCacheEntry>;
 	lastMcpNoticeAt: number;
@@ -93,7 +91,6 @@ export const createChatServiceInternals = (
 		shouldSaveHistory: true,
 		mcpToolMode: 'auto',
 		mcpSelectedServerIds: [],
-		activeCompareGroupId: undefined,
 		multiModelMode: 'single',
 		parallelResponses: undefined,
 		layoutMode: 'horizontal',
@@ -177,7 +174,6 @@ export const createChatServiceInternals = (
 		imageResolver,
 		contextCompactionService,
 		multiModelService: null,
-		multiModelConfigService: null,
 		controller: null,
 		ollamaCapabilityCache: new Map<string, OllamaCapabilityCacheEntry>(),
 		lastMcpNoticeAt: 0,
