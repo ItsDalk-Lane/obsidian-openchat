@@ -1,6 +1,6 @@
 import type { ProviderSettings, Vendor } from 'src/types/provider';
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors';
 import { getCapabilityDisplayText } from 'src/LLMProviders/utils';
-import { availableVendors } from 'src/settings/ai-runtime/api';
 import { ChevronDown } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';

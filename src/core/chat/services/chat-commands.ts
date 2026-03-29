@@ -1,4 +1,4 @@
-import { availableVendors } from 'src/settings/ai-runtime/api'
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors'
 import { localInstance } from 'src/i18n/locals'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import type { SubAgentScanResult } from 'src/tools/sub-agents/types'

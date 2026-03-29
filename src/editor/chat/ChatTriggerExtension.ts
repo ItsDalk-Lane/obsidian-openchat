@@ -1,7 +1,7 @@
 import { Extension } from '@codemirror/state';
 import { EditorView, ViewUpdate } from '@codemirror/view';
 import { TFile } from 'obsidian';
-import type { ChatSettings } from 'src/types/chat';
+import type { ChatSettings } from 'src/domains/chat/types';
 import { getTriggerSource, isToolbarVisibleGlobally } from 'src/editor/selectionToolbar/SelectionToolbarExtension';
 
 /**

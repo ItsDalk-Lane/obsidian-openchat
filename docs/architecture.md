@@ -83,7 +83,7 @@ src/providers/
 ├── obsidian-api.ts # Obsidian Vault/Workspace API 的类型安全薄封装
 ├── settings.ts # 全局设置的读写接口
 ├── event-bus.ts # 域间通信的事件总线
-└── providers.types.ts # Provider 接口定义
+└── providers.types.ts # Provider 接口定义（窄端口 + 兼容层）
 ```
 
 - 所有对 Obsidian API 的调用必须通过 providers/obsidian-api.ts
@@ -97,11 +97,44 @@ src/providers/
 - provider 实现允许依赖稳定的共享工具模块（如 src/utils/AIPathManager），
    但不得反向依赖 domains、core、commands 或其他 provider 实现
 
+#### 窄端口（Narrow Port）架构
+
+`providers.types.ts` 将宿主能力拆分为 13 个职责窄端口：
+
+| 端口 | 职责 |
+|------|------|
+| `NoticePort` | 用户通知 |
+| `SystemPromptPort` | 全局系统提示词构建 |
+| `VaultPathPort` | 路径归一化、目录管理 |
+| `VaultReadPort` | Vault 读取（文件、frontmatter、条目列表） |
+| `VaultWritePort` | Vault 写入与删除 |
+| `VaultWatchPort` | Vault 变更事件监听 |
+| `HttpRequestPort` | HTTP 请求 |
+| `YamlPort` | YAML 序列化与反序列化 |
+| `LocalStoragePort` | 本地存储读写 |
+| `SettingsNavigationPort` | 设置页跳转 |
+| `EditorInsertPort` | 编辑器文本插入 |
+| `MarkdownRenderPort` | Markdown 渲染 |
+| `InternalLinkPort` | 内部链接打开 |
+
+域消费者通过交叉类型组合仅所需的端口：
+
+```typescript
+// 示例：skills 域的 service 层仅需 3 个端口
+type SkillScannerHostPort = VaultPathPort & VaultReadPort & YamlPort;
+
+// 示例：editor 域仅需 2 个端口
+constructor(obsidianApi: NoticePort & SystemPromptPort)
+```
+
+`ObsidianApiProvider` 作为兼容层 `extends` 全部 13 个端口，已标记 `@deprecated`；
+新增域消费者应直接引用窄端口组合，不再使用 `ObsidianApiProvider`。
+
 ### 全仓纳管范围
 
 - 当前 lint-arch / lint-taste / arch.test 已纳管 `infra/` 与整个 `src/`
 - 不再使用“大面积默认 consumer”兜底；所有真实源码文件都必须命中显式类别：
-  - `module/root`：`src/main.ts`、`src/core/FeatureCoordinator.ts`、`src/core/PluginStartupCoordinator.ts`
+  - `module/root`：`src/main.ts`、`src/core/FeatureCoordinator.ts`、`src/core/PluginStartupCoordinator.ts`、`src/core/settings-adapter-assembly.ts`、`src/core/chat-assembler.ts`、`src/core/ai-runtime-assembler.ts`、`src/core/feature-query-facade.ts`
   - `module/command`：`src/commands/**`
   - `module/component`：`src/components/**`
   - `module/editor`：`src/editor/**`
@@ -111,8 +144,17 @@ src/providers/
   - `chat/*`：`src/core/chat/**` 与 `src/commands/chat/**` 中仍保留的 legacy chat 组合根/服务
   - `shim/*`：旧路径兼容出口，只允许 import/export/type alias
 - `src/domains/**` 继续作为最终目标形态；legacy 目录依然存在，但它们现在同样受全仓护栏约束
-- settings 域当前仍复用 `src/settings/ai-runtime` 与 `src/types/chat` 中的共享运行时类型，
-   这是迁移期的显式 shim；这类文件必须保持“仅转发、无业务逻辑”
+- settings 域现已拥有 ai-runtime 的真实类型与默认/归一化逻辑：
+  - `src/domains/settings/types-ai-runtime.ts`
+  - `src/domains/settings/config-ai-runtime.ts`
+  - `src/domains/settings/config-ai-runtime-vendors.ts`
+  legacy 兼容出口中，以下文件现为纯 shim（只允许 import/export/type alias）：
+  - `src/settings/ai-runtime/core.ts`
+  - `src/settings/ai-runtime/api.ts`
+  - `src/settings/ai-runtime/settings.ts`
+  - `src/types/chat.ts`
+  仓库内部生产代码已直接依赖 domains/settings 与 domains/chat 真源；
+  上述 shim 仅保留给兼容旧导入路径与专门的兼容测试
 - chat 域当前除共享类型、默认配置与纯 helper 外，新增承接了：
   - `src/domains/chat/ui-view-coordinator.ts`
   - `src/domains/chat/ui-view-coordinator-support.ts`
@@ -120,24 +162,59 @@ src/providers/
   旧的 `src/commands/chat/chat-view-coordinator.ts`、
   `src/commands/chat/chat-view-coordinator-ui.ts` 与
   `src/core/chat/utils/markdown.ts` 仅保留兼容 shim
+
+#### chat 域文件分层索引
+
+chat 域文件较多，按 service 职责分组如下，方便查找：
+
+| 分组 | 文件 | 核心职责 |
+| --- | --- | --- |
+| **域标准层** | types.ts, types-multi-model.ts, types-tools.ts, types-view-coordinator.ts | 纯数据结构 |
+| | config.ts | 默认值与归一化 |
+| | service.ts | 宿主端口契约与 pinned 检测 |
+| | ui.ts | 视图参数归一化（薄壳） |
+| **上下文压缩** | service-context-compaction.ts, service-context-compaction-range.ts, service-provider-message-compaction.ts | token 预算与摘要压缩 |
+| **历史管理** | service-history-parsing.ts, service-history-formatting.ts, service-history-summary.ts, service-history-summary-budget.ts, service-history-summary-shared.ts | 历史解析、格式化、摘要 |
+| **Provider 消息** | service-provider-message-context.ts, service-provider-message-support.ts | 组装 provider 请求 |
+| **其他 service** | service-attachment-selection.ts, service-content-blocks.ts, service-file-intent.ts, service-plan-prompts.ts, service-state-store.ts | 附件、内容块、意图识别、状态 |
+| **UI 协调器** | ui-view-coordinator.ts, ui-view-coordinator-support.ts, ui-markdown.ts | 视图生命周期与 Markdown 渲染 |
+
 - quick-actions 域当前已承接快捷操作的核心持久化与执行逻辑：
   - `src/domains/quick-actions/service-data.ts`
   - `src/domains/quick-actions/service-execution.ts`
+  - `src/domains/quick-actions/service-result.ts`
   - `src/domains/quick-actions/service-data-utils.ts`
   - `src/domains/quick-actions/service-group-helpers.ts`
+  其中 `service-data.ts` 与 `service-execution.ts` 对可预期错误使用 typed Result /
+  discriminated union（`QuickActionDataError`、`QuickActionExecutionError`）建模；
+  settings/editor 壳层现已优先消费 Result-first 入口
+  （如 `moveQuickActionToGroupResult()`、
+  `updateQuickActionGroupChildrenResult()`、
+  `executeQuickActionStreamResult()`）；
+  旧的 Promise/throw 语义仅由兼容包装层保留给 legacy public API
   editor 旧路径 `src/editor/selectionToolbar/QuickActionDataService.ts`、
   `src/editor/selectionToolbar/QuickActionExecutionService.ts`、
   `src/editor/selectionToolbar/quickActionDataUtils.ts` 与
   `src/editor/selectionToolbar/quickActionGroupHelpers.ts` 仅保留兼容 shim；
-  settings quick-actions 面板通过 `ObsidianApiProvider` 派生的 host adapter 获取通知与 Vault 读写能力
+  settings quick-actions 面板通过窄端口组合（`QuickActionDataHostPort`、`QuickActionExecutionHostPort`）获取通知与 Vault 读写能力
+  `quick-actions` 域当前无 ui.ts（Settings 面板与 editor 侧边栏均通过 legacy shim 对接，
+  详见对应 shim 路径）；待 settings/editor legacy 迁移完成后再补建 ui 层
 - settings 启动链路现已拆成 bootstrap 与 deferred hydrate 两阶段：
    `main.ts` 只负责注册、异步触发 bootstrap，真正的系统提示词迁移、MCP Markdown 同步、
    AI 数据目录整理与 MCP 初始化延后到 `onLayoutReady` 后的编排阶段执行
-- chat consumer 组合根现已通过 `ChatConsumerHost` 收敛宿主依赖：
-   `src/core/FeatureCoordinator.ts` 创建 host adapter，
-   `createChatServiceDeps()`、`ChatFeatureManager`、`ChatViewCoordinator` 与
-   `ChatEditorIntegration` 只接收最小接口，不再继续传递 `OpenChatPlugin`
-- AI runtime 命令层现已通过 `AiRuntimeCommandHost` 收敛状态栏、命令注册与 Notice，
+- `FeatureCoordinator` 已拆分为薄编排入口 + 三个独立模块：
+  - `ChatAssembler`（`src/core/chat-assembler.ts`）：构建 `ChatConsumerHost`、
+     管理早期视图注册与 `ChatFeatureManager` 完整生命周期
+  - `AiRuntimeAssembler`（`src/core/ai-runtime-assembler.ts`）：构建
+     `AiRuntimeCommandHost`、管理 `AiRuntimeCommandManager` 生命周期
+  - `FeatureQueryFacade`（`src/core/feature-query-facade.ts`）：聚合
+     skills / mcp / chat / tool 查询门面，持有 `ToolExecutorRegistry`
+   `FeatureCoordinator` 本身只负责：创建共享基础设施（`obsidianApiProvider`、
+   `SystemPromptAssembler`），持有域 runtime 协调器引用（`SkillsRuntimeCoordinator`、
+   `McpRuntimeCoordinator`），编排 initialize / refresh / dispose 顺序。
+   对外 API 保持兼容，消费者（`main.ts`、`PluginStartupCoordinator`、
+   `plugin-setting-host`）无需修改
+- AI runtime 命令层通过 `AiRuntimeCommandHost` 收敛状态栏、命令注册与 Notice，
    `AiRuntimeCommandManager` 不再直接持有 `Plugin`
 
 ## 机械化执行
@@ -191,6 +268,7 @@ describe('架构约束', () => {
 ```text
 main.ts
 ├── domains/settings/*        → bootstrap / merge / save / migrate 接缝
+│   └── core/settings-adapter-assembly.ts → 按端口契约装配 legacy 适配器
 ├── core/PluginStartupCoordinator.ts
 │   └── 编排 bootstrap settings、deferred hydrate、目录迁移与 MCP 初始化
 ├── core/FeatureCoordinator.ts
@@ -218,6 +296,7 @@ main.ts
 插件启动或用户保存设置
    → main.ts 先以 DEFAULT_SETTINGS 同步注册 chat view、设置页与 ai-runtime 命令
    → core/PluginStartupCoordinator.ts 触发 bootstrap settings 读取
+   → core/settings-adapter-assembly.ts 将 legacy 服务包装为端口契约注入 SettingsDomainService
    → domains/settings/service.ts 读取 data.json、解密 aiRuntime、裁剪 legacy 字段
    → main.ts 用 bootstrap settings 刷新 ai-runtime 运行时
    → core/FeatureCoordinator.ts 创建 ChatConsumerHost，并用最小宿主接口装配 chat 运行时
@@ -241,7 +320,11 @@ main.ts
    → providers/obsidian-api.ts 负责 Vault 目录读取、文件读取、YAML 解析与变更事件
 
 chat consumer / component 读取共享类型、默认设置、Markdown 渲染或图片意图识别逻辑
-   → src/types/chat.ts 与 legacy chat type/service shim 转发到 domains/chat
+   → 仓库内部生产代码直接依赖 domains/chat 真源；
+      `src/types/chat.ts` 仅保留兼容旧导入路径与兼容测试
+   → 由于 domains 不允许跨域直接互相 import，
+      `settings` / `quick-actions` 等域文件通过 `src/types/chat.ts` 这个纯 shim
+      共享 chat 契约；组件、编辑器、命令层与 core 仍直接依赖 domains/chat 真源
    → domains/chat/types.ts 提供稳定数据结构
    → domains/chat/config.ts 提供默认值与消息管理归一化
    → domains/chat/ui-markdown.ts 通过 ObsidianApiProvider 统一内部链接打开与 MarkdownRenderer
@@ -282,9 +365,23 @@ chat 构建 system prompt 或工具读取技能正文
 
 ## 事件注册表
 
-| 事件名             | 发布者 | 订阅者 | 数据类型 |
-| ------------------ | ------ | ------ | -------- |
-| （随项目演进填充） |        |        |          |
+### 自定义 EventBus（类型安全）
+
+| 事件名 | 发布者 | 订阅者 | 数据类型 |
+| --- | --- | --- | --- |
+| `editor.tab-completion.requested` | domains/editor/service.ts | （当前无订阅） | `{ requestId: string; providerTag: string }` |
+| `editor.tab-completion.completed` | domains/editor/service.ts | （当前无订阅） | `{ requestId: string; textLength: number }` |
+| `editor.tab-completion.failed` | domains/editor/service.ts | （当前无订阅） | `{ requestId: string; message: string }` |
+
+类型定义：`domains/editor/types.ts` (`EditorTabCompletionEvents`)
+总线实例创建：`commands/ai-runtime/AiRuntimeCommandManager.ts`
+
+### 状态存储事件（subscribe/emit 模式）
+
+| 存储 | 发布者 | 订阅者 |
+| --- | --- | --- |
+| ChatStateStore | domains/chat/service-state-store.ts | components/chat-components/ChatModal.tsx, ChatView.tsx, ChatPersistentModalApp.tsx, core/chat/services/chat-service-state-api.ts |
+| PlanState | tools/runtime/plan-state.ts | tools/runtime/BuiltinToolsRuntime.ts |
 
 ## 架构分析：第一性原理
 

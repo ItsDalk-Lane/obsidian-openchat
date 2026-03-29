@@ -1,7 +1,7 @@
 import { Loader2, X } from 'lucide-react';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import { getModelDisplayNameByTag } from 'src/core/chat/services/chat-provider-helpers';
-import { availableVendors } from 'src/settings/ai-runtime/api';
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors';
 import { localInstance } from 'src/i18n/locals';
 
 interface CompareTabBarProps {

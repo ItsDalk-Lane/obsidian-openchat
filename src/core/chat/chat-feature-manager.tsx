@@ -11,9 +11,11 @@ import type {
 	ChatServiceDeps,
 } from 'src/core/chat/services/chat-service-types';
 import { ChatViewCoordinator } from 'src/domains/chat/ui-view-coordinator';
+import type { ChatViewFactory } from 'src/domains/chat/types-view-coordinator';
+import type { ChatSettings } from 'src/domains/chat/types';
+import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime';
+import { buildChatViewFactory } from 'src/core/chat/chat-view-factory-builder';
 import { ChatEditorIntegration } from 'src/editor/chat/ChatEditorIntegration';
-import type { ChatSettings } from 'src/types/chat';
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api';
 
 export class ChatFeatureManager {
 	private readonly service: ChatService;
@@ -29,7 +31,8 @@ export class ChatFeatureManager {
 		existingViewCoordinator?: ChatViewCoordinator,
 	) {
 		this.service = existingService ?? new ChatService(serviceDeps);
-		this.viewCoordinator = existingViewCoordinator ?? new ChatViewCoordinator(host, this.service);
+		this.viewCoordinator = existingViewCoordinator
+			?? new ChatViewCoordinator(host, this.service, this.createViewFactory());
 		this.editorIntegration = new ChatEditorIntegration(host, this.service);
 	}
 
@@ -88,6 +91,10 @@ export class ChatFeatureManager {
 
 	openChatInPersistentModal(activeFile?: Parameters<ChatViewCoordinator['openChatInPersistentModal']>[0]): void {
 		this.viewCoordinator.openChatInPersistentModal(activeFile);
+	}
+
+	private createViewFactory(): ChatViewFactory {
+		return buildChatViewFactory(this.host, this.service);
 	}
 
 	dispose(): void {

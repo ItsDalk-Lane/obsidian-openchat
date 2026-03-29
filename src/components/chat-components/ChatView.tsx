@@ -4,7 +4,7 @@ import { createRoot, Root } from 'react-dom/client';
 import { ObsidianAppContext } from 'src/contexts/obsidianAppContext';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import type { ChatConsumerHost } from 'src/core/chat/services/chat-service-types';
-import type { ChatState } from 'src/types/chat';
+import type { ChatState } from 'src/domains/chat/types';
 import { ChatPlanPanel } from './ChatPlanPanel';
 import { ChatMessages } from './ChatMessages';
 import { ChatControls } from './ChatControls';

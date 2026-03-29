@@ -1,7 +1,7 @@
 import type { QuickActionDataService } from 'src/domains/quick-actions/service-data'
+import type { QuickAction, QuickActionType } from 'src/domains/chat/types'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { localInstance } from 'src/i18n/locals'
-import type { QuickAction, QuickActionType } from 'src/types/chat'
 import type { QuickActionEditModalOptions } from './types'
 
 interface QuickActionGroupMembersSectionParams {

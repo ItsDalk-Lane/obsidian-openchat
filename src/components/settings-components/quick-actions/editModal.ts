@@ -1,7 +1,7 @@
 import { formatProviderOptionLabel } from 'src/components/chat-components/chatSettingsHelpers'
+import type { QuickAction, QuickActionType } from 'src/domains/chat/types'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { localInstance } from 'src/i18n/locals'
-import type { QuickAction, QuickActionType } from 'src/types/chat'
 import type { QuickActionEditModalContext, QuickActionEditModalOptions } from './types'
 import { createQuickActionGroupMembersSection } from './editModalGroupMembers'
 import { saveQuickActionFromEditModal } from './editModalSave'

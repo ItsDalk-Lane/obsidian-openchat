@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useCallback, useState } from 'react';
-import type { ChatState, ChatMessage } from 'src/types/chat';
+import type { ChatMessage, ChatState } from 'src/domains/chat/types';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import { MessageItem } from './MessageItem';
 import { ParallelResponseViewer } from './ParallelResponseViewer';

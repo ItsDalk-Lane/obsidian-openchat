@@ -1,6 +1,6 @@
 import { localInstance } from 'src/i18n/locals';
+import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api';
 import type { McpSettings } from 'src/types/mcp';
 import type { ChatSession } from '../types/chat';
 import type { SavedChatSessionState } from './chat-service-types';

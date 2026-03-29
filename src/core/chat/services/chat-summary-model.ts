@@ -1,4 +1,4 @@
-import { availableVendors } from 'src/settings/ai-runtime/api';
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors';
 import type { ProviderSettings, ResolveEmbedAsBinary } from 'src/types/provider';
 
 interface RunSummaryModelRequestParams {

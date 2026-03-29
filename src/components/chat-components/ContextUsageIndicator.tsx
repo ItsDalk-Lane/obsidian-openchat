@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
-import type { ChatMessage, ChatSession } from 'src/types/chat';
+import type { ChatMessage, ChatSession } from 'src/domains/chat/types';
 import type { ProviderSettings } from 'src/types/provider';
 import { resolveContextBudget } from 'src/core/chat/utils/context-budget';
 import { countMessageTokens, countTextTokens } from 'src/core/chat/utils/token';

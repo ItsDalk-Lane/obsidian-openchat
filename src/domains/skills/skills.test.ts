@@ -10,13 +10,14 @@ import {
 	stripSkillFrontmatter,
 } from './service';
 import { SkillsRuntimeCoordinator } from './ui';
-import type { ObsidianApiProvider, VaultChangeEvent, VaultEntry } from 'src/providers/providers.types';
+import type { VaultChangeEvent, VaultEntry } from 'src/providers/providers.types';
+import type { SkillsRuntimeHostPort } from './ui';
 
 function createFakeProvider(options?: {
 	folders?: Record<string, readonly VaultEntry[]>;
 	files?: Record<string, string>;
 	readDelayMs?: number;
-}): ObsidianApiProvider & {
+}): SkillsRuntimeHostPort & {
 	triggerVaultChange(event: VaultChangeEvent): void;
 	setFolderEntries(path: string, entries: readonly VaultEntry[]): void;
 	setFile(path: string, content: string): void;
@@ -29,19 +30,14 @@ function createFakeProvider(options?: {
 	const readCounts = new Map<string, number>();
 	let failYaml = false;
 	return {
-		notify(): void {},
-		async buildGlobalSystemPrompt(): Promise<string> { return ''; },
 		normalizePath(path: string): string { return path.replace(/\\/gu, '/').replace(/\/+/gu, '/'); },
 		async ensureAiDataFolders(): Promise<void> {},
 		async ensureVaultFolder(folderPath: string): Promise<string> { return folderPath; },
-		async requestHttp() {
-			return { status: 200, text: '', headers: {} };
+		getVaultName(): string {
+			return 'vault';
 		},
 		getVaultEntry() {
 			return null;
-		},
-		getVaultName(): string {
-			return 'vault';
 		},
 		getActiveFilePath(): string | null {
 			return null;
@@ -73,9 +69,6 @@ function createFakeProvider(options?: {
 		async readVaultBinary(): Promise<ArrayBuffer> {
 			return new Uint8Array().buffer;
 		},
-		async writeVaultFile(): Promise<void> {},
-		async writeVaultBinary(): Promise<void> {},
-		async deleteVaultPath(): Promise<void> {},
 		parseYaml(content: string): unknown {
 			if (failYaml) {
 				failYaml = false;
@@ -88,14 +81,6 @@ function createFakeProvider(options?: {
 		},
 		stringifyYaml(): string {
 			return '';
-		},
-		readLocalStorage(): string | null {
-			return null;
-		},
-		writeLocalStorage(): void {},
-		openSettingsTab(): void {},
-		insertTextIntoMarkdownEditor() {
-			return { inserted: false };
 		},
 		onVaultChange(listener): () => void {
 			listeners.add(listener);

@@ -1,5 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import type {
+	ChatMessage,
+	ChatSession,
+} from 'src/domains/chat/types';
+import type {
 	ToolCallRequest,
 	ToolCallResult,
 	ToolDefinition,
@@ -7,7 +11,6 @@ import type {
 	ToolExecutionRecord,
 	ToolExecutor,
 } from 'src/types/tool';
-import type { ChatMessage, ChatSession } from 'src/types/chat';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { SubAgentScannerService } from './SubAgentScannerService';
 import type {

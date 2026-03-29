@@ -1,16 +1,16 @@
-import type { QuickAction, QuickActionType } from 'src/types/chat';
+import type {
+	QuickAction,
+	QuickActionType,
+	QuickActionYamlParser,
+	QuickActionYamlStringifier,
+	RawQuickAction,
+} from './types';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 
 export const FRONTMATTER_DELIMITER = '---';
 
-export type QuickActionYamlParser = (content: string) => unknown;
-export type QuickActionYamlStringifier = (content: unknown) => string;
-
-export interface RawQuickAction extends Partial<QuickAction> {
-	skillType?: QuickActionType;
-	isSkillGroup?: boolean;
-}
+export type { QuickActionYamlParser, QuickActionYamlStringifier, RawQuickAction };
 
 export const isNonEmptyString = (value: unknown): value is string => {
 	return typeof value === 'string' && value.trim().length > 0;

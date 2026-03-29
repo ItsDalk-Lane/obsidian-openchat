@@ -10,8 +10,13 @@ import {
 	type SetStateAction,
 } from 'react'
 import type { App } from 'obsidian'
+import {
+	DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
+	normalizeMessageManagementSettings,
+} from 'src/domains/chat/config'
+import type { ChatSettings } from 'src/domains/chat/types'
+import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime'
 import { localInstance } from 'src/i18n/locals'
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api'
 import type { SkillScanResult } from 'src/domains/skills/types'
 import type { SubAgentScanResult } from 'src/tools/sub-agents/types'
 import { BUILTIN_SERVER_ID } from 'src/tools/runtime/constants'
@@ -24,11 +29,6 @@ import {
 	type McpToolInfo,
 } from 'src/services/mcp/types'
 import { McpImportModal, McpServerEditModal } from 'src/services/mcp/McpConfigModals'
-import {
-	DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
-	normalizeMessageManagementSettings,
-	type ChatSettings,
-} from 'src/types/chat'
 import { formatProviderOptionLabel } from './chatSettingsHelpers'
 import type { ChatService } from 'src/core/chat/services/chat-service'
 import type { ExternalMcpEntry, ProviderOption } from './chatSettingsTypes'

@@ -10,6 +10,7 @@ import './styles/chat.css';
 import { PluginSettingsController } from 'src/domains/settings/ui';
 import { PluginStartupCoordinator } from './core/PluginStartupCoordinator';
 import { createObsidianApiProvider } from 'src/providers/obsidian-api';
+import { assembleSettingsDomainPorts } from './core/settings-adapter-assembly';
 
 export default class OpenChatPlugin extends Plugin {
 	settings: PluginSettings = DEFAULT_SETTINGS;
@@ -19,9 +20,12 @@ export default class OpenChatPlugin extends Plugin {
 	private bootstrapSettingsPromise: Promise<PluginSettings> | null = null;
 	private settingTab: PluginSettingTab | null = null;
 	private settingsDomainService = new SettingsDomainService(
-		this,
-		this.bootstrapObsidianApiProvider,
-		DebugLogger,
+		assembleSettingsDomainPorts({
+			app: this.app,
+			plugin: this,
+			obsidianApi: this.bootstrapObsidianApiProvider,
+			logger: DebugLogger,
+		}),
 	);
 	private settingsController = new PluginSettingsController(
 		this.settingsDomainService,

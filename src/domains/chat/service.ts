@@ -8,12 +8,19 @@
  */
 
 import type {
+	HttpRequestPort,
 	HttpRequestOptions,
 	HttpResponseData,
-	ObsidianApiProvider,
+	NoticePort,
+	SystemPromptPort,
 	VaultChangeEvent,
 	VaultEntry,
+	VaultPathPort,
+	VaultReadPort,
 	VaultStat,
+	VaultWatchPort,
+	VaultWritePort,
+	YamlPort,
 } from 'src/providers/providers.types';
 import type { ChatMessage } from './types';
 
@@ -81,7 +88,10 @@ export interface ChatHostPorts {
 	vault: ChatVaultPort;
 }
 
-export function createChatVaultPort(provider: ObsidianApiProvider): ChatVaultPort {
+/** createChatVaultPort 所需的最小宿主能力 */
+type ChatVaultProviderPort = VaultReadPort & VaultWritePort & VaultPathPort & VaultWatchPort;
+
+export function createChatVaultPort(provider: ChatVaultProviderPort): ChatVaultPort {
 	return {
 		getEntry: (path) => provider.getVaultEntry(path),
 		exists: (path) => provider.pathExists(path),
@@ -97,7 +107,12 @@ export function createChatVaultPort(provider: ObsidianApiProvider): ChatVaultPor
 	};
 }
 
-export function createChatHostPorts(provider: ObsidianApiProvider): ChatHostPorts {
+/** createChatHostPorts 所需的最小宿主能力 */
+export type ChatHostProviderPort =
+	NoticePort & SystemPromptPort & VaultPathPort & VaultReadPort &
+	VaultWritePort & VaultWatchPort & HttpRequestPort & YamlPort;
+
+export function createChatHostPorts(provider: ChatHostProviderPort): ChatHostPorts {
 	return {
 		notify: (message, timeout) => provider.notify(message, timeout),
 		buildGlobalSystemPrompt: (featureId) => provider.buildGlobalSystemPrompt(featureId),

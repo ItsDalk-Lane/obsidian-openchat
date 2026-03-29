@@ -1,7 +1,9 @@
 import { Check, Copy, PenSquare, RotateCw, TextCursorInput, Trash2, X, Highlighter, StopCircle, Pin } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useObsidianApp } from 'src/contexts/obsidianAppContext';
-import type { ChatMessage, ChatMessageMetadata } from 'src/types/chat';
+import type { ChatMessage, ChatMessageMetadata } from 'src/domains/chat/types';
+import { isPinnedChatMessage } from 'src/domains/chat/service';
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors';
 import type { ChatService } from 'src/core/chat/services/chat-service';
 import { getModelDisplayNameByTag } from 'src/core/chat/services/chat-provider-helpers';
 import { MessageService } from 'src/core/chat/services/message-service';
@@ -9,13 +11,11 @@ import { createObsidianApiProvider } from 'src/providers/obsidian-api';
 import {
 	parseContentBlocks,
 	type ContentBlock,
-} from 'src/domains/chat/ui-markdown';
+} from 'src/domains/chat/service-content-blocks';
 import { getEditableUserMessageContent } from 'src/core/chat/utils/user-message-editing';
 import { ModelTag } from './ModelTag';
-import { availableVendors } from 'src/settings/ai-runtime/api';
 import { countMessageTokens, formatTokenCount } from 'src/core/chat/utils/token';
 import { localInstance } from 'src/i18n/locals';
-import { isPinnedChatMessage } from 'src/types/chat';
 import { SkillCallBlock } from './SkillCallBlock';
 import { SubAgentMessageFold } from './SubAgentMessageFold';
 import { DebugLogger } from 'src/utils/DebugLogger';

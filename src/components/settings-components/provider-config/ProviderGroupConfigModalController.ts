@@ -1,8 +1,8 @@
 import { App, Setting } from 'obsidian';
 import { SelectModelModal } from 'src/components/modals/AiRuntimeProviderModals';
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors';
 import { ollamaVendor } from 'src/LLMProviders/ollama';
 import { t } from 'src/i18n/ai-runtime/helper';
-import { availableVendors } from 'src/settings/ai-runtime/api';
 import type { BaseOptions, ProviderSettings, Vendor } from 'src/types/provider';
 import {
 	createProviderGroupId,

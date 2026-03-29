@@ -1,25 +1,4 @@
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
-import {
-	formatMcpToolBlock,
-	parseContentBlocks,
-} from 'src/domains/chat/service-content-blocks';
-import type {
-	ContentBlock,
-	McpToolBlock,
-	ReasoningBlock,
-	TextBlock,
-} from 'src/domains/chat/service-content-blocks';
-
-export type {
-	ContentBlock,
-	McpToolBlock,
-	ReasoningBlock,
-	TextBlock,
-};
-export {
-	formatMcpToolBlock,
-	parseContentBlocks,
-};
 
 type ChatMarkdownContainer = HTMLElement & {
 	__ffInternalLinkClickHandler?: (event: MouseEvent) => void;

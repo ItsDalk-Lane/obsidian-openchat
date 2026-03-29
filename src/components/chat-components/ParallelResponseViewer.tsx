@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { StopCircle, RotateCw, AlertTriangle } from 'lucide-react';
 import { Component } from 'obsidian';
-import type { ChatMessage } from 'src/types/chat';
+import type { ChatMessage } from 'src/domains/chat/types';
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors';
 import type { LayoutMode, ParallelResponseGroup } from 'src/core/chat/types/multiModel';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import { getModelDisplayNameByTag } from 'src/core/chat/services/chat-provider-helpers';
 import { ModelTag } from './ModelTag';
 import {
-	renderMarkdownContent,
 	parseContentBlocks,
 	type ContentBlock,
-} from 'src/domains/chat/ui-markdown';
-import { availableVendors } from 'src/settings/ai-runtime/api';
+} from 'src/domains/chat/service-content-blocks';
+import { renderMarkdownContent } from 'src/domains/chat/ui-markdown';
 import { localInstance } from 'src/i18n/locals';
 
 interface ParallelResponseViewerProps {

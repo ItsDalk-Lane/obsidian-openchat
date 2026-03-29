@@ -1,12 +1,22 @@
-import type { ObsidianApiProvider, VaultEntry } from 'src/providers/providers.types';
-import type { QuickAction } from 'src/types/chat';
+import type { VaultPathPort, VaultReadPort, VaultWritePort, YamlPort } from 'src/providers/providers.types';
 import { DebugLogger } from 'src/utils/DebugLogger';
+import {
+	err,
+	ok,
+	unwrapQuickActionResult,
+} from './service-result';
+import type {
+	QuickAction,
+	QuickActionDataError,
+	QuickActionDataRuntimePort,
+	QuickActionResult,
+	RawQuickAction,
+} from './types';
 import {
 	buildMarkdownRecord,
 	isNonEmptyString,
 	normalizeQuickActions,
 	parseMarkdownRecord,
-	type RawQuickAction,
 } from './service-data-utils';
 import {
 	getNestingLevelSync,
@@ -14,31 +24,29 @@ import {
 	removeFromAllGroupsSync,
 	reorderTopLevelQuickActionsSync,
 } from './service-group-helpers';
+import {
+	createCycleDetectedError,
+	createDescendantTargetError,
+	createInvalidGroupTargetError,
+	createMaxDepthExceededError,
+	createSelfTargetError,
+	createStorageFolderMissingError,
+	getQuickActionIdFromPath,
+	getQuickActionsPath,
+	isMarkdownEntry,
+} from './service-data-support';
 
-export interface QuickActionDataRuntimePort {
-	getAiDataFolder(): string;
-	syncRuntimeQuickActions(quickActions: QuickAction[]): void;
-}
+export type { QuickActionDataRuntimePort } from './types';
 
-const QUICK_ACTIONS_SUBFOLDER = 'quick-actions';
-const getQuickActionIdFromPath = (filePath: string): string =>
-	filePath.split('/').pop()?.replace(/\.md$/u, '') ?? filePath;
-const getQuickActionsPath = (
-	obsidianApi: ObsidianApiProvider,
-	aiDataFolder: string,
-): string => obsidianApi.normalizePath(
-		`${aiDataFolder.replace(/[\\/]+$/gu, '')}/${QUICK_ACTIONS_SUBFOLDER}`,
-	);
-
-const isMarkdownEntry = (entry: VaultEntry): boolean =>
-	entry.kind === 'file' && entry.path.endsWith('.md');
+/** QuickActionDataService 所需的最小宿主能力 */
+export type QuickActionDataHostPort = VaultPathPort & VaultReadPort & VaultWritePort & YamlPort;
 
 export class QuickActionDataService {
 	private quickActionsCache: QuickAction[] | null = null;
 	private initializePromise: Promise<void> | null = null;
 
 	constructor(
-		private readonly obsidianApi: ObsidianApiProvider,
+		private readonly obsidianApi: QuickActionDataHostPort,
 		private readonly runtimePort: QuickActionDataRuntimePort,
 	) {}
 
@@ -133,45 +141,49 @@ export class QuickActionDataService {
 		targetGroupId: string | null,
 		position?: number,
 	): Promise<void> {
+		unwrapQuickActionResult(
+			await this.moveQuickActionToGroupResult(quickActionId, targetGroupId, position),
+		);
+	}
+
+	async moveQuickActionToGroupResult(
+		quickActionId: string,
+		targetGroupId: string | null,
+		position?: number,
+	): Promise<QuickActionResult<void, QuickActionDataError>> {
 		await this.initialize();
 		const quickActions = this.quickActionsCache || [];
 		const byId = new Map(quickActions.map((quickAction) => [quickAction.id, quickAction] as const));
 		const quickAction = byId.get(quickActionId);
 		if (!quickAction) {
-			return;
+			return ok(undefined);
 		}
 
 		const subtreeDepth = getSubtreeMaxRelativeDepthSync(quickActionId, quickActions);
+		let targetGroup: QuickAction | null = null;
 		if (targetGroupId !== null) {
-			const targetGroup = byId.get(targetGroupId);
-			if (!targetGroup || !targetGroup.isActionGroup) {
-				throw new Error('目标不是有效的操作组');
+			const validatedTarget = await this.validateMoveTarget(
+				quickActionId,
+				targetGroupId,
+				subtreeDepth,
+				quickActions,
+				byId,
+			);
+			if (!validatedTarget.ok) {
+				return validatedTarget;
 			}
-			if (targetGroupId === quickActionId) {
-				throw new Error('不能将操作组移动到自身内部');
-			}
-			const descendants = await this.getAllDescendants(quickActionId);
-			if (descendants.some((item) => item.id === targetGroupId)) {
-				throw new Error('不能将操作组移动到其后代内部');
-			}
-
-			const targetLevel = getNestingLevelSync(targetGroupId, quickActions) + 1;
-			if (targetLevel + subtreeDepth > 2) {
-				throw new Error('最多支持 3 层嵌套');
-			}
+			targetGroup = validatedTarget.value;
 		}
 
 		removeFromAllGroupsSync(quickActionId, quickActions);
 		if (targetGroupId === null) {
 			await reorderTopLevelQuickActionsSync(quickActions, quickActionId, position);
 			this.quickActionsCache = quickActions;
-			await this.persistQuickActions();
-			return;
+			return await this.persistQuickActionsResult();
 		}
 
-		const targetGroup = byId.get(targetGroupId);
 		if (!targetGroup || !targetGroup.isActionGroup) {
-			throw new Error('目标不是有效的操作组');
+			return err(createInvalidGroupTargetError(targetGroupId));
 		}
 
 		const children = [...(targetGroup.children ?? [])].filter((id) => id !== quickActionId);
@@ -184,15 +196,27 @@ export class QuickActionDataService {
 
 		await reorderTopLevelQuickActionsSync(quickActions);
 		this.quickActionsCache = quickActions;
-		await this.persistQuickActions();
+		return await this.persistQuickActionsResult();
 	}
 
-	async updateQuickActionGroupChildren(groupId: string, childrenIds: string[]): Promise<void> {
+	async updateQuickActionGroupChildren(
+		groupId: string,
+		childrenIds: string[],
+	): Promise<void> {
+		unwrapQuickActionResult(
+			await this.updateQuickActionGroupChildrenResult(groupId, childrenIds),
+		);
+	}
+
+	async updateQuickActionGroupChildrenResult(
+		groupId: string,
+		childrenIds: string[],
+	): Promise<QuickActionResult<void, QuickActionDataError>> {
 		await this.initialize();
 		const quickActions = this.quickActionsCache || [];
 		const group = quickActions.find((quickAction) => quickAction.id === groupId);
 		if (!group || !group.isActionGroup) {
-			throw new Error('目标不是有效的操作组');
+			return err(createInvalidGroupTargetError(groupId));
 		}
 
 		const byId = new Map(quickActions.map((quickAction) => [quickAction.id, quickAction] as const));
@@ -210,18 +234,18 @@ export class QuickActionDataService {
 		for (const childId of normalized) {
 			const childDescendants = await this.getAllDescendants(childId);
 			if (childDescendants.some((quickAction) => quickAction.id === groupId)) {
-				throw new Error('操作组 children 存在循环引用');
+				return err(createCycleDetectedError(groupId, childId));
 			}
 			const childSubtreeDepth = getSubtreeMaxRelativeDepthSync(childId, quickActions);
 			if (groupLevel + 1 + childSubtreeDepth > 2) {
-				throw new Error('最多支持 3 层嵌套');
+				return err(createMaxDepthExceededError(childId, groupId));
 			}
 		}
 
 		group.children = normalized;
 		group.updatedAt = Date.now();
 		this.quickActionsCache = quickActions;
-		await this.persistQuickActions();
+		return await this.persistQuickActionsResult();
 	}
 
 	async getNestingLevel(quickActionId: string): Promise<number> {
@@ -242,7 +266,7 @@ export class QuickActionDataService {
 		}
 
 		this.quickActionsCache = quickActions;
-		await this.persistQuickActions();
+		await this.persistQuickActionsOrThrow();
 	}
 
 	async deleteQuickAction(id: string): Promise<void> {
@@ -256,7 +280,7 @@ export class QuickActionDataService {
 		const deletedQuickAction = quickActions.splice(index, 1)[0];
 		DebugLogger.debug('[QuickActionDataService] 删除操作', deletedQuickAction.name);
 		this.quickActionsCache = quickActions;
-		await this.persistQuickActions();
+		await this.persistQuickActionsOrThrow();
 	}
 
 	async updateQuickActionsOrder(orderedIds: string[]): Promise<void> {
@@ -269,7 +293,7 @@ export class QuickActionDataService {
 			}
 		});
 		this.quickActionsCache = quickActions;
-		await this.persistQuickActions();
+		await this.persistQuickActionsOrThrow();
 		DebugLogger.debug('[QuickActionDataService] 更新操作排序');
 	}
 
@@ -283,7 +307,7 @@ export class QuickActionDataService {
 		quickAction.showInToolbar = showInToolbar;
 		quickAction.updatedAt = Date.now();
 		this.quickActionsCache = quickActions;
-		await this.persistQuickActions();
+		await this.persistQuickActionsOrThrow();
 		DebugLogger.debug(
 			'[QuickActionDataService] 更新操作显示状态',
 			quickAction.name,
@@ -302,11 +326,12 @@ export class QuickActionDataService {
 
 	private async loadQuickActions(): Promise<void> {
 		try {
-			const folderPath = await this.getStorageFolderPath();
-			if (!folderPath) {
+			const folderPathResult = await this.getStorageFolderPathResult();
+			if (!folderPathResult.ok) {
 				this.quickActionsCache = [];
 				return;
 			}
+			const folderPath = folderPathResult.value;
 
 			const files = this.listMarkdownFiles(folderPath);
 			const loaded: RawQuickAction[] = [];
@@ -346,11 +371,14 @@ export class QuickActionDataService {
 		}
 	}
 
-	private async persistQuickActions(): Promise<void> {
-		const folderPath = await this.getStorageFolderPath();
-		if (!folderPath) {
-			throw new Error('无法解析 AI 数据目录，无法保存快捷操作');
+	private async persistQuickActionsResult(): Promise<
+		QuickActionResult<void, QuickActionDataError>
+	> {
+		const folderPathResult = await this.getStorageFolderPathResult();
+		if (!folderPathResult.ok) {
+			return folderPathResult;
 		}
+		const folderPath = folderPathResult.value;
 
 		const normalizedCache = normalizeQuickActions(this.quickActionsCache || []);
 		const expectedPaths = new Set<string>();
@@ -402,17 +430,52 @@ export class QuickActionDataService {
 		this.quickActionsCache = normalizedCache;
 		this.runtimePort.syncRuntimeQuickActions(normalizedCache);
 		DebugLogger.debug('[QuickActionDataService] 快捷操作已同步到 Markdown 文件');
+		return ok(undefined);
 	}
 
-	private async getStorageFolderPath(): Promise<string | null> {
+	private async persistQuickActionsOrThrow(): Promise<void> {
+		unwrapQuickActionResult(await this.persistQuickActionsResult());
+	}
+
+	private async getStorageFolderPathResult(): Promise<
+		QuickActionResult<string, QuickActionDataError>
+	> {
 		const aiDataFolder = this.runtimePort.getAiDataFolder().trim();
 		if (!aiDataFolder) {
 			DebugLogger.warn('[QuickActionDataService] AI 数据目录未配置，回退为空');
-			return null;
+			return err(createStorageFolderMissingError(aiDataFolder));
 		}
 
 		await this.obsidianApi.ensureAiDataFolders(aiDataFolder);
-		return getQuickActionsPath(this.obsidianApi, aiDataFolder);
+		return ok(getQuickActionsPath(this.obsidianApi, aiDataFolder));
+	}
+
+	private async validateMoveTarget(
+		quickActionId: string,
+		targetGroupId: string,
+		subtreeDepth: number,
+		quickActions: QuickAction[],
+		byId: Map<string, QuickAction>,
+	): Promise<QuickActionResult<QuickAction, QuickActionDataError>> {
+		const targetGroup = byId.get(targetGroupId);
+		if (!targetGroup || !targetGroup.isActionGroup) {
+			return err(createInvalidGroupTargetError(targetGroupId));
+		}
+		if (targetGroupId === quickActionId) {
+			return err(createSelfTargetError(quickActionId));
+		}
+
+		const descendants = await this.getAllDescendants(quickActionId);
+		if (descendants.some((item) => item.id === targetGroupId)) {
+			return err(createDescendantTargetError(quickActionId, targetGroupId));
+		}
+
+		const targetLevel = getNestingLevelSync(targetGroupId, quickActions) + 1;
+		if (targetLevel + subtreeDepth > 2) {
+			return err(createMaxDepthExceededError(quickActionId, targetGroupId));
+		}
+
+		return ok(targetGroup);
 	}
 
 	private listMarkdownFiles(folderPath: string): string[] {

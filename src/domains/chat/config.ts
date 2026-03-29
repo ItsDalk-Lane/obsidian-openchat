@@ -9,6 +9,9 @@
 
 import type { ChatSettings, MessageManagementSettings } from './types';
 
+export const VIEW_TYPE_CHAT_SIDEBAR = 'form-chat-sidebar';
+export const VIEW_TYPE_CHAT_TAB = 'form-chat-tab';
+
 export const DEFAULT_MESSAGE_MANAGEMENT_SETTINGS: MessageManagementSettings = {
 	enabled: true,
 	recentTurns: 1,

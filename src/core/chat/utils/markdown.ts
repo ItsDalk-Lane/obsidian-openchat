@@ -3,10 +3,12 @@ export type {
 	McpToolBlock,
 	ReasoningBlock,
 	TextBlock,
-} from 'src/domains/chat/ui-markdown';
+} from 'src/domains/chat/service-content-blocks';
 export {
-	attachChatInternalLinkHandler,
 	formatMcpToolBlock,
 	parseContentBlocks,
+} from 'src/domains/chat/service-content-blocks';
+export {
+	attachChatInternalLinkHandler,
 	renderMarkdownContent,
 } from 'src/domains/chat/ui-markdown';

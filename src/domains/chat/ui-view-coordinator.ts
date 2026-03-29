@@ -1,14 +1,12 @@
 import type { TFile, WorkspaceLeaf } from 'obsidian';
-import { ChatService } from 'src/core/chat/services/chat-service';
-import type { ChatConsumerHost } from 'src/core/chat/services/chat-service-types';
-import {
-	ChatView,
-	VIEW_TYPE_CHAT_SIDEBAR,
-	VIEW_TYPE_CHAT_TAB,
-} from 'src/components/chat-components/ChatView';
-import { ChatModal } from 'src/components/chat-components/ChatModal';
-import { ChatPersistentModal } from 'src/components/chat-components/ChatPersistentModal';
-import type { ChatOpenMode } from 'src/types/chat';
+import type { ChatOpenMode } from './types';
+import type {
+	ChatViewCoordinatorServicePort,
+	ChatViewCoordinatorHost,
+	ChatViewFactory,
+	ChatPersistentModalHandle,
+} from './types-view-coordinator';
+import { VIEW_TYPE_CHAT_SIDEBAR, VIEW_TYPE_CHAT_TAB } from './config';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import {
@@ -17,13 +15,14 @@ import {
 } from './ui-view-coordinator-support';
 
 export class ChatViewCoordinator {
-	private persistentModal: ChatPersistentModal | null = null;
+	private persistentModal: ChatPersistentModalHandle | null = null;
 	private ribbonEl: HTMLElement | null = null;
 	private viewTypesRegistered = false;
 
 	constructor(
-		private readonly host: ChatConsumerHost,
-		private readonly service: ChatService,
+		private readonly host: ChatViewCoordinatorHost,
+		private readonly service: ChatViewCoordinatorServicePort,
+		private readonly viewFactory: ChatViewFactory,
 	) {}
 
 	registerViewTypesOnly(): void {
@@ -105,7 +104,7 @@ export class ChatViewCoordinator {
 			return;
 		}
 
-		const modal = new ChatModal(this.host.app, this.service, {
+		const modal = this.viewFactory.createModal({
 			width: settings.chatModalWidth ?? 700,
 			height: settings.chatModalHeight ?? 500,
 			activeFile: file,
@@ -126,7 +125,7 @@ export class ChatViewCoordinator {
 		const settings = this.host.getChatSettings();
 		const file = activeFile ?? this.host.getActiveMarkdownFile();
 
-		this.persistentModal = new ChatPersistentModal(this.host.app, this.host, this.service, {
+		this.persistentModal = this.viewFactory.createPersistentModal({
 			width: settings.chatModalWidth ?? 700,
 			height: settings.chatModalHeight ?? 500,
 			activeFile: file,
@@ -172,11 +171,11 @@ export class ChatViewCoordinator {
 	private registerViews(): void {
 		this.host.registerView(
 			VIEW_TYPE_CHAT_SIDEBAR,
-			(leaf) => new ChatView(leaf, this.host, this.service, 'sidebar', VIEW_TYPE_CHAT_SIDEBAR),
+			(leaf) => this.viewFactory.createSidebarView(leaf),
 		);
 		this.host.registerView(
 			VIEW_TYPE_CHAT_TAB,
-			(leaf) => new ChatView(leaf, this.host, this.service, 'tab', VIEW_TYPE_CHAT_TAB),
+			(leaf) => this.viewFactory.createTabView(leaf),
 		);
 	}
 

@@ -26,7 +26,7 @@ import {
 	type EditorTabCompletionRuntime,
 	type PendingSuggestionRequest,
 } from './types';
-import type { EventBus, ObsidianApiProvider } from 'src/providers/providers.types';
+import type { EventBus, NoticePort, SystemPromptPort } from 'src/providers/providers.types';
 
 /** @precondition state 为有效的 EditorState @postcondition 返回与光标对齐的上下文 @throws 从不抛出 @example buildEditorContext(state) */
 export function buildEditorContext(state: EditorState, options: Partial<ContextBuilderOptions> = {}): EditorContext {
@@ -147,7 +147,7 @@ export class EditorTabCompletionService {
 	private completionHistory: number[] = [];
 
 	constructor(
-		private readonly obsidianApi: ObsidianApiProvider,
+		private readonly obsidianApi: NoticePort & SystemPromptPort,
 		private readonly eventBus: EventBus<EditorTabCompletionEvents> | null,
 		private runtime: EditorTabCompletionRuntime,
 	) {}

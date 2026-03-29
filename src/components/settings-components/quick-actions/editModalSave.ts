@@ -1,6 +1,6 @@
 import type { QuickActionDataService } from 'src/domains/quick-actions/service-data'
 import { localInstance } from 'src/i18n/locals'
-import type { QuickAction, QuickActionType } from 'src/types/chat'
+import type { QuickAction, QuickActionType } from 'src/domains/chat/types'
 import type { QuickActionEditModalContext, QuickActionEditModalOptions } from './types'
 
 interface PendingGroupMembersAccessor {
@@ -27,6 +27,59 @@ interface SaveQuickActionFromEditModalParams {
 	promptError: HTMLElement
 	modelSelect: HTMLSelectElement
 	useDefaultSystemPromptCheckbox: HTMLInputElement
+}
+
+const resolveErrorMessage = (error: unknown): string =>
+	error instanceof Error ? error.message : String(error)
+
+const moveQuickActionToGroupOrNotify = async (
+	context: QuickActionEditModalContext,
+	quickActionDataService: QuickActionDataService,
+	params: {
+		quickActionId: string
+		targetGroupId: string | null
+		position?: number
+		prefix: string
+	}
+): Promise<boolean> => {
+	try {
+		const result = await quickActionDataService.moveQuickActionToGroupResult(
+			params.quickActionId,
+			params.targetGroupId,
+			params.position,
+		)
+		if (!result.ok) {
+			context.notify(params.prefix + result.error.message)
+			return false
+		}
+		return true
+	} catch (error) {
+		context.notify(params.prefix + resolveErrorMessage(error))
+		return false
+	}
+}
+
+const updateQuickActionGroupChildrenOrNotify = async (
+	context: QuickActionEditModalContext,
+	quickActionDataService: QuickActionDataService,
+	groupId: string,
+	childrenIds: string[],
+	prefix: string
+): Promise<boolean> => {
+	try {
+		const result = await quickActionDataService.updateQuickActionGroupChildrenResult(
+			groupId,
+			childrenIds,
+		)
+		if (!result.ok) {
+			context.notify(prefix + result.error.message)
+			return false
+		}
+		return true
+	} catch (error) {
+		context.notify(prefix + resolveErrorMessage(error))
+		return false
+	}
 }
 
 export const saveQuickActionFromEditModal = async (
@@ -138,18 +191,46 @@ export const saveQuickActionFromEditModal = async (
 				.filter((id) => id !== savedQuickAction.id)
 			const previous = quickAction?.isActionGroup ? (quickAction.children ?? []).slice() : []
 			const removed = previous.filter((id) => !desired.includes(id))
-			await quickActionDataService.updateQuickActionGroupChildren(savedQuickAction.id, [])
+			const saveFailedPrefix = localInstance.ai_runtime_quick_action_group_save_failed_prefix
+			if (
+				!await updateQuickActionGroupChildrenOrNotify(
+					context,
+					quickActionDataService,
+					savedQuickAction.id,
+					[],
+					saveFailedPrefix,
+				)
+			) {
+				return
+			}
 			for (const removedId of removed) {
-				await quickActionDataService.moveQuickActionToGroup(removedId, null)
+				if (
+					!await moveQuickActionToGroupOrNotify(context, quickActionDataService, {
+						quickActionId: removedId,
+						targetGroupId: null,
+						prefix: saveFailedPrefix,
+					})
+				) {
+					return
+				}
 			}
 			for (let i = 0; i < desired.length; i += 1) {
-				await quickActionDataService.moveQuickActionToGroup(desired[i], savedQuickAction.id, i)
+				if (
+					!await moveQuickActionToGroupOrNotify(context, quickActionDataService, {
+						quickActionId: desired[i],
+						targetGroupId: savedQuickAction.id,
+						position: i,
+						prefix: saveFailedPrefix,
+					})
+				) {
+					return
+				}
 			}
 			await context.refreshQuickActionsCache?.()
 		} catch (error) {
 			context.notify(
 				localInstance.ai_runtime_quick_action_group_save_failed_prefix +
-					(error instanceof Error ? error.message : String(error))
+					resolveErrorMessage(error)
 			)
 			return
 		}
@@ -158,13 +239,23 @@ export const saveQuickActionFromEditModal = async (
 	if ((quickAction?.isActionGroup ?? false) && !isGroup) {
 		try {
 			const descendants = await quickActionDataService.getAllDescendants(savedQuickAction.id)
+			const releaseFailedPrefix =
+				localInstance.ai_runtime_quick_action_group_release_failed_prefix
 			for (const descendant of descendants) {
-				await quickActionDataService.moveQuickActionToGroup(descendant.id, null)
+				if (
+					!await moveQuickActionToGroupOrNotify(context, quickActionDataService, {
+						quickActionId: descendant.id,
+						targetGroupId: null,
+						prefix: releaseFailedPrefix,
+					})
+				) {
+					return
+				}
 			}
 		} catch (error) {
 			context.notify(
 				localInstance.ai_runtime_quick_action_group_release_failed_prefix +
-					(error instanceof Error ? error.message : String(error))
+					resolveErrorMessage(error)
 			)
 		}
 	}
@@ -174,7 +265,7 @@ export const saveQuickActionFromEditModal = async (
 	} catch (error) {
 		context.notify(
 			localInstance.ai_runtime_callback_failed_prefix +
-				(error instanceof Error ? error.message : String(error))
+				resolveErrorMessage(error)
 		)
 	}
 

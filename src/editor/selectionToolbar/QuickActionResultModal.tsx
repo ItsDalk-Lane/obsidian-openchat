@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Component } from 'obsidian';
 import { X, Copy, Replace, Plus, RefreshCw, Check, Square } from 'lucide-react';
-import type { QuickAction } from 'src/types/chat';
+import type { QuickAction } from 'src/domains/chat/types';
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
 import type { ProviderSettings } from 'src/types/provider';
 import { localInstance } from 'src/i18n/locals';

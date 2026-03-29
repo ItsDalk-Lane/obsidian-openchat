@@ -90,6 +90,16 @@ function lintDomainImport(
 	if (!resolved) {
 		return;
 	}
+	if (resolved.startsWith('src/core/') || resolved.startsWith('src/components/')) {
+		violations.push({
+			filePath: file.relativePath,
+			line,
+			rule: 'arch/domain-no-core-component',
+			message:
+				'域层不能直接导入 src/core/ 或 src/components/。\n修复方法：\n1. 在域内定义 Port 接口，通过构造参数注入。\n2. 在 FeatureCoordinator 或命令层组合根中提供适配器。',
+		});
+		return;
+	}
 	const importedCategory = classifyManagedFile(resolved);
 	if (importedCategory.kind === 'provider') {
 		if (!PROVIDER_ALLOWED_LAYERS.has(file.category.layer)) {
@@ -144,6 +154,10 @@ function lintDomainImport(
 				'域内部不应依赖命令层或 infra。\n修复方法：\n1. 把运行时参数收敛为 provider 或适配器接口。\n2. 让命令层消费域，而不是让域反向依赖命令层。',
 		});
 	}
+	// 已知 shim 豁免：settings 域 types 层对 src/settings/ 和 src/types/ 的 type-only 导入。
+	// 当前因 AiRuntimeSettings / ChatSettings 仍定义在 legacy 全局模块而必须保留。
+	// 迁移计划：docs/plans/migrate-legacy-types.md
+	// 补强规则时请勿对上述路径产生误报。
 }
 
 function lintChatImport(

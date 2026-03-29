@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { PluginSettings } from './types';
+import type { SettingsDomainPorts } from './service';
 
 function createNoopLogger() {
 	return {
@@ -32,7 +36,11 @@ function createDebugAdapterSpy() {
 	};
 }
 
-function createServiceDependencies(stubs?: {
+/** 创建测试用 SettingsDomainPorts，支持按需覆盖各端口的方法 */
+function createTestPorts(overrides?: {
+	loadData?: () => Promise<Record<string, unknown> | null>;
+	saveData?: (data: unknown) => Promise<void>;
+	ensureAiDataFolders?: (aiDataFolder: string) => Promise<void>;
 	decryptAiRuntimeSettings?: (
 		settings?: Partial<PluginSettings['aiRuntime']> | Record<string, unknown>,
 	) => PluginSettings['aiRuntime'];
@@ -53,58 +61,59 @@ function createServiceDependencies(stubs?: {
 		content?: string | null;
 	}) => Promise<boolean>;
 	syncServers?: (aiDataFolder: string, servers: unknown[]) => Promise<unknown[]>;
-}) {
+	logger?: SettingsDomainPorts['logger'];
+}): SettingsDomainPorts {
 	return {
-		createSecretManager() {
-			return {
-				decryptAiRuntimeSettings:
-					stubs?.decryptAiRuntimeSettings
-					?? ((settings?: Partial<PluginSettings['aiRuntime']> | Record<string, unknown>) =>
-						settings as PluginSettings['aiRuntime']),
-				encryptAiRuntimeSettings:
-					stubs?.encryptAiRuntimeSettings
-					?? ((settings: PluginSettings['aiRuntime']) => settings),
-			};
+		persistence: {
+			loadData: overrides?.loadData ?? (async () => ({})),
+			saveData: overrides?.saveData ?? (async () => {}),
 		},
-		async getMigrationService() {
-			return {
-				resolvePersistedAiRuntime:
-					stubs?.resolvePersistedAiRuntime
-					?? ((persisted: Record<string, unknown>) =>
-						((persisted.aiRuntime as Record<string, unknown> | undefined) ?? {})),
-				resolveAiDataFolder:
-					stubs?.resolveAiDataFolder
-					?? ((persisted: Record<string, unknown>) =>
-						typeof persisted.aiDataFolder === 'string'
-							? persisted.aiDataFolder
-							: 'System/AI Data'),
-				normalizeLegacyFolderPath:
-					stubs?.normalizeLegacyFolderPath
-					?? ((value: unknown) =>
-						typeof value === 'string' ? value.trim().replace(/[\\/]+$/g, '') || undefined : undefined),
-				migrateAIDataStorage:
-					stubs?.migrateAIDataStorage
-					?? (async () => {}),
-				cleanupLegacyAIStorage:
-					stubs?.cleanupLegacyAIStorage
-					?? (async () => {}),
-			};
+		host: {
+			ensureAiDataFolders: overrides?.ensureAiDataFolders ?? (async () => {}),
 		},
-		async getSystemPromptService() {
-			return {
-				migrateFromLegacyDefaultSystemMessage:
-					stubs?.migrateFromLegacyDefaultSystemMessage
-					?? (async () => false),
-			};
+		secret: {
+			decryptAiRuntimeSettings:
+				overrides?.decryptAiRuntimeSettings
+				?? ((settings?: Partial<PluginSettings['aiRuntime']> | Record<string, unknown>) =>
+					settings as PluginSettings['aiRuntime']),
+			encryptAiRuntimeSettings:
+				overrides?.encryptAiRuntimeSettings
+				?? ((settings: PluginSettings['aiRuntime']) => settings),
 		},
-		async getMcpServerService() {
-			return {
-				loadServers: stubs?.loadServers ?? (async () => []),
-				syncServers:
-					stubs?.syncServers
-					?? (async (_folderPath: string, servers: unknown[]) => servers),
-			};
+		migration: {
+			resolvePersistedAiRuntime:
+				overrides?.resolvePersistedAiRuntime
+				?? ((persisted: Record<string, unknown>) =>
+					((persisted.aiRuntime as Record<string, unknown> | undefined) ?? {})),
+			resolveAiDataFolder:
+				overrides?.resolveAiDataFolder
+				?? ((persisted: Record<string, unknown>) =>
+					typeof persisted.aiDataFolder === 'string'
+						? persisted.aiDataFolder
+						: 'System/AI Data'),
+			normalizeLegacyFolderPath:
+				overrides?.normalizeLegacyFolderPath
+				?? ((value: unknown) =>
+					typeof value === 'string' ? value.trim().replace(/[\\/]+$/g, '') || undefined : undefined),
+			migrateAIDataStorage:
+				overrides?.migrateAIDataStorage
+				?? (async () => {}),
+			cleanupLegacyAIStorage:
+				overrides?.cleanupLegacyAIStorage
+				?? (async () => {}),
 		},
+		systemPrompt: {
+			migrateFromLegacyDefaultSystemMessage:
+				overrides?.migrateFromLegacyDefaultSystemMessage
+				?? (async () => false),
+		},
+		mcpServer: {
+			loadServers: overrides?.loadServers ?? (async () => []),
+			syncServers:
+				overrides?.syncServers
+				?? (async (_folderPath: string, servers: unknown[]) => servers),
+		},
+		logger: overrides?.logger ?? createNoopLogger(),
 	};
 }
 
@@ -129,7 +138,7 @@ function installTestWindow(): void {
 
 test('mergePluginSettings 会合并 chat 与 aiRuntime 并保留未覆盖字段', async () => {
 	installTestWindow();
-	const { cloneAiRuntimeSettings } = await import('src/settings/ai-runtime/core');
+	const { cloneAiRuntimeSettings } = await import('./config-ai-runtime');
 	const { DEFAULT_SETTINGS, mergePluginSettings } = await import('./config');
 	const currentSettings: PluginSettings = {
 		...DEFAULT_SETTINGS,
@@ -145,6 +154,41 @@ test('mergePluginSettings 会合并 chat 与 aiRuntime 并保留未覆盖字段'
 	assert.equal(merged.aiRuntime.debugMode, true);
 	assert.equal(merged.chat.enableQuickActions, true);
 	assert.equal(merged.aiRuntime.debugLevel, currentSettings.aiRuntime.debugLevel);
+});
+
+test('legacy ai-runtime shim 会转发 settings 域中的默认值与归一化逻辑', async () => {
+	installTestWindow();
+	const domainConfig = await import('./config-ai-runtime');
+	const legacyShim = await import('src/settings/ai-runtime/core');
+	const domainRuntime = domainConfig.cloneAiRuntimeSettings({
+		mcp: { builtinVaultEnabled: true } as never,
+	});
+	const shimRuntime = legacyShim.cloneAiRuntimeSettings({
+		mcp: { builtinVaultEnabled: true } as never,
+	});
+	assert.deepEqual(shimRuntime, domainRuntime);
+	assert.equal(
+		shimRuntime.toolExecution?.maxToolCalls,
+		domainConfig.DEFAULT_TOOL_EXECUTION_SETTINGS.maxToolCalls,
+	);
+	assert.equal(shimRuntime.mcp?.builtinCoreToolsEnabled, true);
+});
+
+test('legacy ai-runtime settings shim 会转发 vendor registry 与配置 helper', async () => {
+	installTestWindow();
+	const currentDir = dirname(fileURLToPath(import.meta.url));
+	const shimPath = resolve(currentDir, '../../settings/ai-runtime/settings.ts');
+	const shimContent = await readFile(shimPath, 'utf8');
+	assert.match(
+		shimContent,
+		/from 'src\/domains\/settings\/config-ai-runtime-vendors'/,
+	);
+	assert.match(
+		shimContent,
+		/from 'src\/domains\/settings\/config-ai-runtime'/,
+	);
+	assert.doesNotMatch(shimContent, /export const APP_FOLDER =/);
+	assert.doesNotMatch(shimContent, /availableVendors:\s*Vendor\[\]\s*=/);
 });
 
 test('PluginSettingsController replaceSettings 会保存并刷新 feature coordinator', async () => {
@@ -245,15 +289,8 @@ test('SettingsDomainService loadBootstrapSettings 在空数据下回退到默认
 	installTestWindow();
 	const { SettingsDomainService } = await import('./service');
 	const { DEFAULT_SETTINGS } = await import('./config');
-	const settingsService = new SettingsDomainService({
-		app: {},
-		async loadData() {
-			return {};
-		},
-		async saveData() {},
-	}, {
-		async ensureAiDataFolders() {},
-	} as never, createNoopLogger(), createServiceDependencies({
+	const settingsService = new SettingsDomainService(createTestPorts({
+		loadData: async () => ({}),
 		decryptAiRuntimeSettings: () => ({ ...DEFAULT_SETTINGS.aiRuntime }),
 	}));
 	const loaded = await settingsService.loadBootstrapSettings();
@@ -268,27 +305,21 @@ test('SettingsDomainService hydratePersistedSettings 在默认系统消息迁移
 	const { SettingsDomainService } = await import('./service');
 	const { DEFAULT_SETTINGS } = await import('./config');
 	const loggedMessages: string[] = [];
-	const settingsService = new SettingsDomainService({
-		app: {},
-		async loadData() {
-			return {
-				aiRuntime: { enableDefaultSystemMsg: true, defaultSystemMsg: 'legacy prompt' },
-			};
-		},
-		async saveData() {},
-	}, {
-		async ensureAiDataFolders() {},
-	} as never, {
-		...createNoopLogger(),
-		error(message: string): void {
-			loggedMessages.push(message);
-		},
-	}, createServiceDependencies({
+	const settingsService = new SettingsDomainService(createTestPorts({
+		loadData: async () => ({
+			aiRuntime: { enableDefaultSystemMsg: true, defaultSystemMsg: 'legacy prompt' },
+		}),
 		decryptAiRuntimeSettings: (settings) => ({ ...DEFAULT_SETTINGS.aiRuntime, ...(settings ?? {}) }),
 		migrateFromLegacyDefaultSystemMessage: async () => {
 			throw new Error('migrate failed');
 		},
 		loadServers: async () => [],
+		logger: {
+			...createNoopLogger(),
+			error(message: string): void {
+				loggedMessages.push(message);
+			},
+		},
 	}));
 	const bootstrapSettings = await settingsService.loadBootstrapSettings();
 	const loaded = await settingsService.hydratePersistedSettings(bootstrapSettings);
@@ -300,22 +331,15 @@ test('SettingsDomainService hydratePersistedSettings 会合并成功读取的 MC
 	installTestWindow();
 	const { SettingsDomainService } = await import('./service');
 	const { DEFAULT_SETTINGS } = await import('./config');
-	const settingsService = new SettingsDomainService({
-		app: {},
-		async loadData() {
-			return {
-				aiDataFolder: 'Mcp/AI Data',
-				aiRuntime: {
-					mcp: {
-						enabled: true,
-					},
+	const settingsService = new SettingsDomainService(createTestPorts({
+		loadData: async () => ({
+			aiDataFolder: 'Mcp/AI Data',
+			aiRuntime: {
+				mcp: {
+					enabled: true,
 				},
-			};
-		},
-		async saveData() {},
-	}, {
-		async ensureAiDataFolders() {},
-	} as never, createNoopLogger(), createServiceDependencies({
+			},
+		}),
 		decryptAiRuntimeSettings: (settings) => ({ ...DEFAULT_SETTINGS.aiRuntime, ...(settings ?? {}) }),
 		loadServers: async () => [{ id: 'server-a', name: 'Server A' }],
 	}));
@@ -331,30 +355,18 @@ test('SettingsDomainService hydratePersistedSettings 会迁移默认系统消息
 	const { DEFAULT_SETTINGS } = await import('./config');
 	const loggedMessages: string[] = [];
 	let decryptCallCount = 0;
-	const settingsService = new SettingsDomainService({
-		app: {},
-		async loadData() {
-			return {
-				aiDataFolder: 'Custom/AI Data',
-				chat: {
-					enableSelectionToolbar: true,
-					maxToolbarButtons: 7,
-				},
-				aiRuntime: {
-					enableDefaultSystemMsg: true,
-					defaultSystemMsg: 'legacy system prompt',
-				},
-			};
-		},
-		async saveData() {},
-	}, {
-		async ensureAiDataFolders() {},
-	} as never, {
-		...createNoopLogger(),
-		error(message: string): void {
-			loggedMessages.push(message);
-		},
-	}, createServiceDependencies({
+	const settingsService = new SettingsDomainService(createTestPorts({
+		loadData: async () => ({
+			aiDataFolder: 'Custom/AI Data',
+			chat: {
+				enableSelectionToolbar: true,
+				maxToolbarButtons: 7,
+			},
+			aiRuntime: {
+				enableDefaultSystemMsg: true,
+				defaultSystemMsg: 'legacy system prompt',
+			},
+		}),
 		decryptAiRuntimeSettings: (settings) => {
 			decryptCallCount += 1;
 			return {
@@ -365,6 +377,12 @@ test('SettingsDomainService hydratePersistedSettings 会迁移默认系统消息
 		migrateFromLegacyDefaultSystemMessage: async () => true,
 		loadServers: async () => {
 			throw new Error('mcp unavailable');
+		},
+		logger: {
+			...createNoopLogger(),
+			error(message: string): void {
+				loggedMessages.push(message);
+			},
 		},
 	}));
 
@@ -389,31 +407,24 @@ test('SettingsDomainService save 会剥离运行时字段和旧字段并同步 M
 	let savedPayload: Record<string, unknown> | null = null;
 	let encryptedRuntime: PluginSettings['aiRuntime'] | null = null;
 	let syncServersArgs: { aiDataFolder: string; servers: unknown[] } | null = null;
-	const settingsService = new SettingsDomainService({
-		app: {},
-		settings: DEFAULT_SETTINGS,
-		async loadData() {
-			return {
-				promptTemplateFolder: 'Legacy/Templates',
-				chat: {
-					chatFolder: 'Legacy/Chats',
-					enableQuickActions: false,
+	const settingsService = new SettingsDomainService(createTestPorts({
+		loadData: async () => ({
+			promptTemplateFolder: 'Legacy/Templates',
+			chat: {
+				chatFolder: 'Legacy/Chats',
+				enableQuickActions: false,
+			},
+			aiRuntime: {
+				enableDefaultSystemMsg: true,
+				defaultSystemMsg: 'legacy',
+				mcp: {
+					builtinVaultEnabled: true,
 				},
-				aiRuntime: {
-					enableDefaultSystemMsg: true,
-					defaultSystemMsg: 'legacy',
-					mcp: {
-						builtinVaultEnabled: true,
-					},
-				},
-			};
-		},
-		async saveData(data: unknown) {
+			},
+		}),
+		saveData: async (data: unknown) => {
 			savedPayload = data as Record<string, unknown>;
 		},
-	}, {
-		async ensureAiDataFolders() {},
-	} as never, createNoopLogger(), createServiceDependencies({
 		encryptAiRuntimeSettings: (settings) => {
 			encryptedRuntime = {
 				...settings,
@@ -507,22 +518,11 @@ test('SettingsDomainService save 在 MCP servers 同步失败时仍会保存其�
 	const { DEFAULT_SETTINGS } = await import('./config');
 	let savedPayload: Record<string, unknown> | null = null;
 	const loggedMessages: string[] = [];
-	const settingsService = new SettingsDomainService({
-		app: {},
-		async loadData() {
-			return {};
-		},
-		async saveData(data: unknown) {
+	const settingsService = new SettingsDomainService(createTestPorts({
+		loadData: async () => ({}),
+		saveData: async (data: unknown) => {
 			savedPayload = data as Record<string, unknown>;
 		},
-	}, {
-		async ensureAiDataFolders() {},
-	} as never, {
-		...createNoopLogger(),
-		error(message: string): void {
-			loggedMessages.push(message);
-		},
-	}, createServiceDependencies({
 		encryptAiRuntimeSettings: (settings) => ({
 			...settings,
 			vendorApiKeys: {},
@@ -530,6 +530,12 @@ test('SettingsDomainService save 在 MCP servers 同步失败时仍会保存其�
 		}),
 		syncServers: async () => {
 			throw new Error('disk unavailable');
+		},
+		logger: {
+			...createNoopLogger(),
+			error(message: string): void {
+				loggedMessages.push(message);
+			},
 		},
 	}));
 
@@ -565,15 +571,11 @@ test('SettingsDomainService 会委托 provider 和迁移适配器执行公共入
 	const { SettingsDomainService } = await import('./service');
 	const { DEFAULT_SETTINGS } = await import('./config');
 	const calls: string[] = [];
-	const settingsService = new SettingsDomainService({
-		app: {},
-		async loadData() { return {}; },
-		async saveData() {},
-	}, {
-		async ensureAiDataFolders(aiDataFolder: string): Promise<void> {
+	const settingsService = new SettingsDomainService(createTestPorts({
+		loadData: async () => ({}),
+		ensureAiDataFolders: async (aiDataFolder: string) => {
 			calls.push(`ensure:${aiDataFolder}`);
 		},
-	} as never, createNoopLogger(), createServiceDependencies({
 		migrateAIDataStorage: async (settings) => {
 			calls.push(`migrate:${settings.aiDataFolder}`);
 		},

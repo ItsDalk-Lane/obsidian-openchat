@@ -9,8 +9,12 @@
 
 import { SKILL_FILE_NAME, SKILL_RELOAD_DEBOUNCE_MS } from './config';
 import { SkillScannerService } from './service';
+import type { SkillScannerHostPort } from './service';
 import type { SkillChangeListener, SkillsDomainLogger, SkillScanResult } from './types';
-import type { ObsidianApiProvider } from 'src/providers/providers.types';
+import type { VaultWatchPort } from 'src/providers/providers.types';
+
+/** SkillsRuntimeCoordinator 所需的最小宿主能力 */
+export type SkillsRuntimeHostPort = SkillScannerHostPort & VaultWatchPort;
 
 interface SkillsRuntimeCoordinatorOptions {
 	getAiDataFolder: () => string;
@@ -31,7 +35,7 @@ export class SkillsRuntimeCoordinator {
 	private started = false;
 
 	constructor(
-		private readonly obsidianApi: ObsidianApiProvider,
+		private readonly obsidianApi: SkillsRuntimeHostPort,
 		private readonly options: SkillsRuntimeCoordinatorOptions,
 	) {
 		this.skillScannerService = new SkillScannerService(this.obsidianApi, this.options);

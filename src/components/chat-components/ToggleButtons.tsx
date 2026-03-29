@@ -1,6 +1,6 @@
 import { Brain, Search, FileText } from 'lucide-react';
 import { ChatService } from 'src/core/chat/services/chat-service';
-import type { ChatState } from 'src/types/chat';
+import type { ChatState } from 'src/domains/chat/types';
 import { localInstance } from 'src/i18n/locals';
 
 interface ToggleButtonsProps {

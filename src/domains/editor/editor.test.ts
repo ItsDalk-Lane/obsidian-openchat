@@ -12,13 +12,16 @@ import {
 	selectCompletionProvider,
 } from './service';
 import { ContextType, type EditorCompletionMessage, type EditorCompletionProvider, type EditorTabCompletionEvents, type EditorTabCompletionRuntime } from './types';
-import type { EventBus, ObsidianApiProvider } from 'src/providers/providers.types';
+import type { EventBus, NoticePort, SystemPromptPort } from 'src/providers/providers.types';
 
 function createEditorState(doc: string, anchor: number = doc.length): EditorState {
 	return EditorState.create({ doc, selection: { anchor } });
 }
 
-function createFakeObsidianApiProvider(globalPrompt = ''): ObsidianApiProvider & {
+/** 编辑器域仅需 NoticePort & SystemPromptPort */
+type EditorHostPort = NoticePort & SystemPromptPort;
+
+function createFakeObsidianApiProvider(globalPrompt = ''): EditorHostPort & {
 	notifications: Array<{ message: string; timeout?: number }>;
 } {
 	const notifications: Array<{ message: string; timeout?: number }> = [];
@@ -29,66 +32,6 @@ function createFakeObsidianApiProvider(globalPrompt = ''): ObsidianApiProvider &
 		},
 		async buildGlobalSystemPrompt(): Promise<string> {
 			return globalPrompt;
-		},
-		normalizePath(path: string): string {
-			return path.replace(/\\/gu, '/');
-		},
-		async ensureAiDataFolders(): Promise<void> {},
-		async ensureVaultFolder(folderPath: string): Promise<string> {
-			return folderPath;
-		},
-		async requestHttp() {
-			return { status: 200, text: '', headers: {} };
-		},
-		getVaultEntry() {
-			return null;
-		},
-		getVaultName(): string {
-			return 'vault';
-		},
-		getActiveFilePath(): string | null {
-			return null;
-		},
-		async getAvailableAttachmentPath(filename: string): Promise<string> {
-			return filename;
-		},
-		getFrontmatter() {
-			return null;
-		},
-		async pathExists(): Promise<boolean> {
-			return false;
-		},
-		async statPath() {
-			return null;
-		},
-		listFolderEntries() {
-			return [];
-		},
-		async readVaultFile(): Promise<string> {
-			return '';
-		},
-		async readVaultBinary(): Promise<ArrayBuffer> {
-			return new Uint8Array().buffer;
-		},
-		async writeVaultFile(): Promise<void> {},
-		async writeVaultBinary(): Promise<void> {},
-		async deleteVaultPath(): Promise<void> {},
-		parseYaml(): unknown {
-			return {};
-		},
-		stringifyYaml(): string {
-			return '';
-		},
-		readLocalStorage(): string | null {
-			return null;
-		},
-		writeLocalStorage(): void {},
-		openSettingsTab(): void {},
-		insertTextIntoMarkdownEditor() {
-			return { inserted: false };
-		},
-		onVaultChange(): () => void {
-			return () => {};
 		},
 	};
 }

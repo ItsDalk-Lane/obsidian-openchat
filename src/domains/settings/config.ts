@@ -2,12 +2,13 @@
  * @module settings/config
  * @description 提供 settings 域的默认值与设置合并逻辑。
  *
- * @dependencies src/settings/ai-runtime, src/types/chat, src/domains/settings/types
+ * @dependencies src/domains/settings/config-ai-runtime, src/types/chat,
+ *   src/domains/settings/types
  * @side-effects 无
  * @invariants 仅负责 settings 数据本身，不执行持久化。
  */
 
-import { cloneAiRuntimeSettings } from 'src/settings/ai-runtime/core';
+import { cloneAiRuntimeSettings } from './config-ai-runtime';
 import { DEFAULT_CHAT_SETTINGS } from 'src/types/chat';
 import type { PluginSettings } from './types';
 

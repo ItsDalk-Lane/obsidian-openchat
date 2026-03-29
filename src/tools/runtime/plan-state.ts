@@ -1,4 +1,4 @@
-import type { PlanSnapshot, PlanTask, PlanTaskStatus } from 'src/types/chat';
+import type { PlanSnapshot, PlanTask, PlanTaskStatus } from 'src/domains/chat/types';
 
 export type { PlanSnapshot, PlanTask, PlanTaskStatus };
 

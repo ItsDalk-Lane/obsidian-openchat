@@ -171,6 +171,10 @@ export function classifyManagedFile(relativePath: string): ManagedFileCategory {
 		normalized === 'src/main.ts'
 		|| normalized === 'src/core/FeatureCoordinator.ts'
 		|| normalized === 'src/core/PluginStartupCoordinator.ts'
+		|| normalized === 'src/core/settings-adapter-assembly.ts'
+		|| normalized === 'src/core/chat-assembler.ts'
+		|| normalized === 'src/core/ai-runtime-assembler.ts'
+		|| normalized === 'src/core/feature-query-facade.ts'
 	) {
 		return { kind: 'module', scope: 'root' };
 	}

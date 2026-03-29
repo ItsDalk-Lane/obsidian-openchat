@@ -1,8 +1,8 @@
 import type { App } from 'obsidian'
+import type { QuickAction } from 'src/domains/chat/types'
 import type { QuickActionDataService } from 'src/domains/quick-actions/service-data'
 import type { ObsidianApiProvider } from 'src/providers/providers.types'
 import type { ProviderSettings } from 'src/types/provider'
-import type { QuickAction } from 'src/types/chat'
 
 export interface QuickActionListContext {
 	quickActionDataService: QuickActionDataService

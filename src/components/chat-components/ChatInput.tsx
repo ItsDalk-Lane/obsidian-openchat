@@ -1,7 +1,7 @@
 import { CornerDownLeft, StopCircle, Palette, RotateCw } from 'lucide-react';
 import { FormEvent, useEffect, useState, useRef, Fragment, useMemo, lazy, Suspense } from 'react';
 import { ChatService } from 'src/core/chat/services/chat-service';
-import type { ChatState } from 'src/types/chat';
+import type { ChatState } from 'src/domains/chat/types';
 import type { CompareGroup } from 'src/core/chat/types/multiModel';
 import { MultiModelSelector } from './MultiModelSelector';
 import { TemplateSelector } from './TemplateSelector';

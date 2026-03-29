@@ -1,4 +1,4 @@
-import type { QuickAction } from 'src/types/chat';
+import type { QuickAction } from './types';
 
 export function getNestingLevelSync(
 	quickActionId: string,

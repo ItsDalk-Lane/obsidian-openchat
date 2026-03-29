@@ -1,15 +1,15 @@
 import { App, Setting } from 'obsidian'
-import type { QuickActionDataService } from 'src/domains/quick-actions/service-data'
-import type { ObsidianApiProvider } from 'src/providers/providers.types'
-import { t } from 'src/i18n/ai-runtime/helper'
-import { localInstance } from 'src/i18n/locals'
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api'
-import type { ChatSettings } from 'src/types/chat'
-import { renderQuickActionsSettingsSection } from 'src/components/settings-components/quick-actions/panelActions'
 import {
 	DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
 	normalizeMessageManagementSettings,
-} from 'src/types/chat'
+} from 'src/domains/chat/config'
+import type { ChatSettings } from 'src/domains/chat/types'
+import type { QuickActionDataService } from 'src/domains/quick-actions/service-data'
+import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime'
+import type { ObsidianApiProvider } from 'src/providers/providers.types'
+import { t } from 'src/i18n/ai-runtime/helper'
+import { localInstance } from 'src/i18n/locals'
+import { renderQuickActionsSettingsSection } from 'src/components/settings-components/quick-actions/panelActions'
 import { formatProviderOptionLabel } from 'src/components/chat-components/chatSettingsHelpers'
 
 const CHEVRON_SVG = `

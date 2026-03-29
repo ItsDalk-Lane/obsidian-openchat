@@ -1,7 +1,7 @@
 import { Extension } from '@codemirror/state';
 import { EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import { TFile } from 'obsidian';
-import type { ChatSettings } from 'src/types/chat';
+import type { ChatSettings } from 'src/domains/chat/types';
 import { DebugLogger } from 'src/utils/DebugLogger';
 
 /**

@@ -1,10 +1,10 @@
-import type { ProviderSettings } from 'src/types/provider';
-import { availableVendors } from 'src/settings/ai-runtime/api';
+import type { ChatMessage } from 'src/domains/chat/types';
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors';
 import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils';
-import type { ChatMessage } from 'src/types/chat';
 import { PromptBuilder } from 'src/core/services/PromptBuilder';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { Message as ProviderMessage } from 'src/types/provider';
+import type { ProviderSettings } from 'src/types/provider';
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
 
 /**

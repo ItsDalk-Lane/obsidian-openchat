@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight, CheckCircle2, Loader2, XCircle, Ban } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { ChatMessage } from 'src/types/chat';
+import type { ChatMessage } from 'src/domains/chat/types';
 import type { SubAgentExecutionStatus } from 'src/tools/sub-agents/types';
 
 interface SubAgentMessageFoldProps {

@@ -318,4 +318,6 @@ export default {
 	'API returned an incomplete response. Content may be truncated.':
 		'API 回傳了不完整的回應，內容可能被截斷。',
 	'Failed to parse response: {message}': '解析回應失敗：{message}',
+	'⚠️ Tool call failed, fell back to plain request.\nReason: {reason}':
+		'⚠️ 工具調用失敗，已回退為普通請求。\n原因: {reason}',
 } as const

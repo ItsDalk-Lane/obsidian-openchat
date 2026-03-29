@@ -3,9 +3,12 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { localInstance } from "src/i18n/locals";
 import FolderSuggest from "src/components/combobox/FolderSuggest";
 import { DEFAULT_SETTINGS } from "src/domains/settings/config";
+import {
+	resolveToolExecutionSettings,
+	syncToolExecutionSettings,
+} from "src/domains/settings/config-ai-runtime";
 import { t } from "src/i18n/ai-runtime/helper";
 import { DebugLogger } from "src/utils/DebugLogger";
-import { resolveToolExecutionSettings, syncToolExecutionSettings } from "src/settings/ai-runtime/api";
 import type { PluginSettingTabHost } from "./plugin-setting-host";
 import "./GeneralSettingTabItem.css";
 

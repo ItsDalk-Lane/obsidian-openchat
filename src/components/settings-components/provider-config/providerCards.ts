@@ -1,5 +1,5 @@
 import { App, setIcon } from 'obsidian'
-import { availableVendors } from 'src/settings/ai-runtime/api'
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors'
 import { getCapabilityDisplayText } from 'src/LLMProviders/utils'
 import { t } from 'src/i18n/ai-runtime/helper'
 import type { ProviderSettings } from 'src/types/provider'

@@ -1,55 +1,42 @@
-import { azureVendor } from 'src/LLMProviders/azure';
-import { claudeVendor } from 'src/LLMProviders/claude';
-import { deepSeekVendor } from 'src/LLMProviders/deepSeek';
-import { doubaoVendor } from 'src/LLMProviders/doubao';
-import { geminiVendor } from 'src/LLMProviders/gemini';
-import { gptImageVendor } from 'src/LLMProviders/gptImage';
-import { grokVendor } from 'src/LLMProviders/grok';
-import { kimiVendor } from 'src/LLMProviders/kimi';
-import { ollamaVendor } from 'src/LLMProviders/ollama';
-import { openAIVendor } from 'src/LLMProviders/openAI';
-import { openRouterVendor } from 'src/LLMProviders/openRouter';
-import { poeVendor } from 'src/LLMProviders/poe';
-import { qianFanVendor } from 'src/LLMProviders/qianFan';
-import { qwenVendor } from 'src/LLMProviders/qwen';
-import { siliconFlowVendor } from 'src/LLMProviders/siliconflow';
-import type { Vendor } from 'src/types/provider';
-import { zhipuVendor } from 'src/LLMProviders/zhipu';
+/**
+ * @module settings/ai-runtime/settings
+ * @description legacy 兼容 shim，转发 settings 域拥有的 AI runtime vendor 注册表与配置逻辑。
+ *
+ * @dependencies src/domains/settings/config-ai-runtime,
+ *   src/domains/settings/config-ai-runtime-vendors,
+ *   src/domains/settings/types-ai-runtime
+ * @side-effects 无
+ * @invariants 仅 re-export，不保留业务逻辑。
+ *
+ * @deprecated 真实实现已迁入 settings 域；保留此文件仅为兼容旧导入路径。
+ */
+
 import {
 	DEFAULT_AI_RUNTIME_SETTINGS,
 	DEFAULT_TOOL_EXECUTION_SETTINGS,
 	cloneAiRuntimeSettings,
 	resolveToolExecutionSettings,
 	syncToolExecutionSettings,
-} from './core';
+} from 'src/domains/settings/config-ai-runtime';
+import {
+	APP_FOLDER,
+	availableVendors,
+} from 'src/domains/settings/config-ai-runtime-vendors';
+import type {
+	AiRuntimeSettings,
+	EditorStatus,
+	ToolExecutionSettings,
+} from 'src/domains/settings/types-ai-runtime';
+
 export type {
 	AiRuntimeSettings,
 	EditorStatus,
 	ToolExecutionSettings,
-} from './core';
-
-export const APP_FOLDER = 'OpenChat';
-
-export const availableVendors: Vendor[] = [
-	openAIVendor,
-	azureVendor,
-	claudeVendor,
-	deepSeekVendor,
-	doubaoVendor,
-	geminiVendor,
-	gptImageVendor,
-	grokVendor,
-	kimiVendor,
-	ollamaVendor,
-	openRouterVendor,
-	poeVendor,
-	qianFanVendor,
-	qwenVendor,
-	siliconFlowVendor,
-	zhipuVendor,
-];
+};
 
 export {
+	APP_FOLDER,
+	availableVendors,
 	DEFAULT_AI_RUNTIME_SETTINGS,
 	DEFAULT_TOOL_EXECUTION_SETTINGS,
 	cloneAiRuntimeSettings,

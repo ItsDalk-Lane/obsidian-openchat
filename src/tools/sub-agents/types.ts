@@ -3,7 +3,7 @@ import type {
 	ChatSession,
 	SubAgentExecutionState,
 	SubAgentExecutionStatus,
-} from 'src/types/chat';
+} from 'src/domains/chat/types';
 import type {
 	ToolDefinition,
 	ToolExecutionRecord,

@@ -1,11 +1,13 @@
 import type { TFile } from 'obsidian';
-import type { ChatService } from 'src/core/chat/services/chat-service';
-import type { ChatConsumerHost } from 'src/core/chat/services/chat-service-types';
-import type { ChatOpenMode } from 'src/types/chat';
+import type { ChatOpenMode } from './types';
+import type {
+	ChatViewCoordinatorServicePort,
+	ChatViewCoordinatorHost,
+} from './types-view-coordinator';
 
 export interface ChatViewCoordinatorCommandDeps {
-	host: ChatConsumerHost;
-	service: ChatService;
+	host: ChatViewCoordinatorHost;
+	service: ChatViewCoordinatorServicePort;
 	activateChatView(mode: ChatOpenMode): Promise<void>;
 	openChatInPersistentModal(activeFile?: TFile | null): void;
 }
@@ -83,8 +85,8 @@ export const registerChatViewCommands = (
 };
 
 export const syncChatRibbonIcon = (
-	host: ChatConsumerHost,
-	service: ChatService,
+	host: ChatViewCoordinatorHost,
+	service: ChatViewCoordinatorServicePort,
 	existingRibbonEl: HTMLElement | null,
 	show: boolean,
 	activateChatView: (mode: ChatOpenMode) => Promise<void>,

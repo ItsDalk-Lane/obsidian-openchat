@@ -1,9 +1,6 @@
 import type {
 	ChatContextCompactionRange,
 	ChatContextCompactionState,
-	ChatDomainLogger,
-	ChatHostPorts,
-	ChatMcpPort,
 	ChatMessage,
 	ChatMessageMetadata,
 	ChatOpenMode,
@@ -11,12 +8,7 @@ import type {
 	ChatRole,
 	ChatSession,
 	ChatSettings,
-	ChatSkillDescriptor,
-	ChatSkillsPort,
-	ChatSkillsSnapshot,
 	ChatState,
-	ChatToolSettingsPort,
-	ChatVaultPort,
 	CompareGroup,
 	FileIntentAnalysis,
 	FileRole,
@@ -38,8 +30,18 @@ import type {
 	SubAgentExecutionState,
 	SubAgentExecutionStatus,
 	ToolCall,
-} from 'src/types/chat';
-import { isPinnedChatMessage } from 'src/types/chat';
+} from 'src/domains/chat/types';
+import type {
+	ChatDomainLogger,
+	ChatHostPorts,
+	ChatMcpPort,
+	ChatSkillDescriptor,
+	ChatSkillsPort,
+	ChatSkillsSnapshot,
+	ChatToolSettingsPort,
+	ChatVaultPort,
+} from 'src/domains/chat/service';
+import { isPinnedChatMessage } from 'src/domains/chat/service';
 
 export type {
 	ChatContextCompactionRange,

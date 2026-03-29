@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown, Settings } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors';
 import type { ProviderSettings, Vendor } from 'src/types/provider';
 import { getCapabilityDisplayText } from 'src/LLMProviders/utils';
-import { availableVendors } from 'src/settings/ai-runtime/api';
 import type { CompareGroup } from 'src/core/chat/types/multiModel';
 import { localInstance } from 'src/i18n/locals';
 import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';

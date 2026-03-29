@@ -1,7 +1,7 @@
 import { Hammer, Check, ChevronLeft } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import type { McpToolMode } from 'src/types/chat';
+import type { McpToolMode } from 'src/domains/chat/types';
 import type { ChatService } from 'src/core/chat/services/chat-service';
 
 interface McpModeSelectorProps {

@@ -24,7 +24,7 @@ import { QuickActionDataService } from 'src/domains/quick-actions/service-data';
 import { SelectionToolbar } from 'src/editor/selectionToolbar/SelectionToolbar';
 import { ModifyTextModal } from 'src/editor/selectionToolbar/ModifyTextModal';
 import { createModifyGhostTextExtension } from 'src/editor/selectionToolbar/ModifyGhostTextExtension';
-import type { QuickAction } from 'src/types/chat';
+import type { QuickAction } from 'src/domains/chat/types';
 import type { ProviderSettings } from 'src/types/provider';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { localInstance } from 'src/i18n/locals';

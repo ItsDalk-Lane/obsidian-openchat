@@ -1,9 +1,9 @@
 import type { Plugin, PluginManifest, App } from 'obsidian';
 import type { ChatService } from 'src/core/chat/services/chat-service';
+import type { ChatSettings } from 'src/domains/chat/types';
 import type { McpRuntimeManager } from 'src/domains/mcp/types';
 import type { PluginSettings } from 'src/domains/settings/types';
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
-import type { ChatSettings } from 'src/types/chat';
 
 interface PluginSettingFeatureCoordinator {
 	getChatFeatureManager(): { getService(): ChatService } | null;

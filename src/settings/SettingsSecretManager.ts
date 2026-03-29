@@ -1,5 +1,5 @@
-import { cloneAiRuntimeSettings } from 'src/settings/ai-runtime/core';
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime/core';
+import { cloneAiRuntimeSettings } from 'src/domains/settings/config-ai-runtime';
+import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime';
 import { encryptApiKey, decryptApiKey, generateDeviceFingerprint } from 'src/settings/ai-runtime/utils/cryptoUtils';
 import type { BaseOptions, ProviderSettings } from 'src/types/provider';
 import { DebugLogger } from 'src/utils/DebugLogger';

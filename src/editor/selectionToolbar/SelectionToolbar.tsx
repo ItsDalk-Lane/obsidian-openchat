@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { MessageSquare, ChevronDown, Edit, Copy, Scissors } from 'lucide-react';
-import type { QuickAction, ChatSettings } from 'src/types/chat';
+import type { ChatSettings, QuickAction } from 'src/domains/chat/types';
 import type { SelectionInfo } from './SelectionToolbarExtension';
 import { localInstance } from 'src/i18n/locals';
 import { useSelectionToolbar } from './useSelectionToolbar';
@@ -409,5 +409,4 @@ export const SelectionToolbar = ({
 };
 
 export default SelectionToolbar;
-
 

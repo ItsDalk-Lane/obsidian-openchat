@@ -1,6 +1,6 @@
 import { t } from 'src/i18n/ai-runtime/helper'
 import { localInstance } from 'src/i18n/locals'
-import type { QuickAction } from 'src/types/chat'
+import type { QuickAction } from 'src/domains/chat/types'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import type { QuickActionListContext } from './types'
 
@@ -72,7 +72,16 @@ export const renderQuickActionsList = async (
 	}
 	const performMove = async (movedId: string, targetParentId: string | null, insertAt: number) => {
 		try {
-			await quickActionDataService.moveQuickActionToGroup(movedId, targetParentId, insertAt)
+			const result = await quickActionDataService.moveQuickActionToGroupResult(
+				movedId,
+				targetParentId,
+				insertAt,
+			)
+			if (!result.ok) {
+				DebugLogger.error('[QuickActions] Failed to move action', result.error)
+				context.notify(result.error.message)
+				return
+			}
 			await context.refreshQuickActionsCache?.()
 		} catch (error) {
 			DebugLogger.error('[QuickActions] Failed to move action', error)

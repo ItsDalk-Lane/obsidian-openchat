@@ -272,5 +272,7 @@ export default {
 
 	'Enable AI runtime feature': 'Enable AI assistant feature',
 	'AI runtime feature disabled description': 'Enable the feature above to configure AI assistants.',
+	'⚠️ Tool call failed, fell back to plain request.\nReason: {reason}':
+		'⚠️ Tool call failed, fell back to plain request.\nReason: {reason}',
 	...enMcpLocale,
 } as const

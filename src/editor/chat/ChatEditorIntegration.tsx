@@ -4,7 +4,7 @@ import { Transaction } from '@codemirror/state';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { setModifyGhostEffect } from 'src/editor/selectionToolbar/ModifyGhostTextExtension';
-import type { QuickAction, ChatSettings } from 'src/types/chat';
+import type { ChatSettings, QuickAction } from 'src/domains/chat/types';
 import type { ProviderSettings } from 'src/types/provider';
 import { ChatModal } from 'src/components/chat-components/ChatModal';
 import { QuickActionResultModal } from 'src/editor/selectionToolbar/QuickActionResultModal';
@@ -319,8 +319,16 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 		}
 
 		try {
-			const generator = this.quickActionExecutionService.executeQuickActionStream(quickAction, selection, overrideModelTag);
-			for await (const chunk of generator) {
+			const streamResult = await this.quickActionExecutionService.executeQuickActionStreamResult(
+				quickAction,
+				selection,
+				overrideModelTag,
+			);
+			if (!streamResult.ok) {
+				callbacks.onError(streamResult.error.message);
+				return;
+			}
+			for await (const chunk of streamResult.value) {
 				callbacks.onChunk(chunk);
 			}
 			callbacks.onComplete();

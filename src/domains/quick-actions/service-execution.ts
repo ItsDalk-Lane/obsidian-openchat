@@ -1,17 +1,27 @@
-import type { ObsidianApiProvider } from 'src/providers/providers.types';
-import type { QuickAction } from 'src/types/chat';
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api';
-import { availableVendors } from 'src/settings/ai-runtime/api';
-import type { Message, ProviderSettings, Vendor } from 'src/types/provider';
-import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils';
+import type { SystemPromptPort, VaultReadPort } from 'src/providers/providers.types';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
+import {
+	err,
+	ok,
+	QuickActionCompatibilityError,
+} from './service-result';
+import type {
+	QuickAction,
+	QuickActionExecutionError,
+	QuickActionExecutionResult,
+	QuickActionMessage,
+	QuickActionProviderAdapter,
+	QuickActionProviderConfig,
+	QuickActionResult,
+	QuickActionRuntimeSettings,
+	QuickActionSendRequest,
+} from './types';
 
-export interface QuickActionExecutionResult {
-	success: boolean;
-	content: string;
-	error?: string;
-}
+export type { QuickActionExecutionResult } from './types';
+
+/** QuickActionExecutionService 所需的最小宿主能力 */
+export type QuickActionExecutionHostPort = VaultReadPort & SystemPromptPort;
 
 function getQuickActionType(quickAction: QuickAction): 'normal' | 'group' {
 	if (quickAction.actionType) {
@@ -23,12 +33,54 @@ function getQuickActionType(quickAction: QuickAction): 'normal' | 'group' {
 	return 'normal';
 }
 
+interface PreparedQuickActionExecution {
+	readonly messages: QuickActionMessage[];
+	readonly sendRequest: QuickActionSendRequest;
+}
+
+const createGroupNotExecutableError = (
+	quickActionId: string,
+): QuickActionExecutionError => ({
+	source: 'execution',
+	kind: 'group-not-executable',
+	quickActionId,
+	message: localInstance.quick_action_group_not_executable,
+});
+
+const createMissingModelConfigError = (
+	requestedModelTag?: string,
+): QuickActionExecutionError => ({
+	source: 'execution',
+	kind: 'missing-model-config',
+	requestedModelTag,
+	message: localInstance.quick_action_no_model_config,
+});
+
+const createProviderMissingError = (
+	vendor: string,
+): QuickActionExecutionError => ({
+	source: 'execution',
+	kind: 'provider-missing',
+	vendor,
+	message: `${localInstance.quick_action_provider_missing_prefix}: ${vendor}`,
+});
+
+const createTemplateReadFailedError = (
+	path: string,
+): QuickActionExecutionError => ({
+	source: 'execution',
+	kind: 'template-read-failed',
+	path,
+	message: `${localInstance.quick_action_template_read_failed_prefix}: ${path}`,
+});
+
 export class QuickActionExecutionService {
 	private currentAbortController: AbortController | null = null;
 
 	constructor(
-		private readonly obsidianApi: ObsidianApiProvider,
-		private readonly getAiRuntimeSettings: () => AiRuntimeSettings,
+		private readonly obsidianApi: QuickActionExecutionHostPort,
+		private readonly providerAdapter: QuickActionProviderAdapter,
+		private readonly getAiRuntimeSettings: () => QuickActionRuntimeSettings,
 		private readonly getPromptTemplateFolder: () => string,
 	) {}
 
@@ -45,13 +97,6 @@ export class QuickActionExecutionService {
 		modelTag?: string,
 	): Promise<QuickActionExecutionResult> {
 		try {
-			if (getQuickActionType(quickAction) === 'group') {
-				return {
-					success: false,
-					content: '',
-					error: localInstance.quick_action_group_not_executable,
-				};
-			}
 			return await this.executeNormalQuickAction(quickAction, selection, modelTag);
 		} catch (error) {
 			DebugLogger.error('[QuickActionExecutionService] 执行操作失败', error);
@@ -98,67 +143,16 @@ export class QuickActionExecutionService {
 		selection: string,
 		modelTag?: string,
 	): AsyncGenerator<string, void, unknown> {
-		if (getQuickActionType(quickAction) === 'group') {
-			throw new Error(localInstance.quick_action_group_not_executable);
-		}
-
 		try {
-			const promptContent = await this.resolvePromptContent(quickAction);
-			const providerSettings = this.resolveProviderSettings(
-				this.getAiRuntimeSettings(),
-				modelTag || quickAction.modelTag,
-			);
-			if (!providerSettings) {
-				throw new Error(localInstance.quick_action_no_model_config);
-			}
-
-			const messages = await this.buildMessages(
-				quickAction.useDefaultSystemPrompt ?? true,
-				promptContent,
+			const streamResult = await this.executeQuickActionStreamResult(
+				quickAction,
 				selection,
-				quickAction.customPromptRole,
+				modelTag,
 			);
-			const vendor = this.getVendor(providerSettings.vendor);
-			if (!vendor) {
-				throw new Error(
-					`${localInstance.quick_action_provider_missing_prefix}: ${providerSettings.vendor}`,
-				);
+			if (!streamResult.ok) {
+				throw new QuickActionCompatibilityError(streamResult.error);
 			}
-
-			this.currentAbortController = new AbortController();
-			const controller = this.currentAbortController;
-			const providerOptions = buildProviderOptionsWithReasoningDisabled(
-				providerSettings.options,
-				providerSettings.vendor,
-			);
-			const sendRequest = vendor.sendRequestFunc(providerOptions);
-			DebugLogger.logLlmMessages(
-				'QuickActionExecutionService.executeQuickActionStream',
-				messages,
-				{ level: 'debug' },
-			);
-
-			const resolveEmbed = async () => new ArrayBuffer(0);
-			let preview = '';
-			try {
-				for await (const chunk of sendRequest(messages, controller, resolveEmbed)) {
-					if (controller.signal.aborted) {
-						DebugLogger.debug('[QuickActionExecutionService] 操作执行已被取消');
-						break;
-					}
-					if (preview.length < 100) {
-						preview = `${preview}${chunk}`.slice(0, 100);
-					}
-					yield chunk;
-				}
-				DebugLogger.logLlmResponsePreview(
-					'QuickActionExecutionService.executeQuickActionStream',
-					preview,
-					{ level: 'debug', previewChars: 100 },
-				);
-			} finally {
-				this.currentAbortController = null;
-			}
+			yield* streamResult.value;
 		} catch (error) {
 			if (error instanceof Error && error.name === 'AbortError') {
 				DebugLogger.debug('[QuickActionExecutionService] 操作执行已取消');
@@ -169,32 +163,43 @@ export class QuickActionExecutionService {
 		}
 	}
 
+	async executeQuickActionStreamResult(
+		quickAction: QuickAction,
+		selection: string,
+		modelTag?: string,
+	): Promise<
+		QuickActionResult<AsyncGenerator<string, void, unknown>, QuickActionExecutionError>
+	> {
+		const planResult = await this.prepareExecutionPlan(
+			quickAction,
+			selection,
+			modelTag,
+		);
+		if (!planResult.ok) {
+			return planResult;
+		}
+		return ok(this.streamPreparedExecution(planResult.value));
+	}
+
 	private async executeNormalQuickAction(
 		quickAction: QuickAction,
 		selection: string,
 		modelTag?: string,
 	): Promise<QuickActionExecutionResult> {
 		try {
-			const promptContent = await this.resolvePromptContent(quickAction);
-			const providerSettings = this.resolveProviderSettings(
-				this.getAiRuntimeSettings(),
-				modelTag || quickAction.modelTag,
+			const planResult = await this.prepareExecutionPlan(
+				quickAction,
+				selection,
+				modelTag,
 			);
-			if (!providerSettings) {
-				return {
-					success: false,
-					content: '',
-					error: localInstance.quick_action_no_model_config,
-				};
+			if (!planResult.ok) {
+				return this.buildFailedExecutionResult(planResult.error);
 			}
 
-			const messages = await this.buildMessages(
-				quickAction.useDefaultSystemPrompt ?? true,
-				promptContent,
-				selection,
-				quickAction.customPromptRole,
+			const result = await this.callAIWithMessages(
+				planResult.value.sendRequest,
+				planResult.value.messages,
 			);
-			const result = await this.callAIWithMessages(providerSettings, messages);
 			return { success: true, content: result };
 		} catch (error) {
 			DebugLogger.error('[QuickActionExecutionService] 执行操作失败', error);
@@ -206,22 +211,75 @@ export class QuickActionExecutionService {
 		}
 	}
 
-	private async resolvePromptContent(quickAction: QuickAction): Promise<string> {
-		if (quickAction.promptSource === 'template' && quickAction.templateFile) {
-			return await this.loadTemplateFile(quickAction.templateFile);
+	private async prepareExecutionPlan(
+		quickAction: QuickAction,
+		selection: string,
+		modelTag?: string,
+	): Promise<QuickActionResult<PreparedQuickActionExecution, QuickActionExecutionError>> {
+		if (getQuickActionType(quickAction) === 'group') {
+			return err(createGroupNotExecutableError(quickAction.id));
 		}
-		return quickAction.prompt;
+
+		const promptContentResult = await this.resolvePromptContentResult(quickAction);
+		if (!promptContentResult.ok) {
+			return promptContentResult;
+		}
+
+		const providerSettingsResult = this.resolveProviderSettingsResult(
+			this.getAiRuntimeSettings(),
+			modelTag || quickAction.modelTag,
+		);
+		if (!providerSettingsResult.ok) {
+			return providerSettingsResult;
+		}
+
+		const messages = await this.buildMessages(
+			quickAction.useDefaultSystemPrompt ?? true,
+			promptContentResult.value,
+			selection,
+			quickAction.customPromptRole,
+		);
+		const sendRequest = this.providerAdapter.createSendRequest(
+			providerSettingsResult.value.vendor,
+			providerSettingsResult.value.options,
+		);
+		if (!sendRequest) {
+			return err(createProviderMissingError(providerSettingsResult.value.vendor));
+		}
+
+		return ok({ messages, sendRequest });
 	}
 
-	private async loadTemplateFile(filePath: string): Promise<string> {
+	private buildFailedExecutionResult(
+		error: QuickActionExecutionError,
+	): QuickActionExecutionResult {
+		return {
+			success: false,
+			content: '',
+			error: error.message,
+		};
+	}
+
+	private async resolvePromptContentResult(
+		quickAction: QuickAction,
+	): Promise<QuickActionResult<string, QuickActionExecutionError>> {
+		if (quickAction.promptSource === 'template' && quickAction.templateFile) {
+			return await this.loadTemplateFileResult(quickAction.templateFile);
+		}
+		return ok(quickAction.prompt);
+	}
+
+	private async loadTemplateFileResult(
+		filePath: string,
+	): Promise<QuickActionResult<string, QuickActionExecutionError>> {
 		try {
-			return await this.obsidianApi.readVaultFile(filePath);
+			return ok(await this.obsidianApi.readVaultFile(filePath));
 		} catch (error) {
 			DebugLogger.warn(
 				`[QuickActionExecutionService] 读取模板文件失败: ${filePath}`,
 				error,
 			);
-			throw new Error(`${localInstance.quick_action_template_read_failed_prefix}: ${filePath}`);
+			return err(createTemplateReadFailedError(filePath));
 		}
 	}
 
@@ -249,25 +307,57 @@ export class QuickActionExecutionService {
 		return `[${localInstance.quick_action_template_missing_prefix}: ${templateName}]`;
 	}
 
-	private resolveProviderSettings(
-		aiRuntimeSettings: AiRuntimeSettings,
+	private resolveProviderSettingsResult(
+		aiRuntimeSettings: QuickActionRuntimeSettings,
 		modelTag?: string,
-	): ProviderSettings | null {
+	): QuickActionResult<QuickActionProviderConfig, QuickActionExecutionError> {
 		const providers = aiRuntimeSettings.providers;
 		if (providers.length === 0) {
-			return null;
+			return err(createMissingModelConfigError(modelTag));
 		}
 		if (modelTag) {
 			const provider = providers.find((item) => item.tag === modelTag);
 			if (provider) {
-				return provider;
+				return ok(provider);
 			}
 		}
-		return providers[0];
+		return ok(providers[0]);
 	}
 
-	private getVendor(vendorName: string): Vendor | undefined {
-		return availableVendors.find((vendor) => vendor.name === vendorName);
+	private async *streamPreparedExecution(
+		plan: PreparedQuickActionExecution,
+	): AsyncGenerator<string, void, unknown> {
+		this.currentAbortController = new AbortController();
+		const controller = this.currentAbortController;
+		DebugLogger.logLlmMessages(
+			'QuickActionExecutionService.executeQuickActionStream',
+			plan.messages,
+			{ level: 'debug' },
+		);
+
+		const resolveEmbed = async () => new ArrayBuffer(0);
+		let preview = '';
+		try {
+			for await (
+				const chunk of plan.sendRequest(plan.messages, controller, resolveEmbed)
+			) {
+				if (controller.signal.aborted) {
+					DebugLogger.debug('[QuickActionExecutionService] 操作执行已被取消');
+					break;
+				}
+				if (preview.length < 100) {
+					preview = `${preview}${chunk}`.slice(0, 100);
+				}
+				yield chunk;
+			}
+			DebugLogger.logLlmResponsePreview(
+				'QuickActionExecutionService.executeQuickActionStream',
+				preview,
+				{ level: 'debug', previewChars: 100 },
+			);
+		} finally {
+			this.currentAbortController = null;
+		}
 	}
 
 	private async buildMessages(
@@ -275,8 +365,8 @@ export class QuickActionExecutionService {
 		promptContent: string,
 		selection: string,
 		customPromptRole?: 'system' | 'user',
-	): Promise<Message[]> {
-		const messages: Message[] = [];
+	): Promise<QuickActionMessage[]> {
+		const messages: QuickActionMessage[] = [];
 
 		if (useDefaultSystemPrompt) {
 			const globalSystemPrompt = (
@@ -310,23 +400,11 @@ export class QuickActionExecutionService {
 	}
 
 	private async callAIWithMessages(
-		providerSettings: ProviderSettings,
-		messages: Message[],
+		sendRequest: QuickActionSendRequest,
+		messages: QuickActionMessage[],
 	): Promise<string> {
-		const vendor = this.getVendor(providerSettings.vendor);
-		if (!vendor) {
-			throw new Error(
-				`${localInstance.quick_action_provider_missing_prefix}: ${providerSettings.vendor}`,
-			);
-		}
-
 		this.currentAbortController = new AbortController();
 		const controller = this.currentAbortController;
-		const providerOptions = buildProviderOptionsWithReasoningDisabled(
-			providerSettings.options,
-			providerSettings.vendor,
-		);
-		const sendRequest = vendor.sendRequestFunc(providerOptions);
 		DebugLogger.logLlmMessages('QuickActionExecutionService.callAIWithMessages', messages, {
 			level: 'debug',
 		});

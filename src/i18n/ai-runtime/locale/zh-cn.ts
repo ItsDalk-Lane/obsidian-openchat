@@ -267,5 +267,7 @@ export default {
 
 	'Enable AI runtime feature': '启用 AI 运行时功能',
 	'AI runtime feature disabled description': '请先启用上方开关以配置 AI 运行时。',
+	'⚠️ Tool call failed, fell back to plain request.\nReason: {reason}':
+		'⚠️ 工具调用失败，已回退为普通请求。\n原因: {reason}',
 	...zhCnMcpLocale,
 } as const

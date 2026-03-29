@@ -9,7 +9,7 @@ import {
 	useInteractions,
 	type ReferenceType
 } from '@floating-ui/react';
-import type { QuickAction, ChatSettings } from 'src/types/chat';
+import type { ChatSettings, QuickAction } from 'src/domains/chat/types';
 import type { SelectionInfo } from './SelectionToolbarExtension';
 
 interface UseSelectionToolbarParams {

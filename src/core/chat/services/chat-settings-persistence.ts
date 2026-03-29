@@ -1,6 +1,9 @@
 import { localInstance } from 'src/i18n/locals';
+import {
+	syncToolExecutionSettings,
+} from 'src/domains/settings/config-ai-runtime';
+import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime';
 import { normalizeMessageManagementSettings } from '../types/chat';
-import { syncToolExecutionSettings, type AiRuntimeSettings } from 'src/settings/ai-runtime/api';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { ChatSettingsAccessor } from './chat-service-types';
 import type { McpSettings } from 'src/services/mcp/types';

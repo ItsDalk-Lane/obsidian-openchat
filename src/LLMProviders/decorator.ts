@@ -1,5 +1,5 @@
 import { normalizePath } from 'obsidian'
-import { APP_FOLDER } from 'src/settings/ai-runtime/api'
+import { APP_FOLDER } from 'src/domains/settings/config-ai-runtime-vendors'
 import { CreatePlainText, SendRequest } from './provider-shared'
 import { DebugLogger } from 'src/utils/DebugLogger'
 

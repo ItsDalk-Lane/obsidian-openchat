@@ -73,6 +73,12 @@ export interface LocalPart4 {
 	quick_action_template_read_failed_prefix: string;
 	quick_action_template_missing_prefix: string;
 	quick_action_provider_missing_prefix: string;
+	quick_action_invalid_group_target: string;
+	quick_action_group_self_target: string;
+	quick_action_group_descendant_target: string;
+	quick_action_group_cycle_detected: string;
+	quick_action_group_max_depth: string;
+	quick_action_storage_folder_missing: string;
 	quick_action_data_unnamed: string;
 	quick_action_result_waiting_model: string;
 	quick_action_result_select_model_hint: string;

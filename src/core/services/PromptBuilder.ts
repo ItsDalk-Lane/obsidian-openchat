@@ -1,6 +1,11 @@
 import type { App, EmbedCache } from 'obsidian';
+import type {
+	ChatMessage,
+	FileIntentAnalysis,
+	SelectedFile,
+	SelectedFolder,
+} from 'src/domains/chat/types';
 import type { Message as ProviderMessage } from 'src/types/provider';
-import type { ChatMessage, SelectedFile, SelectedFolder, FileIntentAnalysis } from 'src/types/chat';
 import type { FileContentOptions, FileContentService, FileContent } from 'src/core/chat/services/file-content-service';
 import { FileIntentAnalyzer } from 'src/core/chat/services/file-intent-analyzer';
 import { parseContentBlocks } from 'src/core/chat/utils/markdown';

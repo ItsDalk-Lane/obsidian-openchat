@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { App } from 'obsidian';
 import type { ChatService } from 'src/core/chat/services/chat-service';
-import type { ChatState } from 'src/types/chat';
+import type { ChatState } from 'src/domains/chat/types';
 import { ChatPlanPanel } from './ChatPlanPanel';
 import { ChatMessages } from './ChatMessages';
 import { ChatControls } from './ChatControls';

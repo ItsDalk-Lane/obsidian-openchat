@@ -22,7 +22,10 @@ import type {
 	SkillScanError,
 	SkillScanResult,
 } from './types';
-import type { ObsidianApiProvider } from 'src/providers/providers.types';
+import type { VaultPathPort, VaultReadPort, YamlPort } from 'src/providers/providers.types';
+
+/** SkillScannerService 所需的最小宿主能力 */
+export type SkillScannerHostPort = VaultPathPort & VaultReadPort & YamlPort;
 
 interface SkillScannerServiceOptions {
 	getAiDataFolder: () => string;
@@ -41,7 +44,7 @@ export class SkillScannerService {
 	private readonly skillsByPath = new Map<string, SkillDefinition>();
 
 	constructor(
-		private readonly obsidianApi: ObsidianApiProvider,
+		private readonly obsidianApi: SkillScannerHostPort,
 		private readonly options: SkillScannerServiceOptions,
 	) {}
 
@@ -182,7 +185,7 @@ export class SkillScannerService {
 }
 
 /** @precondition content 为 SKILL.md 原始内容 @postcondition 返回经校验后的 frontmatter 元数据 @throws 当前置 YAML 缺失、非法或字段不合规时抛出 @example parseSkillMetadata('---\nname: demo\ndescription: desc\n---', obsidianApi) */
-export function parseSkillMetadata(content: string, obsidianApi: Pick<ObsidianApiProvider, 'parseYaml'>): SkillMetadata {
+export function parseSkillMetadata(content: string, obsidianApi: YamlPort): SkillMetadata {
 	const match = content.match(FRONTMATTER_REGEX);
 	if (!match) {
 		throw new Error('SKILL.md 缺少有效的 YAML frontmatter');

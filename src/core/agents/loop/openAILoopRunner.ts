@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import type { BaseOptions, SendRequest } from 'src/types/provider'
 import { REASONING_BLOCK_END_MARKER, REASONING_BLOCK_START_MARKER } from 'src/LLMProviders/utils'
 import { DebugLogger } from 'src/utils/DebugLogger'
+import { t } from 'src/i18n/ai-runtime/helper'
 import type { ToolDefinition } from './types'
 import {
 	DEFAULT_MAX_TOOL_CALL_LOOPS,
@@ -446,7 +447,7 @@ export function createOpenAIToolLoopSupportFactory(
 				try {
 					const { Notice } = await import('obsidian')
 					new Notice(
-						`⚠️ 工具调用失败，已回退为普通请求。\n原因: ${errorText.slice(0, 120)}`,
+						t('⚠️ Tool call failed, fell back to plain request.\nReason: {reason}').replace('{reason}', errorText.slice(0, 120)),
 						8000,
 					)
 				} catch {

@@ -3,15 +3,15 @@ import type { App } from 'obsidian'
 import { Copy } from 'lucide-react'
 import { ToggleSwitch } from 'src/components/toggle-switch/ToggleSwitch'
 import { SystemPromptManagerPanel } from 'src/components/system-prompt-components/SystemPromptManagerModal'
+import type {
+	ChatOpenMode,
+	ChatSettings,
+	MessageManagementSettings,
+} from 'src/domains/chat/types'
+import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime'
 import { localInstance } from 'src/i18n/locals'
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api'
 import type { McpSettings, McpToolInfo } from 'src/services/mcp/types'
 import { summarizeToolDescriptionForUi } from 'src/services/mcp/toolDescriptionSummary'
-import {
-	type ChatOpenMode,
-	type ChatSettings,
-	type MessageManagementSettings,
-} from 'src/types/chat'
 import './ChatSettingsModal.css'
 
 interface AiChatSettingsTabProps {

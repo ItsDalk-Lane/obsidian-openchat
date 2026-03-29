@@ -1,5 +1,5 @@
 import type { ToolExecutionRecord } from 'src/types/tool';
-import { availableVendors } from 'src/settings/ai-runtime/api';
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { ChatMessage, ChatSession } from '../types/chat';

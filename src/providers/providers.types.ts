@@ -1,19 +1,36 @@
 /**
  * @module providers/types
- * @description 定义跨域 Provider 的最小接口。
+ * @description 定义跨域 Provider 的窄接口（Port）与兼容全量接口。
+ *
+ * 每个 Port 代表一组稳定、有边界意义的宿主能力契约。
+ * 域层应根据实际需求依赖最小 Port 组合，而非全量 ObsidianApiProvider。
  *
  * @dependencies 无
  * @side-effects 无
  * @invariants 只暴露稳定接口，不承载实现细节。
  */
 
-export interface ObsidianApiProvider {
+// ── 窄接口（按职责拆分） ───────────────────────────
+
+/** 用户通知能力 */
+export interface NoticePort {
 	notify(message: string, timeout?: number): void;
+}
+
+/** 全局系统提示词构建能力 */
+export interface SystemPromptPort {
 	buildGlobalSystemPrompt(featureId: string): Promise<string>;
+}
+
+/** Vault 路径归一化与目录结构保障能力 */
+export interface VaultPathPort {
 	normalizePath(path: string): string;
 	ensureAiDataFolders(aiDataFolder: string): Promise<void>;
 	ensureVaultFolder(folderPath: string): Promise<string>;
-	requestHttp(options: HttpRequestOptions): Promise<HttpResponseData>;
+}
+
+/** Vault 只读查询能力 */
+export interface VaultReadPort {
 	getVaultEntry(path: string): VaultEntry | null;
 	getVaultName(): string;
 	getActiveFilePath(): string | null;
@@ -24,24 +41,86 @@ export interface ObsidianApiProvider {
 	listFolderEntries(folderPath: string): readonly VaultEntry[];
 	readVaultFile(filePath: string): Promise<string>;
 	readVaultBinary(filePath: string): Promise<ArrayBuffer>;
+}
+
+/** Vault 写入与删除能力 */
+export interface VaultWritePort {
 	writeVaultFile(filePath: string, content: string): Promise<void>;
 	writeVaultBinary(filePath: string, content: ArrayBuffer): Promise<void>;
 	deleteVaultPath(path: string): Promise<void>;
+}
+
+/** Vault 变更监听能力 */
+export interface VaultWatchPort {
+	onVaultChange(listener: (event: VaultChangeEvent) => void): () => void;
+}
+
+/** HTTP 请求能力 */
+export interface HttpRequestPort {
+	requestHttp(options: HttpRequestOptions): Promise<HttpResponseData>;
+}
+
+/** YAML 解析与序列化能力 */
+export interface YamlPort {
 	parseYaml(content: string): unknown;
 	stringifyYaml(content: unknown): string;
+}
+
+/** 浏览器 localStorage 读写能力 */
+export interface LocalStoragePort {
 	readLocalStorage(key: string): string | null;
 	writeLocalStorage(key: string, value: string): void;
+}
+
+/** Obsidian 设置页导航能力 */
+export interface SettingsNavigationPort {
 	openSettingsTab(tabId: string): void;
+}
+
+/** Markdown 编辑器文本插入能力 */
+export interface EditorInsertPort {
 	insertTextIntoMarkdownEditor(content: string): EditorInsertResult;
-	openInternalLink(linkTarget: string, sourcePath?: string): void;
+}
+
+/** Markdown 渲染能力 */
+export interface MarkdownRenderPort {
 	renderMarkdown(
 		markdown: string,
 		container: HTMLElement,
 		sourcePath: string,
 		component: unknown,
 	): Promise<void>;
-	onVaultChange(listener: (event: VaultChangeEvent) => void): () => void;
 }
+
+/** 内部链接跳转能力 */
+export interface InternalLinkPort {
+	openInternalLink(linkTarget: string, sourcePath?: string): void;
+}
+
+// ── 兼容全量接口（过渡期保留） ──────────────────────
+
+/**
+ * 所有宿主能力窄接口的联合。
+ *
+ * **新代码不应直接依赖此接口**——请根据实际需求声明最小 Port 组合。
+ * 此接口仅为尚未迁移的 legacy 消费方保留向下兼容。
+ *
+ * @deprecated 新代码应依赖窄接口（如 NoticePort、VaultReadPort 等）。
+ */
+export interface ObsidianApiProvider extends
+	NoticePort,
+	SystemPromptPort,
+	VaultPathPort,
+	VaultReadPort,
+	VaultWritePort,
+	VaultWatchPort,
+	HttpRequestPort,
+	YamlPort,
+	LocalStoragePort,
+	SettingsNavigationPort,
+	EditorInsertPort,
+	MarkdownRenderPort,
+	InternalLinkPort {}
 
 export interface HttpRequestOptions {
 	readonly url: string;

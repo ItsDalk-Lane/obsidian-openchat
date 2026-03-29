@@ -1,4 +1,6 @@
 import { App } from 'obsidian'
+import type { QuickAction } from 'src/domains/chat/types'
+import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime'
 import { QuickActionDataService } from 'src/domains/quick-actions/service-data'
 import { VendorApiKeysModal } from 'src/components/settings-components/VendorApiKeysModal'
 import { ollamaVendor } from 'src/LLMProviders/ollama'
@@ -13,9 +15,7 @@ import {
 	resolveReasoningCapability,
 	writeReasoningCapabilityCache,
 } from 'src/LLMProviders/modelCapability'
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api'
 import type { ObsidianApiProvider } from 'src/providers/providers.types'
-import type { QuickAction } from 'src/types/chat'
 import type { Message as ProviderMessage, ResolveEmbedAsBinary } from 'src/types/provider'
 import type { BaseOptions, ProviderSettings, Vendor } from 'src/types/provider'
 import { isCustomOpenChatProvider } from 'src/utils/aiProviderMetadata'

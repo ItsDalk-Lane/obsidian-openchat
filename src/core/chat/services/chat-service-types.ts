@@ -1,6 +1,6 @@
 import type { Extension } from '@codemirror/state';
 import type { App, Command, MarkdownView, TFile, WorkspaceLeaf } from 'obsidian';
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api';
+import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime';
 import type { PluginSettings } from 'src/domains/settings/types';
 import type { BuiltinToolsRuntime, BuiltinToolsRuntimeSettings } from 'src/tools/runtime/BuiltinToolsRuntime';
 import type { SkillScannerService } from 'src/domains/skills/service';

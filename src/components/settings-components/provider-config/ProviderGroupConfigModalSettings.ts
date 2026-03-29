@@ -22,8 +22,8 @@ import {
 	type ZhipuThinkingType,
 	zhipuVendor,
 } from 'src/LLMProviders/zhipu';
+import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors';
 import { t } from 'src/i18n/ai-runtime/helper';
-import { availableVendors } from 'src/settings/ai-runtime/api';
 import type { BaseOptions, Vendor } from 'src/types/provider';
 import { ensureDoubaoImageDefaults, renderDoubaoImageSections } from './doubaoSections';
 import { addGptImageSections } from './providerGeneralSections';

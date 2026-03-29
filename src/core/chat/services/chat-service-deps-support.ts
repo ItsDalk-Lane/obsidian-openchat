@@ -5,7 +5,7 @@ import {
 } from 'src/domains/skills/service';
 import {
 	resolveToolExecutionSettings,
-} from 'src/settings/ai-runtime/api';
+} from 'src/domains/settings/config-ai-runtime';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { detectImageGenerationIntent } from './chat-image-intent';
 import {
