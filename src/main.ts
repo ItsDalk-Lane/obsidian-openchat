@@ -1,5 +1,4 @@
-import { Notice, Plugin } from 'obsidian';
-import { localInstance } from 'src/i18n/locals';
+import { Plugin } from 'obsidian';
 import type { PluginSettings } from 'src/domains/settings/types';
 import { DEFAULT_SETTINGS } from 'src/domains/settings/config';
 import { SettingsDomainService } from 'src/domains/settings/service';
@@ -14,11 +13,14 @@ import { createObsidianApiProvider } from 'src/providers/obsidian-api';
 
 export default class OpenChatPlugin extends Plugin {
 	settings: PluginSettings = DEFAULT_SETTINGS;
+	private readonly bootstrapObsidianApiProvider = createObsidianApiProvider(this.app, async () => '');
 
 	featureCoordinator = new FeatureCoordinator(this);
+	private bootstrapSettingsPromise: Promise<PluginSettings> | null = null;
+	private settingTab: PluginSettingTab | null = null;
 	private settingsDomainService = new SettingsDomainService(
 		this,
-		createObsidianApiProvider(this.app, async () => ''),
+		this.bootstrapObsidianApiProvider,
 		DebugLogger,
 	);
 	private settingsController = new PluginSettingsController(
@@ -27,22 +29,28 @@ export default class OpenChatPlugin extends Plugin {
 		DebugLogger,
 		DebugLogger,
 	);
-	private startupCoordinator = new PluginStartupCoordinator(this.settingsDomainService, this.featureCoordinator);
+	private startupCoordinator = new PluginStartupCoordinator(
+		this.settingsDomainService,
+		this.featureCoordinator,
+		(message, timeout) => this.bootstrapObsidianApiProvider.notify(message, timeout),
+	);
 
 
 	async onload() {
 		// 在任何 await 之前同步注册聊天视图类型
 		// 确保 Obsidian 恢复工作区布局时能立即识别视图，消除标题栏占位图标
 		this.featureCoordinator.registerChatViewTypesEarly();
-
-		this.settings = await this.settingsController.loadSettings();
-		this.addSettingTab(new PluginSettingTab(this));
+		this.settingTab = new PluginSettingTab(this);
+		this.addSettingTab(this.settingTab);
 		this.featureCoordinator.initializeAiRuntime(this.settings);
+		void this.ensureBootstrapSettingsLoaded().catch((error) => {
+			DebugLogger.error('[OpenChatPlugin] 启动设置加载失败', error);
+		});
 
 		this.app.workspace.onLayoutReady(() => {
 			void this.initializeDeferredFeatures().catch((error) => {
 				DebugLogger.error('[OpenChatPlugin] 延迟初始化失败', error);
-				new Notice(localInstance.plugin_deferred_initialization_failed_notice);
+				this.bootstrapObsidianApiProvider.notify('延迟初始化失败，请查看日志。');
 			});
 		});
 	}
@@ -54,7 +62,14 @@ export default class OpenChatPlugin extends Plugin {
 
 	private async initializeDeferredFeatures(): Promise<void> {
 		try {
-			await this.startupCoordinator.runDeferredInitialization(this.settings);
+			this.settings = await this.ensureBootstrapSettingsLoaded();
+		} catch (error) {
+			DebugLogger.error('[OpenChatPlugin] 启动设置加载失败，继续使用默认设置', error);
+		}
+
+		try {
+			this.settings = await this.startupCoordinator.runDeferredInitialization(this.settings);
+			this.featureCoordinator.initializeAiRuntime(this.settings);
 		} catch (error) {
 			DebugLogger.error('[OpenChatPlugin] 延迟初始化部分失败，继续初始化 Chat', error);
 		}
@@ -63,10 +78,12 @@ export default class OpenChatPlugin extends Plugin {
 	}
 
 	async replaceSettings(value: Partial<PluginSettings>) {
+		await this.ensureBootstrapSettingsLoaded();
 		this.settings = await this.settingsController.replaceSettings(this.settings, value);
 	}
 
 	async saveSettings() {
+		await this.ensureBootstrapSettingsLoaded();
 		await this.settingsController.saveSettings(this.settings);
 	}
 
@@ -76,6 +93,27 @@ export default class OpenChatPlugin extends Plugin {
 	 * @param folderPath - 可选，指定要创建的文件夹路径；为空时使用当前设置值
 	 */
 	async tryEnsureAIDataFolders(folderPath?: string): Promise<void> {
+		await this.ensureBootstrapSettingsLoaded();
 		await this.settingsController.ensureAiDataFolders(folderPath ?? this.settings.aiDataFolder);
+	}
+
+	private async ensureBootstrapSettingsLoaded(): Promise<PluginSettings> {
+		if (!this.bootstrapSettingsPromise) {
+			this.bootstrapSettingsPromise = this.settingsController.loadBootstrapSettings()
+				.then((settings) => {
+					this.settings = settings;
+					this.featureCoordinator.initializeAiRuntime(settings);
+					if (this.settingTab?.containerEl.isConnected) {
+						this.settingTab.display();
+					}
+					return settings;
+				})
+				.catch((error) => {
+					this.bootstrapSettingsPromise = null;
+					throw error;
+				});
+		}
+
+		return await this.bootstrapSettingsPromise;
 	}
 }

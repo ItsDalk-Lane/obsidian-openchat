@@ -1,13 +1,14 @@
+import ts from 'typescript';
 import type { LintViolation, ManagedFile } from './shared';
 import {
 	type DomainLayer,
 	classifyManagedFile,
 	collectManagedFiles,
 	failIfViolations,
-	getImportSpecifiers,
 	isDirectExecution,
-	resolveWorkspaceImport,
 } from './shared';
+import { getImportSpecifiers, resolveWorkspaceImport } from './import-helpers';
+import { lintGlobalHostUsage } from './lint-arch-support';
 
 const ALLOWED_DOMAIN_LAYER_IMPORTS: Record<DomainLayer, ReadonlySet<DomainLayer>> = {
 	types: new Set(['types']),
@@ -19,10 +20,11 @@ const ALLOWED_DOMAIN_LAYER_IMPORTS: Record<DomainLayer, ReadonlySet<DomainLayer>
 const PROVIDER_ALLOWED_LAYERS = new Set<DomainLayer>(['service', 'ui']);
 const PROVIDER_CONTRACT_PATH = 'src/providers/providers.types.ts';
 const OBSIDIAN_PROVIDER_PATH = 'src/providers/obsidian-api.ts';
+const PLUGIN_ENTRY_PATH = 'src/main.ts';
+const ALLOWED_PLUGIN_IMPORTERS = new Set(['src/core/FeatureCoordinator.ts']);
 
 export function lintArchitecture(workspaceRoot: string): LintViolation[] {
-	const files = collectManagedFiles(workspaceRoot);
-	return lintArchitectureFiles(files);
+	return lintArchitectureFiles(collectManagedFiles(workspaceRoot));
 }
 
 export function lintArchitectureFiles(files: readonly ManagedFile[]): LintViolation[] {
@@ -30,6 +32,20 @@ export function lintArchitectureFiles(files: readonly ManagedFile[]): LintViolat
 	for (const file of files) {
 		for (const imported of getImportSpecifiers(file.sourceFile)) {
 			const resolved = resolveWorkspaceImport(file.relativePath, imported.specifier);
+			if (
+				resolved === PLUGIN_ENTRY_PATH
+				&& file.relativePath !== PLUGIN_ENTRY_PATH
+				&& !ALLOWED_PLUGIN_IMPORTERS.has(file.relativePath)
+			) {
+				violations.push({
+					filePath: file.relativePath,
+					line: imported.line,
+					rule: 'arch/no-plugin-leak',
+					message:
+						'禁止在组合根之外直接导入 OpenChatPlugin。\n修复方法：\n1. 让 src/core/FeatureCoordinator.ts 创建最小 host adapter。\n2. 向下游传递接口而不是 Plugin 实例。',
+				});
+				continue;
+			}
 			if (file.category.kind === 'domain') {
 				lintDomainImport(file, imported.line, resolved, imported.isTypeOnly, violations);
 				continue;
@@ -40,8 +56,16 @@ export function lintArchitectureFiles(files: readonly ManagedFile[]): LintViolat
 			}
 			if (file.category.kind === 'provider') {
 				lintProviderImport(file, imported.line, resolved, imported.isTypeOnly, violations);
+				continue;
+			}
+			if (file.category.kind === 'module') {
+				lintModuleImport(file, imported.line, resolved, imported.isTypeOnly, violations);
 			}
 		}
+		if (file.category.kind === 'shim') {
+			lintShimStructure(file, violations);
+		}
+		lintGlobalHostUsage(file, violations);
 	}
 	return violations;
 }
@@ -227,7 +251,7 @@ function lintProviderImport(
 	}
 	if (
 		importedCategory.kind === 'domain'
-		|| importedCategory.kind === 'consumer'
+		|| (importedCategory.kind === 'module' && importedCategory.scope !== 'root')
 		|| resolved === 'src/main.ts'
 		|| resolved.startsWith('src/commands/')
 		|| resolved.startsWith('src/core/')
@@ -240,6 +264,92 @@ function lintProviderImport(
 			message:
 				'provider 不得反向依赖 domains、core、commands 或 infra。\n修复方法：\n1. 将业务相关决策留在组合根。\n2. 让 provider 只暴露宿主能力，不感知具体业务域。',
 		});
+	}
+}
+
+function lintModuleImport(
+	file: ManagedFile & { category: Extract<ManagedFile['category'], { kind: 'module' }> },
+	line: number,
+	resolved: string | null,
+	_isTypeOnly: boolean,
+	violations: LintViolation[],
+): void {
+	if (!resolved || resolved === 'obsidian') {
+		return;
+	}
+
+	const importedCategory = classifyManagedFile(resolved);
+	if (
+		file.category.scope === 'runtime-adapter'
+		&& (
+			resolved.startsWith('src/commands/')
+			|| resolved.startsWith('src/components/')
+			|| (importedCategory.kind === 'domain' && importedCategory.layer === 'ui')
+		)
+	) {
+		violations.push({
+			filePath: file.relativePath,
+			line,
+			rule: 'arch/runtime-adapter-boundary',
+			message:
+				'LLMProviders 只能依赖共享类型、纯工具和服务契约，不能反向依赖命令层或业务 UI。\n修复方法：\n1. 把 UI 相关拼装移动到 commands/components。\n2. 把共享数据结构下沉到 types 或 provider 契约。',
+		});
+		return;
+	}
+
+	if (
+		file.category.scope === 'tool'
+		&& (
+			resolved.startsWith('src/commands/')
+			|| resolved.startsWith('src/components/')
+			|| (importedCategory.kind === 'domain' && importedCategory.layer === 'ui')
+		)
+	) {
+		violations.push({
+			filePath: file.relativePath,
+			line,
+			rule: 'arch/tool-boundary',
+			message:
+				'tools 目录不应依赖具体命令层或业务 UI。\n修复方法：\n1. 将输入/输出参数收敛为纯数据。\n2. 把 UI 与宿主交互放在调用 tools 的上层壳文件。',
+		});
+		return;
+	}
+
+	if (
+		file.category.scope === 'component'
+		&& importedCategory.kind === 'module'
+		&& importedCategory.scope === 'command'
+	) {
+		violations.push({
+			filePath: file.relativePath,
+			line,
+			rule: 'arch/component-command-boundary',
+			message:
+				'共享组件不应直接依赖命令壳层。\n修复方法：\n1. 由上层把回调和状态注入组件。\n2. 把命令注册与宿主交互留在 commands/ 目录。',
+		});
+	}
+}
+
+function lintShimStructure(
+	file: ManagedFile & { category: Extract<ManagedFile['category'], { kind: 'shim' }> },
+	violations: LintViolation[],
+): void {
+	for (const statement of file.sourceFile.statements) {
+		const isAllowed = ts.isImportDeclaration(statement)
+			|| ts.isExportDeclaration(statement)
+			|| ts.isTypeAliasDeclaration(statement)
+			|| ts.isInterfaceDeclaration(statement);
+		if (isAllowed) {
+			continue;
+		}
+		violations.push({
+			filePath: file.relativePath,
+			line: file.sourceFile.getLineAndCharacterOfPosition(statement.getStart(file.sourceFile)).line + 1,
+			rule: 'arch/shim-only-reexport',
+			message:
+				'兼容 shim 只能保留 import/export/type alias，不能承载业务逻辑。\n修复方法：\n1. 把真实实现迁到 domains/、commands/ 或 settings/ 新文件。\n2. 旧路径只保留转发出口。',
+		});
+		break;
 	}
 }
 

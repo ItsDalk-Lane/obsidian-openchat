@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { t } from 'src/i18n/ai-runtime/helper'
 import type { PoeRequestContext } from './poeRunnerShared'
 import {
@@ -23,6 +21,33 @@ import {
 } from './poeMessageTransforms'
 import { executePoeMcpToolCalls } from './poeMcpRunners'
 import { buildReasoningBlockEnd, buildReasoningBlockStart } from './utils'
+
+type PoeResponsesCreateParams =
+	Parameters<PoeRequestContext['client']['responses']['create']>[0]
+
+type PoeResponsesCreateOptions =
+	Parameters<PoeRequestContext['client']['responses']['create']>[1]
+
+type PoeResponsesStream =
+	Awaited<ReturnType<PoeRequestContext['client']['responses']['create']>>
+
+type PoeResponseEvent = Record<string, unknown> & {
+	delta?: unknown
+	response?: unknown
+	text?: unknown
+}
+
+const toPoeResponsesCreateParams = (
+	requestData: Record<string, unknown>,
+): PoeResponsesCreateParams =>
+	requestData as unknown as PoeResponsesCreateParams
+
+const getPoeEventText = (event: PoeResponseEvent): string => {
+	if (typeof event.delta === 'string') {
+		return String(event.delta)
+	}
+	return typeof event.text === 'string' ? String(event.text) : ''
+}
 
 export const buildResponsesRequestData = (
 	context: PoeRequestContext,
@@ -126,12 +151,16 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 	let shouldUseAccumulatedContinuation = isPoeOrganizationKnownZdr(context.baseURL, context.apiKey)
 	const accumulatedProtocolInput: unknown[] = [...context.responseInput]
 	const accumulatedMessageInput: unknown[] = [...context.responseInput]
+	const requestOptions: PoeResponsesCreateOptions = {
+		signal: context.controller.signal,
+	}
 
 	const createResponsesStream = async (requestData: Record<string, unknown>) => {
 		try {
-			return await context.client.responses.create(requestData as any, {
-				signal: context.controller.signal,
-			})
+			return await context.client.responses.create(
+				toPoeResponsesCreateParams(requestData),
+				requestOptions,
+			)
 		} catch (error) {
 			if (!previousResponseId || !shouldRetryWithoutPreviousResponseId(error)) {
 				throw error
@@ -141,8 +170,14 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 			shouldUseAccumulatedContinuation = true
 			previousResponseId = undefined
 			return await context.client.responses.create(
-				buildAccumulatedRequestData(context, accumulatedMessageInput, continuationReasoningEnabled) as any,
-				{ signal: context.controller.signal }
+				toPoeResponsesCreateParams(
+					buildAccumulatedRequestData(
+						context,
+						accumulatedMessageInput,
+						continuationReasoningEnabled,
+					),
+				),
+				requestOptions,
 			)
 		}
 	}
@@ -152,11 +187,11 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 
 		const isToolContinuationTurn = isFunctionCallOutputInput(currentInput)
 		const shouldUseAccumulatedRequest = shouldUseAccumulatedContinuation
-		let stream: Awaited<ReturnType<typeof context.client.responses.create>> | undefined
+		let stream: PoeResponsesStream | undefined
 
 		try {
 			stream = await createResponsesStream(
-				(shouldUseAccumulatedRequest
+				shouldUseAccumulatedRequest
 					? buildAccumulatedRequestData(context, accumulatedMessageInput, continuationReasoningEnabled)
 					: buildResponsesRequestData(
 						context,
@@ -164,7 +199,7 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 						previousResponseId,
 						'default',
 						continuationReasoningEnabled
-					)) as any,
+					),
 			)
 		} catch (error) {
 			let requestError: unknown = error
@@ -179,7 +214,7 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 				continuationReasoningEnabled = false
 				try {
 					stream = await createResponsesStream(
-						(shouldUseAccumulatedContinuation
+						shouldUseAccumulatedContinuation
 							? buildAccumulatedRequestData(context, accumulatedMessageInput, continuationReasoningEnabled)
 							: buildResponsesRequestData(
 								context,
@@ -188,7 +223,7 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 								'default',
 								continuationReasoningEnabled,
 								false
-							)) as any,
+							),
 					)
 				} catch (retryWithoutReasoningError) {
 					requestError = retryWithoutReasoningError
@@ -203,12 +238,12 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 							context,
 							shouldUseAccumulatedContinuation ? accumulatedMessageInput : accumulatedProtocolInput,
 							continuationReasoningEnabled
-						) as any,
+						),
 					)
 				} else if (shouldRetryFunctionOutputTurn400(requestError, currentInput)) {
 					try {
 						stream = await createResponsesStream(
-							(shouldUseAccumulatedContinuation
+							shouldUseAccumulatedContinuation
 								? buildAccumulatedRequestData(context, accumulatedMessageInput, continuationReasoningEnabled)
 								: buildResponsesRequestData(
 									context,
@@ -216,14 +251,14 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 									previousResponseId,
 									'compat',
 									continuationReasoningEnabled
-								)) as any,
+								),
 						)
 					} catch (compatError) {
 						if (!shouldRetryFunctionOutputTurn400(compatError, currentInput)) {
 							throw compatError
 						}
 						stream = await createResponsesStream(
-							(shouldUseAccumulatedContinuation
+							shouldUseAccumulatedContinuation
 								? (() => {
 									const continuationInput = toToolResultContinuationInput(currentInput)
 									const nextAccumulatedMessageInput = Array.isArray(continuationInput)
@@ -241,7 +276,7 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 									previousResponseId,
 									'default',
 									continuationReasoningEnabled
-								)) as any,
+								),
 						)
 					}
 				} else {
@@ -250,20 +285,16 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 			}
 		}
 
-		let completedResponse: any = null
+		let completedResponse: unknown = null
 		let reasoningActive = false
 		let reasoningStartMs: number | null = null
 		let hasStreamedText = false
 		let hasStreamedReasoning = false
 
-		for await (const event of stream as AsyncIterable<Record<string, unknown>>) {
+		for await (const event of stream as AsyncIterable<PoeResponseEvent>) {
 			if (isReasoningDeltaEvent(String(event.type ?? ''))) {
 				if (!context.enableReasoning) continue
-				const text = typeof (event as any).delta === 'string'
-					? String((event as any).delta)
-					: typeof (event as any).text === 'string'
-						? String((event as any).text)
-						: ''
+				const text = getPoeEventText(event)
 				if (!text) {
 					hasStreamedReasoning = true
 					continue
@@ -279,7 +310,7 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 			}
 
 			if (event.type === 'response.output_text.delta') {
-				const text = String((event as any).delta ?? '')
+				const text = getPoeEventText(event)
 				if (!text) continue
 				if (reasoningActive) {
 					reasoningActive = false
@@ -293,7 +324,7 @@ export const runResponsesWithOpenAISdk = async function* (context: PoeRequestCon
 			}
 
 			if (event.type === 'response.completed') {
-				completedResponse = (event as any).response
+				completedResponse = event.response
 				if (reasoningActive) {
 					reasoningActive = false
 					const durationMs = Date.now() - (reasoningStartMs ?? Date.now())

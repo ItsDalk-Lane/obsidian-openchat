@@ -1,6 +1,13 @@
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import {
+	BaseOptions,
+	mergeProviderOptionsWithParameters,
+	Message,
+	ResolveEmbedAsBinary,
+	SendRequest,
+	Vendor,
+} from './provider-shared'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import {
 	buildReasoningBlockStart,
@@ -11,25 +18,19 @@ import { withToolMessageContext } from './messageFormat'
 import {
 	OpenAILoopOptions,
 	withToolCallLoopSupport
-} from 'src/core/agents/loop'
+} from 'src/core/agents/loop/OpenAILoopHandler'
 import {
 	buildZhipuThinkingConfig,
 	createZhipuLoggedFetch,
 	DEFAULT_ZHIPU_THINKING_TYPE,
-	filterZhipuRequestExtras,
 	normalizeZhipuOpenAIBaseURL,
-	type ZhipuOptions,
-	ZHIPU_SLOW_REQUEST_THRESHOLD_MS,
+	ZHIPU_THINKING_TYPE_OPTIONS,
 } from './zhipuShared'
-
-export {
-	buildZhipuThinkingConfig,
-	createZhipuLoggedFetch,
-	DEFAULT_ZHIPU_THINKING_TYPE,
-	normalizeZhipuOpenAIBaseURL,
+import {
+	filterZhipuRequestExtras,
 	type ZhipuOptions,
 	type ZhipuThinkingType,
-	ZHIPU_THINKING_TYPE_OPTIONS,
+	ZHIPU_SLOW_REQUEST_THRESHOLD_MS,
 } from './zhipuShared'
 
 type ZhipuDelta = OpenAI.ChatCompletionChunk.Choice.Delta & {
@@ -220,6 +221,19 @@ export const ZHIPU_MODELS = [
 	'glm-4-flash',
 	'glm-4-flashx'
 ]
+
+export {
+	buildZhipuThinkingConfig,
+	createZhipuLoggedFetch,
+	DEFAULT_ZHIPU_THINKING_TYPE,
+	normalizeZhipuOpenAIBaseURL,
+	ZHIPU_THINKING_TYPE_OPTIONS,
+}
+
+export type {
+	ZhipuOptions,
+	ZhipuThinkingType,
+}
 
 export const zhipuVendor: Vendor = {
 	name: 'Zhipu',

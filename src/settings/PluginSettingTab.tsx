@@ -1,4 +1,4 @@
-import { PluginSettingTab as ObPluginSettingTab } from "obsidian";
+import { Plugin, PluginSettingTab as ObPluginSettingTab } from "obsidian";
 import { StrictMode, useEffect } from "react";
 import { Root, createRoot } from "react-dom/client";
 import { Tab } from "src/components/tab/Tab";
@@ -12,7 +12,6 @@ import type {
 import { ObsidianAppContext } from "src/contexts/obsidianAppContext";
 import { t } from "src/i18n/ai-runtime/helper";
 import { localInstance } from "src/i18n/locals";
-import OpenChatPlugin from "src/main";
 import { GeneralSettingTabItem } from "./GeneralSettingTabItem";
 import { ChatSettingsProvider } from "src/components/chat-components/ChatSettingsContext";
 import {
@@ -27,6 +26,11 @@ import {
 } from "src/components/chat-components/chatSettingsIntegrationTabs";
 import { useChatSettingsContext } from "src/components/chat-components/ChatSettingsContext";
 import { ModelSettingsTabItem } from "src/components/settings-components/ModelSettingsTabItem";
+import {
+	createPluginSettingTabHost,
+	type PluginSettingTabHost,
+	type PluginSettingTabRuntime,
+} from "./plugin-setting-host";
 
 
 const GENERAL_AI_RUNTIME_PANEL_OPTIONS: AiRuntimeSettingsPanelOptions = {
@@ -69,10 +73,10 @@ const TAB_COMPLETION_PANEL_OPTIONS: AiRuntimeSettingsPanelOptions = {
 }
 
 const GeneralSettingsTabContent = ({
-	plugin,
+	host,
 	aiRuntimePanelOptions,
 }: {
-	plugin: OpenChatPlugin
+	host: PluginSettingTabHost
 	aiRuntimePanelOptions: AiRuntimeSettingsPanelOptions
 }) => {
 	const {
@@ -84,9 +88,9 @@ const GeneralSettingsTabContent = ({
 	} = useChatSettingsContext()
 
 	return (
-		<GeneralSettingTabItem plugin={plugin}>
+		<GeneralSettingTabItem host={host}>
 			<AiRuntimeSettingsTabItem
-				plugin={plugin}
+				host={host}
 				panelOptions={aiRuntimePanelOptions}
 			/>
 			<AiChatSettingsTab
@@ -101,20 +105,20 @@ const GeneralSettingsTabContent = ({
 	)
 }
 
-const ModelsTabContent = ({ plugin }: { plugin: OpenChatPlugin }) => {
-	return <ModelSettingsTabItem plugin={plugin} />
+const ModelsTabContent = ({ host }: { host: PluginSettingTabHost }) => {
+	return <ModelSettingsTabItem host={host} />
 }
 
 const GeneralSettingsFallbackContent = ({
-	plugin,
+	host,
 	aiRuntimePanelOptions,
 }: {
-	plugin: OpenChatPlugin
+	host: PluginSettingTabHost
 	aiRuntimePanelOptions: AiRuntimeSettingsPanelOptions
 }) => (
-	<GeneralSettingTabItem plugin={plugin}>
+	<GeneralSettingTabItem host={host}>
 		<AiRuntimeSettingsTabItem
-			plugin={plugin}
+			host={host}
 			panelOptions={aiRuntimePanelOptions}
 		/>
 	</GeneralSettingTabItem>
@@ -197,33 +201,33 @@ const ToolsTabContent = () => {
 }
 
 const QuickActionsTabContent = ({
-	plugin,
+	host,
 	panelOptions,
 }: {
-	plugin: OpenChatPlugin
+	host: PluginSettingTabHost
 	panelOptions: AiRuntimeSettingsPanelOptions
 }) => (
 	<AiRuntimeSettingsTabItem
-		plugin={plugin}
+		host={host}
 		panelOptions={panelOptions}
 	/>
 )
 
 const TabCompletionTabContent = ({
-	plugin,
+	host,
 	panelOptions,
 }: {
-	plugin: OpenChatPlugin
+	host: PluginSettingTabHost
 	panelOptions: AiRuntimeSettingsPanelOptions
 }) => (
 	<AiRuntimeSettingsTabItem
-		plugin={plugin}
+		host={host}
 		panelOptions={panelOptions}
 	/>
 )
 
 export class PluginSettingTab extends ObPluginSettingTab {
-	plugin: OpenChatPlugin;
+	plugin: PluginSettingTabHost;
 	root: Root | null = null;
 	private generalAiRuntimePanelState: AiRuntimeSettingsPanelState = {};
 	private quickActionsPanelState: AiRuntimeSettingsPanelState = {};
@@ -232,9 +236,9 @@ export class PluginSettingTab extends ObPluginSettingTab {
 	private readonly quickActionsPanelOptions: AiRuntimeSettingsPanelOptions;
 	private readonly tabCompletionPanelOptions: AiRuntimeSettingsPanelOptions;
 
-	constructor(plugin: OpenChatPlugin) {
-		super(plugin.app, plugin);
-		this.plugin = plugin;
+	constructor(plugin: PluginSettingTabRuntime) {
+		super(plugin.app, plugin as Plugin);
+		this.plugin = createPluginSettingTabHost(plugin);
 		this.generalAiRuntimePanelOptions = {
 			...GENERAL_AI_RUNTIME_PANEL_OPTIONS,
 			state: this.generalAiRuntimePanelState,
@@ -253,31 +257,30 @@ export class PluginSettingTab extends ObPluginSettingTab {
 		const { containerEl } = this;
 		this.root = createRoot(containerEl);
 
-		const service =
-			this.plugin.featureCoordinator.getChatFeatureManager()?.getService() ?? null;
+		const service = this.plugin.getChatSettingsService();
 
 		const baseItems = [
 			{
 				id: "general_setting",
 				title: localInstance.general_setting,
 				content: service
-					? <GeneralSettingsTabContent plugin={this.plugin} aiRuntimePanelOptions={this.generalAiRuntimePanelOptions} />
-					: <GeneralSettingsFallbackContent plugin={this.plugin} aiRuntimePanelOptions={this.generalAiRuntimePanelOptions} />,
+					? <GeneralSettingsTabContent host={this.plugin} aiRuntimePanelOptions={this.generalAiRuntimePanelOptions} />
+					: <GeneralSettingsFallbackContent host={this.plugin} aiRuntimePanelOptions={this.generalAiRuntimePanelOptions} />,
 			},
 			{
 				id: "models_setting",
 				title: localInstance.tab_models,
-				content: <ModelsTabContent plugin={this.plugin} />,
+				content: <ModelsTabContent host={this.plugin} />,
 			},
 			{
 				id: "quick_actions_setting",
 				title: localInstance.selection_toolbar_settings_section,
-				content: <QuickActionsTabContent plugin={this.plugin} panelOptions={this.quickActionsPanelOptions} />,
+				content: <QuickActionsTabContent host={this.plugin} panelOptions={this.quickActionsPanelOptions} />,
 			},
 			{
 				id: "tab_completion_setting",
 				title: t('AI Tab completion'),
-				content: <TabCompletionTabContent plugin={this.plugin} panelOptions={this.tabCompletionPanelOptions} />,
+				content: <TabCompletionTabContent host={this.plugin} panelOptions={this.tabCompletionPanelOptions} />,
 			},
 		];
 

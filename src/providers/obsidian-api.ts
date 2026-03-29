@@ -2,13 +2,14 @@
  * @module providers/obsidian-api
  * @description 封装当前域迁移所需的 Obsidian API 能力。
  *
- * @dependencies obsidian, src/providers/providers.types, src/utils/AIPathManager
+ * @dependencies obsidian, src/providers/providers.types, src/providers/obsidian-api-core
  * @side-effects 触发 Notice、读取全局系统提示词、访问 Vault、注册 Vault 事件
  * @invariants 不向域层泄露 App 或 Plugin 实例。
  */
 
-import type { App, EventRef, TAbstractFile } from 'obsidian';
+import type { App, Component, EventRef } from 'obsidian';
 import {
+	MarkdownRenderer,
 	MarkdownView,
 	Notice,
 	TFile,
@@ -18,7 +19,6 @@ import {
 	requestUrl,
 	stringifyYaml,
 } from 'obsidian';
-import { ensureAIDataFolders } from 'src/utils/AIPathManager';
 import { createObsidianApiProviderFromRuntime, type ObsidianApiRuntime, type ObsidianVaultNode } from './obsidian-api-core';
 import type {
 	HttpRequestOptions,
@@ -33,6 +33,17 @@ import type {
  * @throws 从不抛出
  * @example createObsidianApiProvider(app, async () => '')
  */
+const AI_DATA_SUBFOLDERS = [
+	'ai prompts',
+	'chat-history',
+	'quick-actions',
+	'system-prompts',
+	'mcp-servers',
+	'multi-model',
+	'skills',
+	'agents',
+] as const;
+
 export function createObsidianApiProvider(
 	app: App,
 	buildGlobalSystemPrompt: (featureId: string) => Promise<string>,
@@ -52,7 +63,11 @@ function createObsidianApiRuntime(app: App): ObsidianApiRuntime {
 			return normalizeVaultPath(path);
 		},
 		async ensureAiDataFolders(aiDataFolder: string): Promise<void> {
-			await ensureAIDataFolders(app, aiDataFolder);
+			const rootPath = normalizeVaultPath(aiDataFolder.replace(/[\\/]+$/gu, ''));
+			await ensureVaultFolderPath(app, rootPath);
+			for (const subfolder of AI_DATA_SUBFOLDERS) {
+				await ensureVaultFolderPath(app, `${rootPath}/${subfolder}`);
+			}
 		},
 		async ensureVaultFolder(folderPath: string): Promise<string> {
 			const normalizedPath = normalizeVaultPath(folderPath);
@@ -229,6 +244,23 @@ function createObsidianApiRuntime(app: App): ObsidianApiRuntime {
 			}
 
 			return { inserted: false };
+		},
+		openInternalLink(linkTarget: string, sourcePath?: string): void {
+			app.workspace.openLinkText(linkTarget, sourcePath ?? '', true);
+		},
+		async renderMarkdown(
+			markdown: string,
+			container: HTMLElement,
+			sourcePath: string,
+			component: unknown,
+		): Promise<void> {
+			await MarkdownRenderer.render(
+				app,
+				markdown,
+				container,
+				sourcePath,
+				component as Component,
+			);
 		},
 		onVaultChange(type: VaultChangeEvent['type'], listener: (path: string, oldPath?: string) => void): EventRef {
 			switch (type) {

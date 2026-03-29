@@ -14,13 +14,30 @@ export interface ManagedFile {
 export type DomainLayer = 'types' | 'config' | 'service' | 'ui';
 export type ProviderRole = 'contract' | 'implementation';
 export type ChatRole = 'service' | 'host-adapter' | 'consumer';
+export type ModuleScope =
+	| 'root'
+	| 'command'
+	| 'component'
+	| 'context'
+	| 'core'
+	| 'editor'
+	| 'hook'
+	| 'i18n'
+	| 'runtime-adapter'
+	| 'service'
+	| 'settings'
+	| 'shared'
+	| 'tool'
+	| 'type';
+export type ShimScope = 'command' | 'core' | 'editor' | 'service' | 'settings' | 'type';
 
 export type ManagedFileCategory =
 	| { kind: 'infra' }
 	| { kind: 'provider'; role: ProviderRole; moduleName: string }
-	| { kind: 'consumer' }
 	| { kind: 'chat'; role: ChatRole }
 	| { kind: 'domain'; domainName: string; layer: DomainLayer }
+	| { kind: 'module'; scope: ModuleScope }
+	| { kind: 'shim'; scope: ShimScope }
 	| { kind: 'unknown' };
 
 export interface LintViolation {
@@ -30,8 +47,7 @@ export interface LintViolation {
 	rule: string;
 }
 
-const MANAGED_ROOTS = ['infra', 'src/providers', 'src/domains', 'src/core/chat/services', 'src/core/chat/utils', 'src/core/chat/runtime', 'src/commands/chat'];
-const MANAGED_EXPLICIT_FILES = ['src/main.ts', 'src/core/FeatureCoordinator.ts', 'src/core/chat/chat-feature-manager.tsx', 'src/commands/ai-runtime/AiRuntimeCommandManager.ts'];
+const MANAGED_ROOTS = ['infra', 'src'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
 
 export const DOMAIN_LAYER_ORDER: Record<DomainLayer, number> = {
@@ -41,9 +57,25 @@ export const DOMAIN_LAYER_ORDER: Record<DomainLayer, number> = {
 	ui: 3,
 };
 
-export function normalizePath(value: string): string {
-	return value.replace(/\\/g, '/');
-}
+const SHIM_FILE_SCOPES: Record<string, ShimScope> = {
+	'src/commands/chat/chat-view-coordinator.ts': 'command',
+	'src/commands/chat/chat-view-coordinator-ui.ts': 'command',
+	'src/core/chat/utils/markdown.ts': 'core',
+	'src/editor/selectionToolbar/QuickActionDataService.ts': 'editor',
+	'src/editor/selectionToolbar/QuickActionExecutionService.ts': 'editor',
+	'src/editor/selectionToolbar/quickActionDataUtils.ts': 'editor',
+	'src/editor/selectionToolbar/quickActionGroupHelpers.ts': 'editor',
+	'src/editor/types/chat.ts': 'editor',
+	'src/services/mcp/types.ts': 'service',
+	'src/settings/ai-runtime/api.ts': 'settings',
+	'src/types/chat.ts': 'type',
+	'src/types/mcp.ts': 'type',
+	'src/types/provider.ts': 'type',
+	'src/types/sub-agent.ts': 'type',
+	'src/types/system-prompt.ts': 'type',
+};
+
+export function normalizePath(value: string): string { return value.replace(/\\/g, '/'); }
 
 export function createManagedFile(relativePath: string, content: string): ManagedFile {
 	const normalized = normalizePath(relativePath);
@@ -65,14 +97,7 @@ export function collectManagedFiles(workspaceRoot: string): ManagedFile[] {
 		}
 		walkDirectory(workspaceRoot, absoluteRoot, files);
 	}
-	for (const explicitFile of MANAGED_EXPLICIT_FILES) {
-		const absoluteFile = path.join(workspaceRoot, explicitFile);
-		if (!fs.existsSync(absoluteFile)) {
-			continue;
-		}
-		files.push(readManagedFile(workspaceRoot, absoluteFile));
-	}
-	return files.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+	return dedupeManagedFiles(files).sort((left, right) => left.relativePath.localeCompare(right.relativePath));
 }
 
 function walkDirectory(workspaceRoot: string, directoryPath: string, files: ManagedFile[]): void {
@@ -119,22 +144,18 @@ export function classifyManagedFile(relativePath: string): ManagedFileCategory {
 				: fileName.replace(/-(core|runtime|impl|internal|adapter)$/u, ''),
 		};
 	}
-	if (
-		normalized === 'src/main.ts'
-		|| normalized === 'src/core/FeatureCoordinator.ts'
-		|| normalized === 'src/core/chat/chat-feature-manager.tsx'
-		|| normalized === 'src/commands/ai-runtime/AiRuntimeCommandManager.ts'
-	) {
-		return { kind: 'consumer' };
+	const shimScope = SHIM_FILE_SCOPES[normalized];
+	if (shimScope) {
+		return { kind: 'shim', scope: shimScope };
+	}
+	if (normalized === 'src/core/chat/chat-feature-manager.tsx') {
+		return { kind: 'chat', role: 'consumer' };
 	}
 	if (
 		normalized === 'src/core/chat/services/file-content-service.ts'
 		|| normalized === 'src/core/chat/services/message-service.ts'
 	) {
 		return { kind: 'chat', role: 'host-adapter' };
-	}
-	if (normalized === 'src/core/chat/utils/markdown.ts') {
-		return { kind: 'chat', role: 'consumer' };
 	}
 	if (
 		normalized.startsWith('src/core/chat/services/')
@@ -145,6 +166,52 @@ export function classifyManagedFile(relativePath: string): ManagedFileCategory {
 	}
 	if (normalized.startsWith('src/commands/chat/')) {
 		return { kind: 'chat', role: 'consumer' };
+	}
+	if (
+		normalized === 'src/main.ts'
+		|| normalized === 'src/core/FeatureCoordinator.ts'
+		|| normalized === 'src/core/PluginStartupCoordinator.ts'
+	) {
+		return { kind: 'module', scope: 'root' };
+	}
+	if (normalized.startsWith('src/commands/')) {
+		return { kind: 'module', scope: 'command' };
+	}
+	if (normalized.startsWith('src/components/')) {
+		return { kind: 'module', scope: 'component' };
+	}
+	if (normalized.startsWith('src/contexts/')) {
+		return { kind: 'module', scope: 'context' };
+	}
+	if (normalized.startsWith('src/editor/')) {
+		return { kind: 'module', scope: 'editor' };
+	}
+	if (normalized.startsWith('src/hooks/')) {
+		return { kind: 'module', scope: 'hook' };
+	}
+	if (normalized.startsWith('src/i18n/')) {
+		return { kind: 'module', scope: 'i18n' };
+	}
+	if (normalized.startsWith('src/LLMProviders/')) {
+		return { kind: 'module', scope: 'runtime-adapter' };
+	}
+	if (normalized.startsWith('src/services/')) {
+		return { kind: 'module', scope: 'service' };
+	}
+	if (normalized.startsWith('src/settings/')) {
+		return { kind: 'module', scope: 'settings' };
+	}
+	if (normalized.startsWith('src/tools/')) {
+		return { kind: 'module', scope: 'tool' };
+	}
+	if (normalized.startsWith('src/types/')) {
+		return { kind: 'module', scope: 'type' };
+	}
+	if (normalized.startsWith('src/utils/')) {
+		return { kind: 'module', scope: 'shared' };
+	}
+	if (normalized.startsWith('src/core/')) {
+		return { kind: 'module', scope: 'core' };
 	}
 	const domainMatch = normalized.match(/^src\/domains\/([^/]+)\/(types|config|service|ui)\.tsx?$/u);
 	if (domainMatch) {
@@ -187,65 +254,12 @@ export function classifyManagedFile(relativePath: string): ManagedFileCategory {
 	return { kind: 'unknown' };
 }
 
-export function getImportSpecifiers(sourceFile: ts.SourceFile): Array<{
-	specifier: string;
-	line: number;
-	isTypeOnly: boolean;
-}> {
-	const specifiers: Array<{ specifier: string; line: number; isTypeOnly: boolean }> = [];
-	const visit = (node: ts.Node): void => {
-		if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
-			const text = node.moduleSpecifier.getText(sourceFile).slice(1, -1);
-			const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-			const isTypeOnly = ts.isImportDeclaration(node)
-				? Boolean(node.importClause?.isTypeOnly)
-				: Boolean(node.isTypeOnly);
-			specifiers.push({ specifier: text, line, isTypeOnly });
-		}
-		ts.forEachChild(node, visit);
-	};
-	visit(sourceFile);
-	return specifiers;
-}
-
-export function resolveWorkspaceImport(fromFile: string, importSpecifier: string): string | null {
-	if (importSpecifier === 'obsidian') {
-		return 'obsidian';
+function dedupeManagedFiles(files: readonly ManagedFile[]): ManagedFile[] {
+	const deduped = new Map<string, ManagedFile>();
+	for (const file of files) {
+		deduped.set(file.relativePath, file);
 	}
-	if (importSpecifier.startsWith('src/')) {
-		return resolveImportCandidate(importSpecifier);
-	}
-	if (!importSpecifier.startsWith('.')) {
-		return null;
-	}
-	const baseDirectory = path.posix.dirname(normalizePath(fromFile));
-	const candidates = buildImportCandidates(path.posix.normalize(path.posix.join(baseDirectory, importSpecifier)));
-	for (const candidate of candidates) {
-		if (candidate.endsWith('.ts') || candidate.endsWith('.tsx')) {
-			return normalizePath(candidate);
-		}
-	}
-	return null;
-}
-
-function resolveImportCandidate(importSpecifier: string): string | null {
-	const candidates = buildImportCandidates(normalizePath(importSpecifier));
-	for (const candidate of candidates) {
-		if (candidate.endsWith('.ts') || candidate.endsWith('.tsx')) {
-			return normalizePath(candidate);
-		}
-	}
-	return null;
-}
-
-function buildImportCandidates(basePath: string): string[] {
-	return [
-		basePath,
-		`${basePath}.ts`,
-		`${basePath}.tsx`,
-		`${basePath}/index.ts`,
-		`${basePath}/index.tsx`,
-	].map((candidate) => path.posix.normalize(candidate));
+	return [...deduped.values()];
 }
 
 export function printViolations(prefix: string, violations: readonly LintViolation[]): void {
@@ -279,8 +293,5 @@ export function findNodeLine(sourceFile: ts.SourceFile, node: ts.Node): number {
 }
 
 export function getLineCount(content: string): number {
-	if (content.length === 0) {
-		return 0;
-	}
-	return content.split(/\r?\n/u).length;
+	return content.length === 0 ? 0 : content.split(/\r?\n/u).length;
 }

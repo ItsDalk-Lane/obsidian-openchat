@@ -2,27 +2,40 @@ import { Setting } from "obsidian";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { localInstance } from "src/i18n/locals";
 import FolderSuggest from "src/components/combobox/FolderSuggest";
-import OpenChatPlugin from "src/main";
 import { DEFAULT_SETTINGS } from "src/domains/settings/config";
 import { t } from "src/i18n/ai-runtime/helper";
 import { DebugLogger } from "src/utils/DebugLogger";
-import { resolveToolExecutionSettings, syncToolExecutionSettings } from "src/settings/ai-runtime";
+import { resolveToolExecutionSettings, syncToolExecutionSettings } from "src/settings/ai-runtime/api";
+import type { PluginSettingTabHost } from "./plugin-setting-host";
 import "./GeneralSettingTabItem.css";
 
-export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?: ReactNode }) {
-	const { plugin, children } = props;
+interface GeneralSettingTabItemProps {
+	host: Pick<
+		PluginSettingTabHost,
+		| "app"
+		| "manifest"
+		| "settings"
+		| "replaceSettings"
+		| "saveSettings"
+		| "tryEnsureAIDataFolders"
+	>;
+	children?: ReactNode;
+}
+
+export function GeneralSettingTabItem(props: GeneralSettingTabItemProps) {
+	const { host, children } = props;
 	const settings = {
 		...DEFAULT_SETTINGS,
-		...plugin.settings,
+		...host.settings,
 	};
-	const app = plugin.app;
+	const app = host.app;
 	const formRef = useRef<HTMLDivElement>(null);
 	const debugSettingsRef = useRef<HTMLDivElement>(null);
 
 	const [settingsValue, setSettingsValue] = useState(settings);
 	useEffect(() => {
-		plugin.replaceSettings(settingsValue);
-	}, [settingsValue]);
+		void host.replaceSettings(settingsValue);
+	}, [host, settingsValue]);
 
 	useEffect(() => {
 		if (!formRef.current) {
@@ -31,7 +44,7 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?
 		const el = formRef.current;
 		el.empty();
 
-		new Setting(el).setName("V" + plugin.manifest.version).setDesc("");
+		new Setting(el).setName("V" + host.manifest.version).setDesc("");
 
 		// AI data folder setting
 		new Setting(el)
@@ -48,7 +61,7 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?
 				cb.inputEl.addEventListener('blur', () => {
 					const current = cb.getValue();
 					if (current !== valueOnFocus) {
-						plugin.tryEnsureAIDataFolders();
+						void host.tryEnsureAIDataFolders();
 					}
 				});
 				cb.onChange((v) => {
@@ -69,13 +82,12 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?
 						};
 					});
 					suggest.close();
-					// 通过下拉建议选择时直接传入路径触发文件夹创建
-					plugin.tryEnsureAIDataFolders(folder.path);
+					void host.tryEnsureAIDataFolders(folder.path);
 				});
 			});
 
 		// Tool execution settings
-		const aiRuntime = plugin.settings.aiRuntime;
+		const aiRuntime = host.settings.aiRuntime;
 		const sharedToolExecutionSettings = resolveToolExecutionSettings(aiRuntime);
 
 		new Setting(el)
@@ -90,8 +102,8 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?
 						if (!Number.isFinite(parsed) || parsed < 1) {
 							return;
 						}
-						syncToolExecutionSettings(plugin.settings.aiRuntime, { maxToolCalls: parsed });
-						await plugin.saveSettings();
+						syncToolExecutionSettings(host.settings.aiRuntime, { maxToolCalls: parsed });
+						await host.saveSettings();
 					})
 			);
 
@@ -107,15 +119,15 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?
 						if (!Number.isFinite(parsed) || parsed < 1000) {
 							return;
 						}
-						syncToolExecutionSettings(plugin.settings.aiRuntime, { timeoutMs: parsed });
-						await plugin.saveSettings();
+						syncToolExecutionSettings(host.settings.aiRuntime, { timeoutMs: parsed });
+						await host.saveSettings();
 					})
 			);
 
 		return () => {
 			el.empty();
 		};
-	}, [plugin.manifest.version]);
+	}, [host]);
 
 	// Debug settings - rendered after children
 	useEffect(() => {
@@ -125,15 +137,15 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?
 		const el = debugSettingsRef.current;
 		el.empty();
 
-		const aiRuntime = plugin.settings.aiRuntime;
+		const aiRuntime = host.settings.aiRuntime;
 
 		new Setting(el)
 			.setName(t('Debug mode'))
 			.setDesc(t('Debug mode description'))
 			.addToggle((toggle) =>
 				toggle.setValue(aiRuntime.debugMode ?? false).onChange(async (value) => {
-					plugin.settings.aiRuntime.debugMode = value;
-					await plugin.saveSettings();
+					host.settings.aiRuntime.debugMode = value;
+					await host.saveSettings();
 					DebugLogger.setDebugMode(value);
 				})
 			);
@@ -143,8 +155,8 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?
 			.setDesc(t('LLM console log description'))
 			.addToggle((toggle) =>
 				toggle.setValue(aiRuntime.enableLlmConsoleLog ?? false).onChange(async (value) => {
-					plugin.settings.aiRuntime.enableLlmConsoleLog = value;
-					await plugin.saveSettings();
+					host.settings.aiRuntime.enableLlmConsoleLog = value;
+					await host.saveSettings();
 					DebugLogger.setLlmConsoleLogEnabled(value);
 				})
 			);
@@ -159,8 +171,8 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?
 					.onChange(async (value) => {
 						const parsed = Number.parseInt(value, 10);
 						const previewChars = Number.isFinite(parsed) && parsed >= 0 ? parsed : 100;
-						plugin.settings.aiRuntime.llmResponsePreviewChars = previewChars;
-						await plugin.saveSettings();
+						host.settings.aiRuntime.llmResponsePreviewChars = previewChars;
+						await host.saveSettings();
 						DebugLogger.setLlmResponsePreviewChars(previewChars);
 					})
 			);
@@ -177,8 +189,8 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?
 					.setValue(aiRuntime.debugLevel ?? 'error')
 					.onChange(async (value) => {
 						const debugLevel = value as typeof aiRuntime.debugLevel;
-						plugin.settings.aiRuntime.debugLevel = debugLevel;
-						await plugin.saveSettings();
+						host.settings.aiRuntime.debugLevel = debugLevel;
+						await host.saveSettings();
 						DebugLogger.setDebugLevel(debugLevel);
 					})
 			);
@@ -186,7 +198,7 @@ export function GeneralSettingTabItem(props: { plugin: OpenChatPlugin; children?
 		return () => {
 			el.empty();
 		};
-	}, [plugin.manifest.version]);
+	}, [host]);
 
 	return (
 		<div>

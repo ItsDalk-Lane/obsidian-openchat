@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Platform } from 'obsidian'
+import { App, Modal, Platform } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
 
 export type StatusBarType = 'idle' | 'generating' | 'success' | 'error'
@@ -64,6 +64,7 @@ class GenerationStatsModal extends Modal {
 class ErrorDetailModal extends Modal {
 	constructor(
 		app: App,
+		private readonly notify: (message: string, timeout?: number) => void,
 		private error: ErrorInfo
 	) {
 		super(app)
@@ -91,7 +92,7 @@ class ErrorDetailModal extends Modal {
 			const copyBtn = buttonContainer.createEl('button', { text: t('Copy Error Info') })
 			copyBtn.onclick = () => {
 				navigator.clipboard.writeText(JSON.stringify(this.error, null, 2))
-				new Notice(t('Error info copied to clipboard'))
+				this.notify(t('Error info copied to clipboard'))
 			}
 		}
 	}
@@ -108,6 +109,7 @@ export class StatusBarManager {
 
 	constructor(
 		private app: App,
+		private readonly notify: (message: string, timeout?: number) => void,
 		private statusBarItem: HTMLElement
 	) {
 		this.state = {
@@ -128,7 +130,11 @@ export class StatusBarManager {
 			if (!this.state.data) return
 
 			if (this.state.type === 'error') {
-				new ErrorDetailModal(this.app, this.state.data as ErrorInfo).open()
+				new ErrorDetailModal(
+					this.app,
+					this.notify,
+					this.state.data as ErrorInfo,
+				).open()
 			} else if (this.state.type === 'success') {
 				new GenerationStatsModal(this.app, this.state.data as GenerationStats).open()
 			}

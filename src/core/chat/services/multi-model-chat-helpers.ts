@@ -31,7 +31,7 @@ export const queueParallelResponseUpdate = (
 		return
 	}
 
-	const timer = window.setTimeout(() => {
+	const timer = setTimeout(() => {
 		pendingFlushTimers.delete(groupId)
 		flush(groupId)
 	}, streamUpdateInterval)
@@ -46,7 +46,7 @@ export const flushQueuedParallelResponseUpdates = (
 ): void => {
 	const timer = pendingFlushTimers.get(groupId)
 	if (timer !== undefined) {
-		window.clearTimeout(timer)
+		clearTimeout(timer)
 		pendingFlushTimers.delete(groupId)
 	}
 
@@ -98,7 +98,7 @@ export const clearPendingParallelUpdates = (
 ): void => {
 	const timer = pendingFlushTimers.get(groupId)
 	if (timer !== undefined) {
-		window.clearTimeout(timer)
+		clearTimeout(timer)
 		pendingFlushTimers.delete(groupId)
 	}
 	pendingResponsePatches.delete(groupId)
@@ -109,7 +109,7 @@ export const clearAllPendingParallelUpdates = (
 	pendingFlushTimers: Map<string, number>,
 ): void => {
 	for (const timer of pendingFlushTimers.values()) {
-		window.clearTimeout(timer)
+		clearTimeout(timer)
 	}
 	pendingFlushTimers.clear()
 	pendingResponsePatches.clear()

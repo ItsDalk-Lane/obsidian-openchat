@@ -8,21 +8,19 @@ import { FileMenuPopup } from './FileMenuPopup';
 import { ModeSelector } from './ModeSelector';
 import { LayoutSelector } from './LayoutSelector';
 import { ToggleButtons } from './ToggleButtons';
-import { App, TFile, TFolder } from 'obsidian';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 
 interface ChatControlsProps {
 	service: ChatService;
 	state: ChatState;
-	app: App;
 }
 
 export const ChatControls = ({
 	service,
 	state,
-	app,
 }: ChatControlsProps) => {
+	const obsidianApi = service.getObsidianApiProvider();
 	const [historyOpen, setHistoryOpen] = useState(false);
 	const [historyItems, setHistoryItems] = useState<ChatHistoryEntry[]>([]);
 	const [showFileMenu, setShowFileMenu] = useState(false);
@@ -77,13 +75,8 @@ export const ChatControls = ({
 	};
 
 	const handleOpenHistoryFile = async (item: ChatHistoryEntry) => {
-		// 在新标签页中打开历史记录文件
-		const file = app.vault.getAbstractFileByPath(item.filePath);
-		if (file instanceof TFile) {
-			const leaf = app.workspace.getLeaf(true);
-			await leaf.openFile(file);
-			setHistoryOpen(false);
-		}
+		obsidianApi.openInternalLink(item.filePath);
+		setHistoryOpen(false);
 	};
 
 	const handleTemplateButtonClick = () => {
@@ -121,11 +114,11 @@ export const ChatControls = ({
 		setShowFileMenu(true);
 	};
 
-	const handleFileSelect = (file: TFile) => {
+	const handleFileSelect = (file: { path: string; name: string; extension: string }) => {
 		service.addSelectedFile(file);
 	};
 
-	const handleFolderSelect = (folder: TFolder) => {
+	const handleFolderSelect = (folder: { path: string; name: string }) => {
 		service.addSelectedFolder(folder);
 	};
 
@@ -223,9 +216,9 @@ export const ChatControls = ({
 			<FileMenuPopup
 				isOpen={showFileMenu}
 				onClose={() => setShowFileMenu(false)}
+				service={service}
 				onSelectFile={handleFileSelect}
 				onSelectFolder={handleFolderSelect}
-				app={app}
 				buttonRef={fileMenuButtonRef}
 			/>
 		</div>

@@ -1,11 +1,19 @@
 import { Notice, requestUrl } from 'obsidian'
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
+import {
+	BaseOptions,
+	mergeProviderOptionsWithParameters,
+	Message,
+	ResolveEmbedAsBinary,
+	SaveAttachment,
+	SendRequest,
+	Vendor,
+} from './provider-shared'
 import { buildReasoningBlockEnd, buildReasoningBlockStart, convertEmbedToImageUrl } from './utils'
 import { withToolMessageContext } from './messageFormat'
 import { DebugLogger } from 'src/utils/DebugLogger'
-import { withToolCallLoopSupport } from 'src/core/agents/loop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop/OpenAILoopHandler'
 
 export interface QianFanOptions extends BaseOptions {
 	enableThinking?: boolean

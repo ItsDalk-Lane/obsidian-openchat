@@ -1,7 +1,7 @@
 import { buildEditedUserMessage, getEditableUserMessageContent } from 'src/core/chat/utils/user-message-editing';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api';
 import type { MultiModelChatService } from './multi-model-chat-service';
 import type { ChatSessionManager } from './chat-session-manager';
 import type { PreparedChatRequest } from './chat-service-types';

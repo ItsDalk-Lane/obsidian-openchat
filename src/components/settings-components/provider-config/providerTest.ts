@@ -1,5 +1,4 @@
 import OpenAI from 'openai'
-import { Notice } from 'obsidian'
 import { normalizeProviderBaseURLForRuntime } from 'src/components/settings-components/provider-config/providerUtils'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { buildZhipuThinkingConfig, createZhipuLoggedFetch, normalizeZhipuOpenAIBaseURL } from 'src/LLMProviders/zhipu'
@@ -159,12 +158,13 @@ interface TestProviderConfigurationParams {
 	provider: ProviderSettings
 	vendor: Vendor
 	getVendorApiKey: (vendor: string) => string
+	notify: (message: string, timeout?: number) => void
 }
 
 export const testProviderConfiguration = async (
 	params: TestProviderConfigurationParams
 ): Promise<boolean> => {
-	new Notice(t('Testing model...'))
+	params.notify(t('Testing model...'))
 
 	const testStartedAt = Date.now()
 	try {
@@ -213,7 +213,7 @@ export const testProviderConfiguration = async (
 			if (!fastTestResult) {
 				throw new Error(t('Model test empty response'))
 			}
-			new Notice(t('Model test succeeded'))
+			params.notify(t('Model test succeeded'))
 			return true
 		}
 		let received = ''
@@ -247,7 +247,7 @@ export const testProviderConfiguration = async (
 				messages
 			)
 			if (fallbackSucceeded) {
-				new Notice(t('Model test succeeded'))
+				params.notify(t('Model test succeeded'))
 				return true
 			}
 			throw new Error(t('Model test empty response'))
@@ -260,12 +260,12 @@ export const testProviderConfiguration = async (
 			firstChunkMs,
 			receivedLength: received.length,
 		})
-		new Notice(t('Model test succeeded'))
+		params.notify(t('Model test succeeded'))
 		return true
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
 		if (error instanceof Error && error.name === 'AbortError') {
-			new Notice(t('Model test succeeded'))
+			params.notify(t('Model test succeeded'))
 			return true
 		}
 		DebugLogger.error('[ModelTest] 模型测试失败', {
@@ -275,7 +275,7 @@ export const testProviderConfiguration = async (
 			durationMs: Date.now() - testStartedAt,
 			error,
 		})
-		new Notice(`${t('Model test failed')}: ${message}`)
+		params.notify(`${t('Model test failed')}: ${message}`)
 		return false
 	}
 }

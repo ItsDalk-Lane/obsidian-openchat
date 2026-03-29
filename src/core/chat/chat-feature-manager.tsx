@@ -3,15 +3,17 @@
  * 负责协调各个子服务和组件的创建与生命周期管理
  * 已拆分为：ChatViewCoordinator（视图管理）、ChatEditorIntegration（编辑器扩展）
  */
-import OpenChatPlugin from 'src/main';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import { MultiModelConfigService } from 'src/core/chat/services/multi-model-config-service';
 import { MultiModelChatService } from 'src/core/chat/services/multi-model-chat-service';
-import type { ChatServiceDeps } from 'src/core/chat/services/chat-service-types';
-import { ChatViewCoordinator } from 'src/commands/chat/chat-view-coordinator';
-import { ChatEditorIntegration } from 'src/editor/chat';
+import type {
+	ChatConsumerHost,
+	ChatServiceDeps,
+} from 'src/core/chat/services/chat-service-types';
+import { ChatViewCoordinator } from 'src/domains/chat/ui-view-coordinator';
+import { ChatEditorIntegration } from 'src/editor/chat/ChatEditorIntegration';
 import type { ChatSettings } from 'src/types/chat';
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api';
 
 export class ChatFeatureManager {
 	private readonly service: ChatService;
@@ -21,14 +23,14 @@ export class ChatFeatureManager {
 	private readonly editorIntegration: ChatEditorIntegration;
 
 	constructor(
-		private readonly plugin: OpenChatPlugin,
+		private readonly host: ChatConsumerHost,
 		serviceDeps: ChatServiceDeps,
 		existingService?: ChatService,
 		existingViewCoordinator?: ChatViewCoordinator,
 	) {
 		this.service = existingService ?? new ChatService(serviceDeps);
-		this.viewCoordinator = existingViewCoordinator ?? new ChatViewCoordinator(plugin, this.service);
-		this.editorIntegration = new ChatEditorIntegration(plugin, this.service);
+		this.viewCoordinator = existingViewCoordinator ?? new ChatViewCoordinator(host, this.service);
+		this.editorIntegration = new ChatEditorIntegration(host, this.service);
 	}
 
 	async initialize(initialSettings?: Partial<ChatSettings>): Promise<void> {
@@ -38,7 +40,7 @@ export class ChatFeatureManager {
 		// 2. 初始化多模型服务
 		this.multiModelConfigService = new MultiModelConfigService(
 			this.service.getObsidianApiProvider(),
-			this.plugin.settings.aiDataFolder
+			this.host.getAiDataFolder(),
 		);
 		await this.multiModelConfigService.initialize();
 		this.multiModelChatService = new MultiModelChatService(this.service, this.multiModelConfigService);

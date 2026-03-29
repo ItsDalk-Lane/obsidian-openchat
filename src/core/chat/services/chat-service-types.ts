@@ -1,4 +1,6 @@
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
+import type { Extension } from '@codemirror/state';
+import type { App, Command, MarkdownView, TFile, WorkspaceLeaf } from 'obsidian';
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api';
 import type { PluginSettings } from 'src/domains/settings/types';
 import type { BuiltinToolsRuntime, BuiltinToolsRuntimeSettings } from 'src/tools/runtime/BuiltinToolsRuntime';
 import type { SkillScannerService } from 'src/domains/skills/service';
@@ -16,12 +18,9 @@ import type { ToolExecutionRecord } from 'src/types/tool';
 import type { AttachmentSelectionSnapshot } from './chat-attachment-selection-service';
 import type { FileContentService } from './file-content-service';
 import type { MessageService } from './message-service';
-import type {
-	ResolvedToolRuntime,
-	SubAgentScannerService,
-	SubAgentStateCallback,
-	SubAgentWatcherService,
-} from 'src/tools/sub-agents';
+import type { ResolvedToolRuntime, SubAgentStateCallback } from 'src/tools/sub-agents/types';
+import type { SubAgentScannerService } from 'src/tools/sub-agents/SubAgentScannerService';
+import type { SubAgentWatcherService } from 'src/tools/sub-agents/SubAgentWatcherService';
 
 export type ChatTriggerSource =
 	| 'chat_input'
@@ -68,6 +67,42 @@ export interface ChatSettingsAccessor {
 	setAiRuntimeSettings(nextSettings: AiRuntimeSettings): void;
 	saveSettings(): Promise<void>;
 	openSettingsTab(): void;
+}
+
+export interface ChatConsumerHost {
+	app: App;
+	notify(message: string, timeout?: number): void;
+	getManifestId(): string;
+	getAiDataFolder(): string;
+	getPluginSettings(): Readonly<PluginSettings>;
+	getChatSettings(): Readonly<ChatSettings>;
+	setChatSettings(nextSettings: ChatSettings): void;
+	getAiRuntimeSettings(): Readonly<AiRuntimeSettings>;
+	setAiRuntimeSettings(nextSettings: AiRuntimeSettings): void;
+	saveSettings(): Promise<void>;
+	openSettingsTab(): void;
+	registerView(viewType: string, viewCreator: (leaf: WorkspaceLeaf) => unknown): void;
+	addCommand(command: Command): void;
+	addRibbonIcon(
+		icon: string,
+		title: string,
+		callback: (event: MouseEvent) => void,
+	): HTMLElement;
+	getActiveMarkdownFile(): TFile | null;
+	getActiveMarkdownView(): MarkdownView | null;
+	getOpenMarkdownFiles(): TFile[];
+	findLeafByViewType(viewType: string): WorkspaceLeaf | null;
+	revealLeaf(leaf: WorkspaceLeaf): void;
+	getLeaf(target: 'tab' | 'window'): WorkspaceLeaf;
+	getSidebarLeaf(side: 'left' | 'right'): WorkspaceLeaf | null;
+	setLeafViewState(leaf: WorkspaceLeaf, viewType: string, active: boolean): Promise<void>;
+	isWorkspaceReady(): boolean;
+	detachLeavesOfType(viewType: string): void;
+	registerEditorExtension(extension: Extension | readonly Extension[]): void;
+	updateWorkspaceOptions(): void;
+	onWorkspaceLayoutChange(listener: () => void): () => void;
+	onActiveMarkdownFileChange(listener: (file: TFile | null) => void): () => void;
+	onMarkdownFileOpen(listener: (file: TFile | null) => void): () => void;
 }
 
 export interface ChatHostDeps {

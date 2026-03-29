@@ -2,6 +2,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { normalizeBuiltinServerId } from 'src/tools/runtime/constants';
 import { getChatHistoryPath } from 'src/utils/AIPathManager';
 import { DebugLogger } from 'src/utils/DebugLogger';
+import type {
+	ChatAttachmentFileInput,
+	ChatAttachmentFolderInput,
+} from 'src/domains/chat/service-attachment-selection';
 import { normalizeMessageManagementSettings } from '../types/chat';
 import type { ChatSession, ChatSettings, McpToolMode, SelectedFile, SelectedFolder } from '../types/chat';
 import type { CompareGroup, LayoutMode, MultiModelMode, ParallelResponseGroup } from '../types/multiModel';
@@ -212,14 +216,14 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 	getReasoningToggle() { return internals.stateStore.getMutableState().enableReasoningToggle; },
 	getWebSearchToggle() { return internals.stateStore.getMutableState().enableWebSearchToggle; },
 	getTemplateAsSystemPromptToggle() { return internals.stateStore.getMutableState().enableTemplateAsSystemPrompt; },
-	addSelectedFile(file: import('obsidian').TFile) { internals.attachmentSelectionService.addSelectedFile(file); },
-	addActiveFile(file: import('obsidian').TFile | null) { internals.attachmentSelectionService.addActiveFile(file); },
+	addSelectedFile(file: ChatAttachmentFileInput) { internals.attachmentSelectionService.addSelectedFile(file); },
+	addActiveFile(file: ChatAttachmentFileInput | null) { internals.attachmentSelectionService.addActiveFile(file); },
 	removeAutoAddedFile(filePath: string) { internals.attachmentSelectionService.removeAutoAddedFile(filePath); },
 	removeAllAutoAddedFiles() { internals.attachmentSelectionService.removeAllAutoAddedFiles(); },
 	getAutoAddedFiles(): SelectedFile[] { return internals.attachmentSelectionService.getAutoAddedFiles(); },
 	onNoActiveFile() { internals.attachmentSelectionService.onNoActiveFile(); },
-	onChatViewReopened(currentFile: import('obsidian').TFile | null) { internals.attachmentSelectionService.onChatViewReopened(currentFile); },
-	addSelectedFolder(folder: import('obsidian').TFolder) { internals.attachmentSelectionService.addSelectedFolder(folder); },
+	onChatViewReopened(currentFile: ChatAttachmentFileInput | null) { internals.attachmentSelectionService.onChatViewReopened(currentFile); },
+	addSelectedFolder(folder: ChatAttachmentFolderInput) { internals.attachmentSelectionService.addSelectedFolder(folder); },
 	removeSelectedFile(fileId: string, isManualRemoval = true) { internals.attachmentSelectionService.removeSelectedFile(fileId, isManualRemoval); },
 	removeSelectedFolder(folderId: string) { internals.attachmentSelectionService.removeSelectedFolder(folderId); },
 	setSelectedFiles(files: SelectedFile[]) { internals.attachmentSelectionService.setSelectedFiles(files); },

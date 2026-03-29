@@ -1,4 +1,4 @@
-import { DropdownComponent, Notice, Setting, type App } from 'obsidian'
+import { DropdownComponent, Setting, type App } from 'obsidian'
 import { ollamaVendor } from 'src/LLMProviders/ollama'
 import { SelectModelModal, ProviderSettingModal } from 'src/components/modals/AiRuntimeProviderModals'
 import { t } from 'src/i18n/ai-runtime/helper'
@@ -19,6 +19,7 @@ export const addModelButtonSection = (params: {
 	modelConfig: ModelFetchConfig
 	desc: string
 	saveSettings: () => Promise<void>
+	notify: (message: string, timeout?: number) => void
 	getVendorApiKey: (vendor: string) => string
 	cacheReasoningCapabilityFromMetadata: (
 		vendorName: string,
@@ -48,11 +49,11 @@ export const addModelButtonSection = (params: {
 					modelOptions.apiKey = params.getVendorApiKey(params.vendorName)
 				}
 				if (params.modelConfig.requiresApiKey && !modelOptions.apiKey) {
-					new Notice(t('Please input API key first'))
+					params.notify(t('Please input API key first'))
 					return
 				}
 				if (params.modelConfig.requiresApiSecret && !modelOptions.apiSecret) {
-					new Notice(localInstance.ai_runtime_api_secret_required)
+					params.notify(localInstance.ai_runtime_api_secret_required)
 					return
 				}
 				try {
@@ -64,7 +65,7 @@ export const addModelButtonSection = (params: {
 						throw new Error('No models available from remote endpoint or fallback list')
 					}
 					if (usedFallback) {
-						new Notice(
+						params.notify(
 							localInstance.ai_runtime_model_list_fallback_notice.replace(
 								'{reason}',
 								fallbackReason ? `: ${fallbackReason}` : ''
@@ -91,14 +92,14 @@ export const addModelButtonSection = (params: {
 					if (error instanceof Error) {
 						const errorMessage = error.message.toLowerCase()
 						if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
-							new Notice(t('API key may be incorrect. Please check your API key.'))
+							params.notify(t('API key may be incorrect. Please check your API key.'))
 						} else if (errorMessage.includes('403') || errorMessage.includes('forbidden')) {
-							new Notice(t('Access denied. Please check your API permissions.'))
+							params.notify(t('Access denied. Please check your API permissions.'))
 						} else {
-							new Notice(error.message)
+							params.notify(error.message)
 						}
 					} else {
-						new Notice(String(error))
+						params.notify(String(error))
 					}
 				}
 			})
@@ -175,6 +176,7 @@ export const addModelDropDownSection = (params: {
 	models: string[]
 	desc: string
 	saveSettings: () => Promise<void>
+	notify: (message: string, timeout?: number) => void
 	onModelUpdated?: () => Promise<void> | void
 }) => {
 	const CUSTOM_MODEL_KEY = '__custom__'
@@ -382,7 +384,7 @@ export const addOllamaModelTextSection = (params: {
 				}
 				renderList(cachedModels, inputEl)
 			} catch {
-				new Notice(localInstance.ai_runtime_ollama_models_unavailable)
+				params.notify(localInstance.ai_runtime_ollama_models_unavailable)
 			} finally {
 				isLoading = false
 			}

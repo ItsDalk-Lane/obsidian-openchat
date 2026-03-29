@@ -9,15 +9,16 @@ scripts/、构建配置与发布产物不在本次范围内。
 
 ### src/main.ts
 
-- 当前职责：插件入口、初始化、设置加载、延迟启动。
-- 主要问题：仍直接持有多个协调器与设置控制器。
-- 迁移建议：保持为组合根，只负责注册和依赖注入。
+- 当前职责：插件入口、同步注册、bootstrap settings 触发、延迟启动。
+- 主要问题：仍直接持有多个协调器与设置控制器，chat 与 settings 的组合根尚未彻底缩小。
+- 迁移建议：保持为组合根，只负责注册和依赖注入；耗时 hydrate 继续留在 `onLayoutReady` 后执行。
 
 ### src/core/
 
 - 当前职责：跨功能协调、聊天运行时、基础服务。
-- 主要问题：chat 相关体量最大，仍有深层继承和跨层耦合。
+- 主要问题：chat 相关体量最大，虽然继承链已拆平为 facade + support 文件，但跨层耦合仍重。
 - 迁移建议：后续拆为 domains/chat 与少量基础设施。
+- 当前状态：`FeatureCoordinator` 已开始承担 chat host adapter 组合根，`createChatServiceDeps()` 不再接收 `OpenChatPlugin`。
 
 ### src/commands/
 
@@ -30,13 +31,14 @@ scripts/、构建配置与发布产物不在本次范围内。
 - 当前职责：编辑器增强、工具栏、tab completion。
 - 主要问题：同时包含 UI、状态、数据服务与 provider 桥接。
 - 迁移建议：拆为 domains/editor 与 domains/quick-actions。
+- 当前状态：`ChatEditorIntegration*` 已改为接收最小 host adapter，不再直接依赖 `OpenChatPlugin`。
 
 ### src/settings/
 
 - 当前职责：设置存储、迁移、设置页。
 - 主要问题：持久化、UI、默认值与兼容逻辑杂糅。
 - 迁移建议：拆为 domains/settings 与 provider 读写接口。
-- 当前状态：settings 生命周期已迁入 domains/settings，迁移/secret/MCP Markdown 持久化仍保留 legacy 接缝。
+- 当前状态：settings 生命周期已迁入 domains/settings，启动链路已拆为 bootstrap + hydrate；迁移/secret/MCP Markdown 持久化仍保留 legacy 接缝。
 
 ### src/services/skills
 
@@ -129,6 +131,8 @@ scripts/、构建配置与发布产物不在本次范围内。
 - src/services/skills/index.ts、src/tools/sub-agents/index.ts、
   src/tools/runtime/index.ts 等目录仍依赖聚合导出。
 - 这会模糊真实依赖方向，也是后续 lint-taste 的重点治理对象。
+- 当前已开始在 touched path 上把 folder import 改成具体文件导入；
+  `src/tools/sub-agents/index.ts` 与 `src/editor/chat/index.ts` 已移除，但全仓尚未清零。
 
 ## 问题清单
 
@@ -190,3 +194,11 @@ scripts/、构建配置与发布产物不在本次范围内。
   src/domains/mcp/ 承接外部 MCP 运行时完整闭环，
   域内覆盖 service/runtime/process/transport 测试与行为规格，
   legacy src/services/mcp/ 只保留配置 UI、Markdown 持久化与 tool loop 适配。
+- settings 启动编排已完成第一轮收口：
+  `main.ts` 不再 await 完整 settings load，
+  `domains/settings/service.ts` 改为 bootstrap + deferred hydrate 两段式接口，
+  便于后续继续压缩 `onload()` 阻塞路径。
+- chat 宿主边界已完成第一轮收口：
+  `ChatFeatureManager`、`ChatViewCoordinator`、`ChatEditorIntegration`
+  不再接收 `OpenChatPlugin`，
+  它们只消费 `FeatureCoordinator` 创建的最小 host adapter。

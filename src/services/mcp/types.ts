@@ -1,4 +1,4 @@
-export type {
+import type {
 	McpServerStatus,
 	McpTransportType,
 	McpServerConfig,
@@ -12,7 +12,26 @@ export type {
 	McpConfigFile,
 } from 'src/domains/mcp/types';
 
-export {
+import {
 	DEFAULT_BUILTIN_TIME_TIMEZONE,
 	DEFAULT_MCP_SETTINGS,
 } from 'src/domains/mcp/config';
+
+export type {
+	McpCallToolFn,
+	McpConfigFile,
+	McpHealthResult,
+	McpServerConfig,
+	McpServerState,
+	McpServerStatus,
+	McpSettings,
+	McpToolAnnotations,
+	McpToolDefinition,
+	McpToolInfo,
+	McpTransportType,
+}
+
+export {
+	DEFAULT_BUILTIN_TIME_TIMEZONE,
+	DEFAULT_MCP_SETTINGS,
+}

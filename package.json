@@ -13,9 +13,10 @@
 		"test:arch": "tsx --test infra/arch.test.ts",
 		"test:chat-core": "tsx --test src/core/chat/services/chatProviderMessages.test.ts src/core/chat/services/chatMessageFacade.test.ts src/core/chat/services/chatGenerationFacade.test.ts",
 		"test:providers": "tsx --test src/providers/*.test.ts",
-		"test:domains": "tsx --test src/domains/editor/editor.test.ts src/domains/skills/skills.test.ts src/domains/settings/settings.test.ts src/domains/mcp/mcp.test.ts src/domains/chat/chat.test.ts src/domains/chat/chat-service-support.test.ts src/domains/chat/chat-history-formatting.test.ts src/domains/chat/chat-history-summary.test.ts src/domains/chat/chat-context-compaction.test.ts",
+		"test:domains": "tsx --test src/domains/editor/editor.test.ts src/domains/skills/skills.test.ts src/domains/settings/settings.test.ts src/domains/mcp/mcp.test.ts src/domains/chat/chat.test.ts src/domains/chat/chat-service-support.test.ts src/domains/chat/chat-history-formatting.test.ts src/domains/chat/chat-history-summary.test.ts src/domains/chat/chat-context-compaction.test.ts src/domains/quick-actions/quick-actions.test.ts",
 		"test": "npm run test:arch && npm run test:providers && npm run test:chat-core && npm run test:domains",
 		"validate:arch": "npm run lint:arch && npm run lint:taste && npm run test:arch",
+		"cleanup": "tsx infra/cleanup.ts",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"lint": "npm run lint:eslint && npm run lint:arch && npm run lint:taste"
 	},

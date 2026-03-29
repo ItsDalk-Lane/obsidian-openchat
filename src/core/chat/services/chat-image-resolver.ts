@@ -20,7 +20,7 @@ export class ChatImageResolver {
 
 	base64ToArrayBuffer(base64Data: string): ArrayBuffer {
 		const base64 = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
-		const binaryString = window.atob(base64);
+		const binaryString = atob(base64);
 		const bytes = new Uint8Array(binaryString.length);
 		for (let index = 0; index < binaryString.length; index += 1) {
 			bytes[index] = binaryString.charCodeAt(index);

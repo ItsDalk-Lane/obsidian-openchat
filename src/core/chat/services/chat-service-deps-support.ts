@@ -5,7 +5,7 @@ import {
 } from 'src/domains/skills/service';
 import {
 	resolveToolExecutionSettings,
-} from 'src/settings/ai-runtime';
+} from 'src/settings/ai-runtime/api';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { detectImageGenerationIntent } from './chat-image-intent';
 import {
@@ -24,9 +24,6 @@ import {
 import type {
 	ChatServiceInternals,
 } from './chat-service-internals';
-import type {
-	ChatSettingsAccessor,
-} from './chat-service-types';
 
 export const getMaxToolCallLoops = (internals: ChatServiceInternals): number | undefined => {
 	const maxLoops = resolveToolExecutionSettings(

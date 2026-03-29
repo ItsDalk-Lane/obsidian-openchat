@@ -1,43 +1,51 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { File, Folder, ChevronRight, ChevronDown } from 'lucide-react';
-import { App, TFile, TFolder } from 'obsidian';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
+import type { ChatService } from 'src/core/chat/services/chat-service';
+import type {
+	ChatAttachmentFileInput,
+	ChatAttachmentFolderInput,
+} from 'src/domains/chat/service-attachment-selection';
 import {
+	type FileMenuSearchResult,
 	getFileSecondaryText,
 	getFolderSecondaryText,
-	searchInFile,
 	getFilteredFiles,
 	getFolderTree,
+	searchVaultEntries,
 } from './fileMenuUtils';
 import './FileMenuPopup.css';
 
 interface FileMenuPopupProps {
 	isOpen: boolean;
 	onClose: () => void;
-	onSelectFile: (file: TFile) => void;
-	onSelectFolder: (folder: TFolder) => void;
-	app: App;
+	service: ChatService;
+	onSelectFile: (file: ChatAttachmentFileInput) => void;
+	onSelectFolder: (folder: ChatAttachmentFolderInput) => void;
 	buttonRef: React.RefObject<HTMLSpanElement>;
 }
 
 type ViewType = 'menu' | 'fileSelector' | 'folderSelector';
 
-export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, app, buttonRef }: FileMenuPopupProps) => {
+export const FileMenuPopup = ({
+	isOpen,
+	onClose,
+	service,
+	onSelectFile,
+	onSelectFolder,
+	buttonRef,
+}: FileMenuPopupProps) => {
 	const popupRef = useRef<HTMLDivElement>(null);
 	const menuSearchInputRef = useRef<HTMLInputElement>(null);
+	const obsidianApi = service.getObsidianApiProvider();
 	const [currentView, setCurrentView] = useState<ViewType>('menu');
 
 
 	// 主菜单搜索状态
 	const [searchQuery, setSearchQuery] = useState('');
-	const [searchResults, setSearchResults] = useState<Array<{
-		type: 'file' | 'folder';
-		file?: TFile;
-		folder?: TFolder;
-		matches: string[]
-	}>>();
+	const [searchResults, setSearchResults] = useState<FileMenuSearchResult[]>();
 	const [isSearching, setIsSearching] = useState(false);
 
 	// 文件选择器状态
@@ -99,47 +107,7 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 		const performSearch = async () => {
 			setIsSearching(true);
 			try {
-				const query = searchQuery.toLowerCase();
-				const results: Array<{ type: 'file' | 'folder'; file?: TFile; folder?: TFolder; matches: string[] }> = [];
-
-				// 搜索文件夹
-				const allFolders = app.vault.getAllLoadedFiles().filter(item =>
-					item instanceof TFolder
-				) as TFolder[];
-
-				for (const folder of allFolders) {
-					if (folder.name.toLowerCase().includes(query)) {
-						results.push({
-							type: 'folder',
-							folder,
-							matches: [localInstance.chat_file_match_folder_prefix.replace('{name}', folder.name)]
-						});
-					}
-				}
-
-				// 搜索文件
-				const files = app.vault.getFiles();
-				for (const file of files) {
-					// 只搜索文件，跳过文件夹
-					if (file.extension === undefined) {
-						continue;
-					}
-
-					const cache = app.metadataCache.getFileCache(file);
-					if (cache) {
-						const matches = searchInFile(file, cache, query);
-						if (matches.length > 0) {
-							results.push({
-								type: 'file',
-								file,
-								matches
-							});
-						}
-					}
-				}
-
-				// 文件夹在前，文件在后
-				setSearchResults(results.slice(0, 10));
+				setSearchResults(searchVaultEntries(obsidianApi, searchQuery));
 			} catch (error) {
 				DebugLogger.error('[FileMenuPopup] 搜索时出错', error);
 			} finally {
@@ -149,7 +117,7 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 
 		const timeoutId = setTimeout(performSearch, 300);
 		return () => clearTimeout(timeoutId);
-	}, [searchQuery, app, currentView]);
+	}, [searchQuery, currentView, obsidianApi]);
 
 	const toggleFolder = (folderPath: string) => {
 		const newExpanded = new Set(expandedFolders);
@@ -161,7 +129,7 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 		setExpandedFolders(newExpanded);
 	};
 
-	const handleFileToggle = (file: TFile) => {
+	const handleFileToggle = (file: ChatAttachmentFileInput) => {
 		const newSelected = new Set(selectedFiles);
 		if (newSelected.has(file.path)) {
 			newSelected.delete(file.path);
@@ -171,7 +139,7 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 		setSelectedFiles(newSelected);
 	};
 
-	const handleFolderToggle = (folder: TFolder) => {
+	const handleFolderToggle = (folder: ChatAttachmentFolderInput) => {
 		const newSelected = new Set(selectedFolders);
 		if (newSelected.has(folder.path)) {
 			newSelected.delete(folder.path);
@@ -182,14 +150,15 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 	};
 
 	const handleFileSelect = () => {
-		const files = getFilteredFiles(app, fileSearchQuery).filter(file => selectedFiles.has(file.path));
+		const files = getFilteredFiles(obsidianApi, fileSearchQuery).filter(file => selectedFiles.has(file.path));
 		files.forEach(file => onSelectFile(file)); // 支持多文件选择
 		onClose();
 	};
 
 	const handleFolderSelect = () => {
-		const allFolders = app.vault.getAllLoadedFiles().filter(item => item instanceof TFolder) as TFolder[];
-		const folders = allFolders.filter(folder => selectedFolders.has(folder.path));
+		const folders = getFolderTree(obsidianApi, folderSearchQuery, expandedFolders)
+			.map(({ folder }) => folder)
+			.filter(folder => selectedFolders.has(folder.path));
 		folders.forEach(folder => onSelectFolder(folder)); // 支持多文件夹选择
 		onClose();
 	};
@@ -306,7 +275,7 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 													<>
 														<File className="ff-icon" />
 														<div className="ff-result-info">
-															<div className="ff-result-name">{result.file?.basename}</div>
+															<div className="ff-result-name">{result.file?.basename ?? result.file?.name}</div>
 															<div className="ff-result-path">
 																{(() => {
 																	if (!result.file) return '';
@@ -361,13 +330,13 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 
 						{/* 文件列表 */}
 						<div className="ff-list-container">
-							{getFilteredFiles(app, fileSearchQuery).length === 0 ? (
+							{getFilteredFiles(obsidianApi, fileSearchQuery).length === 0 ? (
 								<div className="ff-empty-message">
 									{fileSearchQuery ? localInstance.chat_file_menu_no_files_match : localInstance.chat_file_menu_no_files}
 								</div>
 							) : (
 								<div className="ff-list">
-									{getFilteredFiles(app, fileSearchQuery).map(file => (
+									{getFilteredFiles(obsidianApi, fileSearchQuery).map(file => (
 										<div
 											key={file.path}
 											onClick={() => handleFileToggle(file)}
@@ -375,7 +344,7 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 										>
 											<File className="ff-icon" />
 											<div className="ff-file-info">
-												<div className="ff-file-name">{file.name}</div>
+												<div className="ff-file-name">{file.basename}</div>
 												<div className="ff-file-path">{getFileSecondaryText(file)}</div>
 											</div>
 											{selectedFiles.has(file.path) && <div className="ff-check-mark">✓</div>}
@@ -422,13 +391,13 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 
 						{/* 文件夹列表 */}
 						<div className="ff-list-container">
-							{getFolderTree(app, folderSearchQuery, expandedFolders).length === 0 ? (
+							{getFolderTree(obsidianApi, folderSearchQuery, expandedFolders).length === 0 ? (
 								<div className="ff-empty-message">
 									{folderSearchQuery ? localInstance.chat_file_menu_no_folders_match : localInstance.chat_file_menu_no_folders}
 								</div>
 							) : (
 								<div className="ff-list">
-									{getFolderTree(app, folderSearchQuery, expandedFolders).map(({ folder, level, isExpanded }) => (
+									{getFolderTree(obsidianApi, folderSearchQuery, expandedFolders).map(({ folder, level, isExpanded }) => (
 										<div key={folder.path}>
 											<div 
 												className={`ff-folder-item ${selectedFolders.has(folder.path) ? 'ff-selected' : ''}`}
@@ -436,7 +405,7 @@ export const FileMenuPopup = ({ isOpen, onClose, onSelectFile, onSelectFolder, a
 											>
 												{/* 展开/折叠按钮区域 */}
 												<div className="ff-folder-toggle">
-													{folder.children.some(child => child instanceof TFolder) ? (
+													{folder.hasChildren ? (
 														<button
 															onClick={(e) => {
 																e.stopPropagation();

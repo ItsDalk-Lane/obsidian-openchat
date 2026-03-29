@@ -3,7 +3,10 @@ import type { ToolDefinition, ToolExecutionRecord } from 'src/types/tool';
 import { t } from 'src/i18n/ai-runtime/helper';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import type { ResolvedToolRuntime, SubAgentStateCallback } from 'src/tools/sub-agents';
+import type {
+	ResolvedToolRuntime,
+	SubAgentStateCallback,
+} from 'src/tools/sub-agents/types';
 import type { GenerateAssistantOptions } from './chat-service-types';
 import type { ChatImageResolver } from './chat-image-resolver';
 import type { ChatSessionManager } from './chat-session-manager';

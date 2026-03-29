@@ -1,11 +1,19 @@
-import type OpenChatPlugin from "src/main";
 import {
 	AiRuntimeSettingsTabItem,
 } from "src/components/settings-components/AiRuntimeSettingsTabItem";
 import type { AiRuntimeSettingsPanelOptions } from "src/components/settings-components/AiRuntimeSettingsPanel";
+import type { PluginSettingTabHost } from "src/settings/plugin-setting-host";
 
 interface Props {
-	plugin: OpenChatPlugin;
+	host: Pick<
+		PluginSettingTabHost,
+		| "app"
+		| "settings"
+		| "saveSettings"
+		| "updateChatSettings"
+		| "refreshQuickActionsCache"
+		| "getMcpClientManager"
+	>;
 }
 
 const MODEL_SETTINGS_PANEL_OPTIONS: AiRuntimeSettingsPanelOptions = {
@@ -21,10 +29,10 @@ const MODEL_SETTINGS_PANEL_OPTIONS: AiRuntimeSettingsPanelOptions = {
 	},
 }
 
-export const ModelSettingsTabItem = ({ plugin }: Props) => {
+export const ModelSettingsTabItem = ({ host }: Props) => {
 	return (
 		<AiRuntimeSettingsTabItem
-			plugin={plugin}
+			host={host}
 			panelOptions={MODEL_SETTINGS_PANEL_OPTIONS}
 		/>
 	);

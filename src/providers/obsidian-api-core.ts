@@ -45,6 +45,13 @@ export interface ObsidianApiRuntime {
 	writeLocalStorage(key: string, value: string): void;
 	openSettingsTab(tabId: string): void;
 	insertTextIntoMarkdownEditor(content: string): EditorInsertResult;
+	openInternalLink(linkTarget: string, sourcePath?: string): void;
+	renderMarkdown(
+		markdown: string,
+		container: HTMLElement,
+		sourcePath: string,
+		component: unknown,
+	): Promise<void>;
 	onVaultChange(type: VaultChangeEvent['type'], listener: (path: string, oldPath?: string) => void): unknown;
 	offVaultChange(ref: unknown): void;
 }
@@ -149,6 +156,17 @@ export function createObsidianApiProviderFromRuntime(
 		},
 		insertTextIntoMarkdownEditor(content: string): EditorInsertResult {
 			return runtime.insertTextIntoMarkdownEditor(content);
+		},
+		openInternalLink(linkTarget: string, sourcePath?: string): void {
+			runtime.openInternalLink(linkTarget, sourcePath);
+		},
+		async renderMarkdown(
+			markdown: string,
+			container: HTMLElement,
+			sourcePath: string,
+			component: unknown,
+		): Promise<void> {
+			await runtime.renderMarkdown(markdown, container, sourcePath, component);
 		},
 		onVaultChange(listener: (event: VaultChangeEvent) => void): () => void {
 			const refs = (['create', 'modify', 'delete', 'rename'] as const).map((type) =>

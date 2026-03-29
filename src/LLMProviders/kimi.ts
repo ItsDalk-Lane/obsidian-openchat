@@ -1,10 +1,22 @@
 import axios from 'axios'
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import {
+	BaseOptions,
+	mergeProviderOptionsWithParameters,
+	Message,
+	ResolveEmbedAsBinary,
+	SendRequest,
+	Vendor,
+} from './provider-shared'
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl } from './utils'
 import { feedChunk, ParsedSSEEvent } from './sse'
-import { OpenAILoopOptions, OpenAIToolDefinition, ToolNameMapping, withToolCallLoopSupport } from 'src/core/agents/loop'
+import {
+	type OpenAILoopOptions,
+	type OpenAIToolDefinition,
+	type ToolNameMapping,
+	withToolCallLoopSupport,
+} from 'src/core/agents/loop/OpenAILoopHandler'
 import { DebugLogger } from 'src/utils/DebugLogger'
 
 // Kimi选项接口，扩展基础选项以支持推理功能

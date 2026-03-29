@@ -1,21 +1,13 @@
 import { Extension } from '@codemirror/state';
 import { EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
-import { App, TFile, MarkdownView } from 'obsidian';
+import { TFile } from 'obsidian';
 import type { ChatSettings } from 'src/types/chat';
 import { DebugLogger } from 'src/utils/DebugLogger';
 
 /**
  * 获取文件内容（不包括 frontmatter）
  */
-export function getContentWithoutFrontmatter(app: App): string {
-	const activeView = app.workspace.getActiveViewOfType(MarkdownView);
-	if (!activeView) {
-		return '';
-	}
-
-	// 获取编辑器内容
-	const content = activeView.editor.getValue();
-
+export function getContentWithoutFrontmatter(content: string): string {
 	// 检查是否有 frontmatter
 	const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n/;
 	const match = content.match(frontmatterRegex);
@@ -127,8 +119,8 @@ export function getSelectionToolbarSettings(): ChatSettings | null {
  * @returns CodeMirror 6 扩展
  */
 export function createSelectionToolbarExtension(
-	app: App,
 	settings: ChatSettings,
+	getActiveFile: () => TFile | null,
 	callbacks: SelectionToolbarCallbacks
 ): Extension {
 	// 防抖控制
@@ -225,7 +217,7 @@ export function createSelectionToolbarExtension(
 					}
 
 					// 获取当前活动文件
-					const activeFile = app.workspace.getActiveFile();
+					const activeFile = getActiveFile();
 
 					// 调用回调显示工具栏
 					const selectionInfo: SelectionInfo = {

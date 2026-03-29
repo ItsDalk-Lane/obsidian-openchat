@@ -3,13 +3,13 @@
  * 负责管理所有编辑器扩展：触发扩展、划词工具栏、Modify弹窗、快捷操作
  * 从 ChatFeatureManager 中拆分出来，遵循单一职责原则
  */
-import { Notice, TFile } from 'obsidian';
+import { TFile } from 'obsidian';
 import { Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { createRoot, Root } from 'react-dom/client';
 import { StrictMode } from 'react';
-import OpenChatPlugin from 'src/main';
 import type { ChatService } from 'src/core/chat/services/chat-service';
+import type { ChatConsumerHost } from 'src/core/chat/services/chat-service-types';
 import { createChatTriggerExtension, updateChatTriggerSettings } from './ChatTriggerExtension';
 import {
 	createSelectionToolbarExtension,
@@ -19,16 +19,19 @@ import {
 	setTriggerSource,
 	setToolbarVisible
 } from 'src/editor/selectionToolbar/SelectionToolbarExtension';
-import { QuickActionExecutionService } from 'src/editor/selectionToolbar/QuickActionExecutionService';
-import { QuickActionDataService } from 'src/editor/selectionToolbar/QuickActionDataService';
+import { QuickActionExecutionService } from 'src/domains/quick-actions/service-execution';
+import { QuickActionDataService } from 'src/domains/quick-actions/service-data';
 import { SelectionToolbar } from 'src/editor/selectionToolbar/SelectionToolbar';
 import { ModifyTextModal } from 'src/editor/selectionToolbar/ModifyTextModal';
 import { createModifyGhostTextExtension } from 'src/editor/selectionToolbar/ModifyGhostTextExtension';
 import type { QuickAction } from 'src/types/chat';
 import type { ProviderSettings } from 'src/types/provider';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import { getPromptTemplatePath } from 'src/utils/AIPathManager';
 import { localInstance } from 'src/i18n/locals';
+import {
+	createChatEditorQuickActionDataService,
+	createChatEditorQuickActionExecutionService,
+} from './chat-editor-quick-actions';
 
 
 export abstract class ChatEditorIntegrationBase {
@@ -73,7 +76,7 @@ export abstract class ChatEditorIntegrationBase {
 	protected currentError: string | undefined = undefined;
 
 	constructor(
-		protected readonly plugin: OpenChatPlugin,
+		protected readonly host: ChatConsumerHost,
 		protected readonly service: ChatService
 	) {}
 
@@ -102,12 +105,12 @@ export abstract class ChatEditorIntegrationBase {
 	 * 注册 Chat 触发编辑器扩展
 	 */
 	private registerChatTriggerExtension(): void {
-		const settings = this.plugin.settings.chat;
+		const settings = this.host.getChatSettings();
 		updateChatTriggerSettings(settings);
 
 		this.chatTriggerExtension = createChatTriggerExtension(
-			this.plugin.app,
 			settings,
+			() => this.host.getActiveMarkdownFile(),
 			{
 				onShowToolbar: (view, activeFile, symbolRange) => {
 					this.showToolbarBySymbol(view, activeFile, symbolRange);
@@ -115,28 +118,28 @@ export abstract class ChatEditorIntegrationBase {
 			}
 		);
 
-		this.plugin.registerEditorExtension(this.chatTriggerExtension);
+		this.host.registerEditorExtension(this.chatTriggerExtension);
 	}
 
 	/**
 	 * 更新 Chat 触发编辑器扩展
 	 */
 	updateChatTriggerExtension(): void {
-		const settings = this.plugin.settings.chat;
+		const settings = this.host.getChatSettings();
 		updateChatTriggerSettings(settings);
-		this.plugin.app.workspace.updateOptions();
+		this.host.updateWorkspaceOptions();
 	}
 
 	/**
 	 * 注册选区工具栏编辑器扩展
 	 */
 	private registerSelectionToolbarExtension(): void {
-		const settings = this.plugin.settings.chat;
+		const settings = this.host.getChatSettings();
 		updateSelectionToolbarSettings(settings);
 
 		this.selectionToolbarExtension = createSelectionToolbarExtension(
-			this.plugin.app,
 			settings,
+			() => this.host.getActiveMarkdownFile(),
 			{
 				onShowToolbar: (info, view, activeFile) => {
 					this.showSelectionToolbar(info, view, activeFile);
@@ -147,21 +150,21 @@ export abstract class ChatEditorIntegrationBase {
 			}
 		);
 
-		this.plugin.registerEditorExtension(this.selectionToolbarExtension);
+		this.host.registerEditorExtension(this.selectionToolbarExtension);
 	}
 
 	/**
 	 * 更新选区工具栏编辑器扩展
 	 */
 	updateSelectionToolbarExtension(): void {
-		const settings = this.plugin.settings.chat;
+		const settings = this.host.getChatSettings();
 		updateSelectionToolbarSettings(settings);
 
 		if (this.isToolbarVisible && this.currentSelectionInfo) {
 			this.renderToolbar();
 		}
 
-		this.plugin.app.workspace.updateOptions();
+		this.host.updateWorkspaceOptions();
 	}
 
 	/**
@@ -169,17 +172,16 @@ export abstract class ChatEditorIntegrationBase {
 	 */
 	private registerModifyGhostTextExtension(): void {
 		this.modifyGhostExtensions = createModifyGhostTextExtension();
-		this.plugin.registerEditorExtension(this.modifyGhostExtensions);
+		this.host.registerEditorExtension(this.modifyGhostExtensions);
 	}
 
 	/**
 	 * 初始化快捷操作执行服务
 	 */
 	private initializeQuickActionExecutionService(): void {
-		this.quickActionExecutionService = new QuickActionExecutionService(
-			this.plugin.app,
-			() => this.plugin.settings.aiRuntime,
-			() => getPromptTemplatePath(this.plugin.settings.aiDataFolder)
+		this.quickActionExecutionService = createChatEditorQuickActionExecutionService(
+			this.host,
+			this.service,
 		);
 	}
 
@@ -188,7 +190,10 @@ export abstract class ChatEditorIntegrationBase {
 	 */
 	private async initializeQuickActionDataService(): Promise<void> {
 		try {
-			this.quickActionDataService = QuickActionDataService.getInstance(this.plugin.app);
+			this.quickActionDataService = createChatEditorQuickActionDataService(
+				this.host,
+				this.service,
+			);
 			await this.quickActionDataService.initialize();
 			this.cachedQuickActions = await this.quickActionDataService.getSortedQuickActions();
 			DebugLogger.debug('[ChatEditorIntegration] 快捷操作数据服务初始化完成，已加载', this.cachedQuickActions.length, '个操作');
@@ -237,7 +242,7 @@ export abstract class ChatEditorIntegrationBase {
 		setTriggerSource('symbol');
 		setToolbarVisible(true);
 
-		const fullText = getContentWithoutFrontmatter(this.plugin.app);
+		const fullText = getContentWithoutFrontmatter(view.state.doc.toString());
 		const cursorPos = view.state.selection.main.head;
 		const coords = view.coordsAtPos(cursorPos);
 		if (!coords) {
@@ -270,7 +275,7 @@ export abstract class ChatEditorIntegrationBase {
 			return;
 		}
 
-		const settings = this.plugin.settings.chat;
+		const settings = this.host.getChatSettings();
 		const settingsWithCachedQuickActions = { ...settings, quickActions: this.cachedQuickActions };
 		const { triggerSource, fullText } = this.currentSelectionInfo;
 
@@ -303,7 +308,7 @@ export abstract class ChatEditorIntegrationBase {
 		setTriggerSource(null);
 
 		if (this.toolbarRoot) {
-			const settings = this.plugin.settings.chat;
+			const settings = this.host.getChatSettings();
 			const settingsWithCachedQuickActions = { ...settings, quickActions: this.cachedQuickActions };
 
 			this.toolbarRoot.render(
@@ -334,9 +339,9 @@ export abstract class ChatEditorIntegrationBase {
 
 		const text = this.currentSelectionInfo.text;
 		navigator.clipboard.writeText(text).then(() => {
-			new Notice(localInstance.copied_to_clipboard);
+			this.host.notify(localInstance.copied_to_clipboard);
 		}).catch(() => {
-			new Notice(localInstance.copy_failed);
+			this.host.notify(localInstance.copy_failed);
 		});
 
 		this.hideSelectionToolbar();
@@ -357,10 +362,10 @@ export abstract class ChatEditorIntegrationBase {
 			editorView.dispatch({
 				changes: { from, to, insert: '' }
 			});
-			new Notice(localInstance.cut_to_clipboard);
+			this.host.notify(localInstance.cut_to_clipboard);
 			this.hideSelectionToolbar();
 		}).catch(() => {
-			new Notice(localInstance.cut_failed);
+			this.host.notify(localInstance.cut_failed);
 			this.hideSelectionToolbar();
 		});
 	}
@@ -409,7 +414,7 @@ export abstract class ChatEditorIntegrationBase {
 			this.pendingModifyContext = {
 				triggerSource: 'symbol',
 				anchorCoords: selectionInfo.coords,
-				contentForAI: fullText ?? getContentWithoutFrontmatter(this.plugin.app),
+				contentForAI: fullText ?? getContentWithoutFrontmatter(view.state.doc.toString()),
 				replaceFrom: bodyStart,
 				replaceTo: docEnd,
 				ghostPos: docEnd

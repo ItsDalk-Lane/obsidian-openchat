@@ -1,7 +1,9 @@
 import { App, Setting } from 'obsidian'
+import type { QuickActionDataService } from 'src/domains/quick-actions/service-data'
+import type { ObsidianApiProvider } from 'src/providers/providers.types'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { localInstance } from 'src/i18n/locals'
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api'
 import type { ChatSettings } from 'src/types/chat'
 import { renderQuickActionsSettingsSection } from 'src/components/settings-components/quick-actions/panelActions'
 import {
@@ -52,6 +54,9 @@ interface AiRuntimePanelLayoutParams {
 	saveSettings: () => Promise<void>
 	updateChatSettings: (partial: Partial<ChatSettings>) => Promise<void>
 	rerender: (expandLastProvider?: boolean, keepOpenIndex?: number) => void
+	quickActionDataService: QuickActionDataService
+	obsidianApi: ObsidianApiProvider
+	notify: (message: string, timeout?: number) => void
 	quickActionGroupExpandedState: Map<string, boolean>
 	resolveActiveQuickActionsListContainer: () => HTMLElement | null
 	setActiveQuickActionsListContainer: (container: HTMLElement | null) => void
@@ -389,6 +394,9 @@ export const renderAiRuntimeSettingsPanelLayout = (
 			chatSettings: params.chatSettings,
 			providers: params.settings.providers || [],
 			promptTemplateFolder: params.promptTemplateFolder,
+			obsidianApi: params.obsidianApi,
+			quickActionDataService: params.quickActionDataService,
+			notify: params.notify,
 			quickActionGroupExpandedState: params.quickActionGroupExpandedState,
 			resolveActiveQuickActionsListContainer: params.resolveActiveQuickActionsListContainer,
 			setActiveQuickActionsListContainer: params.setActiveQuickActionsListContainer,

@@ -11,8 +11,14 @@ context compaction、provider message 纯 helper、文件意图分析、
 
 - 会话生命周期与消息生成主链路
 - 历史持久化与多模型配置监听
-- Chat 视图、模态框与编辑器集成
+- Chat 视图组件、模态框组件与编辑器集成
 - MCP、skills、sub-agent 与 command 层装配
+
+当前已迁入 domain UI 接缝的内容：
+
+- `ui-view-coordinator.ts`：chat 视图激活、sidebar/window/tab 切换、Ribbon 同步
+- `ui-view-coordinator-support.ts`：chat 命令注册与 Ribbon 壳辅助
+- `ui-markdown.ts`：Markdown 渲染与内部链接打开，统一经 `ObsidianApiProvider`
 
 ## 核心行为
 
@@ -134,7 +140,8 @@ context compaction、provider message 纯 helper、文件意图分析、
 ## 不做什么（显式排除）
 
 - 该阶段的 chat 域不直接访问 obsidian。
-- 该阶段的 chat 域不注册视图、命令、Ribbon 或编辑器扩展。
+- 该阶段的 chat 域允许通过 `ChatConsumerHost` / `ObsidianApiProvider`
+  承接视图激活、Ribbon 与 Markdown 渲染接缝，但不直接持有 `Plugin` 或调用裸 `workspace.*`。
 - 该阶段的 chat 域不负责 MCP、skills、sub-agent 或 provider 装配。
 
 ## 依赖

@@ -1,10 +1,17 @@
 import { requestUrl } from 'obsidian'
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import {
+	BaseOptions,
+	mergeProviderOptionsWithParameters,
+	Message,
+	ResolveEmbedAsBinary,
+	SendRequest,
+	Vendor,
+} from './provider-shared'
 import { buildReasoningBlockStart, buildReasoningBlockEnd, convertEmbedToImageUrl } from './utils'
 import { withToolMessageContext } from './messageFormat'
-import { withToolCallLoopSupport } from 'src/core/agents/loop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop/OpenAILoopHandler'
 
 // SiliconFlow选项接口，扩展基础选项以支持推理功能
 export interface SiliconFlowOptions extends BaseOptions {

@@ -1,9 +1,10 @@
-import { App, EventRef, MarkdownView, Modal, TFile } from 'obsidian';
+import { App, Modal, TFile } from 'obsidian';
 import { StrictMode } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { ObsidianAppContext } from 'src/contexts/obsidianAppContext';
 import { localInstance } from 'src/i18n/locals';
 import { ChatService } from 'src/core/chat/services/chat-service';
+import type { ChatConsumerHost } from 'src/core/chat/services/chat-service-types';
 import { ChatPersistentModalApp } from './ChatPersistentModalApp';
 import { setupModalDragging } from './chatPersistentModalDrag';
 
@@ -32,7 +33,7 @@ export class ChatPersistentModal extends Modal {
 	private readonly onCloseCallback?: () => void;
 
 	// 事件监听器引用(用于清理)
-	private eventRefs: EventRef[] = [];
+	private eventCleanups: Array<() => void> = [];
 
 	// 拖动清理函数
 	private dragCleanup: (() => void) | null = null;
@@ -56,6 +57,14 @@ export class ChatPersistentModal extends Modal {
 
 	constructor(
 		app: App,
+		private readonly host: Pick<
+			ChatConsumerHost,
+			| 'app'
+			| 'getOpenMarkdownFiles'
+			| 'onWorkspaceLayoutChange'
+			| 'onActiveMarkdownFileChange'
+			| 'onMarkdownFileOpen'
+		>,
 		service: ChatService,
 		options: ChatPersistentModalOptions
 	) {
@@ -166,8 +175,7 @@ export class ChatPersistentModal extends Modal {
 	 */
 	private registerEventListeners() {
 		// 1. active-leaf-change事件:监听文件切换
-		const activeLeafRef = this.app.workspace.on('active-leaf-change', () => {
-			const file = this.app.workspace.getActiveFile();
+		this.eventCleanups.push(this.host.onActiveMarkdownFileChange((file) => {
 			if (!file) {
 				// 如果文件为null,说明没有活动文件,移除所有自动添加的文件并重置标记
 				this.service.removeAllAutoAddedFiles();
@@ -178,11 +186,10 @@ export class ChatPersistentModal extends Modal {
 				// 同时检查并清理已关闭的文件
 				this.checkAndCleanAutoAddedFiles();
 			}
-		});
-		this.eventRefs.push(activeLeafRef);
+		}));
 
 		// 2. file-open事件:监听文件打开/关闭
-		const fileOpenRef = this.app.workspace.on('file-open', (file) => {
+		this.eventCleanups.push(this.host.onMarkdownFileOpen((file) => {
 			if (!file) {
 				// 文件被关闭,检查自动添加的文件是否仍打开
 				this.checkAndCleanAutoAddedFiles();
@@ -194,27 +201,25 @@ export class ChatPersistentModal extends Modal {
 			} else {
 				this.service.addActiveFile(file);
 			}
-		});
-		this.eventRefs.push(fileOpenRef);
+		}));
 
 		// 3. layout-change事件:监听布局变化(检测标签页关闭)
-		const layoutChangeRef = this.app.workspace.on('layout-change', () => {
+		this.eventCleanups.push(this.host.onWorkspaceLayoutChange(() => {
 			// 延迟执行检查,确保布局已更新
 			setTimeout(() => {
 				this.checkAndCleanAutoAddedFiles();
 			}, 50);
-		});
-		this.eventRefs.push(layoutChangeRef);
+		}));
 	}
 
 	/**
 	 * 清理事件监听器
 	 */
 	private unregisterEventListeners() {
-		this.eventRefs.forEach(ref => {
-			this.app.workspace.offref(ref);
+		this.eventCleanups.forEach((cleanup) => {
+			cleanup();
 		});
-		this.eventRefs = [];
+		this.eventCleanups = [];
 	}
 
 	/**
@@ -222,13 +227,7 @@ export class ChatPersistentModal extends Modal {
 	 * 从ChatView复制
 	 */
 	private getOpenMarkdownFiles(): Set<string> {
-		const openFiles = new Set<string>();
-		this.app.workspace.iterateAllLeaves((leaf) => {
-			if (leaf.view instanceof MarkdownView && leaf.view.file) {
-				openFiles.add(leaf.view.file.path);
-			}
-		});
-		return openFiles;
+		return new Set(this.host.getOpenMarkdownFiles().map((file) => file.path));
 	}
 
 	/**

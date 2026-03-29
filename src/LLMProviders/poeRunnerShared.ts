@@ -5,7 +5,7 @@ import type {
 	ToolExecutor,
 } from 'src/core/agents/loop/types'
 
-import type { BaseOptions, Message, ResolveEmbedAsBinary } from '.'
+import type { BaseOptions, Message, ResolveEmbedAsBinary } from './provider-shared'
 
 import { resolveErrorStatus } from './poeUtils'
 

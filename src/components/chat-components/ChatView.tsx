@@ -1,9 +1,9 @@
-import { ItemView, WorkspaceLeaf, App, MarkdownView } from 'obsidian';
+import { ItemView, WorkspaceLeaf, App } from 'obsidian';
 import { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot, Root } from 'react-dom/client';
-import OpenChatPlugin from 'src/main';
 import { ObsidianAppContext } from 'src/contexts/obsidianAppContext';
 import { ChatService } from 'src/core/chat/services/chat-service';
+import type { ChatConsumerHost } from 'src/core/chat/services/chat-service-types';
 import type { ChatState } from 'src/types/chat';
 import { ChatPlanPanel } from './ChatPlanPanel';
 import { ChatMessages } from './ChatMessages';
@@ -20,7 +20,15 @@ export class ChatView extends ItemView {
 
 	constructor(
 		leaf: WorkspaceLeaf,
-		private readonly plugin: OpenChatPlugin,
+		private readonly host: Pick<
+			ChatConsumerHost,
+			| 'app'
+			| 'getActiveMarkdownFile'
+			| 'getOpenMarkdownFiles'
+			| 'onWorkspaceLayoutChange'
+			| 'onActiveMarkdownFileChange'
+			| 'onMarkdownFileOpen'
+		>,
 		private readonly service: ChatService,
 		private readonly mode: ChatViewMode,
 		private readonly viewType: string
@@ -47,22 +55,15 @@ export class ChatView extends ItemView {
 
 		// 重新打开AI Chat界面时，清除当前文件的手动移除标记
 		// 这样在同一文件中重新打开界面时，文件可以重新被自动添加
-		const currentFile = this.app.workspace.getActiveFile();
+		const currentFile = this.host.getActiveMarkdownFile();
 		this.service.onChatViewReopened(currentFile);
 
 		// 聊天界面真正打开时（非悬浮按钮恢复），重置模型为配置的默认模型
 		this.service.onChatPanelOpen();
 		
 		// 获取当前所有打开的Markdown文件路径
-		const getOpenMarkdownFiles = (): Set<string> => {
-			const openFiles = new Set<string>();
-			this.app.workspace.iterateAllLeaves((leaf) => {
-				if (leaf.view instanceof MarkdownView && leaf.view.file) {
-					openFiles.add(leaf.view.file.path);
-				}
-			});
-			return openFiles;
-		};
+		const getOpenMarkdownFiles = (): Set<string> =>
+			new Set(this.host.getOpenMarkdownFiles().map((file) => file.path));
 
 		// 检查自动添加的文件是否仍然打开，如果未打开则清除
 		const checkAndCleanAutoAddedFiles = () => {
@@ -78,51 +79,44 @@ export class ChatView extends ItemView {
 		};
 
 		// 监听布局变化事件，检测标签页关闭
-		this.registerEvent(
-			this.app.workspace.on('layout-change', () => {
-				// 延迟执行检查，确保布局已更新
-				setTimeout(() => {
-					checkAndCleanAutoAddedFiles();
-				}, 50);
-			})
-		);
+		this.register(this.host.onWorkspaceLayoutChange(() => {
+			// 延迟执行检查，确保布局已更新
+			setTimeout(() => {
+				checkAndCleanAutoAddedFiles();
+			}, 50);
+		}));
 
 		// 监听文件切换事件（包括文件关闭）
-		this.registerEvent(
-			this.app.workspace.on('active-leaf-change', () => {
-				const file = this.app.workspace.getActiveFile();
-				// 如果文件为null，说明没有活动文件，移除所有自动添加的文件并重置标记
-				if (!file) {
-					this.service.removeAllAutoAddedFiles();
-					this.service.onNoActiveFile();
-				} else {
-					// 添加新的活动文件（会自动移除之前的自动添加文件）
-					this.service.addActiveFile(file);
-					// 同时检查并清理已关闭的文件
-					checkAndCleanAutoAddedFiles();
-				}
-			})
-		);
+		this.register(this.host.onActiveMarkdownFileChange((file) => {
+			// 如果文件为null，说明没有活动文件，移除所有自动添加的文件并重置标记
+			if (!file) {
+				this.service.removeAllAutoAddedFiles();
+				this.service.onNoActiveFile();
+			} else {
+				// 添加新的活动文件（会自动移除之前的自动添加文件）
+				this.service.addActiveFile(file);
+				// 同时检查并清理已关闭的文件
+				checkAndCleanAutoAddedFiles();
+			}
+		}));
 		
 		// 监听文件打开事件
-		this.registerEvent(
-			this.app.workspace.on('file-open', (file) => {
-				if (!file) {
-					// 文件被关闭，检查自动添加的文件是否仍打开
-					checkAndCleanAutoAddedFiles();
-					// 如果没有任何打开的Markdown文件，重置标记
-					const openFiles = getOpenMarkdownFiles();
-					if (openFiles.size === 0) {
-						this.service.onNoActiveFile();
-					}
-				} else {
-					this.service.addActiveFile(file);
+		this.register(this.host.onMarkdownFileOpen((file) => {
+			if (!file) {
+				// 文件被关闭，检查自动添加的文件是否仍打开
+				checkAndCleanAutoAddedFiles();
+				// 如果没有任何打开的Markdown文件，重置标记
+				const openFiles = getOpenMarkdownFiles();
+				if (openFiles.size === 0) {
+					this.service.onNoActiveFile();
 				}
-			})
-		);
+			} else {
+				this.service.addActiveFile(file);
+			}
+		}));
 		
 		// 初始化时添加当前活跃文件
-		const activeFile = this.app.workspace.getActiveFile();
+		const activeFile = this.host.getActiveMarkdownFile();
 		if (activeFile) {
 			this.service.addActiveFile(activeFile);
 		}
@@ -138,7 +132,7 @@ export class ChatView extends ItemView {
 		this.root.render(
 			<StrictMode>
 				<ObsidianAppContext.Provider value={this.app}>
-					<ChatApp service={this.service} mode={this.mode} app={this.app} />
+					<ChatApp service={this.service} mode={this.mode} app={this.host.app} />
 				</ObsidianAppContext.Provider>
 			</StrictMode>
 		);
@@ -189,9 +183,8 @@ const ChatApp = ({ service, mode, app }: ChatAppProps) => {
 					<ChatControls
 						service={service}
 						state={state}
-						app={app}
 					/>
-					<ChatInput service={service} state={state} app={app} />
+					<ChatInput service={service} state={state} />
 				</>
 			) : (
 				<div className="tw-flex tw-h-full tw-items-center tw-justify-center tw-text-muted">
@@ -201,4 +194,3 @@ const ChatApp = ({ service, mode, app }: ChatAppProps) => {
 		</div>
 	);
 };
-

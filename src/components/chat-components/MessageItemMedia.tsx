@@ -1,11 +1,11 @@
 import { Download, Maximize2, X } from 'lucide-react'
-import { App, Notice, TFile } from 'obsidian'
 import { localInstance } from 'src/i18n/locals'
+import type { ObsidianApiProvider } from 'src/providers/providers.types'
 import { DebugLogger } from 'src/utils/DebugLogger'
 
 type MessageImageGalleryProps = {
-	app: App
 	images: string[]
+	obsidianApi: ObsidianApiProvider
 	onPreview: (imageSrc: string) => void
 }
 
@@ -31,7 +31,11 @@ const resolveDownloadFileName = (imageSrc: string, index: number): string => {
 	return `generated-image-${index + 1}.png`
 }
 
-const downloadImage = async (app: App, imageSrc: string, index: number): Promise<void> => {
+const downloadImage = async (
+	obsidianApi: ObsidianApiProvider,
+	imageSrc: string,
+	index: number,
+): Promise<void> => {
 	const fileName = resolveDownloadFileName(imageSrc, index)
 
 	if (imageSrc.startsWith('data:')) {
@@ -67,12 +71,12 @@ const downloadImage = async (app: App, imageSrc: string, index: number): Promise
 		return
 	}
 
-	const file = app.vault.getAbstractFileByPath(attachmentPath)
-	if (!(file instanceof TFile)) {
+	const file = obsidianApi.getVaultEntry(attachmentPath)
+	if (!file || file.kind !== 'file') {
 		return
 	}
 
-	const arrayBuffer = await app.vault.readBinary(file)
+	const arrayBuffer = await obsidianApi.readVaultBinary(file.path)
 	const blob = new Blob([arrayBuffer])
 	const url = URL.createObjectURL(blob)
 	const link = document.createElement('a')
@@ -84,13 +88,13 @@ const downloadImage = async (app: App, imageSrc: string, index: number): Promise
 	URL.revokeObjectURL(url)
 }
 
-export const MessageImageGallery = ({ app, images, onPreview }: MessageImageGalleryProps) => {
+export const MessageImageGallery = ({ images, obsidianApi, onPreview }: MessageImageGalleryProps) => {
 	const handleDownload = async (imageSrc: string, index: number) => {
 		try {
-			await downloadImage(app, imageSrc, index)
+			await downloadImage(obsidianApi, imageSrc, index)
 		} catch (error) {
 			DebugLogger.error('[MessageItem] 下载图片失败', error)
-			new Notice(localInstance.chat_download_image_failed)
+			obsidianApi.notify(localInstance.chat_download_image_failed)
 		}
 	}
 

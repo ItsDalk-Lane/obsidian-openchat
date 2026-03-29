@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Setting } from 'obsidian';
+import { App, Modal, Setting } from 'obsidian';
 import {
 	DEFAULT_DOUBAO_THINKING_TYPE,
 	DOUBAO_REASONING_EFFORT_OPTIONS,
@@ -23,7 +23,7 @@ import {
 	zhipuVendor,
 } from 'src/LLMProviders/zhipu';
 import { t } from 'src/i18n/ai-runtime/helper';
-import { availableVendors } from 'src/settings/ai-runtime';
+import { availableVendors } from 'src/settings/ai-runtime/api';
 import type { BaseOptions, Vendor } from 'src/types/provider';
 import { ensureDoubaoImageDefaults, renderDoubaoImageSections } from './doubaoSections';
 import { addGptImageSections } from './providerGeneralSections';
@@ -455,6 +455,7 @@ export const openModelSettingsModal = (args: {
 export const openParametersModal = (args: {
 	app: App;
 	draft: ProviderGroupDraft;
+	notify: (message: string, timeout?: number) => void;
 }): void => {
 	const modal = new SettingsSubModal(args.app, t('Additional parameters'), (container) => {
 		container.createEl('div', {
@@ -482,13 +483,13 @@ export const openParametersModal = (args: {
 				}
 				const parsed = JSON.parse(trimmed) as Record<string, unknown>;
 				if (Object.prototype.hasOwnProperty.call(parsed, 'model')) {
-					new Notice(t('Please set model in the Model field above, not here'));
+					args.notify(t('Please set model in the Model field above, not here'));
 					return;
 				}
 				args.draft.parameters = parsed;
 				modal.close();
 			} catch {
-				new Notice(t('Invalid JSON format'));
+				args.notify(t('Invalid JSON format'));
 			}
 		});
 	});

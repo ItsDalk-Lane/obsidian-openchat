@@ -1,6 +1,6 @@
 import { Extension } from '@codemirror/state';
 import { EditorView, ViewUpdate } from '@codemirror/view';
-import { App, TFile } from 'obsidian';
+import { TFile } from 'obsidian';
 import type { ChatSettings } from 'src/types/chat';
 import { getTriggerSource, isToolbarVisibleGlobally } from 'src/editor/selectionToolbar/SelectionToolbarExtension';
 
@@ -35,8 +35,8 @@ function shouldTriggerBySymbol(view: EditorView, from: number, to: number): bool
  * @returns CodeMirror 6 扩展
  */
 export function createChatTriggerExtension(
-	app: App,
 	settings: ChatSettings,
+	getActiveFile: () => TFile | null,
 	callbacks: ChatTriggerCallbacks
 ): Extension {
 	// 防抖控制
@@ -88,7 +88,7 @@ export function createChatTriggerExtension(
 					lastTriggerTime = now;
 
 					// 获取当前活动文件
-					const activeFile = app.workspace.getActiveFile();
+					const activeFile = getActiveFile();
 
 					// 记录触发符号的位置，用于后续删除
 					const symbolRange = { from: fromB, to: toB };

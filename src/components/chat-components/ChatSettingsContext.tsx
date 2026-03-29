@@ -1,4 +1,3 @@
-import { Notice } from 'obsidian'
 import {
 	createContext,
 	useCallback,
@@ -12,18 +11,18 @@ import {
 } from 'react'
 import type { App } from 'obsidian'
 import { localInstance } from 'src/i18n/locals'
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api'
 import type { SkillScanResult } from 'src/domains/skills/types'
-import type { SubAgentScanResult } from 'src/tools/sub-agents'
+import type { SubAgentScanResult } from 'src/tools/sub-agents/types'
 import { BUILTIN_SERVER_ID } from 'src/tools/runtime/constants'
+import { McpConfigImporter } from 'src/services/mcp/McpConfigImporter'
 import {
 	DEFAULT_MCP_SETTINGS,
-	McpConfigImporter,
 	type McpServerConfig,
 	type McpServerState,
 	type McpSettings,
 	type McpToolInfo,
-} from 'src/services/mcp'
+} from 'src/services/mcp/types'
 import { McpImportModal, McpServerEditModal } from 'src/services/mcp/McpConfigModals'
 import {
 	DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
@@ -103,6 +102,7 @@ export const ChatSettingsProvider = ({ app, service, children }: ChatSettingsPro
 	const [builtinServerToolsMap, setBuiltinServerToolsMap] = useState<Map<string, McpToolInfo[]>>(
 		() => new Map()
 	)
+	const obsidianApi = service.getObsidianApiProvider()
 
 	const providers = aiRuntimeSettings.providers ?? service.getProviders()
 	const providerOptions = useMemo<ProviderOption[]>(
@@ -323,7 +323,7 @@ export const ChatSettingsProvider = ({ app, service, children }: ChatSettingsPro
 					if (!success) {
 						throw new Error(localInstance.chat_settings_save_failed)
 					}
-					new Notice(
+					obsidianApi.notify(
 						`${manual ? localInstance.mcp_manual_config_confirm : localInstance.mcp_import_confirm}: +${result.added.length} / ${result.skipped.length}`
 					)
 				}
@@ -344,7 +344,7 @@ export const ChatSettingsProvider = ({ app, service, children }: ChatSettingsPro
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error)
-				new Notice(`${localInstance.mcp_server_toggle_failed}: ${message}`)
+				obsidianApi.notify(`${localInstance.mcp_server_toggle_failed}: ${message}`)
 			}
 		},
 		[service]
@@ -418,11 +418,11 @@ export const ChatSettingsProvider = ({ app, service, children }: ChatSettingsPro
 	const copyToolName = useCallback(async (toolName: string): Promise<void> => {
 		try {
 			await navigator.clipboard.writeText(toolName)
-			new Notice(localInstance.copy_success)
+			obsidianApi.notify(localInstance.copy_success)
 		} catch {
-			new Notice(localInstance.copy_failed)
+			obsidianApi.notify(localInstance.copy_failed)
 		}
-	}, [])
+	}, [obsidianApi])
 
 	const value = useMemo<ChatSettingsContextValue>(
 		() => ({

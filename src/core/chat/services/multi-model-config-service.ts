@@ -48,7 +48,7 @@ export class MultiModelConfigService {
 		this.disposeVaultWatch?.();
 		this.disposeVaultWatch = null;
 		if (this.reloadTimer !== null) {
-			window.clearTimeout(this.reloadTimer);
+			clearTimeout(this.reloadTimer);
 			this.reloadTimer = null;
 		}
 		this.callbacks.clear();
@@ -125,9 +125,9 @@ export class MultiModelConfigService {
 
 	private scheduleReload(): void {
 		if (this.reloadTimer !== null) {
-			window.clearTimeout(this.reloadTimer);
+			clearTimeout(this.reloadTimer);
 		}
-		this.reloadTimer = window.setTimeout(() => {
+		this.reloadTimer = setTimeout(() => {
 			this.reloadTimer = null;
 			void this.emitConfigChanges();
 		}, 100);

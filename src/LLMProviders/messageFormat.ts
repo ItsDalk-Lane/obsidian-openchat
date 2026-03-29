@@ -1,4 +1,4 @@
-import { Message } from '.'
+import { Message } from './provider-shared'
 
 type MessagePayload = {
 	role: string

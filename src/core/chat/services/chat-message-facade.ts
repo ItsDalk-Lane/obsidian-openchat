@@ -1,4 +1,4 @@
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api';
 import type { PreparedChatRequest } from './chat-service-types';
 import type { ChatMessageOperationDeps } from './chat-message-operations';
 import type { ChatMessageMutationDeps } from './chat-message-mutations';

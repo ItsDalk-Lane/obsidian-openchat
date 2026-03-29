@@ -1,121 +1,195 @@
-import { App, TFile, TFolder, CachedMetadata } from 'obsidian';
+import type { ObsidianApiProvider } from 'src/providers/providers.types';
 import { localInstance } from 'src/i18n/locals';
 
-export interface FolderItem {
-	folder: TFolder;
+export interface FileMenuFileItem {
+	path: string;
+	name: string;
+	basename: string;
+	parentPath: string;
+	extension: string;
+}
+
+export interface FileMenuFolderItem {
+	path: string;
+	name: string;
+	parentPath: string;
+	hasChildren: boolean;
+}
+
+export interface FolderTreeItem {
+	folder: FileMenuFolderItem;
 	level: number;
 	isExpanded: boolean;
 }
 
-/** 获取文件的副标题（显示父目录路径） */
-export function getFileSecondaryText(file: TFile): string {
-	// 避免"文件名 + 含文件名的完整路径"导致的重复观感：第二行仅显示父目录
-	return file.parent?.path ?? '/';
+export interface FileMenuSearchResult {
+	type: 'file' | 'folder';
+	file?: FileMenuFileItem;
+	folder?: FileMenuFolderItem;
+	matches: string[];
 }
 
-/** 获取文件夹的副标题（显示父目录路径） */
-export function getFolderSecondaryText(folder: TFolder): string {
-	// 避免"文件夹名 + 顶层同名路径"重复：第二行显示父目录（根目录显示 /）
-	if (folder.path === '/') return '/';
-	return folder.parent?.path ?? '/';
-}
+const ROOT_PATH = '/';
 
-/** 在文件内容（名称、标题、标签、链接）中搜索关键词 */
-export function searchInFile(file: TFile, cache: CachedMetadata, query: string): string[] {
-	const matches: string[] = [];
+const stripExtension = (name: string): string => {
+	const dotIndex = name.lastIndexOf('.');
+	return dotIndex > 0 ? name.slice(0, dotIndex) : name;
+};
 
-	// 搜索文件名
-	if (file.name.toLowerCase().includes(query)) {
-		matches.push(localInstance.chat_file_match_filename_prefix.replace('{name}', file.name));
+const getParentPath = (path: string): string => {
+	if (!path || path === ROOT_PATH) {
+		return ROOT_PATH;
 	}
+	const normalized = path.replace(/\/+$/u, '');
+	const lastSlashIndex = normalized.lastIndexOf('/');
+	if (lastSlashIndex <= 0) {
+		return ROOT_PATH;
+	}
+	return normalized.slice(0, lastSlashIndex) || ROOT_PATH;
+};
 
-	// 搜索标题
-	if (cache.headings) {
-		for (const heading of cache.headings) {
-			if (heading.heading.toLowerCase().includes(query)) {
-				matches.push(localInstance.chat_file_match_heading_prefix.replace('{name}', heading.heading));
+const shouldIncludePath = (path: string): boolean =>
+	path !== '.obsidian' && !path.startsWith('.obsidian/');
+
+const collectVaultEntries = (
+	obsidianApi: ObsidianApiProvider,
+	folderPath = ROOT_PATH,
+): { files: FileMenuFileItem[]; folders: FileMenuFolderItem[] } => {
+	const files: FileMenuFileItem[] = [];
+	const folders: FileMenuFolderItem[] = [];
+
+	const visit = (currentPath: string) => {
+		for (const entry of obsidianApi.listFolderEntries(currentPath)) {
+			if (!shouldIncludePath(entry.path)) {
+				continue;
 			}
-		}
-	}
-
-	// 搜索标签
-	if (cache.tags) {
-		for (const tag of cache.tags) {
-			if (tag.tag.toLowerCase().includes(query)) {
-				matches.push(localInstance.chat_file_match_tag_prefix.replace('{name}', tag.tag));
+			if (entry.kind === 'folder') {
+				const children = obsidianApi.listFolderEntries(entry.path);
+				folders.push({
+					path: entry.path,
+					name: entry.name || ROOT_PATH,
+					parentPath: getParentPath(entry.path),
+					hasChildren: children.some((child) => child.kind === 'folder'),
+				});
+				visit(entry.path);
+				continue;
 			}
-		}
-	}
 
-	// 搜索链接
-	if (cache.links) {
-		for (const link of cache.links) {
-			if (link.displayText && link.displayText.toLowerCase().includes(query)) {
-				matches.push(localInstance.chat_file_match_link_prefix.replace('{name}', link.displayText));
-			}
-		}
-	}
-
-	return matches;
-}
-
-/** 获取过滤后的文件列表（按最近修改时间排序） */
-export function getFilteredFiles(app: App, fileSearchQuery: string): TFile[] {
-	return app.vault.getFiles()
-		.filter(file => !file.path.startsWith('.obsidian'))
-		.filter(file => {
-			if (!fileSearchQuery) return true;
-			const query = fileSearchQuery.toLowerCase();
-			return file.name.toLowerCase().includes(query) ||
-				file.path.toLowerCase().includes(query);
-		})
-		.sort((a, b) => {
-			// 按照最近修改时间排序，最近修改的在前
-			const timeA = a.stat?.mtime || 0;
-			const timeB = b.stat?.mtime || 0;
-			return timeB - timeA;
-		});
-}
-
-/** 获取文件夹树结构（支持搜索过滤与展开状态） */
-export function getFolderTree(app: App, folderSearchQuery: string, expandedFolders: Set<string>): FolderItem[] {
-	const items: FolderItem[] = [];
-	const query = folderSearchQuery.toLowerCase().trim();
-
-	const collectFolders = (folder: TFolder, level = 0) => {
-		// 使用原始文件夹名进行搜索匹配（与菜单栏搜索保持一致）
-		const originalFolderName = folder.name.toLowerCase();
-		const isMatched = !query || originalFolderName.includes(query);
-
-		// 如果当前文件夹匹配，或者没有搜索条件，则显示
-		if (isMatched) {
-			items.push({
-				folder,
-				level,
-				isExpanded: expandedFolders.has(folder.path) || (query ? true : false)
+			const basename = stripExtension(entry.name);
+			const extension = entry.name.includes('.')
+				? entry.name.slice(entry.name.lastIndexOf('.') + 1)
+				: '';
+			files.push({
+				path: entry.path,
+				name: entry.name,
+				basename,
+				parentPath: getParentPath(entry.path),
+				extension,
 			});
-		}
-
-		// 处理子文件夹：
-		// 1. 没有搜索条件时，只处理已展开的文件夹的子项
-		// 2. 有搜索条件时，搜索所有文件夹层级
-		if (!query) {
-			// 没有搜索条件，只处理已展开的文件夹
-			if (expandedFolders.has(folder.path)) {
-				const subfolders = folder.children.filter(child => child instanceof TFolder) as TFolder[];
-				subfolders.sort((a, b) => a.name.localeCompare(b.name));
-				subfolders.forEach(subfolder => collectFolders(subfolder, level + 1));
-			}
-		} else {
-			// 有搜索条件，处理所有子文件夹进行递归搜索
-			const subfolders = folder.children.filter(child => child instanceof TFolder) as TFolder[];
-			subfolders.sort((a, b) => a.name.localeCompare(b.name));
-			subfolders.forEach(subfolder => collectFolders(subfolder, level + 1));
 		}
 	};
 
-	const rootFolder = app.vault.getRoot();
-	collectFolders(rootFolder);
+	visit(folderPath);
+	return { files, folders };
+};
 
+/** 获取文件的副标题（显示父目录路径） */
+export function getFileSecondaryText(file: FileMenuFileItem): string {
+	return file.parentPath;
+}
+
+/** 获取文件夹的副标题（显示父目录路径） */
+export function getFolderSecondaryText(folder: FileMenuFolderItem): string {
+	if (folder.path === ROOT_PATH) return ROOT_PATH;
+	return folder.parentPath;
+}
+
+/** 获取过滤后的文件列表 */
+export function getFilteredFiles(
+	obsidianApi: ObsidianApiProvider,
+	fileSearchQuery: string,
+): FileMenuFileItem[] {
+	return collectVaultEntries(obsidianApi).files
+		.filter((file) => {
+			if (!fileSearchQuery) return true;
+			const query = fileSearchQuery.toLowerCase();
+			return (
+				file.basename.toLowerCase().includes(query)
+				|| file.path.toLowerCase().includes(query)
+			);
+		})
+		.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** 获取文件夹树结构（支持搜索过滤与展开状态） */
+export function getFolderTree(
+	obsidianApi: ObsidianApiProvider,
+	folderSearchQuery: string,
+	expandedFolders: Set<string>,
+): FolderTreeItem[] {
+	const items: FolderTreeItem[] = [];
+	const query = folderSearchQuery.toLowerCase().trim();
+
+	const collectFolders = (folderPath: string, level = 0) => {
+		const subfolders = obsidianApi
+			.listFolderEntries(folderPath)
+			.filter((entry) => entry.kind === 'folder')
+			.sort((a, b) => a.path.localeCompare(b.path));
+
+		for (const folder of subfolders) {
+			const folderItem: FileMenuFolderItem = {
+				path: folder.path,
+				name: folder.name || ROOT_PATH,
+				parentPath: getParentPath(folder.path),
+				hasChildren: obsidianApi
+					.listFolderEntries(folder.path)
+					.some((entry) => entry.kind === 'folder'),
+			};
+			const isMatched = !query || folderItem.name.toLowerCase().includes(query);
+			if (isMatched) {
+				items.push({
+					folder: folderItem,
+					level,
+					isExpanded: expandedFolders.has(folder.path) || Boolean(query),
+				});
+			}
+
+			if (query || expandedFolders.has(folder.path)) {
+				collectFolders(folder.path, level + 1);
+			}
+		}
+	};
+
+	collectFolders(ROOT_PATH);
 	return items;
+}
+
+export function searchVaultEntries(
+	obsidianApi: ObsidianApiProvider,
+	searchQuery: string,
+): FileMenuSearchResult[] {
+	const query = searchQuery.toLowerCase().trim();
+	if (!query) {
+		return [];
+	}
+	const { files, folders } = collectVaultEntries(obsidianApi);
+	const folderResults: FileMenuSearchResult[] = folders
+		.filter((folder) => folder.name.toLowerCase().includes(query))
+		.map((folder) => ({
+			type: 'folder',
+			folder,
+			matches: [localInstance.chat_file_match_folder_prefix.replace('{name}', folder.name)],
+		}));
+	const fileResults: FileMenuSearchResult[] = files
+		.filter((file) => (
+			file.basename.toLowerCase().includes(query)
+			|| file.path.toLowerCase().includes(query)
+		))
+		.map((file) => ({
+			type: 'file',
+			file,
+			matches: [localInstance.chat_file_match_filename_prefix.replace('{name}', file.basename)],
+		}));
+
+	return [...folderResults, ...fileResults].slice(0, 10);
 }

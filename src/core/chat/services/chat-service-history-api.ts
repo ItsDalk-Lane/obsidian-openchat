@@ -1,6 +1,6 @@
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api';
 import type { McpSettings } from 'src/types/mcp';
 import type { ChatSession } from '../types/chat';
 import type { SavedChatSessionState } from './chat-service-types';
@@ -108,6 +108,7 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 	async refreshProviderSettings(aiRuntimeSettings: AiRuntimeSettings): Promise<void> { getMessageMutationFacade(internals).refreshProviderSettings(aiRuntimeSettings); },
 	emitState(): void { internals.stateStore.emit(); },
 	getProviders() { return [...internals.settingsAccessor.getAiRuntimeSettings().providers]; },
+	getAiDataFolder() { return internals.settingsAccessor.getAiDataFolder(); },
 	getChatSettingsSnapshot() { return cloneValueHelper(internals.settingsAccessor.getChatSettings()); },
 	getAiRuntimeSettingsSnapshot() { return cloneValueHelper(internals.settingsAccessor.getAiRuntimeSettings()); },
 	getMcpClientManager() { return internals.runtimeDeps.getMcpClientManager(); },

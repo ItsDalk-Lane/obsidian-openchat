@@ -1,42 +1,47 @@
 import { useEffect, useRef } from "react";
-import type OpenChatPlugin from "src/main";
 import {
 	AiRuntimeSettingsPanel,
 	type AiRuntimeSettingsPanelOptions,
 } from "src/components/settings-components/AiRuntimeSettingsPanel";
+import type { PluginSettingTabHost } from "src/settings/plugin-setting-host";
 import { getPromptTemplatePath } from "src/utils/AIPathManager";
 
 interface Props {
-	plugin: OpenChatPlugin;
+	host: Pick<
+		PluginSettingTabHost,
+		| "app"
+		| "getObsidianApiProvider"
+		| "settings"
+		| "saveSettings"
+		| "updateChatSettings"
+		| "refreshQuickActionsCache"
+		| "getMcpClientManager"
+	>;
 	panelOptions?: AiRuntimeSettingsPanelOptions;
 }
 
-export const AiRuntimeSettingsTabItem = ({ plugin, panelOptions }: Props) => {
+export const AiRuntimeSettingsTabItem = ({ host, panelOptions }: Props) => {
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		if (!containerRef.current) return;
 
-		const panel = new AiRuntimeSettingsPanel(plugin.app, {
-			getSettings: () => plugin.settings.aiRuntime,
-			getChatSettings: () => plugin.settings.chat,
-			getAiDataFolder: () => plugin.settings.aiDataFolder,
-			getPromptTemplateFolder: () => getPromptTemplatePath(plugin.settings.aiDataFolder),
+		const panel = new AiRuntimeSettingsPanel(host.app, {
+			getObsidianApiProvider: () => host.getObsidianApiProvider(),
+			getSettings: () => host.settings.aiRuntime,
+			getChatSettings: () => host.settings.chat,
+			getAiDataFolder: () => host.settings.aiDataFolder,
+			getPromptTemplateFolder: () => getPromptTemplatePath(host.settings.aiDataFolder),
 			saveSettings: async () => {
-				await plugin.saveSettings();
+				await host.saveSettings();
 			},
 			updateChatSettings: async (partial) => {
-				plugin.settings.chat = {
-					...plugin.settings.chat,
-					...partial,
-				};
-				await plugin.saveSettings();
+				await host.updateChatSettings(partial);
 			},
 			refreshQuickActionsCache: async () => {
-				// 通过插件实例访问 FeatureCoordinator 来刷新快捷操作缓存
-				await plugin.featureCoordinator.refreshQuickActionsCache();
+				await host.refreshQuickActionsCache();
 			},
-			getMcpClientManager: () => plugin.featureCoordinator.getMcpClientManager(),
+			getMcpClientManager: () => host.getMcpClientManager(),
 		}, panelOptions);
 
 		panel.render(containerRef.current);
@@ -45,7 +50,7 @@ export const AiRuntimeSettingsTabItem = ({ plugin, panelOptions }: Props) => {
 			panel.dispose();
 			containerRef.current?.replaceChildren();
 		};
-	}, [panelOptions, plugin]);
+	}, [host, panelOptions]);
 
 	return <div ref={containerRef} />;
 };

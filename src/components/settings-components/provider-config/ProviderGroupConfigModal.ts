@@ -5,7 +5,7 @@ import type { ReasoningCapabilityRecord } from 'src/LLMProviders/modelCapability
 import { openAIVendor } from 'src/LLMProviders/openAI';
 import { ollamaVendor } from 'src/LLMProviders/ollama';
 import { t } from 'src/i18n/ai-runtime/helper';
-import { availableVendors } from 'src/settings/ai-runtime';
+import { availableVendors } from 'src/settings/ai-runtime/api';
 import type { ProviderSettings, Vendor } from 'src/types/provider';
 import { createProviderGroupId } from 'src/utils/aiProviderMetadata';
 import { ProviderGroupConfigModalController } from './ProviderGroupConfigModalController';
@@ -23,8 +23,12 @@ export interface ProviderGroupConfigModalParams {
 	title: string;
 	getVendorApiKey: (vendorName: string) => string;
 	onCommit: (draft: ProviderGroupDraft) => Promise<void>;
-	probeReasoningCapability: (provider: ProviderSettings, vendor: Vendor) => Promise<ReasoningCapabilityRecord>;
+	probeReasoningCapability: (
+		provider: ProviderSettings,
+		vendor: Vendor
+	) => Promise<ReasoningCapabilityRecord>;
 	testProviderConfiguration: (provider: ProviderSettings) => Promise<boolean>;
+	notify: (message: string, timeout?: number) => void;
 }
 
 export class ProviderGroupConfigModal extends Modal {

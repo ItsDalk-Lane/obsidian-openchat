@@ -1,5 +1,6 @@
-import { App, Modal, Notice, Setting } from 'obsidian'
-import { QuickActionDataService } from 'src/editor/selectionToolbar/QuickActionDataService'
+import { App, Modal, Setting } from 'obsidian'
+import type { QuickActionDataService } from 'src/domains/quick-actions/service-data'
+import type { ObsidianApiProvider } from 'src/providers/providers.types'
 import { localInstance } from 'src/i18n/locals'
 import type { ChatSettings, QuickAction } from 'src/types/chat'
 import type { ProviderSettings } from 'src/types/provider'
@@ -14,6 +15,9 @@ interface QuickActionsPanelParams {
 	chatSettings: ChatSettings
 	providers: ProviderSettings[]
 	promptTemplateFolder: string
+	obsidianApi: ObsidianApiProvider
+	quickActionDataService: QuickActionDataService
+	notify: (message: string, timeout?: number) => void
 	quickActionGroupExpandedState: Map<string, boolean>
 	resolveActiveQuickActionsListContainer: () => HTMLElement | null
 	setActiveQuickActionsListContainer: (container: HTMLElement | null) => void
@@ -36,18 +40,19 @@ const getQuickActionManagementHintText = (chatSettings: ChatSettings): string =>
 		String(chatSettings.maxQuickActionButtons ?? 4)
 	)
 
-const getQuickActionsFromService = async (app: App): Promise<QuickAction[]> => {
-	const quickActionDataService = QuickActionDataService.getInstance(app)
+const getQuickActionsFromService = async (
+	quickActionDataService: QuickActionDataService
+): Promise<QuickAction[]> => {
 	await quickActionDataService.initialize()
 	return await quickActionDataService.getSortedQuickActions()
 }
 
 const saveQuickAction = async (
-	app: App,
+	quickActionDataService: QuickActionDataService,
+	notify: (message: string, timeout?: number) => void,
 	quickAction: QuickAction,
 	refreshQuickActionsCache?: () => Promise<void>
 ): Promise<void> => {
-	const quickActionDataService = QuickActionDataService.getInstance(app)
 	await quickActionDataService.initialize()
 
 	const existingQuickActions = await quickActionDataService.getQuickActions()
@@ -56,7 +61,7 @@ const saveQuickAction = async (
 	await quickActionDataService.saveQuickAction(quickAction)
 	await refreshQuickActionsCache?.()
 
-	new Notice(
+	notify(
 		existingIndex >= 0
 			? localInstance.quick_action_edit_updated
 			: localInstance.quick_action_edit_created
@@ -64,24 +69,23 @@ const saveQuickAction = async (
 }
 
 const deleteQuickAction = async (
-	app: App,
+	quickActionDataService: QuickActionDataService,
+	notify: (message: string, timeout?: number) => void,
 	quickActionId: string,
 	refreshQuickActionsCache?: () => Promise<void>
 ): Promise<void> => {
-	const quickActionDataService = QuickActionDataService.getInstance(app)
 	await quickActionDataService.initialize()
 	await quickActionDataService.deleteQuickAction(quickActionId)
 	await refreshQuickActionsCache?.()
-	new Notice(localInstance.quick_action_edit_deleted)
+	notify(localInstance.quick_action_edit_deleted)
 }
 
 const updateQuickActionShowInToolbar = async (
-	app: App,
+	quickActionDataService: QuickActionDataService,
 	quickActionId: string,
 	showInToolbar: boolean,
 	refreshQuickActionsCache?: () => Promise<void>
 ): Promise<void> => {
-	const quickActionDataService = QuickActionDataService.getInstance(app)
 	await quickActionDataService.initialize()
 	await quickActionDataService.updateQuickActionShowInToolbar(quickActionId, showInToolbar)
 	await refreshQuickActionsCache?.()
@@ -93,15 +97,21 @@ const renderList = async (
 ): Promise<void> => {
 	await renderQuickActionsList(
 		{
-			app: params.app,
+			quickActionDataService: params.quickActionDataService,
+			notify: params.notify,
 			quickActionGroupExpandedState: params.quickActionGroupExpandedState,
-			getQuickActionsFromService: () => getQuickActionsFromService(params.app),
+			getQuickActionsFromService: () => getQuickActionsFromService(params.quickActionDataService),
 			refreshQuickActionsCache: params.refreshQuickActionsCache,
 			deleteQuickAction: (quickActionId) =>
-				deleteQuickAction(params.app, quickActionId, params.refreshQuickActionsCache),
+				deleteQuickAction(
+					params.quickActionDataService,
+					params.notify,
+					quickActionId,
+					params.refreshQuickActionsCache
+				),
 			updateQuickActionShowInToolbar: (quickActionId, showInToolbar) =>
 				updateQuickActionShowInToolbar(
-					params.app,
+					params.quickActionDataService,
 					quickActionId,
 					showInToolbar,
 					params.refreshQuickActionsCache
@@ -121,15 +131,23 @@ const openEditModal = async (
 	await openQuickActionEditModal(
 		{
 			app: params.app,
+			obsidianApi: params.obsidianApi,
+			quickActionDataService: params.quickActionDataService,
+			notify: params.notify,
 			providers: params.providers,
 			promptTemplateFolder: params.promptTemplateFolder,
 			refreshQuickActionsCache: params.refreshQuickActionsCache,
 			resolveQuickActionsListContainer: () =>
 				params.resolveActiveQuickActionsListContainer() ??
 				(params.rootContainerEl.querySelector('.quick-actions-list-content') as HTMLElement | null),
-			getQuickActionsFromService: () => getQuickActionsFromService(params.app),
+			getQuickActionsFromService: () => getQuickActionsFromService(params.quickActionDataService),
 			saveQuickAction: (savedQuickAction) =>
-				saveQuickAction(params.app, savedQuickAction, params.refreshQuickActionsCache),
+				saveQuickAction(
+					params.quickActionDataService,
+					params.notify,
+					savedQuickAction,
+					params.refreshQuickActionsCache
+				),
 			refreshQuickActionsList: (container) => renderList(params, container),
 			openQuickActionEditModal: (childQuickAction, childOptions) =>
 				openEditModal(params, childQuickAction, childOptions)

@@ -1,3 +1,4 @@
+import type { MarkdownView } from 'obsidian';
 import type OpenChatPlugin from 'src/main';
 import type { PluginSettings } from 'src/domains/settings/types';
 import type { McpRuntimeManager } from 'src/domains/mcp/types';
@@ -5,13 +6,15 @@ import {
     McpRuntimeCoordinator,
     createMcpRuntimeManagerFactory,
 } from 'src/domains/mcp/ui';
-import { AiRuntimeCommandManager } from 'src/commands/ai-runtime';
-import { ChatFeatureManager } from 'src/core/chat';
+import { AiRuntimeCommandManager } from 'src/commands/ai-runtime/AiRuntimeCommandManager';
+import type { AiRuntimeCommandHost } from 'src/commands/ai-runtime/ai-runtime-command-host';
+import { ChatFeatureManager } from 'src/core/chat/chat-feature-manager';
 import type { ChatRuntimeDeps } from 'src/core/chat/runtime/chat-runtime-deps';
 import type { ToolExecutor } from 'src/types/tool';
 import { ChatService } from 'src/core/chat/services/chat-service';
+import type { ChatConsumerHost } from 'src/core/chat/services/chat-service-types';
 import { createChatServiceDeps } from 'src/core/chat/services/create-chat-service-deps';
-import { ChatViewCoordinator } from 'src/commands/chat/chat-view-coordinator';
+import { ChatViewCoordinator } from 'src/domains/chat/ui-view-coordinator';
 import { createObsidianApiProvider } from 'src/providers/obsidian-api';
 import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler';
 import { DebugLogger } from 'src/utils/DebugLogger';
@@ -31,6 +34,8 @@ export class FeatureCoordinator {
     private readonly toolExecutorRegistry = new ToolExecutorRegistry();
     private readonly mcpRuntime: McpRuntimeCoordinator;
     private readonly chatRuntimeDeps: ChatRuntimeDeps;
+    private readonly chatConsumerHost: ChatConsumerHost;
+    private readonly aiRuntimeCommandHost: AiRuntimeCommandHost;
     private chatServiceDeps: ReturnType<typeof createChatServiceDeps> | null = null;
 
     constructor(private plugin: OpenChatPlugin) {
@@ -68,8 +73,10 @@ export class FeatureCoordinator {
             }),
         );
         this.chatRuntimeDeps = this.createChatRuntimeDeps();
+        this.aiRuntimeCommandHost = this.createAiRuntimeCommandHost();
+        this.chatConsumerHost = this.createChatConsumerHost();
         this.chatServiceDeps = createChatServiceDeps(
-            this.plugin,
+            this.chatConsumerHost,
             this.chatRuntimeDeps,
             this.obsidianApiProvider,
         );
@@ -78,7 +85,11 @@ export class FeatureCoordinator {
     initializeAiRuntime(settings: PluginSettings) {
         const aiRuntimeSettings = settings.aiRuntime;
         if (!this.aiRuntimeCommandManager) {
-            this.aiRuntimeCommandManager = new AiRuntimeCommandManager(this.plugin, aiRuntimeSettings);
+            this.aiRuntimeCommandManager = new AiRuntimeCommandManager(
+                this.aiRuntimeCommandHost,
+                this.obsidianApiProvider,
+                aiRuntimeSettings,
+            );
             this.aiRuntimeCommandManager.initialize();
         } else {
             this.aiRuntimeCommandManager.updateSettings(aiRuntimeSettings);
@@ -94,7 +105,10 @@ export class FeatureCoordinator {
     registerChatViewTypesEarly(): void {
         if (this.earlyChatService) return;
         this.earlyChatService = new ChatService(this.getChatServiceDeps());
-        this.earlyChatViewCoordinator = new ChatViewCoordinator(this.plugin, this.earlyChatService);
+        this.earlyChatViewCoordinator = new ChatViewCoordinator(
+            this.chatConsumerHost,
+            this.earlyChatService,
+        );
         this.earlyChatViewCoordinator.registerViewTypesOnly();
         // 提前初始化 Service（使用默认设置），确保 Obsidian 恢复视图时 activeSession 不为 null，
         // 避免在真实设置加载完成前显示「暂无聊天会话」的空白状态。
@@ -106,7 +120,7 @@ export class FeatureCoordinator {
         await this.initializeSkills();
         if (!this.chatFeatureManager) {
             this.chatFeatureManager = new ChatFeatureManager(
-                this.plugin,
+                this.chatConsumerHost,
                 this.getChatServiceDeps(),
                 this.earlyChatService ?? undefined,
                 this.earlyChatViewCoordinator ?? undefined,
@@ -139,6 +153,10 @@ export class FeatureCoordinator {
 
     getChatFeatureManager() {
         return this.chatFeatureManager;
+    }
+
+    getObsidianApiProvider() {
+        return this.obsidianApiProvider;
     }
 
     getMcpClientManager(): McpRuntimeManager | null {
@@ -215,11 +233,132 @@ export class FeatureCoordinator {
     private getChatServiceDeps(): ReturnType<typeof createChatServiceDeps> {
         if (!this.chatServiceDeps) {
             this.chatServiceDeps = createChatServiceDeps(
-                this.plugin,
+                this.chatConsumerHost,
                 this.chatRuntimeDeps,
                 this.obsidianApiProvider,
             );
         }
         return this.chatServiceDeps;
+    }
+
+    private createChatConsumerHost(): ChatConsumerHost {
+        return {
+            app: this.plugin.app,
+            notify: (message, timeout) => {
+                this.obsidianApiProvider.notify(message, timeout);
+            },
+            getManifestId: () => this.plugin.manifest.id,
+            getAiDataFolder: () => this.plugin.settings.aiDataFolder,
+            getPluginSettings: () => this.plugin.settings,
+            getChatSettings: () => this.plugin.settings.chat,
+            setChatSettings: (nextSettings) => {
+                this.plugin.settings.chat = nextSettings;
+            },
+            getAiRuntimeSettings: () => this.plugin.settings.aiRuntime,
+            setAiRuntimeSettings: (nextSettings) => {
+                this.plugin.settings.aiRuntime = nextSettings;
+            },
+            saveSettings: async () => await this.plugin.saveSettings(),
+            openSettingsTab: () => {
+                const settingApp = this.plugin.app as typeof this.plugin.app & {
+                    setting?: { open: () => void; openTabById: (id: string) => boolean };
+                };
+                settingApp.setting?.open();
+                settingApp.setting?.openTabById(this.plugin.manifest.id);
+            },
+            registerView: (viewType, viewCreator) => {
+                this.plugin.registerView(viewType, viewCreator);
+            },
+            addCommand: (command) => {
+                this.plugin.addCommand(command);
+            },
+            addRibbonIcon: (icon, title, callback) =>
+                this.plugin.addRibbonIcon(icon, title, callback),
+            getActiveMarkdownFile: () => this.plugin.app.workspace.getActiveFile(),
+            getActiveMarkdownView: () =>
+                this.plugin.app.workspace.getActiveViewOfType(MarkdownView),
+            getOpenMarkdownFiles: () => {
+                const files: NonNullable<ReturnType<ChatConsumerHost['getOpenMarkdownFiles']>> = [];
+                this.plugin.app.workspace.iterateAllLeaves((leaf) => {
+                    if (leaf.view instanceof MarkdownView && leaf.view.file) {
+                        files.push(leaf.view.file);
+                    }
+                });
+                return files;
+            },
+            findLeafByViewType: (viewType) => {
+                let existingLeaf: ReturnType<ChatConsumerHost['findLeafByViewType']> = null;
+                this.plugin.app.workspace.iterateAllLeaves((leaf) => {
+                    if (leaf.view.getViewType() === viewType) {
+                        existingLeaf = leaf;
+                        return true;
+                    }
+                    return false;
+                });
+                return existingLeaf;
+            },
+            revealLeaf: (leaf) => {
+                this.plugin.app.workspace.revealLeaf(leaf);
+            },
+            getLeaf: (target) => {
+                return this.plugin.app.workspace.getLeaf(target === 'window' ? 'window' : true);
+            },
+            getSidebarLeaf: (side) => {
+                return side === 'right'
+                    ? this.plugin.app.workspace.getRightLeaf(false)
+                    : this.plugin.app.workspace.getLeftLeaf(false);
+            },
+            setLeafViewState: async (leaf, viewType, active) => {
+                await leaf.setViewState({ type: viewType, active });
+            },
+            isWorkspaceReady: () => {
+                return this.plugin.app.workspace.layoutReady && Boolean(this.plugin.app.workspace.rightSplit);
+            },
+            detachLeavesOfType: (viewType) => {
+                this.plugin.app.workspace.detachLeavesOfType(viewType);
+            },
+            registerEditorExtension: (extension) => {
+                this.plugin.registerEditorExtension(extension);
+            },
+            updateWorkspaceOptions: () => {
+                this.plugin.app.workspace.updateOptions();
+            },
+            onWorkspaceLayoutChange: (listener) => {
+                const ref = this.plugin.app.workspace.on('layout-change', listener);
+                return () => this.plugin.app.workspace.offref(ref);
+            },
+            onActiveMarkdownFileChange: (listener) => {
+                const ref = this.plugin.app.workspace.on('active-leaf-change', () => {
+                    listener(this.plugin.app.workspace.getActiveFile());
+                });
+                return () => this.plugin.app.workspace.offref(ref);
+            },
+            onMarkdownFileOpen: (listener) => {
+                const ref = this.plugin.app.workspace.on('file-open', (file) => {
+                    listener(file);
+                });
+                return () => this.plugin.app.workspace.offref(ref);
+            },
+        };
+    }
+
+    private createAiRuntimeCommandHost(): AiRuntimeCommandHost {
+        return {
+            getApp: () => this.plugin.app,
+            getObsidianApiProvider: () => this.obsidianApiProvider,
+            addStatusBarItem: () => this.plugin.addStatusBarItem(),
+            addCommand: (command) => {
+                this.plugin.addCommand(command);
+            },
+            removeCommand: (id) => {
+                this.plugin.removeCommand(id);
+            },
+            registerEditorExtension: (extension) => {
+                this.plugin.registerEditorExtension(extension);
+            },
+            notify: (message, timeout) => {
+                this.obsidianApiProvider.notify(message, timeout);
+            },
+        };
     }
 }

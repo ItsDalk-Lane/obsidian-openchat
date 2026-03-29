@@ -1,15 +1,16 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { App, Notice, MarkdownRenderer, Component } from 'obsidian';
+import { Component } from 'obsidian';
 import { X, Copy, Replace, Plus, RefreshCw, Check, Square } from 'lucide-react';
 import type { QuickAction } from 'src/types/chat';
+import type { ObsidianApiProvider } from 'src/providers/providers.types';
 import type { ProviderSettings } from 'src/types/provider';
 import { localInstance } from 'src/i18n/locals';
 import { ModelSelector } from 'src/components/chat-components/ModelSelector';
 import './QuickActionResultModal.css';
 
 interface QuickActionResultModalProps {
-	app: App;
+	obsidianApi: ObsidianApiProvider;
 	visible: boolean;
 	quickAction: QuickAction;
 	selection: string;
@@ -28,7 +29,7 @@ interface QuickActionResultModalProps {
 }
 
 export const QuickActionResultModal = ({
-	app,
+	obsidianApi,
 	visible,
 	quickAction,
 	selection,
@@ -54,13 +55,13 @@ export const QuickActionResultModal = ({
 		try {
 			await navigator.clipboard.writeText(result);
 			setCopySuccess(true);
-			new Notice(localInstance.copy_success);
+			obsidianApi.notify(localInstance.copy_success);
 			setTimeout(() => setCopySuccess(false), 2000);
 			onCopy();
 		} catch {
-			new Notice(localInstance.copy_failed);
+			obsidianApi.notify(localInstance.copy_failed);
 		}
-	}, [result, onCopy]);
+	}, [obsidianApi, onCopy, result]);
 
 	// 处理替换选中文本
 	const handleReplace = useCallback(() => {
@@ -87,17 +88,15 @@ export const QuickActionResultModal = ({
 			componentRef.current.load();
 		}
 
-		// 使用 Obsidian 的 Markdown 渲染器
-		MarkdownRenderer.render(
-			app,
+		void obsidianApi.renderMarkdown(
 			result,
 			contentRef.current,
-			'',
-			componentRef.current
+			obsidianApi.getActiveFilePath() ?? '',
+			componentRef.current,
 		);
 
 		// 仅在组件卸载时清理
-	}, [app, result]);
+	}, [obsidianApi, result]);
 
 	// 组件卸载时清理
 	useEffect(() => {

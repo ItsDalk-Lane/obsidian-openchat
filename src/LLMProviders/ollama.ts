@@ -1,15 +1,22 @@
 import { Ollama } from 'ollama/browser'
 import type { EmbedCache } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import {
+	BaseOptions,
+	mergeProviderOptionsWithParameters,
+	Message,
+	ResolveEmbedAsBinary,
+	SendRequest,
+	Vendor,
+} from './provider-shared'
 import { arrayBufferToBase64, getMimeTypeFromFilename, buildReasoningBlockStart, buildReasoningBlockEnd } from './utils'
 import {
 	toOpenAITools,
 	resolveCurrentTools,
-} from 'src/core/agents/loop'
+} from 'src/core/agents/loop/OpenAILoopHandler'
 import type { ToolCallRequest } from 'src/core/agents/loop/types'
-import { normalizeProviderBaseURLForRuntime } from 'src/components/settings-components/provider-config/providerUtils'
 import { normalizeProviderError } from './errors'
+import { normalizeProviderBaseURLForRuntime } from './provider-base-url'
 import {
 	type OllamaNativeToolCall,
 	accumulateNativeToolCalls,

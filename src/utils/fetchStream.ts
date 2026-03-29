@@ -1,3 +1,5 @@
+import { DebugLogger } from './DebugLogger'
+
 type FetchStreamOptions = {
     method: string;
     headers: Record<string, string>;
@@ -91,7 +93,7 @@ async function fetchJsonStream<T = unknown>(
                     const parsedData = JSON.parse(jsonString) as T;
                     onParsedData(parsedData);
                 } catch (e) {
-                    console.error("Error parsing JSON:", e);
+                    DebugLogger.error("Error parsing JSON:", e);
                 }
             }
         }

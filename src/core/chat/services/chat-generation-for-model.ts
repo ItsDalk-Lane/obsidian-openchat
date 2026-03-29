@@ -1,8 +1,5 @@
-import type {
-	ProviderSettings,
-} from 'src/types/provider';
 import type { ToolExecutionRecord } from 'src/types/tool';
-import { availableVendors } from 'src/settings/ai-runtime';
+import { availableVendors } from 'src/settings/ai-runtime/api';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { ChatMessage, ChatSession } from '../types/chat';

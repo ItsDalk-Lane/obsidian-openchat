@@ -1,10 +1,11 @@
-import { App, Modal, Notice } from 'obsidian';
+import { App, Modal } from 'obsidian';
 import { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { v4 as uuidv4 } from 'uuid';
 import { ObsidianAppContext } from 'src/contexts/obsidianAppContext';
 import { useObsidianApp } from 'src/contexts/obsidianAppContext';
 import { localInstance } from 'src/i18n/locals';
+import { createObsidianApiProvider } from 'src/providers/obsidian-api';
 import type { AiFeatureId, SystemPromptItem, SystemPromptSourceType } from 'src/types/system-prompt';
 import { getPromptTemplatePath } from 'src/utils/AIPathManager';
 import './SystemPromptModals.css';
@@ -62,6 +63,31 @@ export class SystemPromptEditorModal extends Modal {
 	}
 }
 
+const collectPromptTemplateFiles = (
+	aiDataFolder: string,
+	obsidianApi: ReturnType<typeof createObsidianApiProvider>,
+): Array<{ path: string; label: string }> => {
+	const folder = getPromptTemplatePath(aiDataFolder);
+	const results: Array<{ path: string; label: string }> = [];
+	const visit = (folderPath: string) => {
+		for (const entry of obsidianApi.listFolderEntries(folderPath)) {
+			if (entry.kind === 'folder') {
+				visit(entry.path);
+				continue;
+			}
+			if (!entry.path.endsWith('.md')) {
+				continue;
+			}
+			results.push({
+				path: entry.path,
+				label: entry.path.replace(`${folder}/`, ''),
+			});
+		}
+	};
+	visit(folder);
+	return results;
+};
+
 function SystemPromptEditorForm(props: {
 	mode: SystemPromptEditorMode;
 	prompt?: SystemPromptItem;
@@ -70,6 +96,7 @@ function SystemPromptEditorForm(props: {
 	onSubmit: (prompt: SystemPromptItem) => Promise<void>;
 }) {
 	const app = useObsidianApp();
+	const obsidianApi = useMemo(() => createObsidianApiProvider(app, async () => ''), [app]);
 	const isEdit = props.mode === 'edit';
 	const initial = props.prompt;
 
@@ -122,18 +149,16 @@ function SystemPromptEditorForm(props: {
 		type OpenChatPluginLike = { settings?: { aiDataFolder?: string } }
 		type AppWithPlugins = typeof app & { plugins?: { plugins?: Record<string, OpenChatPluginLike | undefined> } }
 		const plugin = (app as AppWithPlugins).plugins?.plugins?.['openchat'];
-		const folder = getPromptTemplatePath(plugin?.settings?.aiDataFolder || 'System/AI Data');
-		const files = app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(folder + '/'));
-		return files.map((f) => ({
-			path: f.path,
-			label: f.path.replace(folder + '/', ''),
-		}));
-	}, [app]);
+		return collectPromptTemplateFiles(
+			plugin?.settings?.aiDataFolder || 'System/AI Data',
+			obsidianApi,
+		);
+	}, [app, obsidianApi]);
 
 	const validate = (): boolean => {
 		const trimmedName = name.trim();
 		if (!trimmedName) {
-			new Notice(localInstance.system_prompt_error_name_required || '提示词名称不能为空');
+			obsidianApi.notify(localInstance.system_prompt_error_name_required || '提示词名称不能为空');
 			return false;
 		}
 
@@ -141,25 +166,25 @@ function SystemPromptEditorForm(props: {
 			? props.existingPrompts.filter((p) => p.id !== initial?.id)
 			: props.existingPrompts;
 		if (other.some((p) => p.name === trimmedName)) {
-			new Notice(localInstance.system_prompt_error_name_duplicate || '提示词名称已存在');
+			obsidianApi.notify(localInstance.system_prompt_error_name_duplicate || '提示词名称已存在');
 			return false;
 		}
 
 		if (sourceType === 'custom') {
 			if (!content.trim()) {
-				new Notice(localInstance.system_prompt_error_content_required || '提示词内容不能为空');
+				obsidianApi.notify(localInstance.system_prompt_error_content_required || '提示词内容不能为空');
 				return false;
 			}
 		}
 
 		if (sourceType === 'template') {
 			if (!templatePath.trim()) {
-				new Notice(localInstance.system_prompt_error_template_required || '请选择模板文件');
+				obsidianApi.notify(localInstance.system_prompt_error_template_required || '请选择模板文件');
 				return false;
 			}
-			const file = app.vault.getAbstractFileByPath(templatePath.trim());
-			if (!file) {
-				new Notice(localInstance.system_prompt_error_template_missing || '模板文件不存在');
+			const file = obsidianApi.getVaultEntry(templatePath.trim());
+			if (!file || file.kind !== 'file') {
+				obsidianApi.notify(localInstance.system_prompt_error_template_missing || '模板文件不存在');
 				return false;
 			}
 		}
@@ -203,7 +228,7 @@ function SystemPromptEditorForm(props: {
 				updatedAt: now,
 			};
 			await props.onSubmit(prompt);
-			new Notice(isEdit
+			obsidianApi.notify(isEdit
 				? (localInstance.system_prompt_saved || '已保存')
 				: (localInstance.system_prompt_created || '已创建'));
 		} finally {

@@ -1,6 +1,6 @@
 import { normalizePath } from 'obsidian'
-import { APP_FOLDER } from 'src/settings/ai-runtime'
-import { CreatePlainText, SendRequest } from '.'
+import { APP_FOLDER } from 'src/settings/ai-runtime/api'
+import { CreatePlainText, SendRequest } from './provider-shared'
 import { DebugLogger } from 'src/utils/DebugLogger'
 
 interface TextWithTime {

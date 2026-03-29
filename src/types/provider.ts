@@ -12,4 +12,4 @@ export type {
 	SaveAttachment,
 	SendRequest,
 	Vendor,
-} from 'src/LLMProviders';
+} from 'src/LLMProviders/provider-shared';

@@ -3,7 +3,7 @@ import { localInstance } from 'src/i18n/locals';
 import type { SelectedFile, SelectedFolder } from 'src/core/chat/types/chat';
 import type { ProviderSettings } from 'src/types/provider';
 import { ModelTag } from './ModelTag';
-import { availableVendors } from 'src/settings/ai-runtime';
+import { availableVendors } from 'src/settings/ai-runtime/api';
 import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';
 
 // ---- InfoTags ----

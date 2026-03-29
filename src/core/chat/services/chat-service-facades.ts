@@ -20,12 +20,6 @@ import {
 	createChatCommandFacade,
 	type ChatCommandFacade,
 } from './chat-command-facade';
-import type {
-	ChatMessageMutationDeps,
-	ChatMessageOperationDeps,
-} from './chat-message-operations';
-import type { ChatProviderMessageDeps } from './chat-provider-messages';
-import type { ChatGenerationDeps } from './chat-generation';
 import type { ChatServiceInternals } from './chat-service-internals';
 import {
 	executeSkillCommand as executeSkillCommandHelper,
@@ -78,7 +72,7 @@ import {
 
 export const getGenerationFacade = (internals: ChatServiceInternals): ChatGenerationFacade => {
 	if (!internals.generationFacade) {
-			internals.generationFacade = createChatGenerationFacade(
+		internals.generationFacade = createChatGenerationFacade(
 			() => buildGenerationDeps(internals),
 			{
 				generateAssistantResponse: generateAssistantResponseHelper,
@@ -93,7 +87,7 @@ export const getMessageOperationFacade = (
 	internals: ChatServiceInternals,
 ): ChatMessageOperationFacade => {
 	if (!internals.messageOperationFacade) {
-			internals.messageOperationFacade = createChatMessageOperationFacade(
+		internals.messageOperationFacade = createChatMessageOperationFacade(
 			() => buildMessageOperationDeps(internals),
 			{
 				prepareChatRequest: prepareChatRequestHelper,
@@ -108,7 +102,7 @@ export const getMessageMutationFacade = (
 	internals: ChatServiceInternals,
 ): ChatMessageMutationFacade => {
 	if (!internals.messageMutationFacade) {
-			internals.messageMutationFacade = createChatMessageMutationFacade(
+		internals.messageMutationFacade = createChatMessageMutationFacade(
 			() => buildMessageMutationDeps(internals),
 			{
 				editMessage: editMessageHelper,

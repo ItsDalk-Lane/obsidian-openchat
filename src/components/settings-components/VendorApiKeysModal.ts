@@ -1,7 +1,7 @@
 import { App, Modal, Setting } from 'obsidian'
 import { ollamaVendor } from 'src/LLMProviders/ollama'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { availableVendors } from 'src/settings/ai-runtime'
+import { availableVendors } from 'src/settings/ai-runtime/api'
 
 interface VendorApiKeysModalParams {
 	getVendorApiKey: (vendor: string) => string

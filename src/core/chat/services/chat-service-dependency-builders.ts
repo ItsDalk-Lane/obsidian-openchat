@@ -8,7 +8,6 @@ import {
 	detectChatImageGenerationIntent,
 	findProviderByTagExact,
 	getDefaultProviderTag,
-	getMaxToolCallLoops,
 	getModelDisplayName,
 	isCurrentModelSupportImageGeneration,
 	normalizeOllamaBaseUrl,

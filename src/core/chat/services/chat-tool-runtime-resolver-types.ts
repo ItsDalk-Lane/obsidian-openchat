@@ -4,7 +4,8 @@ import type {
 	ResolvedToolRuntime,
 	SubAgentChatServiceAdapter,
 	SubAgentStateCallback,
-} from 'src/tools/sub-agents';
+} from 'src/tools/sub-agents/types';
+import type { SubAgentScannerService } from 'src/tools/sub-agents/SubAgentScannerService';
 import type { ChatRuntimeDeps } from '../runtime/chat-runtime-deps';
 import type { ChatSession, McpToolMode } from '../types/chat';
 import type { ChatPlanSyncService } from './chat-plan-sync-service';
@@ -23,7 +24,7 @@ export interface ChatToolRuntimeResolverOptions {
 	createBuiltinToolsRuntime: ChatHostDeps['createBuiltinToolsRuntime'];
 	settingsAccessor: ChatSettingsAccessor;
 	runtimeDeps: ChatRuntimeDeps;
-	subAgentScannerService: import('src/tools/sub-agents').SubAgentScannerService;
+	subAgentScannerService: SubAgentScannerService;
 	planSyncService: ChatPlanSyncService;
 	getActiveSession: () => ChatSession | null;
 	getMcpToolMode: () => McpToolMode;

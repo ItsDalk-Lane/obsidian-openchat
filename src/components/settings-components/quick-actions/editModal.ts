@@ -1,4 +1,3 @@
-import { QuickActionDataService } from 'src/editor/selectionToolbar/QuickActionDataService'
 import { formatProviderOptionLabel } from 'src/components/chat-components/chatSettingsHelpers'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { localInstance } from 'src/i18n/locals'
@@ -6,6 +5,36 @@ import type { QuickAction, QuickActionType } from 'src/types/chat'
 import type { QuickActionEditModalContext, QuickActionEditModalOptions } from './types'
 import { createQuickActionGroupMembersSection } from './editModalGroupMembers'
 import { saveQuickActionFromEditModal } from './editModalSave'
+
+type TemplateFileOption = {
+	path: string
+	label: string
+}
+
+const collectTemplateFileOptions = (
+	context: QuickActionEditModalContext
+): TemplateFileOption[] => {
+	const results: TemplateFileOption[] = []
+	const visit = (folderPath: string) => {
+		for (const entry of context.obsidianApi.listFolderEntries(folderPath)) {
+			if (entry.kind === 'folder') {
+				visit(entry.path)
+				continue
+			}
+			if (!entry.path.endsWith('.md')) {
+				continue
+			}
+			results.push({
+				path: entry.path,
+				label: entry.path.startsWith(`${context.promptTemplateFolder}/`)
+					? entry.path.slice(context.promptTemplateFolder.length + 1)
+					: entry.name,
+			})
+		}
+	}
+	visit(context.promptTemplateFolder)
+	return results
+}
 
 export const openQuickActionEditModal = async (
 	context: QuickActionEditModalContext,
@@ -15,9 +44,10 @@ export const openQuickActionEditModal = async (
 	const stopAllPropagation = (event: Event) => {
 		event.stopPropagation()
 	}
-	const quickActionDataService = QuickActionDataService.getInstance(context.app)
+	const { quickActionDataService } = context
 	await quickActionDataService.initialize()
 	const allQuickActions = await quickActionDataService.getSortedQuickActions()
+	const templateFiles = collectTemplateFileOptions(context)
 	const existingNames = allQuickActions
 		.filter((item) => item.id !== quickAction?.id)
 		.map((item) => item.name)
@@ -151,6 +181,7 @@ export const openQuickActionEditModal = async (
 		initialQuickActionType: currentQuickActionType,
 		allQuickActions,
 		quickActionDataService,
+		notify: context.notify,
 		openQuickActionEditModal: context.openQuickActionEditModal
 	})
 
@@ -250,18 +281,10 @@ export const openQuickActionEditModal = async (
 	defaultTemplateOption.value = ''
 	defaultTemplateOption.textContent = localInstance.quick_action_edit_template_select_placeholder
 	templateSelect.appendChild(defaultTemplateOption)
-	for (const file of context.app.vault.getMarkdownFiles()) {
-		if (
-			!file.path.startsWith(`${context.promptTemplateFolder}/`)
-			&& !file.path.startsWith(context.promptTemplateFolder)
-		) {
-			continue
-		}
+	for (const file of templateFiles) {
 		const option = document.createElement('option')
 		option.value = file.path
-		option.textContent = file.path.startsWith(`${context.promptTemplateFolder}/`)
-			? file.path.substring(context.promptTemplateFolder.length + 1)
-			: file.name
+		option.textContent = file.label
 		option.selected = quickAction?.templateFile === file.path
 		templateSelect.appendChild(option)
 	}

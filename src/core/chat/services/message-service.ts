@@ -48,7 +48,7 @@ export class MessageService {
 	}
 
 	private resolveMomentLocale(): string {
-		const candidate = window as Window & {
+		const candidate = globalThis as Window & {
 			moment?: { locale?: () => unknown };
 		};
 		const locale = candidate.moment?.locale?.();
@@ -121,7 +121,13 @@ export class MessageService {
 
 	public parseSubAgentStatesFromHistory(
 		content: string
-	): { cleanedContent: string; subAgentStates: Record<string, import('src/tools/sub-agents').SubAgentExecutionState> } {
+	): {
+		cleanedContent: string;
+		subAgentStates: Record<
+			string,
+			import('src/tools/sub-agents/types').SubAgentExecutionState
+		>;
+	} {
 		return parseSubAgentStatesFromHistory(
 			content,
 			(role, text, extras) => this.createMessage(role, text, extras)

@@ -1,4 +1,4 @@
-import type { BaseOptions } from '.'
+import type { BaseOptions } from './provider-shared'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { normalizeProviderError } from './errors'
 import { DebugLogger } from 'src/utils/DebugLogger'

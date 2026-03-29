@@ -45,6 +45,19 @@ import {
 } from './filesystemToolUtils';
 import { getMimeType, toBase64 } from './filesystemFileOps';
 
+interface McpServerWithRegisterTool extends McpServer {
+	registerTool(
+		name: string,
+		config: {
+			title: string;
+			description: string;
+			inputSchema: unknown;
+			annotations?: unknown;
+		},
+		handler: (args: Record<string, unknown>) => Promise<unknown>,
+	): void;
+}
+
 const createReadMediaHandler = (app: App) => async (args: unknown) => {
 	try {
 		const { file_path } = readMediaFileSchema.parse(args);
@@ -171,8 +184,7 @@ export function registerReadWriteHandlers(
 		annotations: readOnlyToolAnnotations,
 		execute: async (args) => await readMediaHandler(args),
 	});
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	(server as any).registerTool(
+	(server as McpServerWithRegisterTool).registerTool(
 		'read_media',
 		{
 			title: '读取媒体文件',

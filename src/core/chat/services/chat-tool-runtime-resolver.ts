@@ -2,27 +2,16 @@ import {
 	BUILTIN_SERVER_ID,
 	normalizeBuiltinServerId,
 } from 'src/tools/runtime/constants';
-import {
-	type BuiltinToolsRuntime,
-} from 'src/tools/runtime/BuiltinToolsRuntime';
+import type { BuiltinToolsRuntime } from 'src/tools/runtime/BuiltinToolsRuntime';
 import { BuiltinToolExecutor } from 'src/tools/runtime/BuiltinToolExecutor';
-import type {
-	ResolvedToolRuntime,
-	SubAgentStateCallback,
-	SubAgentChatServiceAdapter,
-} from 'src/tools/sub-agents';
-import {
-	SubAgentScannerService,
-	SubAgentToolExecutor,
-	subAgentDefinitionsToTools,
-} from 'src/tools/sub-agents';
+import type { ResolvedToolRuntime } from 'src/tools/sub-agents/types';
+import { SubAgentToolExecutor } from 'src/tools/sub-agents/SubAgentToolExecutor';
+import { subAgentDefinitionsToTools } from 'src/tools/sub-agents/subAgentTools';
 import { CompositeToolExecutor } from 'src/core/agents/loop/CompositeToolExecutor';
 import type { ToolDefinition, ToolExecutor } from 'src/core/agents/loop/types';
-import type { McpRuntimeManager } from 'src/domains/mcp/types';
 import { McpToolExecutor, mcpToolToToolDefinition } from 'src/services/mcp/McpToolExecutor';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import type { ChatSession, McpToolMode } from '../types/chat';
-import { ChatPlanSyncService } from './chat-plan-sync-service';
+import type { ChatSession } from '../types/chat';
 import {
 	BUILTIN_FILESYSTEM_ROUTING_HINT,
 	BUILTIN_FILESYSTEM_TOOL_NAMES,
@@ -53,17 +42,17 @@ export class ChatToolRuntimeResolver {
 		}
 
 		this.runtimeClosingPromise = (async () => {
-		const runtime = this.builtinToolsRuntime;
-		this.builtinToolsRuntime = null;
-		this.builtinToolsRuntimePromise = null;
-		this.builtinRuntimeSessionId = null;
-		this.options.planSyncService.detachRuntime();
-		if (!runtime) {
-			return;
-		}
-		await runtime.close().catch((error) => {
-			DebugLogger.warn('[ChatService] 关闭内置工具运行时失败:', error);
-		});
+			const runtime = this.builtinToolsRuntime;
+			this.builtinToolsRuntime = null;
+			this.builtinToolsRuntimePromise = null;
+			this.builtinRuntimeSessionId = null;
+			this.options.planSyncService.detachRuntime();
+			if (!runtime) {
+				return;
+			}
+			await runtime.close().catch((error) => {
+				DebugLogger.warn('[ChatService] 关闭内置工具运行时失败:', error);
+			});
 		})();
 
 		try {
@@ -203,7 +192,7 @@ export class ChatToolRuntimeResolver {
 				requestTools.push(mcpToolToToolDefinition(tool));
 			}
 
-			const mcpCallTool = this.createActualMcpCallTool(mcpManager);
+			const mcpCallTool = createActualMcpCallTool(mcpManager);
 			if (mcpCallTool) {
 				mcpExecutor = new McpToolExecutor(mcpCallTool);
 			}

@@ -10,38 +10,34 @@
 import type { McpSettings } from 'src/types/mcp';
 import { DEFAULT_MCP_SETTINGS } from 'src/types/mcp';
 import { SettingsSecretManager } from 'src/settings/SettingsSecretManager';
+import { cloneAiRuntimeSettings } from 'src/settings/ai-runtime/core';
 import type { AiRuntimeSettings } from 'src/settings/ai-runtime/core';
 import { DEFAULT_CHAT_SETTINGS, type ChatSettings } from 'src/types/chat';
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
 import { DEFAULT_SETTINGS } from './config';
 import type { PluginSettings, SettingsDomainLogger, SettingsPluginAdapter } from './types';
-
 interface LegacySystemPromptService {
 	migrateFromLegacyDefaultSystemMessage(params: {
 		enabled?: boolean;
 		content?: string | null;
 	}): Promise<boolean>;
 }
-
 interface LegacyMcpServerDataService {
 	loadServers(aiDataFolder: string): Promise<unknown[]>;
 	syncServers(aiDataFolder: string, servers: unknown[]): Promise<unknown[]>;
 }
-
 interface SettingsDomainDependencies {
 	createSecretManager(): SettingsSecretAdapter;
 	getMigrationService(pluginAdapter: SettingsPluginAdapter): Promise<SettingsMigrationAdapter>;
 	getSystemPromptService(app: unknown): Promise<LegacySystemPromptService>;
 	getMcpServerService(app: unknown): Promise<LegacyMcpServerDataService>;
 }
-
 interface SettingsSecretAdapter {
 	decryptAiRuntimeSettings(
 		settings?: Partial<AiRuntimeSettings> | Record<string, unknown>,
 	): AiRuntimeSettings;
 	encryptAiRuntimeSettings(settings: AiRuntimeSettings): AiRuntimeSettings;
 }
-
 interface SettingsMigrationAdapter {
 	resolvePersistedAiRuntime(persisted: Record<string, unknown>): Record<string, unknown>;
 	resolveAiDataFolder(
@@ -58,7 +54,6 @@ const CHAT_LEGACY_FIELDS = ['chatFolder', 'enableInternalLinkParsing', 'parseLin
 const AI_RUNTIME_LEGACY_FIELDS = ['enableDefaultSystemMsg', 'defaultSystemMsg', 'systemPromptsData', 'enableInternalLink', 'maxLinkParseDepth', 'linkParseTimeout'] as const;
 const AI_RUNTIME_RUNTIME_ONLY_FIELDS = ['editorStatus', 'vendorApiKeys'] as const;
 const LEGACY_TOP_LEVEL_FIELDS = ['promptTemplateFolder', 'tars'] as const;
-
 const defaultSettingsDomainDependencies: SettingsDomainDependencies = {
 	createSecretManager(): SettingsSecretAdapter {
 		return new SettingsSecretManager();
@@ -96,7 +91,6 @@ const defaultSettingsDomainDependencies: SettingsDomainDependencies = {
 export class SettingsDomainService {
 	private readonly secretManager: SettingsSecretAdapter;
 	private migrationServicePromise: Promise<SettingsMigrationAdapter> | null = null;
-
 	constructor(
 		private readonly pluginAdapter: SettingsPluginAdapter,
 		private readonly obsidianApi: ObsidianApiProvider,
@@ -106,51 +100,22 @@ export class SettingsDomainService {
 		this.secretManager = this.dependencies.createSecretManager();
 	}
 
-	/** @precondition pluginAdapter.loadData 可返回持久化设置或 null @postcondition 返回补齐默认值并清理旧字段后的完整 PluginSettings @throws 当关键迁移依赖失败且未被内部处理时抛出 @example await service.load() */
-	async load(): Promise<PluginSettings> {
+	/** @precondition pluginAdapter.loadData 可返回持久化设置或 null @postcondition 返回可用于启动注册的基础设置快照，不触发迁移或 Markdown hydrate @throws 当关键迁移依赖失败时抛出 @example await service.loadBootstrapSettings() */
+	async loadBootstrapSettings(): Promise<PluginSettings> {
 		const migrationService = await this.getMigrationService();
 		const persisted = (await this.pluginAdapter.loadData()) ?? {};
 		const rawChatSettings = asRecord(persisted.chat);
 		const mergedChat = buildLoadedChatSettings(rawChatSettings);
 		const persistedAiRuntime = migrationService.resolvePersistedAiRuntime(persisted);
-		const aiRuntimeSettings = this.secretManager.decryptAiRuntimeSettings(persistedAiRuntime);
+		const aiRuntimeSettings = cloneAiRuntimeSettings(
+			this.secretManager.decryptAiRuntimeSettings(persistedAiRuntime),
+		);
 		const aiDataFolder = migrationService.resolveAiDataFolder(persisted, rawChatSettings);
+		deleteFields(
+			aiRuntimeSettings as unknown as Record<string, unknown>,
+			['enableDefaultSystemMsg', 'defaultSystemMsg', 'systemPromptsData'],
+		);
 
-		try {
-			const systemPromptService = await this.dependencies.getSystemPromptService(
-				this.pluginAdapter.app,
-			);
-			const migrated = await systemPromptService.migrateFromLegacyDefaultSystemMessage({
-				enabled: getBooleanField(aiRuntimeSettings, 'enableDefaultSystemMsg'),
-				content: getStringOrNullField(aiRuntimeSettings, 'defaultSystemMsg'),
-			});
-			if (migrated) {
-				aiRuntimeSettings.enableGlobalSystemPrompts = true;
-			}
-		} catch (error) {
-			this.logger.error('[SettingsDomain] 迁移默认系统消息失败（忽略，继续加载）', error);
-		}
-
-		try {
-			const mcpServerService = await this.dependencies.getMcpServerService(
-				this.pluginAdapter.app,
-			);
-			const markdownServers = await mcpServerService.loadServers(aiDataFolder);
-			aiRuntimeSettings.mcp = {
-				...DEFAULT_MCP_SETTINGS,
-				...(aiRuntimeSettings.mcp ?? {}),
-				servers: markdownServers,
-			};
-		} catch (error) {
-			this.logger.error('[SettingsDomain] 加载 MCP 服务器 Markdown 配置失败，回退空列表', error);
-			aiRuntimeSettings.mcp = {
-				...DEFAULT_MCP_SETTINGS,
-				...(aiRuntimeSettings.mcp ?? {}),
-				servers: [],
-			};
-		}
-
-		deleteFields(aiRuntimeSettings as unknown as Record<string, unknown>, ['enableDefaultSystemMsg', 'defaultSystemMsg', 'systemPromptsData']);
 		return {
 			...DEFAULT_SETTINGS,
 			...omitLegacyTopLevelFields(persisted),
@@ -160,6 +125,52 @@ export class SettingsDomainService {
 		};
 	}
 
+	/** @precondition settings 来自 bootstrap 阶段且包含完整基础配置 @postcondition 返回补齐系统提示词迁移与 MCP Markdown 配置后的设置快照 @throws 当关键 hydrate 依赖失败且未被内部降级时抛出 @example await service.hydratePersistedSettings(settings) */
+	async hydratePersistedSettings(settings: PluginSettings): Promise<PluginSettings> {
+		const hydratedAiRuntime = cloneAiRuntimeSettings(settings.aiRuntime);
+		try {
+			const systemPromptService = await this.dependencies.getSystemPromptService(
+				this.pluginAdapter.app,
+			);
+			const migrated = await systemPromptService.migrateFromLegacyDefaultSystemMessage({
+				enabled: getBooleanField(hydratedAiRuntime, 'enableDefaultSystemMsg'),
+				content: getStringOrNullField(hydratedAiRuntime, 'defaultSystemMsg'),
+			});
+			if (migrated) {
+				hydratedAiRuntime.enableGlobalSystemPrompts = true;
+			}
+		} catch (error) {
+			this.logger.error('[SettingsDomain] 迁移默认系统消息失败（忽略，继续加载）', error);
+		}
+
+		try {
+			const mcpServerService = await this.dependencies.getMcpServerService(
+				this.pluginAdapter.app,
+			);
+			const markdownServers = await mcpServerService.loadServers(settings.aiDataFolder);
+			hydratedAiRuntime.mcp = {
+				...DEFAULT_MCP_SETTINGS,
+				...(hydratedAiRuntime.mcp ?? {}),
+				servers: markdownServers,
+			};
+		} catch (error) {
+			this.logger.error('[SettingsDomain] 加载 MCP 服务器 Markdown 配置失败，回退空列表', error);
+			hydratedAiRuntime.mcp = {
+				...DEFAULT_MCP_SETTINGS,
+				...(hydratedAiRuntime.mcp ?? {}),
+				servers: [],
+			};
+		}
+
+		deleteFields(
+			hydratedAiRuntime as unknown as Record<string, unknown>,
+			['enableDefaultSystemMsg', 'defaultSystemMsg', 'systemPromptsData'],
+		);
+		return {
+			...settings,
+			aiRuntime: hydratedAiRuntime,
+		};
+	}
 	/** @precondition settings 为待持久化的完整设置快照 @postcondition data.json 被更新且运行时字段不会被写回 @throws 当持久化本身失败时抛出 @example await service.save(settings) */
 	async save(settings: PluginSettings): Promise<void> {
 		const migrationService = await this.getMigrationService();
@@ -234,11 +245,9 @@ export class SettingsDomainService {
 				throw error;
 			});
 		}
-
 		return this.migrationServicePromise;
 	}
 }
-
 function buildLoadedChatSettings(rawChatSettings: Record<string, unknown>): ChatSettings {
 	const legacyQuickActionSettings = rawChatSettings as { enableSelectionToolbar?: boolean; maxToolbarButtons?: number; selectionToolbarStreamOutput?: boolean };
 	return {

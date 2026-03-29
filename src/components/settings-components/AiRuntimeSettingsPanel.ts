@@ -1,6 +1,10 @@
 import { App } from 'obsidian'
 import { renderAiRuntimeSettingsPanelLayout } from 'src/components/settings-components/panelLayoutRenderer'
-import { AiRuntimeReasoningCapabilityManager, AiRuntimeVendorApiKeyManager } from 'src/components/settings-components/AiRuntimeSettingsPanelSupport'
+import {
+	AiRuntimeQuickActionsManager,
+	AiRuntimeReasoningCapabilityManager,
+	AiRuntimeVendorApiKeyManager,
+} from 'src/components/settings-components/AiRuntimeSettingsPanelSupport'
 import { renderProvidersGroupedByVendor } from 'src/components/settings-components/provider-config/providerCards'
 import { renderProviderConfigForPanel } from 'src/components/settings-components/provider-config/panelRenderBridge'
 import { testProviderConfiguration } from 'src/components/settings-components/provider-config/providerTest'
@@ -12,12 +16,13 @@ import { ProviderSettings, Vendor } from 'src/types/provider'
 import { getCapabilityDisplayText } from 'src/LLMProviders/utils'
 import { type ReasoningCapabilityRecord } from 'src/LLMProviders/modelCapability'
 import type { McpRuntimeManager } from 'src/domains/mcp/types'
-import { availableVendors } from 'src/settings/ai-runtime'
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
+import { availableVendors } from 'src/settings/ai-runtime/api'
+import type { ObsidianApiProvider } from 'src/providers/providers.types'
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api'
 import type { ChatSettings } from 'src/types/chat'
 import { isCustomOpenChatProvider } from 'src/utils/aiProviderMetadata'
-
 export interface AiRuntimeSettingsContext {
+	getObsidianApiProvider: () => ObsidianApiProvider
 	getSettings: () => AiRuntimeSettings
 	getChatSettings: () => ChatSettings
 	getAiDataFolder: () => string
@@ -27,7 +32,6 @@ export interface AiRuntimeSettingsContext {
 	refreshQuickActionsCache?: () => Promise<void>
 	getMcpClientManager?: () => McpRuntimeManager | null
 }
-
 export interface AiRuntimeSettingsPanelSections {
 	modelSelection?: boolean
 	providers?: boolean
@@ -35,14 +39,12 @@ export interface AiRuntimeSettingsPanelSections {
 	quickActions?: boolean
 	tabCompletion?: boolean
 }
-
 export interface AiRuntimeSettingsPanelOptions {
 	sections?: AiRuntimeSettingsPanelSections
 	plainSections?: AiRuntimeSettingsPanelSections
 	initialCollapsed?: AiRuntimeSettingsPanelSections
 	state?: AiRuntimeSettingsPanelState
 }
-
 export interface AiRuntimeSettingsPanelState {
 	isProvidersCollapsed?: boolean
 	isVendorApiKeysCollapsed?: boolean
@@ -51,7 +53,6 @@ export interface AiRuntimeSettingsPanelState {
 	quickActionGroupExpandedState?: Map<string, boolean>
 	vendorGroupExpandedState?: Map<string, boolean>
 }
-
 export class AiRuntimeSettingsPanel {
 	private containerEl!: HTMLElement
 	private providersContainerEl!: HTMLElement
@@ -73,13 +74,20 @@ export class AiRuntimeSettingsPanel {
 	private readonly sharedState?: AiRuntimeSettingsPanelState
 	private readonly reasoningCapabilityManager = new AiRuntimeReasoningCapabilityManager()
 	private readonly vendorApiKeyManager = new AiRuntimeVendorApiKeyManager()
-
+	private readonly quickActionsManager: AiRuntimeQuickActionsManager
 	constructor(
 		private readonly app: App,
 		private readonly settingsContext: AiRuntimeSettingsContext,
 		options?: AiRuntimeSettingsPanelOptions
 	) {
 		this.sharedState = options?.state
+		this.quickActionsManager = new AiRuntimeQuickActionsManager(
+			this.settingsContext.getObsidianApiProvider(),
+			() => this.settingsContext.getAiDataFolder(),
+			(quickActions) => {
+				this.settingsContext.getChatSettings().quickActions = quickActions
+			},
+		)
 		this.sections = {
 			modelSelection: options?.sections?.modelSelection ?? false,
 			providers: options?.sections?.providers ?? true,
@@ -128,56 +136,47 @@ export class AiRuntimeSettingsPanel {
 	private get settings() {
 		return this.settingsContext.getSettings()
 	}
-
 	private get chatSettings() {
 		return this.settingsContext.getChatSettings()
 	}
-
 	private async saveSettings() {
 		if (this.autoSaveEnabled) {
 			await this.settingsContext.saveSettings()
 		}
 	}
-
+	private notify(message: string, timeout?: number): void {
+		this.settingsContext.getObsidianApiProvider().notify(message, timeout)
+	}
 	private async updateChatSettings(partial: Partial<ChatSettings>) {
 		await this.settingsContext.updateChatSettings(partial)
 	}
-
 	private getReasoningCapabilityHintText(record: ReasoningCapabilityRecord): string {
 		return t(this.reasoningCapabilityManager.getReasoningCapabilityHintText(record))
 	}
-
 	private normalizeProviderVendor(vendor: string): string {
 		return this.vendorApiKeyManager.normalizeProviderVendor(vendor)
 	}
-
 	private isCustomProvider(provider: Pick<ProviderSettings, 'options'>): boolean {
 		return isCustomOpenChatProvider(provider.options?.parameters)
 	}
-
 	private getVendorApiKey(vendor: string): string {
 		return this.vendorApiKeyManager.getVendorApiKey(this.settings, vendor)
 	}
-
 	private setVendorApiKey(vendor: string, value: string): void {
 		this.vendorApiKeyManager.setVendorApiKey(this.settings, vendor, value)
 	}
-
 	private syncProviderApiKeysByVendor(vendor: string): void {
 		this.vendorApiKeyManager.syncProviderApiKeysByVendor(this.settings, vendor)
 	}
-
 	private syncAllProviderApiKeys(): void {
 		this.vendorApiKeyManager.syncAllProviderApiKeys(this.settings)
 	}
-
 	private async probeReasoningCapability(
 		provider: ProviderSettings,
 		vendor: Vendor
 	): Promise<ReasoningCapabilityRecord> {
 		return await this.reasoningCapabilityManager.probeReasoningCapability(provider, vendor)
 	}
-
 	private openVendorApiKeysModal(): void {
 		this.vendorApiKeyManager.openVendorApiKeysModal(this.app, this.settings, async () => {
 			await this.saveSettings()
@@ -222,6 +221,9 @@ export class AiRuntimeSettingsPanel {
 						shouldExpandLastProvider ?? false,
 						nextKeepOpenIndex ?? -1
 					),
+				quickActionDataService: this.quickActionsManager.getDataService(),
+				obsidianApi: this.settingsContext.getObsidianApiProvider(),
+				notify: (message, timeout) => this.quickActionsManager.notify(message, timeout),
 				quickActionGroupExpandedState: this.quickActionGroupExpandedState,
 				resolveActiveQuickActionsListContainer: () =>
 					this.activeQuickActionsListContainer?.isConnected
@@ -276,9 +278,6 @@ export class AiRuntimeSettingsPanel {
 		}
 	}
 
-	/**
-	 * 更新提供商卡片中的功能显示
-	 */
 	private updateProviderCapabilities(index: number, settings: ProviderSettings) {
 		const vendor = availableVendors.find((v) => v.name === settings.vendor)
 		if (!vendor) return
@@ -289,9 +288,6 @@ export class AiRuntimeSettingsPanel {
 		}
 	}
 
-	/**
-	 * 按提供商分组渲染 AI 助手列表
-	 */
 	private renderProvidersGroupedByVendor() {
 		const groups = buildProviderGroups(this.settings.providers)
 		renderProvidersGroupedByVendor(
@@ -387,6 +383,7 @@ export class AiRuntimeSettingsPanel {
 			},
 			probeReasoningCapability: (provider, vendor) => this.probeReasoningCapability(provider, vendor),
 			testProviderConfiguration: (provider) => this.testProviderConfiguration(provider),
+			notify: (message, timeout) => this.notify(message, timeout),
 		})
 		modal.open()
 	}
@@ -406,13 +403,11 @@ export class AiRuntimeSettingsPanel {
 			},
 			probeReasoningCapability: (provider, vendor) => this.probeReasoningCapability(provider, vendor),
 			testProviderConfiguration: (provider) => this.testProviderConfiguration(provider),
+			notify: (message, timeout) => this.notify(message, timeout),
 		})
 		modal.open()
 	}
 
-	/**
-	 * 在 Modal 容器中渲染服务商配置内容
-	 */
 	private renderProviderConfig(
 		container: HTMLElement,
 		index: number,
@@ -474,7 +469,8 @@ export class AiRuntimeSettingsPanel {
 					record
 				),
 			testProviderConfiguration: (providerSettings) =>
-				this.testProviderConfiguration(providerSettings)
+				this.testProviderConfiguration(providerSettings),
+			notify: (message, timeout) => this.notify(message, timeout)
 		})
 		this.autoSaveEnabled = previousAutoSaveState
 	}
@@ -487,12 +483,8 @@ export class AiRuntimeSettingsPanel {
 		return await testProviderConfiguration({
 			provider,
 			vendor,
-			getVendorApiKey: (providerVendor) => this.getVendorApiKey(providerVendor)
+			getVendorApiKey: (providerVendor) => this.getVendorApiKey(providerVendor),
+			notify: (message, timeout) => this.notify(message, timeout)
 		})
 	}
-
 }
-
-/**
- * MCP 服务器编辑模态框
- */

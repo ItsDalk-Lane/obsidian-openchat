@@ -51,6 +51,7 @@ interface RenderProviderConfigForPanelParams {
 		record: ReasoningCapabilityRecord
 	) => void
 	testProviderConfiguration: (provider: ProviderSettings) => Promise<boolean>
+	notify: (message: string, timeout?: number) => void
 }
 
 export const renderProviderConfigForPanel = (
@@ -79,6 +80,7 @@ export const renderProviderConfigForPanel = (
 		probeReasoningCapability: params.probeReasoningCapability,
 		writeReasoningCapabilityRecord: params.writeReasoningCapabilityRecord,
 		testProviderConfiguration: params.testProviderConfiguration,
+		notify: params.notify,
 		renderProviderConfig: params.renderProviderConfig,
 		sections: {
 			addBaseURLSection: (details, options, defaultValue) =>
@@ -106,6 +108,7 @@ export const renderProviderConfigForPanel = (
 					modelConfig,
 					desc,
 					saveSettings: savePanelSettings,
+					notify: params.notify,
 					getVendorApiKey: params.getVendorApiKey,
 					cacheReasoningCapabilityFromMetadata: params.cacheReasoningCapabilityFromMetadata,
 					vendorName,
@@ -152,19 +155,22 @@ export const renderProviderConfigForPanel = (
 					details,
 					options,
 					desc,
-					saveSettings: savePanelSettings
+					saveSettings: savePanelSettings,
+					notify: params.notify
 				}),
 			addClaudeSections: (details, options) =>
 				addProviderClaudeSections({
 					details,
 					options,
-					saveSettings: savePanelSettings
+					saveSettings: savePanelSettings,
+					notify: params.notify
 				}),
 			addEndpointOptional: (details, options) =>
 				addEndpointSection({
 					details,
 					options,
-					saveSettings: savePanelSettings
+					saveSettings: savePanelSettings,
+					notify: params.notify
 				}),
 			addApiVersionOptional: (details, options) =>
 				addApiVersionSection({
@@ -182,7 +188,8 @@ export const renderProviderConfigForPanel = (
 				addProviderParametersSection({
 					details,
 					options,
-					saveSettings: savePanelSettings
+					saveSettings: savePanelSettings,
+					notify: params.notify
 				}),
 			addGptImageSections: (details, options) =>
 				addProviderGptImageSections({

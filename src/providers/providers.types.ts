@@ -33,6 +33,13 @@ export interface ObsidianApiProvider {
 	writeLocalStorage(key: string, value: string): void;
 	openSettingsTab(tabId: string): void;
 	insertTextIntoMarkdownEditor(content: string): EditorInsertResult;
+	openInternalLink(linkTarget: string, sourcePath?: string): void;
+	renderMarkdown(
+		markdown: string,
+		container: HTMLElement,
+		sourcePath: string,
+		component: unknown,
+	): Promise<void>;
 	onVaultChange(listener: (event: VaultChangeEvent) => void): () => void;
 }
 

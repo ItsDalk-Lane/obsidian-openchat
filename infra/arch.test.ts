@@ -34,8 +34,18 @@ test('允许 main.ts 与 FeatureCoordinator 作为 provider 组合根', () => {
 		createManagedFile('src/providers/obsidian-api.ts', 'export function createObsidianApiProvider(): object { return {}; }'),
 		createManagedFile('src/main.ts', 'import { createObsidianApiProvider } from "src/providers/obsidian-api";\nexport const provider = createObsidianApiProvider();'),
 		createManagedFile('src/core/FeatureCoordinator.ts', 'import { createObsidianApiProvider } from "src/providers/obsidian-api";\nexport const provider = createObsidianApiProvider();'),
+		createManagedFile('src/core/PluginStartupCoordinator.ts', 'import { createObsidianApiProvider } from "src/providers/obsidian-api";\nexport const provider = createObsidianApiProvider();'),
 	];
 	assert.equal(lintArchitectureFiles(files).length, 0);
+});
+
+test('阻止组合根之外导入 OpenChatPlugin', () => {
+	const files = [
+		createManagedFile('src/main.ts', 'export default class OpenChatPlugin {}'),
+		createManagedFile('src/commands/chat/chat-view-shell.ts', 'import type OpenChatPlugin from "src/main";\nexport class ChatViewShell { constructor(_plugin: OpenChatPlugin) {} }'),
+	];
+	const violations = lintArchitectureFiles(files);
+	assert.ok(violations.some((violation) => violation.rule === 'arch/no-plugin-leak'));
 });
 
 test('阻止 types 层导入 providers', () => {
@@ -136,11 +146,20 @@ test('阻止非 obsidian-api provider 直接导入 obsidian', () => {
 	assert.equal(violations[0].rule, 'arch/provider-obsidian-boundary');
 });
 
-test('允许 chat consumer 导入宿主类与 provider 实现', () => {
+test('阻止未授权 provider 与 chat service 直接访问 window/document', () => {
+	const files = [
+		createManagedFile('src/providers/settings.ts', 'export function createSettingsProvider(): string | null { return window.localStorage.getItem("x"); }'),
+		createManagedFile('src/core/chat/services/chat-helper.ts', 'export function buildHelper(): HTMLElement { return document.body; }'),
+	];
+	const violations = lintArchitectureFiles(files);
+	assert.ok(violations.some((violation) => violation.rule === 'arch/no-global-host-access' && violation.filePath === 'src/providers/settings.ts'));
+	assert.ok(violations.some((violation) => violation.rule === 'arch/no-global-host-access' && violation.filePath === 'src/core/chat/services/chat-helper.ts'));
+});
+
+test('允许 chat 组合根导入 provider 实现', () => {
 	const files = [
 		createManagedFile('src/providers/obsidian-api.ts', 'import { Notice } from "obsidian";\nexport function createObsidianApiProvider(): object { return new Notice("ok"); }'),
 		createManagedFile('src/core/chat/chat-feature-manager.tsx', 'import { createObsidianApiProvider } from "src/providers/obsidian-api";\nexport class ChatFeatureManager { provider = createObsidianApiProvider(); }'),
-		createManagedFile('src/commands/chat/chat-view-coordinator.ts', 'import { WorkspaceLeaf } from "obsidian";\nexport class ChatViewCoordinator { leaf: WorkspaceLeaf | null = null; }'),
 	];
 	assert.equal(lintArchitectureFiles(files).length, 0);
 });
@@ -177,11 +196,25 @@ test('将域内 service 支撑文件归类为 service 层', () => {
 		role: 'implementation',
 		moduleName: 'obsidian-api',
 	});
-	assert.deepEqual(classifyManagedFile('src/core/chat/chat-feature-manager.tsx'), {
-		kind: 'consumer',
-	});
 	assert.deepEqual(classifyManagedFile('src/main.ts'), {
-		kind: 'consumer',
+		kind: 'module',
+		scope: 'root',
+	});
+	assert.deepEqual(classifyManagedFile('src/core/FeatureCoordinator.ts'), {
+		kind: 'module',
+		scope: 'root',
+	});
+	assert.deepEqual(classifyManagedFile('src/core/PluginStartupCoordinator.ts'), {
+		kind: 'module',
+		scope: 'root',
+	});
+	assert.deepEqual(classifyManagedFile('src/commands/ai-runtime/AiRuntimeCommandManager.ts'), {
+		kind: 'module',
+		scope: 'command',
+	});
+	assert.deepEqual(classifyManagedFile('src/core/chat/chat-feature-manager.tsx'), {
+		kind: 'chat',
+		role: 'consumer',
 	});
 	assert.deepEqual(classifyManagedFile('src/domains/mcp/runtime/runtime-manager.ts'), {
 		kind: 'domain',
@@ -206,13 +239,36 @@ test('将域内 service 支撑文件归类为 service 层', () => {
 		role: 'service',
 	});
 	assert.deepEqual(classifyManagedFile('src/commands/chat/chat-view-coordinator.ts'), {
-		kind: 'chat',
-		role: 'consumer',
+		kind: 'shim',
+		scope: 'command',
+	});
+	assert.deepEqual(classifyManagedFile('src/core/chat/utils/markdown.ts'), {
+		kind: 'shim',
+		scope: 'core',
 	});
 });
 
+test('compat shim 只能保留 import/export 声明', () => {
+	const validFiles = [
+		createManagedFile(
+			'src/commands/chat/chat-view-coordinator.ts',
+			'export { ChatViewCoordinator } from "src/domains/chat/ui-view-coordinator";',
+		),
+	];
+	assert.equal(lintArchitectureFiles(validFiles).length, 0);
+
+	const invalidFiles = [
+		createManagedFile(
+			'src/commands/chat/chat-view-coordinator.ts',
+			'import { demo } from "src/domains/chat/ui";\nconst leaked = demo;\nexport { leaked };',
+		),
+	];
+	const violations = lintArchitectureFiles(invalidFiles);
+	assert.ok(violations.some((violation) => violation.rule === 'arch/shim-only-reexport'));
+});
+
 test('taste linter 检测 any、console 与超长文件', () => {
-	const oversized = Array.from({ length: 301 }, (_, index) => `export const line${index} = ${index};`).join('\n');
+	const oversized = Array.from({ length: 501 }, (_, index) => `export const line${index} = ${index};`).join('\n');
 	const files = [
 		createManagedFile('src/domains/editor/service.ts', `${oversized}\nexport function buildEditorState(value: any): any { console.log(value); return value; }`),
 	];
@@ -224,7 +280,7 @@ test('taste linter 检测 any、console 与超长文件', () => {
 
 test('taste linter 检测文件名、barrel export 和类型命名', () => {
 	const files = [
-		createManagedFile('src/domains/editor/BadName.ts', 'export interface bad_name { value: string; }\nexport const broken_value = 1;'),
+		createManagedFile('src/providers/BadName.ts', 'export interface bad_name { value: string; }\nexport const broken_value = 1;'),
 		createManagedFile('src/domains/editor/service.ts', 'export { brokenValue } from "./helpers";\nexport interface badType { value: string; }\nexport function BuildEditorState(): void {}'),
 	];
 	const violations = lintTasteFiles(files);
@@ -232,6 +288,15 @@ test('taste linter 检测文件名、barrel export 和类型命名', () => {
 	assert.ok(violations.some((violation) => violation.rule === 'taste/no-barrel-export'));
 	assert.ok(violations.some((violation) => violation.rule === 'taste/type-name'));
 	assert.ok(violations.some((violation) => violation.rule === 'taste/function-name'));
+});
+
+test('taste linter 检测 folder import 指向 index.ts', () => {
+	const files = [
+		createManagedFile('src/core/chat/services/child/index.ts', 'export const value = "ok";'),
+		createManagedFile('src/core/chat/services/consumer.ts', 'import { value } from "./child";\nexport function readValue(): string { return value; }'),
+	];
+	const violations = lintTasteFiles(files);
+	assert.ok(violations.some((violation) => violation.rule === 'taste/no-folder-import'));
 });
 
 test('taste linter 检测方法和函数变量的副作用命名', () => {

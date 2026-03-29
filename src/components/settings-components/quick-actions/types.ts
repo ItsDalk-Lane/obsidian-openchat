@@ -1,9 +1,12 @@
 import type { App } from 'obsidian'
+import type { QuickActionDataService } from 'src/domains/quick-actions/service-data'
+import type { ObsidianApiProvider } from 'src/providers/providers.types'
 import type { ProviderSettings } from 'src/types/provider'
 import type { QuickAction } from 'src/types/chat'
 
 export interface QuickActionListContext {
-	app: App
+	quickActionDataService: QuickActionDataService
+	notify: (message: string, timeout?: number) => void
 	quickActionGroupExpandedState: Map<string, boolean>
 	getQuickActionsFromService: () => Promise<QuickAction[]>
 	refreshQuickActionsCache?: () => Promise<void>
@@ -19,6 +22,9 @@ export interface QuickActionEditModalOptions {
 
 export interface QuickActionEditModalContext {
 	app: App
+	obsidianApi: ObsidianApiProvider
+	quickActionDataService: QuickActionDataService
+	notify: (message: string, timeout?: number) => void
 	providers: ProviderSettings[]
 	promptTemplateFolder: string
 	refreshQuickActionsCache?: () => Promise<void>

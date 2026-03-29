@@ -1,4 +1,4 @@
-import type { Message, ResolveEmbedAsBinary } from '.'
+import type { Message, ResolveEmbedAsBinary } from './provider-shared'
 
 import type { ContentItem, PoeFunctionCallItem } from './poeTypes'
 

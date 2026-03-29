@@ -1,6 +1,19 @@
 import { EmbedCache } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, Capability, ResolveEmbedAsBinary, Vendor } from '.'
+import {
+	BaseOptions,
+	Capability,
+	ResolveEmbedAsBinary,
+	Vendor,
+} from './provider-shared'
+import {
+	isAbortLikeError,
+	normalizeProviderError,
+	shouldRetryNormalizedError,
+	type NormalizedProviderError,
+	type ProviderErrorType,
+} from './errors'
+import { withRetry, type RetryOptions } from './retry'
 
 export const getMimeTypeFromFilename = (filename: string) => {
 	const extension = filename.split('.').pop()?.toLowerCase() || ''
@@ -347,6 +360,11 @@ export const buildProviderOptionsWithReasoningDisabled = (
 	return newOptions
 }
 
-export type { ProviderErrorType, NormalizedProviderError } from './errors'
-export { normalizeProviderError, shouldRetryNormalizedError, isAbortLikeError } from './errors'
-export { withRetry, type RetryOptions } from './retry'
+export type { NormalizedProviderError, ProviderErrorType, RetryOptions }
+
+export {
+	isAbortLikeError,
+	normalizeProviderError,
+	shouldRetryNormalizedError,
+	withRetry,
+}

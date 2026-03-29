@@ -1,9 +1,16 @@
 import OpenAI, { AzureOpenAI } from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import {
+	BaseOptions,
+	mergeProviderOptionsWithParameters,
+	Message,
+	ResolveEmbedAsBinary,
+	SendRequest,
+	Vendor,
+} from './provider-shared'
 import { buildReasoningBlockEnd, buildReasoningBlockStart } from './utils'
 import { DebugLogger } from 'src/utils/DebugLogger'
-import { withToolCallLoopSupport } from 'src/core/agents/loop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop/OpenAILoopHandler'
 
 export interface AzureOptions extends BaseOptions {
 	endpoint: string

@@ -1,4 +1,5 @@
 import { App } from 'obsidian'
+import { QuickActionDataService } from 'src/domains/quick-actions/service-data'
 import { VendorApiKeysModal } from 'src/components/settings-components/VendorApiKeysModal'
 import { ollamaVendor } from 'src/LLMProviders/ollama'
 import {
@@ -12,7 +13,9 @@ import {
 	resolveReasoningCapability,
 	writeReasoningCapabilityCache,
 } from 'src/LLMProviders/modelCapability'
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api'
+import type { ObsidianApiProvider } from 'src/providers/providers.types'
+import type { QuickAction } from 'src/types/chat'
 import type { Message as ProviderMessage, ResolveEmbedAsBinary } from 'src/types/provider'
 import type { BaseOptions, ProviderSettings, Vendor } from 'src/types/provider'
 import { isCustomOpenChatProvider } from 'src/utils/aiProviderMetadata'
@@ -200,5 +203,29 @@ export class AiRuntimeVendorApiKeyManager {
 			normalizeProviderVendor: (vendor) => this.normalizeProviderVendor(vendor),
 			saveSettings,
 		}).open()
+	}
+}
+
+export class AiRuntimeQuickActionsManager {
+	private dataService: QuickActionDataService | null = null
+
+	constructor(
+		private readonly obsidianApi: ObsidianApiProvider,
+		private readonly getAiDataFolder: () => string,
+		private readonly syncRuntimeQuickActions: (quickActions: QuickAction[]) => void,
+	) {}
+
+	getDataService(): QuickActionDataService {
+		if (!this.dataService) {
+			this.dataService = new QuickActionDataService(this.obsidianApi, {
+				getAiDataFolder: () => this.getAiDataFolder(),
+				syncRuntimeQuickActions: (quickActions) => this.syncRuntimeQuickActions(quickActions),
+			})
+		}
+		return this.dataService
+	}
+
+	notify(message: string, timeout?: number): void {
+		this.obsidianApi.notify(message, timeout)
 	}
 }

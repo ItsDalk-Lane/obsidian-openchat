@@ -9,6 +9,24 @@ import type {
 const FRONTMATTER_DELIMITER = '---';
 const TIMESTAMP_REGEX =
 	/(\d{4})[-/](\d{1,2})[-/](\d{1,2})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})/;
+const INVALID_HISTORY_TITLE_CHARS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
+
+const isControlCharacter = (codePoint: number): boolean => {
+	return (codePoint >= 0x00 && codePoint <= 0x1f)
+		|| (codePoint >= 0x7f && codePoint <= 0x9f);
+};
+
+const replaceInvalidHistoryTitleChars = (text: string): string => {
+	return Array.from(text, (char) => {
+		const codePoint = char.codePointAt(0);
+		if (codePoint === undefined) {
+			return char;
+		}
+		return INVALID_HISTORY_TITLE_CHARS.has(char) || isControlCharacter(codePoint)
+			? '_'
+			: char;
+	}).join('');
+};
 
 export const formatChatHistoryTimestamp = (timestamp: number): string => {
 	const date = new Date(timestamp);
@@ -165,9 +183,9 @@ export const parseHistoryLayoutMode = (
 };
 
 export const sanitizeHistoryTitle = (text: string): string => {
-	return text
-		.replace(/\s+/g, '_')
-		.replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_')
+	return replaceInvalidHistoryTitleChars(
+		text.replace(/\s+/g, '_'),
+	)
 		.replace(/_+/g, '_')
 		.replace(/^_|_$/g, '');
 };

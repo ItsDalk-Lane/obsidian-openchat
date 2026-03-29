@@ -1,5 +1,5 @@
 import type { VaultEntry } from 'src/providers/providers.types';
-import { clonePlanSnapshot, type PlanSnapshot } from 'src/tools/runtime/plan-state';
+import { clonePlanSnapshot } from 'src/tools/runtime/plan-state';
 import {
 	ensureFolderExists,
 	joinPath,

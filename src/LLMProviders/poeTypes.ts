@@ -1,4 +1,4 @@
-import type { BaseOptions } from '.'
+import type { BaseOptions } from './provider-shared'
 
 export type ContentItem =
 	| {

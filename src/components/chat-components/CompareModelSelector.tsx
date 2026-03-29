@@ -3,7 +3,7 @@ import { ChevronDown, Settings } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import type { ProviderSettings, Vendor } from 'src/types/provider';
 import { getCapabilityDisplayText } from 'src/LLMProviders/utils';
-import { availableVendors } from 'src/settings/ai-runtime';
+import { availableVendors } from 'src/settings/ai-runtime/api';
 import type { CompareGroup } from 'src/core/chat/types/multiModel';
 import { localInstance } from 'src/i18n/locals';
 import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';

@@ -14,6 +14,24 @@ import {
 } from './vault-query-types';
 import { toComparableNumber } from './vault-query-condition';
 
+interface MetadataTypeManagerLike {
+	getAllProperties?: () => Record<string, PropertyInfoLike>;
+}
+
+interface AppWithMetadataTypeManager extends App {
+	metadataTypeManager?: MetadataTypeManagerLike;
+}
+
+interface TaskListItemLike {
+	task?: string;
+	parent: number;
+	position?: {
+		start?: {
+			line?: number;
+		};
+	};
+}
+
 const inferPropertyType = (value: unknown): string => {
 	if (typeof value === 'boolean') {
 		return 'checkbox';
@@ -67,10 +85,8 @@ const getMarkdownFiles = (app: App): TFile[] => {
 const buildPropertyDataset = (app: App): VaultQueryDataset => {
 	const markdownFiles = getMarkdownFiles(app);
 	const stats = new Map<string, { type: string | null; usageCount: number }>();
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const metadataTypeManager = (app as any).metadataTypeManager as
-		| { getAllProperties?: () => Record<string, PropertyInfoLike> }
-		| undefined;
+	const metadataTypeManager = (app as AppWithMetadataTypeManager)
+		.metadataTypeManager;
 	const propertyDefinitions = metadataTypeManager?.getAllProperties?.() ?? {};
 
 	for (const key of Object.keys(propertyDefinitions)) {
@@ -163,8 +179,7 @@ const buildTaskDataset = async (app: App): Promise<VaultQueryDataset> => {
 
 		const lines = (await app.vault.cachedRead(file)).split(/\r?\n/);
 		for (const item of taskItems) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const lineNumber = ((item as any).position?.start?.line ?? -1) as number;
+			const lineNumber = (item as TaskListItemLike).position?.start?.line ?? -1;
 			if (lineNumber < 0 || lineNumber >= lines.length) {
 				continue;
 			}

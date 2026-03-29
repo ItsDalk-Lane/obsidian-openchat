@@ -1,11 +1,10 @@
 import { useState, useRef, useMemo, useCallback, useEffect, type RefObject } from 'react';
 import type { ChatService } from 'src/core/chat/services/chat-service';
 import type { SlashCommandItem } from 'src/core/chat/types/slashCommand';
-import { Notice } from 'obsidian';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { SkillDefinition } from 'src/domains/skills/types';
-import type { SubAgentDefinition } from 'src/tools/sub-agents';
+import type { SubAgentDefinition } from 'src/tools/sub-agents/types';
 
 export interface UseChatInputSlashCommandReturn {
 	slashCommandVisible: boolean;
@@ -192,7 +191,9 @@ export function useChatInputSlashCommand(
 				}
 			} catch (error) {
 				const reason = error instanceof Error ? error.message : String(error);
-				new Notice(localInstance.chat_command_execute_failed_prefix.replace('{message}', reason));
+				service.getObsidianApiProvider().notify(
+					localInstance.chat_command_execute_failed_prefix.replace('{message}', reason)
+				);
 				DebugLogger.error('[ChatInput] 执行命令失败', error);
 			}
 		},

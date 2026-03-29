@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Plus, Trash2, Save } from 'lucide-react';
 import type { ProviderSettings } from 'src/types/provider';
 import { getCapabilityDisplayText } from 'src/LLMProviders/utils';
-import { availableVendors } from 'src/settings/ai-runtime';
+import { availableVendors } from 'src/settings/ai-runtime/api';
 import type { CompareGroup } from 'src/core/chat/types/multiModel';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import { localInstance } from 'src/i18n/locals';

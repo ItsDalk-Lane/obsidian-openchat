@@ -1,6 +1,5 @@
 import { ChatEditorIntegrationBase } from './ChatEditorIntegrationBase';
 import { requestModifyTextHelper } from './ChatEditorModifyRequester';
-import { Notice, MarkdownView } from 'obsidian';
 import { Transaction } from '@codemirror/state';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -34,7 +33,7 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 		const providers = this.resolveProviders();
 		const provider = providers.find(p => p.tag === this.selectedModifyModelTag) ?? providers[0];
 		if (!provider) {
-			new Notice(localInstance.no_ai_model_configured);
+			this.host.notify(localInstance.no_ai_model_configured);
 			return;
 		}
 
@@ -50,9 +49,14 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 				annotations: Transaction.userEvent.of('modify-ghost-internal')
 			});
 
-			const result = await requestModifyTextHelper(this.plugin.app, provider, instruction, ctx.contentForAI);
+			const result = await requestModifyTextHelper(
+				this.service.getObsidianApiProvider(),
+				provider,
+				instruction,
+				ctx.contentForAI,
+			);
 			if (!result.trim()) {
-				new Notice(localInstance.ai_no_usable_content);
+				this.host.notify(localInstance.ai_no_usable_content);
 				return;
 			}
 
@@ -66,7 +70,7 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 				})
 			});
 		} catch (e) {
-			new Notice(e instanceof Error ? e.message : String(e));
+			this.host.notify(e instanceof Error ? e.message : String(e));
 		}
 	}
 
@@ -96,13 +100,13 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 
 		this.hideSelectionToolbar();
 
-		const settings = this.plugin.settings.chat;
-		const activeFile = this.plugin.app.workspace.getActiveFile();
+		const settings = this.host.getChatSettings();
+		const activeFile = this.host.getActiveMarkdownFile();
 		const initialSelection = triggerSource === 'symbol' ? (fullText || selection) : selection;
 		this.service.setNextTriggerSource(triggerSource === 'symbol' ? 'at_trigger' : 'selection_toolbar');
 
 		const modal = new ChatModal(
-			this.plugin.app,
+			this.host.app,
 			this.service,
 			{
 				width: settings.chatModalWidth ?? 700,
@@ -125,7 +129,7 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 		this.hideSelectionToolbar();
 
 		if (!this.quickActionExecutionService) {
-			new Notice(localInstance.quick_action_service_not_initialized);
+			this.host.notify(localInstance.quick_action_service_not_initialized);
 			return;
 		}
 
@@ -161,7 +165,7 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 			this.resultModalRoot.render(
 				<StrictMode>
 					<QuickActionResultModal
-						app={this.plugin.app}
+						obsidianApi={this.service.getObsidianApiProvider()}
 						visible={true}
 						quickAction={quickAction}
 						selection={selection}
@@ -190,7 +194,7 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 		renderModal();
 
 		if (!requiresModelSelection) {
-			const useStreamOutput = this.plugin.settings.chat.quickActionsStreamOutput ?? true;
+			const useStreamOutput = this.host.getChatSettings().quickActionsStreamOutput ?? true;
 
 			if (useStreamOutput) {
 				this.executeQuickActionAndStream(quickAction, actualSelection, {
@@ -243,7 +247,7 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 		this.currentError = undefined;
 		this.currentRenderModal?.();
 
-		const useStreamOutput = this.plugin.settings.chat.quickActionsStreamOutput ?? true;
+		const useStreamOutput = this.host.getChatSettings().quickActionsStreamOutput ?? true;
 
 		if (useStreamOutput) {
 			this.executeQuickActionAndStream(quickAction, selection, {
@@ -339,9 +343,9 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 	private insertQuickActionResult(result: string, mode: 'replace' | 'append' | 'insert', triggerSource?: 'selection' | 'symbol', fullText?: string): void {
 		this.hideResultModal();
 
-		const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+		const activeView = this.host.getActiveMarkdownView();
 		if (!activeView?.editor) {
-			new Notice(localInstance.chat_trigger_no_active_file);
+			this.host.notify(localInstance.chat_trigger_no_active_file);
 			return;
 		}
 
@@ -361,22 +365,22 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 					} else {
 						editor.setValue(result);
 					}
-					new Notice(localInstance.replaced_file_content);
+					this.host.notify(localInstance.replaced_file_content);
 				} else {
 					editor.replaceSelection(result);
-					new Notice(localInstance.quick_action_result_replaced);
+					this.host.notify(localInstance.quick_action_result_replaced);
 				}
 				break;
 			case 'append': {
 				const selection = editor.getSelection();
 				editor.replaceSelection(selection + '\n\n' + result);
-				new Notice(localInstance.quick_action_result_appended);
+				this.host.notify(localInstance.quick_action_result_appended);
 				break;
 			}
 			case 'insert': {
 				const cursor = editor.getCursor();
 				editor.replaceRange(result, cursor);
-				new Notice(localInstance.quick_action_result_inserted);
+				this.host.notify(localInstance.quick_action_result_inserted);
 				break;
 			}
 		}
@@ -407,13 +411,13 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 			this.resultModalRoot.render(
 				<StrictMode>
 						<QuickActionResultModal
-							app={this.plugin.app}
+							obsidianApi={this.service.getObsidianApiProvider()}
 							visible={false}
 							quickAction={{ id: '', name: '', prompt: '', promptSource: 'custom', showInToolbar: false, order: 0, createdAt: 0, updatedAt: 0 }}
 							selection=""
 							result=""
 							isLoading={false}
-							providers={this.plugin.settings.aiRuntime.providers}
+							providers={this.host.getAiRuntimeSettings().providers}
 						onClose={() => {}}
 						onRegenerate={() => {}}
 						onInsert={() => {}}
@@ -437,14 +441,14 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 	 * 解析 providers
 	 */
 	protected resolveProviders(): ProviderSettings[] {
-		return (this.plugin.settings.aiRuntime?.providers ?? []) as ProviderSettings[];
+		return (this.host.getAiRuntimeSettings().providers ?? []) as ProviderSettings[];
 	}
 
 	/**
 	 * 解析默认 Modify 模型标签
 	 */
 	protected resolveDefaultModifyModelTag(providers: ProviderSettings[]): string {
-		const fromChat = this.plugin.settings.chat?.defaultModel ?? '';
+		const fromChat = this.host.getChatSettings().defaultModel ?? '';
 		if (fromChat && providers.some(p => p.tag === fromChat)) {
 			return fromChat;
 		}
@@ -474,4 +478,3 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 		this.quickActionDataService = null;
 	}
 }
-

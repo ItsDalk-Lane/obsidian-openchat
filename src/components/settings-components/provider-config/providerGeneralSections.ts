@@ -1,4 +1,4 @@
-import { Notice, Setting } from 'obsidian'
+import { Setting } from 'obsidian'
 import type { ClaudeOptions } from 'src/LLMProviders/claude'
 import type { GptImageOptions } from 'src/LLMProviders/gptImage'
 import { t } from 'src/i18n/ai-runtime/helper'
@@ -122,6 +122,7 @@ export const addEndpointSection = (params: {
 	details: HTMLElement
 	options: BaseOptions & Pick<Optional, 'endpoint'>
 	saveSettings: () => Promise<void>
+	notify: (message: string, timeout?: number) => void
 }) =>
 	new Setting(params.details)
 		.setName(t('Endpoint'))
@@ -136,7 +137,7 @@ export const addEndpointSection = (params: {
 						params.options.endpoint = ''
 						await params.saveSettings()
 					} else if (!isValidUrl(url)) {
-						new Notice(t('Invalid URL'))
+						params.notify(t('Invalid URL'))
 					} else {
 						params.options.endpoint = url
 						await params.saveSettings()
@@ -188,6 +189,7 @@ export const addParametersSection = (params: {
 	details: HTMLElement
 	options: BaseOptions
 	saveSettings: () => Promise<void>
+	notify: (message: string, timeout?: number) => void
 }) => {
 	const setting = new Setting(params.details)
 		.setName(t('Additional parameters'))
@@ -206,7 +208,7 @@ export const addParametersSection = (params: {
 						}
 						const parsed = JSON.parse(trimmed)
 						if (parsed.model) {
-							new Notice(t('Please set model in the Model field above, not here'))
+							params.notify(t('Please set model in the Model field above, not here'))
 							return
 						}
 						params.options.parameters = parsed
@@ -227,6 +229,7 @@ export const addClaudeSections = (params: {
 	details: HTMLElement
 	options: ClaudeOptions
 	saveSettings: () => Promise<void>
+	notify: (message: string, timeout?: number) => void
 }) => {
 	new Setting(params.details)
 		.setName(t('Thinking'))
@@ -250,11 +253,11 @@ export const addClaudeSections = (params: {
 				.onChange(async (value) => {
 					const number = parseInt(value, 10)
 					if (Number.isNaN(number)) {
-						new Notice(t('Please enter a number'))
+						params.notify(t('Please enter a number'))
 						return
 					}
 					if (number < 1024) {
-						new Notice(t('Minimum value is 1024'))
+						params.notify(t('Minimum value is 1024'))
 						return
 					}
 					params.options.budget_tokens = number
@@ -272,11 +275,11 @@ export const addClaudeSections = (params: {
 				.onChange(async (value) => {
 					const number = parseInt(value, 10)
 					if (Number.isNaN(number)) {
-						new Notice(t('Please enter a number'))
+						params.notify(t('Please enter a number'))
 						return
 					}
 					if (number < 256) {
-						new Notice(t('Minimum value is 256'))
+						params.notify(t('Minimum value is 256'))
 						return
 					}
 					params.options.max_tokens = number

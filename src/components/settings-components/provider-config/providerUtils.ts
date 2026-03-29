@@ -6,6 +6,10 @@ import { grokVendor } from 'src/LLMProviders/grok'
 import { kimiVendor } from 'src/LLMProviders/kimi'
 import { openRouterVendor } from 'src/LLMProviders/openRouter'
 import { poeVendor } from 'src/LLMProviders/poe'
+import {
+	normalizeOllamaBaseURL,
+	normalizeProviderBaseURLForRuntime,
+} from 'src/LLMProviders/provider-base-url'
 import { qianFanNormalizeBaseURL, qianFanVendor } from 'src/LLMProviders/qianFan'
 import { qwenVendor } from 'src/LLMProviders/qwen'
 import { siliconFlowVendor } from 'src/LLMProviders/siliconflow'
@@ -180,27 +184,13 @@ const fetchModels = async (
 	}
 }
 
-const normalizeBaseUrl = (baseURL?: string) => {
-	const trimmed = (baseURL || '').trim()
-	return trimmed ? (trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed) : 'http://127.0.0.1:11434'
-}
-
-export const normalizeProviderBaseURLForRuntime = (vendorName: string, baseURL?: string): string => {
-	const trimmed = (baseURL || '').trim()
-	if (vendorName === 'Ollama') {
-		return normalizeBaseUrl(trimmed)
-	}
-	if (vendorName === zhipuVendor.name) {
-		return normalizeZhipuOpenAIBaseURL(trimmed)
-	}
-	return trimmed
-}
-
 export const fetchOllamaLocalModels = async (baseURL?: string): Promise<string[]> => {
-	const response = await requestUrl({ url: `${normalizeBaseUrl(baseURL)}/api/tags` })
+	const response = await requestUrl({ url: `${normalizeOllamaBaseURL(baseURL)}/api/tags` })
 	const models = Array.isArray(response.json?.models) ? response.json.models : []
 	return models.map((model: { name: string }) => model.name).filter(Boolean)
 }
+
+export { normalizeProviderBaseURLForRuntime }
 
 export const MODEL_FETCH_CONFIGS: Record<string, ModelFetchConfig> = {
 	[siliconFlowVendor.name]: {

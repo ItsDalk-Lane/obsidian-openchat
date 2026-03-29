@@ -1,6 +1,13 @@
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import {
+	BaseOptions,
+	mergeProviderOptionsWithParameters,
+	Message,
+	ResolveEmbedAsBinary,
+	SendRequest,
+	Vendor,
+} from './provider-shared'
 import {
 	buildReasoningBlockEnd,
 	buildReasoningBlockStart,
@@ -9,7 +16,7 @@ import {
 import { withToolMessageContext } from './messageFormat'
 import { normalizeProviderError } from './errors'
 import { withRetry } from './retry'
-import { withToolCallLoopSupport } from 'src/core/agents/loop'
+import { withToolCallLoopSupport } from 'src/core/agents/loop/OpenAILoopHandler'
 
 export interface OpenAIOptions extends BaseOptions {
 	enableReasoning?: boolean

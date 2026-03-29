@@ -1,4 +1,4 @@
-import { DropdownComponent, Notice, Setting } from 'obsidian'
+import { DropdownComponent, Setting } from 'obsidian'
 import {
 	DEFAULT_DOUBAO_THINKING_TYPE,
 	DOUBAO_REASONING_EFFORT_OPTIONS,
@@ -84,7 +84,7 @@ export const renderDoubaoSections = (
 					} else if (numValue >= 196 && numValue <= 36_000_000) {
 						options.imagePixelLimit.minPixels = numValue
 					} else {
-						new Notice(localInstance.ai_runtime_image_pixel_limit_invalid)
+						context.notify(localInstance.ai_runtime_image_pixel_limit_invalid)
 						return
 					}
 					await context.saveSettings()
@@ -108,7 +108,7 @@ export const renderDoubaoSections = (
 					} else if (numValue >= 196 && numValue <= 36_000_000) {
 						options.imagePixelLimit.maxPixels = numValue
 					} else {
-						new Notice(localInstance.ai_runtime_image_pixel_limit_invalid)
+						context.notify(localInstance.ai_runtime_image_pixel_limit_invalid)
 						return
 					}
 					await context.saveSettings()

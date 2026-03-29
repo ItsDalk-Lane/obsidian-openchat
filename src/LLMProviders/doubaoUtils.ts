@@ -1,7 +1,7 @@
 /**
  * Doubao 工具函数：图片处理、消息预处理、错误创建等
  */
-import type { Message, ResolveEmbedAsBinary } from '.'
+import type { Message, ResolveEmbedAsBinary } from './provider-shared'
 import { convertEmbedToImageUrl, getMimeTypeFromFilename } from './utils'
 import { DebugLogger } from 'src/utils/DebugLogger'
 

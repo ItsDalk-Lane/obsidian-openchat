@@ -1,7 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { EmbedCache } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import {
+	BaseOptions,
+	mergeProviderOptionsWithParameters,
+	Message,
+	ResolveEmbedAsBinary,
+	SendRequest,
+	Vendor,
+} from './provider-shared'
 import {
 	arrayBufferToBase64,
 	CALLOUT_BLOCK_END,
@@ -10,7 +17,7 @@ import {
 } from './utils'
 import { normalizeProviderError } from './errors'
 import { withRetry } from './retry'
-import { withClaudeToolCallLoopSupport } from 'src/core/agents/loop'
+import { withClaudeToolCallLoopSupport } from 'src/core/agents/loop/ClaudeLoopHandler'
 
 export interface ClaudeOptions extends BaseOptions {
 	max_tokens: number

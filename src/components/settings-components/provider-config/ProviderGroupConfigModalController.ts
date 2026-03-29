@@ -1,8 +1,8 @@
-import { App, Notice, Setting } from 'obsidian';
+import { App, Setting } from 'obsidian';
 import { SelectModelModal } from 'src/components/modals/AiRuntimeProviderModals';
 import { ollamaVendor } from 'src/LLMProviders/ollama';
 import { t } from 'src/i18n/ai-runtime/helper';
-import { availableVendors } from 'src/settings/ai-runtime';
+import { availableVendors } from 'src/settings/ai-runtime/api';
 import type { BaseOptions, ProviderSettings, Vendor } from 'src/types/provider';
 import {
 	createProviderGroupId,
@@ -100,7 +100,7 @@ export class ProviderGroupConfigModalController {
 			btn.setButtonText(t('Test now')).onClick(async () => {
 				const provider = await this.resolveProviderForTesting();
 				if (!provider) {
-					new Notice(
+					this.params.notify(
 						this.draft.models.length > 0
 							? t('Please select a model to test')
 							: t('Please add a model first')
@@ -113,7 +113,11 @@ export class ProviderGroupConfigModalController {
 		});
 		setting.addButton((btn) => {
 			btn.setButtonText(t('Additional parameters')).onClick(() => {
-				openParametersModal({ app: this.app, draft: this.draft });
+				openParametersModal({
+					app: this.app,
+					draft: this.draft,
+					notify: this.params.notify,
+				});
 			});
 			this.decorateToolbarButton(btn.buttonEl);
 		});
@@ -123,7 +127,7 @@ export class ProviderGroupConfigModalController {
 					const provider = this.createActiveProvider();
 					const vendor = this.selectedVendor;
 					if (!provider || !vendor) {
-						new Notice(t('Please add a model first'));
+						this.params.notify(t('Please add a model first'));
 						return;
 					}
 					await this.params.probeReasoningCapability(provider, vendor);
@@ -156,7 +160,7 @@ export class ProviderGroupConfigModalController {
 				.onClick(() => {
 					const vendor = this.selectedVendor;
 					if (!vendor) {
-						new Notice(t('Please select an AI provider first'));
+						this.params.notify(t('Please select an AI provider first'));
 						return;
 					}
 					const nextOptions = cloneValue(vendor.defaultOptions);
@@ -341,7 +345,7 @@ export class ProviderGroupConfigModalController {
 			return this.modelSuggestionCache;
 		}
 		if (modelConfig.requiresApiKey && !options.apiKey) {
-			new Notice(t('Please input API key first'));
+			this.params.notify(t('Please input API key first'));
 			this.modelSuggestionCache = [...modelConfig.fallbackModels];
 			this.modelSuggestionCacheKey = cacheKey;
 			return this.modelSuggestionCache;
@@ -363,7 +367,7 @@ export class ProviderGroupConfigModalController {
 		try {
 			const models = await this.getModelSuggestions();
 			if (models.length === 0) {
-				new Notice(t('No models available from remote endpoint or fallback list'));
+				this.params.notify(t('No models available from remote endpoint or fallback list'));
 				return;
 			}
 			new SelectModelModal(this.app, models, (selectedModel) => {
@@ -374,17 +378,17 @@ export class ProviderGroupConfigModalController {
 			if (error instanceof Error) {
 				const errorMessage = error.message.toLowerCase();
 				if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
-					new Notice(t('API key may be incorrect. Please check your API key.'));
+					this.params.notify(t('API key may be incorrect. Please check your API key.'));
 					return;
 				}
 				if (errorMessage.includes('403') || errorMessage.includes('forbidden')) {
-					new Notice(t('Access denied. Please check your API permissions.'));
+					this.params.notify(t('Access denied. Please check your API permissions.'));
 					return;
 				}
-				new Notice(t('Failed to load models. Please try again later.'));
+				this.params.notify(t('Failed to load models. Please try again later.'));
 				return;
 			}
-			new Notice(t('Failed to load models. Please try again later.'));
+			this.params.notify(t('Failed to load models. Please try again later.'));
 		}
 	}
 

@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { StopCircle, RotateCw, AlertTriangle } from 'lucide-react';
-import { App, Component } from 'obsidian';
-import { useObsidianApp } from 'src/contexts/obsidianAppContext';
+import { Component } from 'obsidian';
 import type { ChatMessage } from 'src/types/chat';
 import type { LayoutMode, ParallelResponseGroup } from 'src/core/chat/types/multiModel';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import { getModelDisplayNameByTag } from 'src/core/chat/services/chat-provider-helpers';
 import { ModelTag } from './ModelTag';
-import { renderMarkdownContent, parseContentBlocks, ContentBlock } from 'src/core/chat/utils/markdown';
-import { availableVendors } from 'src/settings/ai-runtime';
+import {
+	renderMarkdownContent,
+	parseContentBlocks,
+	type ContentBlock,
+} from 'src/domains/chat/ui-markdown';
+import { availableVendors } from 'src/settings/ai-runtime/api';
 import { localInstance } from 'src/i18n/locals';
 
 interface ParallelResponseViewerProps {
@@ -38,7 +41,6 @@ interface SingleResponseProps {
 }
 
 const SingleResponse = ({ message, service, isStreaming, isError, compact }: SingleResponseProps) => {
-	const app = useObsidianApp();
 	const [contentBlocks, setContentBlocks] = useState<ContentBlock[]>([]);
 
 	useEffect(() => {
@@ -113,7 +115,13 @@ const SingleResponse = ({ message, service, isStreaming, isError, compact }: Sin
 				) : (
 					contentBlocks.map((block, index) => {
 						if (block.type === 'text') {
-							return <MarkdownBlock key={`text-${index}`} content={block.content} app={app} />;
+							return (
+								<MarkdownBlock
+									key={`text-${index}`}
+									content={block.content}
+									service={service}
+								/>
+							);
 						}
 						if (block.type === 'reasoning') {
 							return (
@@ -136,18 +144,24 @@ const SingleResponse = ({ message, service, isStreaming, isError, compact }: Sin
 	);
 };
 
-const MarkdownBlock = ({ content, app }: { content: string; app: App }) => {
+const MarkdownBlock = ({ content, service }: { content: string; service: ChatService }) => {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const componentRef = useRef(new Component());
+	const obsidianApi = service.getObsidianApiProvider();
 
 	useEffect(() => {
 		if (!containerRef.current) return;
 		const run = async () => {
-			await renderMarkdownContent(app, content, containerRef.current as HTMLDivElement, componentRef.current);
+			await renderMarkdownContent(
+				obsidianApi,
+				content,
+				containerRef.current as HTMLDivElement,
+				componentRef.current,
+			);
 		};
 		void run();
 		return () => { componentRef.current.unload(); };
-	}, [app, content]);
+	}, [content, obsidianApi]);
 
 	return <div ref={containerRef} />;
 };

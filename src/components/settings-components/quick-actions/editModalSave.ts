@@ -1,5 +1,4 @@
-import { Notice } from 'obsidian'
-import { QuickActionDataService } from 'src/editor/selectionToolbar/QuickActionDataService'
+import type { QuickActionDataService } from 'src/domains/quick-actions/service-data'
 import { localInstance } from 'src/i18n/locals'
 import type { QuickAction, QuickActionType } from 'src/types/chat'
 import type { QuickActionEditModalContext, QuickActionEditModalOptions } from './types'
@@ -148,7 +147,7 @@ export const saveQuickActionFromEditModal = async (
 			}
 			await context.refreshQuickActionsCache?.()
 		} catch (error) {
-			new Notice(
+			context.notify(
 				localInstance.ai_runtime_quick_action_group_save_failed_prefix +
 					(error instanceof Error ? error.message : String(error))
 			)
@@ -163,7 +162,7 @@ export const saveQuickActionFromEditModal = async (
 				await quickActionDataService.moveQuickActionToGroup(descendant.id, null)
 			}
 		} catch (error) {
-			new Notice(
+			context.notify(
 				localInstance.ai_runtime_quick_action_group_release_failed_prefix +
 					(error instanceof Error ? error.message : String(error))
 			)
@@ -173,7 +172,7 @@ export const saveQuickActionFromEditModal = async (
 	try {
 		await options?.onSaved?.(savedQuickAction)
 	} catch (error) {
-		new Notice(
+		context.notify(
 			localInstance.ai_runtime_callback_failed_prefix +
 				(error instanceof Error ? error.message : String(error))
 		)

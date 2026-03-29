@@ -1,4 +1,4 @@
-import { Notice, Setting } from 'obsidian'
+import { Setting } from 'obsidian'
 import { ClaudeOptions, claudeVendor } from 'src/LLMProviders/claude'
 import { DeepSeekOptions, deepSeekVendor } from 'src/LLMProviders/deepSeek'
 import { DoubaoOptions, doubaoVendor } from 'src/LLMProviders/doubao'
@@ -122,6 +122,7 @@ export interface RenderProviderConfigParams {
 		record: ReasoningCapabilityRecord
 	) => void
 	testProviderConfiguration: (provider: ProviderSettings) => Promise<boolean>
+	notify: (message: string, timeout?: number) => void
 	renderProviderConfig: (
 		container: HTMLElement,
 		index: number,
@@ -177,6 +178,7 @@ export const renderProviderConfigContent = (params: RenderProviderConfigParams) 
 	)
 	const providerSectionContext: ProviderSectionContext = {
 		saveSettings: params.saveSettings,
+		notify: params.notify,
 		getReasoningCapabilityHintText: params.getReasoningCapabilityHintText,
 		updateProviderCapabilities: params.updateProviderCapabilities,
 		resolveModelReasoningCapability: params.resolveModelReasoningCapability,
@@ -394,7 +396,7 @@ export const renderProviderConfigContent = (params: RenderProviderConfigParams) 
 						)
 					} catch (error) {
 						const msg = error instanceof Error ? error.message : String(error)
-						new Notice(`${t('Model test failed')}: ${msg}`)
+						params.notify(`${t('Model test failed')}: ${msg}`)
 						btn.setButtonText(`❌ ${t('Model test failed')}`)
 					}
 					setTimeout(() => {
@@ -417,7 +419,7 @@ export const renderProviderConfigContent = (params: RenderProviderConfigParams) 
 							const record = await params.probeReasoningCapability(settings, vendor)
 							params.writeReasoningCapabilityRecord(vendor.name, settings.options, record)
 							await params.saveSettingsDirect()
-							new Notice(params.getReasoningCapabilityHintText(record))
+							params.notify(params.getReasoningCapabilityHintText(record))
 							if (modal) {
 								modal.configContainer.empty()
 								params.renderProviderConfig(
@@ -430,7 +432,7 @@ export const renderProviderConfigContent = (params: RenderProviderConfigParams) 
 							}
 						} catch (error) {
 							const message = error instanceof Error ? error.message : String(error)
-							new Notice(`${t('Reasoning capability probe failed')}: ${message}`)
+							params.notify(`${t('Reasoning capability probe failed')}: ${message}`)
 						} finally {
 							setTimeout(() => {
 								btn.setDisabled(false)
@@ -447,11 +449,11 @@ export const renderProviderConfigContent = (params: RenderProviderConfigParams) 
 			.onClick(async () => {
 				const tags = params.getAllProviders().map((provider) => provider.tag.toLowerCase())
 				if (tags.length !== new Set(tags).size) {
-					new Notice(t('Model identifier must be unique'))
+					params.notify(t('Model identifier must be unique'))
 					return
 				}
 				await params.saveSettingsDirect()
-				new Notice(localInstance.system_prompt_saved)
+				params.notify(localInstance.system_prompt_saved)
 				if (vendor.name === openRouterVendor.name) {
 					params.renderRoot(params.rootContainer, false, params.currentOpenProviderIndex)
 				}

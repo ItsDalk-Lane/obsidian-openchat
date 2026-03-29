@@ -1,5 +1,3 @@
-import { Notice } from 'obsidian'
-import { QuickActionDataService } from 'src/editor/selectionToolbar/QuickActionDataService'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { localInstance } from 'src/i18n/locals'
 import type { QuickAction } from 'src/types/chat'
@@ -48,7 +46,7 @@ export const renderQuickActionsList = async (
 		indexMap.set(topLevel[i].id, i)
 	}
 
-	const quickActionDataService = QuickActionDataService.getInstance(context.app)
+	const { quickActionDataService } = context
 	await quickActionDataService.initialize()
 
 	let draggingId: string | null = null
@@ -78,7 +76,7 @@ export const renderQuickActionsList = async (
 			await context.refreshQuickActionsCache?.()
 		} catch (error) {
 			DebugLogger.error('[QuickActions] Failed to move action', error)
-			new Notice(t('Failed to move action. Please try again.'))
+			context.notify(t('Failed to move action. Please try again.'))
 		}
 	}
 
@@ -343,7 +341,7 @@ export const renderQuickActionsList = async (
 						await renderQuickActionsList(context, container)
 					} catch (error) {
 						DebugLogger.error('[QuickActions] Failed to keep child actions', error)
-						new Notice(t('Failed to keep child actions. Please try again.'))
+						context.notify(t('Failed to keep child actions. Please try again.'))
 					}
 				}
 				const deleteChildren = document.createElement('button')
@@ -360,7 +358,7 @@ export const renderQuickActionsList = async (
 						await renderQuickActionsList(context, container)
 					} catch (error) {
 						DebugLogger.error('[QuickActions] Failed to delete child actions', error)
-						new Notice(t('Failed to delete child actions. Please try again.'))
+						context.notify(t('Failed to delete child actions. Please try again.'))
 					}
 				}
 				footer.append(cancel, deleteChildren, keepChildren)

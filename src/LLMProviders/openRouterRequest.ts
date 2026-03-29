@@ -2,13 +2,13 @@ import { OpenRouter } from '@openrouter/sdk'
 import { Notice } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { DebugLogger } from 'src/utils/DebugLogger'
-import { mergeProviderOptionsWithParameters } from '.'
+import { mergeProviderOptionsWithParameters } from './provider-shared'
 import type {
 	Message,
 	ResolveEmbedAsBinary,
 	SaveAttachment,
 	SendRequest,
-} from '.'
+} from './provider-shared'
 import { getCapabilityEmoji } from './utils'
 import { normalizeProviderError } from './errors'
 import { buildOpenRouterHTTPError } from './openRouterErrors'

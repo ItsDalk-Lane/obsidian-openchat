@@ -2,7 +2,6 @@ import {
 	compactProviderMessages,
 } from 'src/domains/chat/service-provider-message-compaction';
 import {
-	buildRequestTokenState,
 	getChatDefaultFileContentOptions as getChatDefaultFileContentOptionsFromDomain,
 	getChatMessageManagementSettings as getChatMessageManagementSettingsFromDomain,
 	hasContextCompactionChanged,
@@ -37,7 +36,7 @@ import {
 	getStringMetadata,
 	hasBuildableContextPayload,
 } from './chat-context-helpers';
-import { buildLivePlanGuidance, buildLivePlanUserContext } from './chat-plan-prompts';
+import { buildLivePlanGuidance } from './chat-plan-prompts';
 import {
 	buildRequestMessagesWithEphemeralContext,
 	updateRequestTokenState,

@@ -4,8 +4,8 @@ import { Copy } from 'lucide-react'
 import { ToggleSwitch } from 'src/components/toggle-switch/ToggleSwitch'
 import { SystemPromptManagerPanel } from 'src/components/system-prompt-components/SystemPromptManagerModal'
 import { localInstance } from 'src/i18n/locals'
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime'
-import type { McpSettings, McpToolInfo } from 'src/services/mcp'
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api'
+import type { McpSettings, McpToolInfo } from 'src/services/mcp/types'
 import { summarizeToolDescriptionForUi } from 'src/services/mcp/toolDescriptionSummary'
 import {
 	type ChatOpenMode,

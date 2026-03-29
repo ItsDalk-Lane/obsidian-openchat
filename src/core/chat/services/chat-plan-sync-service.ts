@@ -1,5 +1,5 @@
 import type { BuiltinToolsRuntime } from 'src/tools/runtime/BuiltinToolsRuntime';
-import { clonePlanSnapshot, type PlanSnapshot } from 'src/tools/runtime/plan-state';
+import { clonePlanSnapshot } from 'src/tools/runtime/plan-state';
 import {
 	normalizeStructuredToolResult,
 	serializeMcpToolResult,
@@ -9,10 +9,7 @@ import { HistoryService } from './history-service';
 import { ChatStateStore } from './chat-state-store';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import {
-	assertContinuePlanProgression,
-	createPlanSummary,
 	isPlanRewriteRequest,
-	isTerminalPlanStatus,
 	parsePlanSnapshotFromWritePlanResult,
 	serializePlanSnapshot,
 	validatePlanContinuationWritePlanArgs,

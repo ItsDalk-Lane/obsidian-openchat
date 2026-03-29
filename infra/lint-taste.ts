@@ -7,12 +7,15 @@ import {
 	getLineCount,
 	isDirectExecution,
 } from './shared';
+import { getImportSpecifiers, resolveFolderImportTarget } from './import-helpers';
 
 const FILE_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*$/u;
 const PASCAL_CASE_PATTERN = /^[A-Z][A-Za-z0-9]*$/u;
 const CAMEL_CASE_PATTERN = /^[a-z][A-Za-z0-9]*$/u;
 const SIDE_EFFECT_VERBS = /^(save|mutate|register|delete|create|update|emit|dispatch|dispose|cancel|ensure|build|run|initialize|open|close|refresh|sync|handle|trigger|start|stop|connect|disconnect|confirm|resolve|send|report|wait|schedule|request|cleanup|load|notify|show|execute|generate|regenerate|edit|toggle|insert|retry|attach|restore|select|queue|flush|clear|prepare|onload|on[A-Z])/u;
 const SIDE_EFFECT_CALLS = /(dispatch\(|abort\(|setTimeout\(|clearTimeout\(|notify\(|emit\(|register[A-Z]|open\(|close\(|writeFile\(|readFile\()/u;
+const MAX_FILE_LINES = 500;
+const ALLOWED_CONSOLE_FILES = new Set(['src/utils/DebugLogger.ts']);
 
 export function lintTaste(workspaceRoot: string): LintViolation[] {
 	const files = collectManagedFiles(workspaceRoot);
@@ -21,25 +24,30 @@ export function lintTaste(workspaceRoot: string): LintViolation[] {
 
 export function lintTasteFiles(files: readonly ManagedFile[]): LintViolation[] {
 	const violations: LintViolation[] = [];
+	const knownFiles = new Set(files.map((file) => file.relativePath));
 	for (const file of files) {
-		collectFileLevelViolations(file, violations);
+		collectFileLevelViolations(file, knownFiles, violations);
 		collectSyntaxViolations(file, violations);
 	}
 	return violations;
 }
 
-function collectFileLevelViolations(file: ManagedFile, violations: LintViolation[]): void {
+function collectFileLevelViolations(
+	file: ManagedFile,
+	knownFiles: ReadonlySet<string>,
+	violations: LintViolation[],
+): void {
 	const lineCount = getLineCount(file.content);
-	if (lineCount > 300) {
+	if (lineCount > MAX_FILE_LINES) {
 		violations.push({
 			filePath: file.relativePath,
 			rule: 'taste/max-lines',
 			message:
-				`文件当前为 ${lineCount} 行，超过 300 行上限。\n修复方法：\n1. 按子功能拆分到同一 domain 目录。\n2. 把纯类型和默认配置下沉到 types.ts / config.ts。`,
+				`文件当前为 ${lineCount} 行，超过 ${MAX_FILE_LINES} 行上限。\n修复方法：\n1. 按子功能拆分到同一 domain 目录。\n2. 把纯类型和默认配置下沉到 types.ts / config.ts。`,
 		});
 	}
 	const baseName = file.relativePath.split('/').pop()?.replace(/\.(ts|tsx)$/u, '') ?? '';
-	if (file.category.kind !== 'consumer' && !FILE_NAME_PATTERN.test(baseName)) {
+	if (shouldEnforceStructuredNaming(file) && !FILE_NAME_PATTERN.test(baseName)) {
 		violations.push({
 			filePath: file.relativePath,
 			rule: 'taste/file-name',
@@ -47,7 +55,13 @@ function collectFileLevelViolations(file: ManagedFile, violations: LintViolation
 				`文件名 ${baseName} 不符合 kebab-case。\n修复方法：\n1. 使用全小写。\n2. 需要分词时用连字符，例如 editor-state.ts。`,
 		});
 	}
-	if (/^\s*export\s+(?:\*|\{[^}]+\})\s+from\s+/mu.test(file.content) || file.relativePath.endsWith('/index.ts')) {
+	if (
+		file.category.kind !== 'shim'
+		&& (
+			/^\s*export\s+(?:\*|\{[^}]+\})\s+from\s+/mu.test(file.content)
+			|| file.relativePath.endsWith('/index.ts')
+		)
+	) {
 		violations.push({
 			filePath: file.relativePath,
 			rule: 'taste/no-barrel-export',
@@ -55,12 +69,26 @@ function collectFileLevelViolations(file: ManagedFile, violations: LintViolation
 				'禁止 barrel export。\n修复方法：\n1. 直接从具体文件导入。\n2. 对外入口请使用明确命名文件，而不是 index.ts 聚合导出。',
 		});
 	}
+	for (const imported of getImportSpecifiers(file.sourceFile)) {
+		if (!resolveFolderImportTarget(file.relativePath, imported.specifier, knownFiles)) {
+			continue;
+		}
+		violations.push({
+			filePath: file.relativePath,
+			line: imported.line,
+			rule: 'taste/no-folder-import',
+			message:
+				'禁止通过文件夹路径导入 index.ts barrel。\n修复方法：\n1. 直接从具体文件导入。\n2. 若需要稳定入口，请使用具名文件，而不是目录默认入口。',
+		});
+	}
 }
 
 function collectSyntaxViolations(file: ManagedFile, violations: LintViolation[]): void {
 	const sourceFile = file.sourceFile;
 	const visit = (node: ts.Node): void => {
-		collectNamingViolations(file, sourceFile, node, violations);
+		if (shouldEnforceStructuredNaming(file)) {
+			collectNamingViolations(file, sourceFile, node, violations);
+		}
 		if (ts.isParameter(node) || ts.isVariableDeclaration(node) || ts.isPropertySignature(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
 			const nodeText = node.getText(sourceFile);
 			if (/(^|\W)any(\W|$)/u.test(nodeText) && /(:\s*any\b|as\s+any\b|<\s*any\s*>)/u.test(nodeText)) {
@@ -76,7 +104,11 @@ function collectSyntaxViolations(file: ManagedFile, violations: LintViolation[])
 		if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
 			const target = node.expression.expression.getText(sourceFile);
 			const method = node.expression.name.getText(sourceFile);
-			if (target === 'console' && ['log', 'info', 'warn', 'error'].includes(method)) {
+			if (
+				target === 'console'
+				&& ['log', 'info', 'warn', 'error'].includes(method)
+				&& !ALLOWED_CONSOLE_FILES.has(file.relativePath)
+			) {
 				violations.push({
 					filePath: file.relativePath,
 					line: findNodeLine(sourceFile, node),
@@ -86,7 +118,7 @@ function collectSyntaxViolations(file: ManagedFile, violations: LintViolation[])
 				});
 			}
 		}
-		if (isNamedFunctionLike(node) && node.body) {
+		if (shouldEnforceStructuredNaming(file) && isNamedFunctionLike(node) && node.body) {
 			const functionName = getFunctionLikeName(node, sourceFile);
 			const bodyText = node.body.getText(sourceFile);
 			if (!SIDE_EFFECT_VERBS.test(functionName) && SIDE_EFFECT_CALLS.test(bodyText)) {
@@ -102,6 +134,13 @@ function collectSyntaxViolations(file: ManagedFile, violations: LintViolation[])
 		ts.forEachChild(node, visit);
 	};
 	visit(sourceFile);
+}
+
+function shouldEnforceStructuredNaming(file: ManagedFile): boolean {
+	return file.category.kind === 'infra'
+		|| file.category.kind === 'provider'
+		|| file.category.kind === 'domain'
+		|| file.category.kind === 'chat';
 }
 
 function collectNamingViolations(

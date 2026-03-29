@@ -29,9 +29,9 @@ export class PluginSettingsController {
 		private readonly logger: Pick<SettingsDomainLogger, 'error'>,
 	) {}
 
-	/** @precondition settingsService 可成功读取持久化设置 @postcondition 返回完整设置并同步调试开关 @throws 当底层 load 失败时抛出 @example await controller.loadSettings() */
-	async loadSettings(): Promise<PluginSettings> {
-		const settings = await this.settingsService.load();
+	/** @precondition settingsService 可成功读取持久化设置 @postcondition 返回可用于启动注册的基础设置并同步调试开关 @throws 当底层 bootstrap load 失败时抛出 @example await controller.loadBootstrapSettings() */
+	async loadBootstrapSettings(): Promise<PluginSettings> {
+		const settings = await this.settingsService.loadBootstrapSettings();
 		this.applyDebugSettings(settings);
 		return settings;
 	}

@@ -7,7 +7,7 @@
  * @invariants 不包含运行时代码，不依赖 UI 或命令层。
  */
 
-import type { AiRuntimeSettings } from 'src/settings/ai-runtime';
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api';
 import type { ChatSettings } from 'src/types/chat';
 
 export interface PluginSettings {

@@ -1,16 +1,14 @@
 import { Extension } from '@codemirror/state'
-import { Notice, Plugin } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { AiRuntimeSettings } from 'src/settings/ai-runtime'
+import type { AiRuntimeSettings } from 'src/settings/ai-runtime/api'
 import { StatusBarManager } from './StatusBarManager'
-import { availableVendors } from 'src/settings/ai-runtime'
+import { availableVendors } from 'src/settings/ai-runtime/api'
 import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils'
 import { localInstance } from 'src/i18n/locals'
-import { createObsidianApiProvider } from 'src/providers/obsidian-api'
 import { createEventBus } from 'src/providers/event-bus'
 import { createEditorDomainExtension, EditorDomainController } from 'src/domains/editor/ui'
 import { normalizeEditorTabCompletionSettings } from 'src/domains/editor/config'
-import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler'
+import type { ObsidianApiProvider } from 'src/providers/providers.types'
 import type {
 	EditorCompletionMessage,
 	EditorCompletionProvider,
@@ -18,6 +16,7 @@ import type {
 	EditorTabCompletionRuntime,
 } from 'src/domains/editor/types'
 import { DebugLogger } from 'src/utils/DebugLogger'
+import type { AiRuntimeCommandHost } from './ai-runtime-command-host'
 
 export class AiRuntimeCommandManager {
 	private statusBarManager: StatusBarManager | null = null
@@ -26,26 +25,22 @@ export class AiRuntimeCommandManager {
 	private tabCompletionExtensions: Extension[] = []
 	private tabCompletionRegistered = false
 	private readonly editorEventBus = createEventBus<EditorTabCompletionEvents>()
-	private readonly obsidianApiProvider
 	private tabCompletionController: EditorDomainController | null = null
-	private readonly systemPromptAssembler: SystemPromptAssembler
 
 	constructor(
-		private readonly plugin: Plugin,
+		private readonly host: AiRuntimeCommandHost,
+		private readonly obsidianApiProvider: ObsidianApiProvider,
 		private settings: AiRuntimeSettings
-	) {
-		this.systemPromptAssembler = new SystemPromptAssembler(this.plugin.app)
-		this.obsidianApiProvider = createObsidianApiProvider(
-			this.plugin.app,
-			async (featureId) =>
-				await this.systemPromptAssembler.buildGlobalSystemPrompt(featureId as never),
-		)
-	}
+	) {}
 
 	initialize() {
 		this.settings.editorStatus = this.settings.editorStatus ?? { isTextInserting: false }
-		const statusBarItem = this.plugin.addStatusBarItem()
-		this.statusBarManager = new StatusBarManager(this.plugin.app, statusBarItem)
+		const statusBarItem = this.host.addStatusBarItem()
+		this.statusBarManager = new StatusBarManager(
+			this.host.getApp(),
+			(message, timeout) => this.host.notify(message, timeout),
+			statusBarItem,
+		)
 
 		this.ensureTabCompletionRegistered()
 		this.syncTabCompletionRuntime()
@@ -57,11 +52,11 @@ export class AiRuntimeCommandManager {
 				this.settings.editorStatus.isTextInserting = false
 
 				if (this.aborterInstance === null) {
-					new Notice(t('No active generation to cancel'))
+					this.host.notify(t('No active generation to cancel'))
 					return
 				}
 				if (this.aborterInstance.signal.aborted) {
-					new Notice(t('Generation already cancelled'))
+					this.host.notify(t('Generation already cancelled'))
 					return
 				}
 
@@ -71,7 +66,7 @@ export class AiRuntimeCommandManager {
 	}
 
 	dispose() {
-		this.registeredCommandIds.forEach((id) => this.plugin.removeCommand(id))
+		this.registeredCommandIds.forEach((id) => this.host.removeCommand(id))
 		this.registeredCommandIds.clear()
 
 		this.disposeTabCompletion()
@@ -88,10 +83,10 @@ export class AiRuntimeCommandManager {
 
 	private registerCommand(
 		id: string,
-		command: Parameters<Plugin['addCommand']>[0],
+		command: Parameters<AiRuntimeCommandHost['addCommand']>[0],
 		track = true
 	) {
-		this.plugin.addCommand(command)
+		this.host.addCommand(command)
 		if (track) {
 			this.registeredCommandIds.add(id)
 		}
@@ -107,7 +102,7 @@ export class AiRuntimeCommandManager {
 			this.createTabCompletionRuntime(),
 		)
 		this.tabCompletionExtensions = createEditorDomainExtension(this.tabCompletionController)
-		this.plugin.registerEditorExtension(this.tabCompletionExtensions)
+		this.host.registerEditorExtension(this.tabCompletionExtensions)
 		this.tabCompletionRegistered = true
 	}
 

@@ -1,42 +1,20 @@
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
-import type { ProviderSettings } from 'src/types/provider';
-import type { ToolCall, ToolExecutionRecord } from 'src/types/tool';
 import { getChatHistoryPath } from 'src/utils/AIPathManager';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import type { SkillDefinition, SkillScanResult } from 'src/domains/skills/types';
-import type { McpRuntimeManager } from 'src/domains/mcp/types';
-import type { SubAgentScanResult } from 'src/tools/sub-agents';
-import {
-	SubAgentScannerService,
-	type SubAgentStateCallback,
-	SubAgentWatcherService,
-} from 'src/tools/sub-agents';
-import type { ResolvedContextBudget } from 'src/core/chat/utils/context-budget';
-import { SKILL_TOOL_NAME } from 'src/tools/skill/skill-tools';
-import { normalizeBuiltinServerId } from 'src/tools/runtime/constants';
-import { buildSkillsSystemPromptBlock } from 'src/domains/skills/service';
-import {
-	resolveToolExecutionSettings,
-	type AiRuntimeSettings,
-} from 'src/settings/ai-runtime';
-import type { McpSettings } from 'src/types/mcp';
+import { SubAgentScannerService } from 'src/tools/sub-agents/SubAgentScannerService';
+import { SubAgentWatcherService } from 'src/tools/sub-agents/SubAgentWatcherService';
 import type {
-	ChatMessage,
-	ChatSession,
 	ChatSettings,
-	ChatState,
-	MessageManagementSettings,
 } from '../types/chat';
 import { DEFAULT_CHAT_SETTINGS } from '../types/chat';
-import type { LayoutMode, MultiModelMode, ParallelResponseGroup } from '../types/multiModel';
 import type { ChatRuntimeDeps } from '../runtime/chat-runtime-deps';
 import { MessageService } from './message-service';
-import { HistoryService, type ChatHistoryEntry } from './history-service';
-import { FileContentService, type FileContentOptions } from './file-content-service';
+import { HistoryService } from './history-service';
+import { FileContentService } from './file-content-service';
 import type { MultiModelChatService } from './multi-model-chat-service';
 import type { MultiModelConfigService } from './multi-model-config-service';
 import { MessageContextOptimizer } from './message-context-optimizer';
-import { ChatStateStore, type ChatStateSubscriber } from './chat-state-store';
+import { ChatStateStore } from './chat-state-store';
 import { ChatAttachmentSelectionService } from './chat-attachment-selection-service';
 import { ChatPlanSyncService } from './chat-plan-sync-service';
 import { ChatToolRuntimeResolver } from './chat-tool-runtime-resolver';
@@ -47,9 +25,6 @@ import type {
 	ChatServiceDeps,
 	ChatSettingsAccessor,
 	ChatTriggerSource,
-	GenerateAssistantOptions,
-	PreparedChatRequest,
-	SavedChatSessionState,
 } from './chat-service-types';
 import type { ChatGenerationFacade } from './chat-generation-facade';
 import type {

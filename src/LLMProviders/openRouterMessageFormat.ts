@@ -1,6 +1,6 @@
 import { type EmbedCache } from 'obsidian'
 import { t } from 'src/i18n/ai-runtime/helper'
-import type { Message, ResolveEmbedAsBinary } from '.'
+import type { Message, ResolveEmbedAsBinary } from './provider-shared'
 import { arrayBufferToBase64, getMimeTypeFromFilename } from './utils'
 import { withToolMessageContext } from './messageFormat'
 

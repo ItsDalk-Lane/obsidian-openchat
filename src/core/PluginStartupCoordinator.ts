@@ -1,19 +1,31 @@
-import { Notice } from 'obsidian';
-import { localInstance } from 'src/i18n/locals';
 import type { PluginSettings } from 'src/domains/settings/types';
 import { SettingsDomainService } from 'src/domains/settings/service';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { FeatureCoordinator } from './FeatureCoordinator';
 
 export class PluginStartupCoordinator {
-  private deferredInitializationPromise: Promise<void> | null = null;
+  private bootstrapSettingsPromise: Promise<PluginSettings> | null = null;
+  private deferredInitializationPromise: Promise<PluginSettings> | null = null;
 
   constructor(
     private readonly settingsService: SettingsDomainService,
     private readonly featureCoordinator: FeatureCoordinator,
+    private readonly notify: (message: string, timeout?: number) => void,
   ) {}
 
-  runDeferredInitialization(settings: PluginSettings): Promise<void> {
+  loadBootstrapSettings(): Promise<PluginSettings> {
+    if (!this.bootstrapSettingsPromise) {
+      this.bootstrapSettingsPromise = this.settingsService.loadBootstrapSettings()
+        .catch((error) => {
+          this.bootstrapSettingsPromise = null;
+          throw error;
+        });
+    }
+
+    return this.bootstrapSettingsPromise;
+  }
+
+  runDeferredInitialization(settings: PluginSettings): Promise<PluginSettings> {
     if (!this.deferredInitializationPromise) {
       this.deferredInitializationPromise = this.executeDeferredInitialization(settings)
         .catch((error) => {
@@ -25,11 +37,13 @@ export class PluginStartupCoordinator {
     return this.deferredInitializationPromise;
   }
 
-  private async executeDeferredInitialization(settings: PluginSettings): Promise<void> {
+  private async executeDeferredInitialization(settings: PluginSettings): Promise<PluginSettings> {
     await this.cleanupLegacyStorage();
     await this.ensureAiDataFolders(settings.aiDataFolder);
     await this.migrateAiDataStorage(settings);
-    await this.initializeMcp(settings);
+    const hydratedSettings = await this.hydratePersistedSettings(settings);
+    await this.initializeMcp(hydratedSettings);
+    return hydratedSettings;
   }
 
   private async cleanupLegacyStorage(): Promise<void> {
@@ -53,7 +67,16 @@ export class PluginStartupCoordinator {
       await this.settingsService.migrateAiDataStorage(settings);
     } catch (error) {
       DebugLogger.error('[OpenChatPlugin] AI数据目录迁移失败', error);
-      new Notice(localInstance.ai_data_folder_migration_failed_notice);
+      this.notify('AI 数据目录迁移失败，请稍后重试。');
+    }
+  }
+
+  private async hydratePersistedSettings(settings: PluginSettings): Promise<PluginSettings> {
+    try {
+      return await this.settingsService.hydratePersistedSettings(settings);
+    } catch (error) {
+      DebugLogger.error('[OpenChatPlugin] 持久化设置 hydrate 失败，继续使用 bootstrap 设置', error);
+      return settings;
     }
   }
 

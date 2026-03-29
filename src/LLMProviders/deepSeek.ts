@@ -1,9 +1,21 @@
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
+import {
+	BaseOptions,
+	mergeProviderOptionsWithParameters,
+	Message,
+	ResolveEmbedAsBinary,
+	SendRequest,
+	Vendor,
+} from './provider-shared'
 import { buildReasoningBlockStart, buildReasoningBlockEnd } from './utils'
 import { DebugLogger } from 'src/utils/DebugLogger'
-import { withToolCallLoopSupport, OpenAILoopOptions, OpenAIToolDefinition, ToolNameMapping } from 'src/core/agents/loop'
+import {
+	withToolCallLoopSupport,
+	type OpenAILoopOptions,
+	type OpenAIToolDefinition,
+	type ToolNameMapping,
+} from 'src/core/agents/loop/OpenAILoopHandler'
 
 // DeepSeek选项接口，扩展基础选项以支持推理功能
 export interface DeepSeekOptions extends BaseOptions {

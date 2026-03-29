@@ -1,7 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useObsidianApp } from 'src/contexts/obsidianAppContext';
-import { Notice } from 'obsidian';
+import type { ChatService } from 'src/core/chat/services/chat-service';
 import { getPromptTemplatePath } from 'src/utils/AIPathManager';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
@@ -9,15 +8,13 @@ import './TemplateSelector.css';
 
 interface TemplateSelectorProps {
 	visible: boolean;
+	service: ChatService;
 	onSelect: (templatePath: string) => void;
 	onClose: () => void;
 	inputValue: string;
 }
 
-export const TemplateSelector = ({ visible, onSelect, onClose, inputValue }: TemplateSelectorProps) => {
-	const app = useObsidianApp();
-	type OpenChatPluginLike = { settings?: { aiDataFolder?: string } }
-	type AppWithPlugins = typeof app & { plugins?: { plugins?: Record<string, OpenChatPluginLike | undefined> } }
+export const TemplateSelector = ({ visible, service, onSelect, onClose, inputValue }: TemplateSelectorProps) => {
 	const [templates, setTemplates] = useState<Array<{ value: string; label: string; description: string }>>([]);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [filterText, setFilterText] = useState('');
@@ -29,25 +26,30 @@ export const TemplateSelector = ({ visible, onSelect, onClose, inputValue }: Tem
 
 		const fetchTemplates = async () => {
 			try {
-				// 获取插件设置中的提示词模板目录
-				const plugin = (app as AppWithPlugins).plugins?.plugins?.['openchat'];
-				const promptTemplateFolder = getPromptTemplatePath(plugin?.settings?.aiDataFolder || 'System/AI Data');
-				
-				// 获取所有Markdown文件
-				const files = app.vault.getMarkdownFiles();
-				
-				// 过滤出提示词模板目录下的文件
-				const filteredFiles = files.filter((f) => 
-					f.path.startsWith(promptTemplateFolder + "/") || 
-					f.path === promptTemplateFolder
-				);
-				
-				const templateOptions = await Promise.all(filteredFiles.map(async (f) => {
-					const content = await app.vault.read(f);
+				const obsidianApi = service.getObsidianApiProvider();
+				const promptTemplateFolder = getPromptTemplatePath(service.getAiDataFolder());
+				const fileEntries: Array<{ path: string; name: string }> = [];
+				const visit = (folderPath: string) => {
+					for (const entry of obsidianApi.listFolderEntries(folderPath)) {
+						if (entry.kind === 'folder') {
+							visit(entry.path);
+							continue;
+						}
+						if (entry.path.endsWith('.md')) {
+							fileEntries.push(entry);
+						}
+					}
+				};
+				visit(promptTemplateFolder);
+
+				const templateOptions = await Promise.all(fileEntries.map(async (f) => {
+					const content = await obsidianApi.readVaultFile(f.path);
 					const preview = content.length > 100 ? content.substring(0, 100) + '...' : content;
 					return {
 						value: f.path,
-						label: f.basename,
+						label: f.path.startsWith(`${promptTemplateFolder}/`)
+							? f.path.substring(promptTemplateFolder.length + 1)
+							: f.name,
 						description: preview
 					};
 				}));
@@ -56,12 +58,12 @@ export const TemplateSelector = ({ visible, onSelect, onClose, inputValue }: Tem
 				setSelectedIndex(0);
 			} catch (error) {
 				DebugLogger.error('[TemplateSelector] 获取模板列表失败', error);
-				new Notice(localInstance.chat_template_list_failed);
+				service.getObsidianApiProvider().notify(localInstance.chat_template_list_failed);
 			}
 		};
 
 		fetchTemplates();
-	}, [app, visible]);
+	}, [service, visible]);
 
 	// 过滤模板
 	const filteredTemplates = useMemo(() => {

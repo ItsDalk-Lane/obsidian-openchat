@@ -49,11 +49,15 @@ export interface PromptBuilderContextMessageParams {
 	images?: string[];
 }
 
+export interface PromptBuilderHost {
+	getActiveFilePath(): string | null;
+}
+
 export class PromptBuilder {
 	private readonly intentAnalyzer: FileIntentAnalyzer;
 
 	constructor(
-		private readonly app: App,
+		private readonly host: App | PromptBuilderHost,
 		private readonly fileContentService?: FileContentService
 	) {
 		this.intentAnalyzer = new FileIntentAnalyzer();
@@ -69,7 +73,7 @@ export class PromptBuilder {
 		const selectedFiles = ctx?.selectedFiles ?? [];
 		const selectedFolders = ctx?.selectedFolders ?? [];
 		const fileContentOptions = ctx?.fileContentOptions;
-		const sourcePath = ctx?.sourcePath ?? this.app.workspace.getActiveFile()?.path ?? '';
+		const sourcePath = ctx?.sourcePath ?? this.getActiveFilePath() ?? '';
 		const maxHistoryRounds = ctx?.maxHistoryRounds ?? DEFAULT_HISTORY_ROUNDS;
 		const prebuiltContextMessage = ctx?.prebuiltContextMessage;
 		const taskTemplate = ctx?.taskTemplate;
@@ -157,6 +161,13 @@ export class PromptBuilder {
 		}
 
 		return result;
+	}
+
+	private getActiveFilePath(): string | null {
+		if ('workspace' in this.host) {
+			return this.host.workspace.getActiveFile()?.path ?? null;
+		}
+		return this.host.getActiveFilePath();
 	}
 
 	/**

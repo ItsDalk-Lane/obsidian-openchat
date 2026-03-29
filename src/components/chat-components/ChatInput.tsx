@@ -7,7 +7,6 @@ import { MultiModelSelector } from './MultiModelSelector';
 import { TemplateSelector } from './TemplateSelector';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { SlashCommandMenu } from './SlashCommandMenu';
-import { App } from 'obsidian';
 import { localInstance } from 'src/i18n/locals';
 import { useChatInputSlashCommand } from './useChatInputSlashCommand';
 import { ChatInputInfoTags, ChatInputImagePreview, ChatInputFileTags, ChatInputSelectedModelsHint } from './ChatInputSubComponents';
@@ -15,14 +14,13 @@ import { ChatInputInfoTags, ChatInputImagePreview, ChatInputFileTags, ChatInputS
 interface ChatInputProps {
 	service: ChatService;
 	state: ChatState;
-	app: App;
 }
 
 const CompareGroupManagerDialog = lazy(async () => import('./CompareGroupManagerDialog').then((module) => ({
 	default: module.CompareGroupManagerDialog
 })));
 
-export const ChatInput = ({ service, state, app }: ChatInputProps) => {
+export const ChatInput = ({ service, state }: ChatInputProps) => {
 	const [value, setValue] = useState(state.inputValue);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const [maxHeight, setMaxHeight] = useState(80);
@@ -381,6 +379,7 @@ export const ChatInput = ({ service, state, app }: ChatInputProps) => {
 			{/* 模板选择器 */}
 			<TemplateSelector
 				visible={state.showTemplateSelector}
+				service={service}
 				onSelect={handleTemplateSelect}
 				onClose={handleTemplateSelectorClose}
 				inputValue={value}

@@ -1,10 +1,16 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
-
 import OpenAI from 'openai'
-import { resolveCurrentTools, type ToolDefinition } from 'src/core/agents/loop'
+import { resolveCurrentTools } from 'src/core/agents/loop/OpenAILoopHandler'
+import type { ToolDefinition } from 'src/core/agents/loop/types'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SendRequest, Vendor } from '.'
-import { mcpToolToToolDefinition, McpToolExecutor } from 'src/services/mcp'
+import {
+	BaseOptions,
+	mergeProviderOptionsWithParameters,
+	Message,
+	ResolveEmbedAsBinary,
+	SendRequest,
+	Vendor,
+} from './provider-shared'
+import { mcpToolToToolDefinition, McpToolExecutor } from 'src/services/mcp/McpToolExecutor'
 import { resolveCurrentMcpTools } from 'src/services/mcp/mcpToolCallHandler'
 import { DebugLogger } from 'src/utils/DebugLogger'
 
@@ -20,8 +26,7 @@ import {
 	resolveErrorStatus
 } from './poeUtils'
 
-export type { PoeOptions } from './poeTypes'
-export { normalizePoeBaseURL, poeMapResponsesParams } from './poeUtils'
+type PoeResponseTool = Record<string, unknown>
 
 const DEFAULT_MCP_TOOL_LOOP_LIMIT = 10
 const POE_RETRY_OPTIONS = {
@@ -33,18 +38,23 @@ const POE_RETRY_OPTIONS = {
 
 const POE_SDK_BLOCKED_HEADER_PATTERN = /^x-stainless-/i
 
-const dedupeTools = (tools: any[]): any[] => {
+const dedupeTools = (tools: PoeResponseTool[]): PoeResponseTool[] => {
 	const seen = new Set<string>()
-	const result: any[] = []
+	const result: PoeResponseTool[] = []
 
 	for (const tool of tools) {
 		if (!tool || typeof tool !== 'object') continue
-		const type = String((tool as any).type ?? '')
+		const toolRecord = tool as Record<string, unknown>
+		const type = String(toolRecord.type ?? '')
 		if (!type) continue
 
 		let key = type
 		if (type === 'function') {
-			const fnName = String((tool as any).name ?? (tool as any).function?.name ?? '')
+			const nestedFunction =
+				toolRecord.function && typeof toolRecord.function === 'object'
+					? (toolRecord.function as Record<string, unknown>)
+					: undefined
+			const fnName = String(toolRecord.name ?? nestedFunction?.name ?? '')
 			if (!fnName) continue
 			key = `function:${fnName}`
 		} else {
@@ -59,7 +69,7 @@ const dedupeTools = (tools: any[]): any[] => {
 	return result
 }
 
-const normalizeResponsesFunctionTool = (tool: unknown): any | null => {
+const normalizeResponsesFunctionTool = (tool: unknown): PoeResponseTool | null => {
 	if (!tool || typeof tool !== 'object') return null
 	const raw = tool as Record<string, unknown>
 	if (raw.type !== 'function') {
@@ -167,7 +177,7 @@ const mergeResponseTools = (
 	enableWebSearch: boolean,
 	tools: ToolDefinition[]
 ) => {
-	const merged: any[] = []
+	const merged: PoeResponseTool[] = []
 	if (Array.isArray(apiParamTools)) {
 		for (const tool of apiParamTools) {
 			const normalized = normalizeResponsesFunctionTool(tool)
@@ -341,4 +351,11 @@ export const poeVendor: Vendor = {
 	models: ['Claude-Sonnet-4.5', 'GPT-5.2', 'Gemini-3-Pro', 'Grok-4'],
 	websiteToObtainKey: 'https://poe.com/api_key',
 	capabilities: ['Text Generation', 'Image Vision', 'Web Search', 'Reasoning']
+}
+
+export type { PoeOptions }
+
+export {
+	normalizePoeBaseURL,
+	poeMapResponsesParams,
 }

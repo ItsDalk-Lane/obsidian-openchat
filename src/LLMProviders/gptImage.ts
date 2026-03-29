@@ -1,7 +1,15 @@
 import { Notice } from 'obsidian'
 import OpenAI from 'openai'
 import { t } from 'src/i18n/ai-runtime/helper'
-import { BaseOptions, mergeProviderOptionsWithParameters, Message, ResolveEmbedAsBinary, SaveAttachment, SendRequest, Vendor } from '.'
+import {
+	BaseOptions,
+	mergeProviderOptionsWithParameters,
+	Message,
+	ResolveEmbedAsBinary,
+	SaveAttachment,
+	SendRequest,
+	Vendor,
+} from './provider-shared'
 import { getMimeTypeFromFilename } from './utils'
 import { DebugLogger } from 'src/utils/DebugLogger'
 

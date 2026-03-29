@@ -1,21 +1,15 @@
 import OpenAI from 'openai'
-import type { BaseOptions, Vendor } from '.'
+import type { BaseOptions, Vendor } from './provider-shared'
 import {
 	type OpenAILoopOptions,
 	type OpenAIToolDefinition,
 	type ToolNameMapping,
 	withToolCallLoopSupport,
-} from 'src/core/agents/loop'
+} from 'src/core/agents/loop/OpenAILoopHandler'
 import { createOpenRouterSendRequest } from './openRouterRequest'
 import {
 	isImageGenerationModel,
 	normalizeOpenRouterBaseURL,
-	type OpenRouterOptions,
-	type OpenRouterReasoningEffort,
-} from './openRouterShared'
-
-export {
-	isImageGenerationModel,
 	type OpenRouterOptions,
 	type OpenRouterReasoningEffort,
 } from './openRouterShared'
@@ -198,4 +192,11 @@ export const openRouterVendor: Vendor = {
 	models: [],
 	websiteToObtainKey: 'https://openrouter.ai',
 	capabilities: ['Text Generation', 'Image Vision', 'PDF Vision', 'Web Search', 'Image Generation', 'Reasoning'],
+}
+
+export { isImageGenerationModel }
+
+export type {
+	OpenRouterOptions,
+	OpenRouterReasoningEffort,
 }

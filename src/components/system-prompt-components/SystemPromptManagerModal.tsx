@@ -1,4 +1,4 @@
-import { App, Modal, Notice, TFile } from 'obsidian';
+import { App, Modal } from 'obsidian';
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Pencil, Trash2, Upload } from 'lucide-react';
@@ -7,7 +7,8 @@ import { localInstance } from 'src/i18n/locals';
 import { ConfirmPopover } from 'src/components/confirm/ConfirmPopover';
 import { InteractiveList, InteractiveListItem } from 'src/components/interactive-list/InteractiveList';
 import { ToggleSwitch } from 'src/components/toggle-switch/ToggleSwitch';
-import { SystemPromptDataService } from 'src/settings/system-prompts';
+import { createObsidianApiProvider } from 'src/providers/obsidian-api';
+import { SystemPromptDataService } from 'src/settings/system-prompts/SystemPromptDataService';
 import type { AiFeatureId, SystemPromptItem } from 'src/types/system-prompt';
 import { SystemPromptEditorModal } from './SystemPromptEditorModal';
 import './SystemPromptModals.css';
@@ -59,6 +60,10 @@ export function SystemPromptManagerPanel(props: { app: App; embedded?: boolean }
 	const [items, setItems] = useState<SystemPromptItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const service = useMemo(() => SystemPromptDataService.getInstance(props.app), [props.app]);
+	const obsidianApi = useMemo(
+		() => createObsidianApiProvider(props.app, async () => ''),
+		[props.app],
+	);
 
 	const reload = useCallback(async () => {
 		setLoading(true);
@@ -110,14 +115,14 @@ export function SystemPromptManagerPanel(props: { app: App; embedded?: boolean }
 
 	const handleDelete = useCallback(async (id: string) => {
 		await service.deletePrompt(id);
-		new Notice(localInstance.system_prompt_deleted || '已删除');
+		obsidianApi.notify(localInstance.system_prompt_deleted || '已删除');
 		await reload();
-	}, [service, reload]);
+	}, [obsidianApi, reload, service]);
 
 	const exportMarkdown = useCallback(async () => {
 		try {
 			const prompts = await service.getSortedPrompts();
-			const md = await buildExportMarkdown(props.app, prompts);
+			const md = await buildExportMarkdown(obsidianApi, prompts);
 
 			// eslint-disable-next-line @typescript-eslint/no-var-requires -- Electron 特定代码
 			const { dialog } = require('@electron/remote');
@@ -128,19 +133,19 @@ export function SystemPromptManagerPanel(props: { app: App; embedded?: boolean }
 			});
 
 			if (result.canceled || !result.filePath) {
-				new Notice(localInstance.system_prompt_export_canceled || '已取消导出');
+				obsidianApi.notify(localInstance.system_prompt_export_canceled || '已取消导出');
 				return;
 			}
 
 			// eslint-disable-next-line @typescript-eslint/no-var-requires -- Electron 特定代码
 			const fs = require('fs/promises');
 			await fs.writeFile(result.filePath, md, 'utf8');
-			new Notice((localInstance.system_prompt_export_success || '导出成功') + `: ${result.filePath}`);
+			obsidianApi.notify((localInstance.system_prompt_export_success || '导出成功') + `: ${result.filePath}`);
 		} catch (error: unknown) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			new Notice((localInstance.system_prompt_export_failed || '导出失败') + `: ${errorMessage}`);
+			obsidianApi.notify((localInstance.system_prompt_export_failed || '导出失败') + `: ${errorMessage}`);
 		}
-	}, [service, props.app]);
+	}, [obsidianApi, service]);
 
 	return (
 		<div className={`system-prompt-manager ${props.embedded ? 'system-prompt-manager--embedded' : ''}`.trim()}>
@@ -231,7 +236,10 @@ export function SystemPromptManagerPanel(props: { app: App; embedded?: boolean }
 	);
 }
 
-async function buildExportMarkdown(app: App, prompts: SystemPromptItem[]): Promise<string> {
+async function buildExportMarkdown(
+	obsidianApi: ReturnType<typeof createObsidianApiProvider>,
+	prompts: SystemPromptItem[],
+): Promise<string> {
 	const featureLabel = (id: AiFeatureId): string => {
 		switch (id) {
 			case 'ai_action':
@@ -272,9 +280,9 @@ async function buildExportMarkdown(app: App, prompts: SystemPromptItem[]): Promi
 			lines.push('');
 			if (path) {
 				try {
-					const file = app.vault.getAbstractFileByPath(path);
-					if (file instanceof TFile) {
-						const content = await app.vault.read(file);
+					const file = obsidianApi.getVaultEntry(path);
+					if (file?.kind === 'file') {
+						const content = await obsidianApi.readVaultFile(file.path);
 						lines.push('```');
 						lines.push(content);
 						lines.push('```');

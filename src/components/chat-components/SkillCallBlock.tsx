@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { TFile } from 'obsidian';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useObsidianApp } from 'src/contexts/obsidianAppContext';
+import { createObsidianApiProvider } from 'src/providers/obsidian-api';
 
 interface SkillCallBlockProps {
 	skillName: string;
@@ -15,6 +15,7 @@ export const SkillCallBlock = ({
 	fallbackContent,
 }: SkillCallBlockProps) => {
 	const app = useObsidianApp();
+	const obsidianApi = useMemo(() => createObsidianApiProvider(app, async () => ''), [app]);
 	const [collapsed, setCollapsed] = useState(true);
 	const [fullSkillContent, setFullSkillContent] = useState<string | null>(null);
 
@@ -24,14 +25,14 @@ export const SkillCallBlock = ({
 		}
 		let cancelled = false;
 		const run = async () => {
-			const abstractFile = app.vault.getAbstractFileByPath(skillPath);
-			if (!(abstractFile instanceof TFile)) {
+			const abstractFile = obsidianApi.getVaultEntry(skillPath);
+			if (!abstractFile || abstractFile.kind !== 'file') {
 				if (!cancelled) {
 					setFullSkillContent(null);
 				}
 				return;
 			}
-			const content = await app.vault.read(abstractFile);
+			const content = await obsidianApi.readVaultFile(abstractFile.path);
 			if (!cancelled) {
 				setFullSkillContent(content);
 			}
@@ -40,7 +41,7 @@ export const SkillCallBlock = ({
 		return () => {
 			cancelled = true;
 		};
-	}, [app, collapsed, skillPath]);
+	}, [collapsed, obsidianApi, skillPath]);
 
 	const toggleCollapse = useCallback(() => {
 		setCollapsed((prev) => !prev);

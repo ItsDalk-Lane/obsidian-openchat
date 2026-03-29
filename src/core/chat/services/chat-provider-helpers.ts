@@ -1,5 +1,5 @@
 import { isImageGenerationModel } from 'src/LLMProviders/openRouter';
-import { availableVendors } from 'src/settings/ai-runtime';
+import { availableVendors } from 'src/settings/ai-runtime/api';
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
 import type { ProviderSettings } from 'src/types/provider';
 import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';

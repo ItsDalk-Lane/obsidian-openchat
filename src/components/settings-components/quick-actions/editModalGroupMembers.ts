@@ -1,5 +1,4 @@
-import { Notice } from 'obsidian'
-import { QuickActionDataService } from 'src/editor/selectionToolbar/QuickActionDataService'
+import type { QuickActionDataService } from 'src/domains/quick-actions/service-data'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { localInstance } from 'src/i18n/locals'
 import type { QuickAction, QuickActionType } from 'src/types/chat'
@@ -10,6 +9,7 @@ interface QuickActionGroupMembersSectionParams {
 	initialQuickActionType: QuickActionType
 	allQuickActions: QuickAction[]
 	quickActionDataService: QuickActionDataService
+	notify: (message: string, timeout?: number) => void
 	openQuickActionEditModal: (
 		quickAction?: QuickAction,
 		options?: QuickActionEditModalOptions
@@ -29,6 +29,7 @@ export const createQuickActionGroupMembersSection = async (
 		initialQuickActionType,
 		allQuickActions,
 		quickActionDataService,
+		notify,
 		openQuickActionEditModal
 	} = params
 	let pendingGroupChildrenIds =
@@ -280,7 +281,7 @@ export const createQuickActionGroupMembersSection = async (
 	addExistingBtn.onclick = (event) => {
 		event.stopPropagation()
 		if (!addExistingSelect.value) {
-			new Notice(localInstance.ai_runtime_select_action_required)
+			notify(localInstance.ai_runtime_select_action_required)
 			return
 		}
 		if (!pendingGroupChildrenIds.includes(addExistingSelect.value)) {

@@ -19,6 +19,13 @@ function createRuntimeFixture(options?: {
 	const notifications: Array<{ message: string; timeout?: number }> = [];
 	const offRefs: unknown[] = [];
 	const listeners = new Map<string, (path: string, oldPath?: string) => void>();
+	const openedInternalLinks: Array<{ linkTarget: string; sourcePath?: string }> = [];
+	const renderedMarkdown: Array<{
+		markdown: string;
+		container: HTMLElement;
+		sourcePath: string;
+		component: unknown;
+	}> = [];
 	const entries = new Map(Object.entries(options?.entries ?? {}));
 	const fileContents = new Map(Object.entries(options?.fileContents ?? {}));
 	const binaryContents = new Map(Object.entries(options?.binaryContents ?? {}));
@@ -136,6 +143,17 @@ function createRuntimeFixture(options?: {
 				fileName: 'active-note',
 			};
 		},
+		openInternalLink(linkTarget: string, sourcePath?: string): void {
+			openedInternalLinks.push({ linkTarget, sourcePath });
+		},
+		async renderMarkdown(
+			markdown: string,
+			container: HTMLElement,
+			sourcePath: string,
+			component: unknown,
+		): Promise<void> {
+			renderedMarkdown.push({ markdown, container, sourcePath, component });
+		},
 		onVaultChange(type, listener): unknown {
 			listeners.set(type, listener);
 			return `${type}-ref`;
@@ -155,6 +173,8 @@ function createRuntimeFixture(options?: {
 		deletedPaths,
 		localStorage,
 		openedTabs,
+		openedInternalLinks,
+		renderedMarkdown,
 	};
 }
 
@@ -285,7 +305,7 @@ test('ObsidianApiProvider 会委托 YAML 解析', () => {
 	assert.equal(provider.stringifyYaml({ demo: true }), '{"demo":true}');
 });
 
-test('ObsidianApiProvider 会委托 frontmatter、本地存储与设置打开能力', () => {
+test('ObsidianApiProvider 会委托 frontmatter、本地存储与设置打开能力', async () => {
 	const fixture = createRuntimeFixture({
 		frontmatters: {
 			'note.md': { title: 'demo' },
@@ -301,7 +321,21 @@ test('ObsidianApiProvider 会委托 frontmatter、本地存储与设置打开能
 		inserted: true,
 		fileName: 'active-note',
 	});
+	provider.openInternalLink('folder/demo', 'folder/source.md');
+	const container = {} as HTMLElement;
+	const component = { id: 'component' };
+	await provider.renderMarkdown('**demo**', container, 'folder/source.md', component);
 	assert.deepEqual(fixture.openedTabs, ['openchat']);
+	assert.deepEqual(fixture.openedInternalLinks, [{
+		linkTarget: 'folder/demo',
+		sourcePath: 'folder/source.md',
+	}]);
+	assert.deepEqual(fixture.renderedMarkdown, [{
+		markdown: '**demo**',
+		container,
+		sourcePath: 'folder/source.md',
+		component,
+	}]);
 });
 
 test('ObsidianApiProvider 会映射 Vault 事件并在清理时注销全部监听器', () => {

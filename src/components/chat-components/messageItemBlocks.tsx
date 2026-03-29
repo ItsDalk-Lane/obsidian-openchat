@@ -1,7 +1,8 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Component } from 'obsidian';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { renderMarkdownContent } from 'src/core/chat/utils/markdown';
+import type { ObsidianApiProvider } from 'src/providers/providers.types';
+import { renderMarkdownContent } from 'src/domains/chat/ui-markdown';
 
 /** 格式化推理耗时（毫秒 → 秒字符串） */
 export const formatDuration = (durationMs: number): string => {
@@ -119,11 +120,10 @@ export const McpToolBlockComponent = ({ toolName, content }: McpToolBlockProps) 
 // 文本块组件 - 用于渲染 Markdown 内容
 interface TextBlockProps {
 	content: string;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	app: any;
+	obsidianApi: ObsidianApiProvider;
 }
 
-export const TextBlockComponent = ({ content, app }: TextBlockProps) => {
+export const TextBlockComponent = ({ content, obsidianApi }: TextBlockProps) => {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const componentRef = useRef(new Component());
 
@@ -131,14 +131,19 @@ export const TextBlockComponent = ({ content, app }: TextBlockProps) => {
 		if (!containerRef.current) return;
 
 		const run = async () => {
-			await renderMarkdownContent(app, content, containerRef.current as HTMLDivElement, componentRef.current);
+			await renderMarkdownContent(
+				obsidianApi,
+				content,
+				containerRef.current as HTMLDivElement,
+				componentRef.current,
+			);
 		};
 		void run();
 
 		return () => {
 			componentRef.current.unload();
 		};
-	}, [app, content]);
+	}, [content, obsidianApi]);
 
 	return <div ref={containerRef}></div>;
 };

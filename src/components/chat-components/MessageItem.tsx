@@ -5,11 +5,14 @@ import type { ChatMessage, ChatMessageMetadata } from 'src/types/chat';
 import type { ChatService } from 'src/core/chat/services/chat-service';
 import { getModelDisplayNameByTag } from 'src/core/chat/services/chat-provider-helpers';
 import { MessageService } from 'src/core/chat/services/message-service';
-import { parseContentBlocks, ContentBlock } from 'src/core/chat/utils/markdown';
+import { createObsidianApiProvider } from 'src/providers/obsidian-api';
+import {
+	parseContentBlocks,
+	type ContentBlock,
+} from 'src/domains/chat/ui-markdown';
 import { getEditableUserMessageContent } from 'src/core/chat/utils/user-message-editing';
-import { Notice } from 'obsidian';
 import { ModelTag } from './ModelTag';
-import { availableVendors } from 'src/settings/ai-runtime';
+import { availableVendors } from 'src/settings/ai-runtime/api';
 import { countMessageTokens, formatTokenCount } from 'src/core/chat/utils/token';
 import { localInstance } from 'src/i18n/locals';
 import { isPinnedChatMessage } from 'src/types/chat';
@@ -31,6 +34,10 @@ interface MessageItemProps {
 export const MessageItem = ({ message, service, isGenerating, hideModelTag, compact = false }: MessageItemProps) => {
 	const app = useObsidianApp();
 	const helper = useMemo(() => new MessageService(app), [app]);
+	const obsidianApi = useMemo(() => {
+		return service?.getObsidianApiProvider()
+			?? createObsidianApiProvider(app, async () => '');
+	}, [app, service]);
 	const [copied, setCopied] = useState(false);
 	const [editing, setEditing] = useState(false);
 	const editableContent = useMemo(() => getEditableUserMessageContent(message), [message]);
@@ -89,7 +96,7 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 			setTimeout(() => setCopied(false), 2000);
 		} catch (error) {
 			DebugLogger.error('[MessageItem] 复制失败', error);
-			new Notice(localInstance.copy_failed);
+			obsidianApi.notify(localInstance.copy_failed);
 		}
 	};
 
@@ -139,8 +146,8 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 				{/* 显示图片 */}
 				{message.images && message.images.length > 0 && (
 					<MessageImageGallery
-						app={app}
 						images={message.images}
+						obsidianApi={obsidianApi}
 						onPreview={handleImageClick}
 					/>
 				)}
@@ -228,6 +235,7 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 												<MessageItem
 													key={`${toolCall?.id ?? 'sub'}-${nestedMessage.id}-${nestedIndex}`}
 													message={nestedMessage}
+													service={service}
 													hideModelTag={true}
 													compact={true}
 												/>
@@ -266,7 +274,7 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 								<TextBlockComponent
 									key={`text-${index}`}
 									content={block.content}
-									app={app}
+									obsidianApi={obsidianApi}
 								/>
 							);
 						})
@@ -282,6 +290,7 @@ export const MessageItem = ({ message, service, isGenerating, hideModelTag, comp
 							<MessageItem
 								key={`${toolCallId}-${nestedMessage.id}-${nestedIndex}`}
 								message={nestedMessage}
+								service={service}
 								hideModelTag={true}
 								compact={true}
 							/>

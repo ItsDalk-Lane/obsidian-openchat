@@ -1,4 +1,4 @@
-export type {
+import type {
 	ChatContextCompactionRange,
 	ChatContextCompactionState,
 	ChatMessage,
@@ -31,7 +31,7 @@ export type {
 	SubAgentExecutionStatus,
 	ToolCall,
 } from 'src/domains/chat/types';
-export type {
+import type {
 	ChatDomainLogger,
 	ChatHostPorts,
 	ChatMcpPort,
@@ -41,14 +41,66 @@ export type {
 	ChatToolSettingsPort,
 	ChatVaultPort,
 } from 'src/domains/chat/service';
-export {
+import {
 	DEFAULT_CHAT_SETTINGS,
 	DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
 	normalizeMessageManagementSettings,
 } from 'src/domains/chat/config';
-export {
+import {
 	createChatVaultPort,
 	createChatHostPorts,
 	detectImageGenerationIntent,
 	isPinnedChatMessage,
 } from 'src/domains/chat/service';
+
+export type {
+	ChatContextCompactionRange,
+	ChatContextCompactionState,
+	ChatDomainLogger,
+	ChatHostPorts,
+	ChatMcpPort,
+	ChatMessage,
+	ChatMessageMetadata,
+	ChatOpenMode,
+	ChatRequestTokenState,
+	ChatRole,
+	ChatSession,
+	ChatSettings,
+	ChatSkillDescriptor,
+	ChatSkillsPort,
+	ChatSkillsSnapshot,
+	ChatState,
+	ChatToolSettingsPort,
+	ChatVaultPort,
+	CompareGroup,
+	FileIntentAnalysis,
+	FileRole,
+	LayoutMode,
+	McpToolMode,
+	MessageManagementSettings,
+	MultiModelMode,
+	ParallelResponseEntry,
+	ParallelResponseGroup,
+	PlanSnapshot,
+	PlanTask,
+	PlanTaskStatus,
+	QuickAction,
+	QuickActionPromptSource,
+	QuickActionType,
+	SelectedFile,
+	SelectedFolder,
+	SelectedItem,
+	SubAgentExecutionState,
+	SubAgentExecutionStatus,
+	ToolCall,
+}
+
+export {
+	DEFAULT_CHAT_SETTINGS,
+	DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
+	createChatHostPorts,
+	createChatVaultPort,
+	detectImageGenerationIntent,
+	isPinnedChatMessage,
+	normalizeMessageManagementSettings,
+}

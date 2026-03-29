@@ -7,18 +7,32 @@
 
 import type { BaseOptions, SendRequest } from 'src/types/provider'
 import { createOpenAIToolLoopSupportFactory } from './openAILoopRunner'
-import type { OpenAILoopOptions } from './openAILoopShared'
-
-export {
+import {
 	toOpenAITools,
 	resolveCurrentTools,
-	type OpenAIToolDefinition,
-	type OpenAIToolCall,
-	type ToolLoopMessage,
-	type ContentPart,
-	type ToolNameMapping,
-	type OpenAILoopOptions,
 } from './openAILoopShared'
+import type {
+	ContentPart,
+	OpenAILoopOptions,
+	OpenAIToolCall,
+	OpenAIToolDefinition,
+	ToolLoopMessage,
+	ToolNameMapping,
+} from './openAILoopShared'
+
+export {
+	resolveCurrentTools,
+	toOpenAITools,
+}
+
+export type {
+	ContentPart,
+	OpenAILoopOptions,
+	OpenAIToolCall,
+	OpenAIToolDefinition,
+	ToolLoopMessage,
+	ToolNameMapping,
+}
 
 /**
  * 为 OpenAI 兼容 Provider 注入工具调用循环支持

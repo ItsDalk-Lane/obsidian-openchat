@@ -4,6 +4,7 @@ import type { BaseOptions, ProviderSettings } from 'src/types/provider'
 
 export interface ProviderSectionContext {
 	saveSettings: () => Promise<void>
+	notify: (message: string, timeout?: number) => void
 	getReasoningCapabilityHintText: (record: ReasoningCapabilityRecord) => string
 	updateProviderCapabilities: (index: number, settings: ProviderSettings) => void
 	resolveModelReasoningCapability: (

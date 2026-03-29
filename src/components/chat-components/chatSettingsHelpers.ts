@@ -5,8 +5,10 @@ import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';
 import {
 	BUILTIN_SERVER_ID,
 	BUILTIN_SERVER_NAME,
+} from 'src/tools/runtime/constants';
+import {
 	type McpSettings,
-} from 'src/services/mcp';
+} from 'src/services/mcp/types';
 
 type McpStatusLocale = Pick<
 	Local,

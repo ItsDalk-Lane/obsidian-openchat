@@ -1,0 +1,87 @@
+import type { ObsidianApiProvider } from 'src/providers/providers.types';
+import {
+	formatMcpToolBlock,
+	parseContentBlocks,
+} from 'src/domains/chat/service-content-blocks';
+import type {
+	ContentBlock,
+	McpToolBlock,
+	ReasoningBlock,
+	TextBlock,
+} from 'src/domains/chat/service-content-blocks';
+
+export type {
+	ContentBlock,
+	McpToolBlock,
+	ReasoningBlock,
+	TextBlock,
+};
+export {
+	formatMcpToolBlock,
+	parseContentBlocks,
+};
+
+type ChatMarkdownContainer = HTMLElement & {
+	__ffInternalLinkClickHandler?: (event: MouseEvent) => void;
+};
+
+const getInternalLinkElement = (target: EventTarget | null): HTMLAnchorElement | null => {
+	if (!(target instanceof HTMLElement)) {
+		return null;
+	}
+	const matched = target.closest('a.internal-link');
+	return matched instanceof HTMLAnchorElement ? matched : null;
+};
+
+export const attachChatInternalLinkHandler = (
+	obsidianApi: ObsidianApiProvider,
+	container: HTMLElement,
+): void => {
+	const host = container as ChatMarkdownContainer;
+	if (host.__ffInternalLinkClickHandler) {
+		container.removeEventListener('click', host.__ffInternalLinkClickHandler, true);
+	}
+
+	host.__ffInternalLinkClickHandler = (event: MouseEvent) => {
+		const linkEl = getInternalLinkElement(event.target);
+		if (!linkEl) {
+			return;
+		}
+
+		const linkTarget = (
+			linkEl.getAttribute('data-href')
+			?? linkEl.getAttribute('href')
+			?? ''
+		).trim();
+		if (!linkTarget) {
+			return;
+		}
+
+		event.preventDefault();
+		event.stopPropagation();
+		event.stopImmediatePropagation();
+
+		obsidianApi.openInternalLink(
+			linkTarget,
+			obsidianApi.getActiveFilePath() ?? '',
+		);
+	};
+
+	container.addEventListener('click', host.__ffInternalLinkClickHandler, true);
+};
+
+export const renderMarkdownContent = async (
+	obsidianApi: ObsidianApiProvider,
+	markdown: string,
+	container: HTMLElement,
+	component: unknown,
+): Promise<void> => {
+	container.empty();
+	await obsidianApi.renderMarkdown(
+		markdown,
+		container,
+		obsidianApi.getActiveFilePath() ?? '',
+		component,
+	);
+	attachChatInternalLinkHandler(obsidianApi, container);
+};
