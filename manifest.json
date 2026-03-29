@@ -1,7 +1,7 @@
 {
 	"id": "openchat",
 	"name": "OpenChat",
-	"version": "1.0.0",
+	"version": "1.0.260329",
 	"minAppVersion": "0.15.0",
 	"description": "An Obsidian-native AI assistant with chat, vault search, context handling, and multi-provider LLM support.",
 	"author": "Study Ultra",
