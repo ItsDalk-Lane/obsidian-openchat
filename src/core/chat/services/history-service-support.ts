@@ -5,6 +5,12 @@ import {
 	joinPath,
 	sanitizeFileName,
 } from 'src/core/chat/utils/storage';
+import {
+	getManagedImportedFilePaths,
+	MANAGED_IMPORTED_FILES_FRONTMATTER_KEY,
+	mergeManagedImportedFilePaths,
+	readManagedImportedFilePaths,
+} from './chat-managed-attachments';
 import type {
 	ChatMessage,
 	ChatSession,
@@ -33,20 +39,26 @@ export interface HistoryHostSupport {
 export const buildHistorySessionFrontmatter = (
 	parser: ChatHistoryParser,
 	session: ChatSession,
-): Record<string, unknown> => ({
-	id: session.id,
-	title: session.title,
-	model: session.modelId,
-	created: parser.formatTimestamp(session.createdAt),
-	updated: parser.formatTimestamp(session.updatedAt),
-	messageCount: session.messages.length,
-	contextNotes: session.contextNotes ?? [],
-	multiModelMode: session.multiModelMode ?? 'single',
-	layoutMode: session.layoutMode,
-	livePlan: clonePlanSnapshot(session.livePlan ?? null),
-	contextCompaction: session.contextCompaction ?? null,
-	requestTokenState: session.requestTokenState ?? null,
-});
+): Record<string, unknown> => {
+	const managedImportedFiles = getManagedImportedFilePaths(session.selectedFiles);
+	return {
+		id: session.id,
+		title: session.title,
+		model: session.modelId,
+		created: parser.formatTimestamp(session.createdAt),
+		updated: parser.formatTimestamp(session.updatedAt),
+		messageCount: session.messages.length,
+		contextNotes: session.contextNotes ?? [],
+		multiModelMode: session.multiModelMode ?? 'single',
+		layoutMode: session.layoutMode,
+		livePlan: clonePlanSnapshot(session.livePlan ?? null),
+		contextCompaction: session.contextCompaction ?? null,
+		requestTokenState: session.requestTokenState ?? null,
+		...(managedImportedFiles.length > 0
+			? { [MANAGED_IMPORTED_FILES_FRONTMATTER_KEY]: managedImportedFiles }
+			: {}),
+	};
+};
 
 export const ensureHistoryFolder = async (
 	obsidianApi: Pick<HistoryHostSupport, 'ensureVaultFolder' | 'getVaultEntry'>,
@@ -128,16 +140,23 @@ export const updateHistoryFileTimestamp = async (
 		updates: Record<string, unknown>,
 	) => Promise<void>,
 ): Promise<void> => {
+	const frontmatter = obsidianApi.getFrontmatter(filePath);
 	const updates: Record<string, unknown> = {
 		updated: parser.formatTimestamp(timestamp),
 	};
 	const nextContextNotes = buildContextNotesFromSelections(selectedFiles, selectedFolders);
 	if (nextContextNotes.length > 0) {
-		const frontmatter = obsidianApi.getFrontmatter(filePath);
 		const existingContextNotes = Array.isArray(frontmatter?.contextNotes)
 			? frontmatter.contextNotes.filter((item): item is string => typeof item === 'string')
 			: [];
 		updates.contextNotes = [...existingContextNotes, ...nextContextNotes];
+	}
+	const managedImportedFiles = mergeManagedImportedFilePaths(
+		readManagedImportedFilePaths(frontmatter),
+		getManagedImportedFilePaths(selectedFiles),
+	);
+	if (managedImportedFiles.length > 0) {
+		updates[MANAGED_IMPORTED_FILES_FRONTMATTER_KEY] = managedImportedFiles;
 	}
 	await updateFileFrontmatter(filePath, updates);
 };

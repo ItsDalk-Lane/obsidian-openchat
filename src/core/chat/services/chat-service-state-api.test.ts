@@ -85,3 +85,109 @@ test('createNewSession 不再在 session 上写入模板系统提示词标记', 
 
 	assert.equal(session.modelId, 'model-a');
 })
+
+	test('deleteManagedImportedSelectedFile 会清理受管导入附件文件', async () => {
+	const stateStore = createStateStore();
+	stateStore.getMutableState().selectedFiles = [{
+		id: 'System/AI Data/chat-history/files/imported.md',
+		name: 'imported.md',
+		path: 'System/AI Data/chat-history/files/imported.md',
+		extension: 'md',
+		type: 'file',
+		attachmentSource: 'managed-import',
+	}];
+	const deletedPaths: string[] = [];
+
+	const internals = {
+		stateStore,
+		attachmentSelectionService: {
+			removeSelectedFile: (fileId: string) => {
+				stateStore.getMutableState().selectedFiles = stateStore.getMutableState().selectedFiles
+					.filter((file) => file.id !== fileId);
+			},
+		} as ChatServiceInternals['attachmentSelectionService'],
+		obsidianApi: {
+			pathExists: async () => true,
+			deleteVaultPath: async (path: string) => {
+				deletedPaths.push(path);
+			},
+			notify: () => {},
+		} as ChatServiceInternals['obsidianApi'],
+	} as ChatServiceInternals;
+
+	const api = createChatServiceStateApi(internals);
+	api.deleteManagedImportedSelectedFile('System/AI Data/chat-history/files/imported.md');
+	await new Promise((resolve) => setTimeout(resolve, 0));
+
+	assert.deepEqual(deletedPaths, ['System/AI Data/chat-history/files/imported.md']);
+	assert.equal(stateStore.getMutableState().selectedFiles.length, 1);
+});
+
+test('removeSelectedFile 仅更新选择状态而不删除文件', async () => {
+	const stateStore = createStateStore();
+	stateStore.getMutableState().selectedFiles = [{
+		id: 'docs/spec.md',
+		name: 'spec.md',
+		path: 'docs/spec.md',
+		extension: 'md',
+		type: 'file',
+	}];
+	const deletedPaths: string[] = [];
+
+	const internals = {
+		stateStore,
+		attachmentSelectionService: {
+			removeSelectedFile: (fileId: string) => {
+				stateStore.getMutableState().selectedFiles = stateStore.getMutableState().selectedFiles
+					.filter((file) => file.id !== fileId);
+			},
+		} as ChatServiceInternals['attachmentSelectionService'],
+		obsidianApi: {
+			pathExists: async () => true,
+			deleteVaultPath: async (path: string) => {
+				deletedPaths.push(path);
+			},
+			notify: () => {},
+		} as ChatServiceInternals['obsidianApi'],
+	} as ChatServiceInternals;
+
+	const api = createChatServiceStateApi(internals);
+	api.removeSelectedFile('docs/spec.md');
+	await new Promise((resolve) => setTimeout(resolve, 0));
+
+	assert.deepEqual(deletedPaths, []);
+	assert.equal(stateStore.getMutableState().selectedFiles.length, 0);
+});
+
+	test('deleteManagedImportedSelectedFile 不删除普通 Vault 附件文件', async () => {
+	const stateStore = createStateStore();
+	stateStore.getMutableState().selectedFiles = [{
+		id: 'docs/spec.md',
+		name: 'spec.md',
+		path: 'docs/spec.md',
+		extension: 'md',
+		type: 'file',
+	}];
+	const deletedPaths: string[] = [];
+
+	const internals = {
+		stateStore,
+		attachmentSelectionService: {
+			removeSelectedFile: () => {},
+		} as ChatServiceInternals['attachmentSelectionService'],
+		obsidianApi: {
+			pathExists: async () => true,
+			deleteVaultPath: async (path: string) => {
+				deletedPaths.push(path);
+			},
+			notify: () => {},
+		} as ChatServiceInternals['obsidianApi'],
+	} as ChatServiceInternals;
+
+	const api = createChatServiceStateApi(internals);
+	api.deleteManagedImportedSelectedFile('docs/spec.md');
+	await new Promise((resolve) => setTimeout(resolve, 0));
+
+	assert.deepEqual(deletedPaths, []);
+	assert.equal(stateStore.getMutableState().selectedFiles.length, 1);
+});

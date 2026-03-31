@@ -191,6 +191,7 @@ test('ChatAttachmentSelectionService 维护选择快照并与 session 同步', (
 		path: 'docs/spec.md',
 		name: 'spec.md',
 		extension: 'md',
+		attachmentSource: 'managed-import',
 	})
 	service.updateSelectionWithFile({
 		path: 'docs/spec.md',
@@ -204,7 +205,9 @@ test('ChatAttachmentSelectionService 维护选择快照并与 session 同步', (
 
 	const mutatedSnapshot = service.getSelectionSnapshot()
 	mutatedSnapshot.selectedFiles[0]!.name = 'changed.md'
+	mutatedSnapshot.selectedFiles[0]!.attachmentSource = undefined
 	assert.equal(store.getMutableState().selectedFiles[0]?.name, 'spec.md')
+	assert.equal(store.getMutableState().selectedFiles[0]?.attachmentSource, 'managed-import')
 	assert.equal(store.getMutableState().selectedFiles.length, 1)
 	assert.equal(store.getMutableState().selectedFolders.length, 1)
 
@@ -244,6 +247,7 @@ test('ChatAttachmentSelectionService 维护选择快照并与 session 同步', (
 	sessionSelection.selectedFiles[0]!.name = 'session-mutated.md'
 	assert.equal(store.getMutableState().selectedFiles[0]?.path, 'vault/plan.md')
 	assert.equal(store.getMutableState().selectedFiles[0]?.name, 'plan.md')
+	assert.equal(store.getMutableState().selectedFiles[0]?.attachmentSource, undefined)
 	assert.equal('isAutoAdded' in (store.getMutableState().selectedFiles[0] as Record<string, unknown>), false)
 	assert.equal(store.getMutableState().selectedFolders[0]?.path, 'vault')
 })

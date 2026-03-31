@@ -20,12 +20,15 @@ export interface FileIntentAnalysis {
 	confidence: 'high' | 'medium' | 'low';
 }
 
+export type SelectedFileAttachmentSource = 'managed-import';
+
 export interface SelectedFile {
 	id: string;
 	name: string;
 	path: string;
 	extension: string;
 	type: 'file';
+	attachmentSource?: SelectedFileAttachmentSource;
 }
 
 export interface SelectedFolder {

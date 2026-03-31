@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-openchat",
-	"version": "1.1.260331",
+	"version": "1.1.260401",
 	"description": "An Obsidian-native AI assistant with chat, vault search, context handling, and multi-provider LLM support.",
 	"main": "main.js",
 	"scripts": {
@@ -11,9 +11,9 @@
 		"lint:arch": "tsx infra/lint-arch.ts",
 		"lint:taste": "tsx infra/lint-taste.ts",
 		"test:arch": "tsx --test infra/arch.test.ts",
-		"test:chat-core": "tsx --test src/core/chat/services/chatProviderMessages.test.ts src/core/chat/services/chatMessageFacade.test.ts src/core/chat/services/chatGenerationFacade.test.ts src/core/chat/services/chat-service-state-api.test.ts src/core/chat-assembler.test.ts src/core/ribbon-activation-settings.test.ts",
+		"test:chat-core": "tsx --test src/core/chat/services/chatProviderMessages.test.ts src/core/chat/services/chatMessageFacade.test.ts src/core/chat/services/chatGenerationFacade.test.ts src/core/chat/services/chat-service-state-api.test.ts src/core/chat/services/history-service.test.ts src/core/chat/services/chat-session-manager.test.ts src/core/chat-assembler.test.ts src/core/ribbon-activation-settings.test.ts",
 		"test:providers": "tsx --test src/providers/*.test.ts",
-		"test:domains": "tsx --test src/domains/editor/editor.test.ts src/domains/skills/skills.test.ts src/domains/settings/settings.test.ts src/domains/mcp/mcp.test.ts src/domains/chat/chat.test.ts src/domains/chat/chat-service-support.test.ts src/domains/chat/chat-history-formatting.test.ts src/domains/chat/chat-history-summary.test.ts src/domains/chat/chat-context-compaction.test.ts src/domains/quick-actions/quick-actions.test.ts src/components/chat-components/chat-input-selector-utils.test.ts",
+		"test:domains": "tsx --test src/domains/editor/editor.test.ts src/domains/skills/skills.test.ts src/domains/settings/settings.test.ts src/domains/mcp/mcp.test.ts src/domains/chat/chat.test.ts src/domains/chat/chat-service-support.test.ts src/domains/chat/chat-history-formatting.test.ts src/domains/chat/chat-history-summary.test.ts src/domains/chat/chat-context-compaction.test.ts src/domains/quick-actions/quick-actions.test.ts src/components/chat-components/chat-input-selector-utils.test.ts src/components/chat-components/chat-input-attachment-transfer.test.ts",
 		"test": "npm run test:arch && npm run test:providers && npm run test:chat-core && npm run test:domains",
 		"validate:arch": "npm run lint:arch && npm run lint:taste && npm run test:arch",
 		"cleanup": "tsx infra/cleanup.ts",

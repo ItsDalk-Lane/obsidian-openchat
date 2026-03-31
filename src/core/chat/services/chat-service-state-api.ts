@@ -4,10 +4,13 @@ import type {
 	ChatAttachmentFileInput,
 	ChatAttachmentFolderInput,
 } from 'src/domains/chat/service-attachment-selection';
+import { localInstance } from 'src/i18n/locals';
+import { DebugLogger } from 'src/utils/DebugLogger';
 import { normalizeMessageManagementSettings } from '../types/chat';
 import type { ChatSession, ChatSettings, SelectedFile, SelectedFolder } from '../types/chat';
 import type { LayoutMode, MultiModelMode, ParallelResponseGroup } from '../types/multiModel';
 import type { ChatServiceInternals } from './chat-service-internals';
+import { isManagedImportedSelectedFile } from './chat-managed-attachments';
 
 const resolveDefaultProviderTag = (internals: ChatServiceInternals): string | null => {
 	return internals.service.getDefaultProviderTag();
@@ -186,7 +189,36 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 	getWebSearchToggle() { return internals.stateStore.getMutableState().enableWebSearchToggle; },
 	addSelectedFile(file: ChatAttachmentFileInput) { internals.attachmentSelectionService.addSelectedFile(file); },
 	addSelectedFolder(folder: ChatAttachmentFolderInput) { internals.attachmentSelectionService.addSelectedFolder(folder); },
-	removeSelectedFile(fileId: string) { internals.attachmentSelectionService.removeSelectedFile(fileId); },
+	removeSelectedFile(fileId: string) {
+		internals.attachmentSelectionService.removeSelectedFile(fileId);
+	},
+	deleteManagedImportedSelectedFile(fileId: string) {
+		const selectedFile = internals.stateStore
+			.getMutableState()
+			.selectedFiles
+			.find((file) => file.id === fileId);
+		if (!isManagedImportedSelectedFile(selectedFile)) {
+			return;
+		}
+		void (async () => {
+			try {
+				if (await internals.obsidianApi.pathExists(selectedFile.path)) {
+					await internals.obsidianApi.deleteVaultPath(selectedFile.path);
+				}
+			} catch (error) {
+				DebugLogger.warn('[ChatService] 删除外部导入附件失败', {
+					path: selectedFile.path,
+					error,
+				});
+				const message = error instanceof Error && error.message.trim().length > 0
+					? error.message
+					: selectedFile.name;
+				internals.obsidianApi.notify(
+					localInstance.chat_managed_attachment_delete_failed_prefix.replace('{message}', message),
+				);
+			}
+		})();
+	},
 	removeSelectedFolder(folderId: string) { internals.attachmentSelectionService.removeSelectedFolder(folderId); },
 	setSelectedFiles(files: SelectedFile[]) { internals.attachmentSelectionService.setSelectedFiles(files); },
 	setSelectedFolders(folders: SelectedFolder[]) { internals.attachmentSelectionService.setSelectedFolders(folders); },

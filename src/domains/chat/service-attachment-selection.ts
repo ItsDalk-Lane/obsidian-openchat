@@ -19,6 +19,7 @@ export interface ChatAttachmentFileInput {
 	path: string;
 	name: string;
 	extension: string;
+	attachmentSource?: SelectedFile['attachmentSource'];
 }
 
 export interface ChatAttachmentFolderInput {
@@ -26,12 +27,15 @@ export interface ChatAttachmentFolderInput {
 	name: string;
 }
 
-const normalizeSelectedFile = (file: Pick<SelectedFile, 'id' | 'name' | 'path' | 'extension'>): SelectedFile => ({
+const normalizeSelectedFile = (
+	file: Pick<SelectedFile, 'id' | 'name' | 'path' | 'extension' | 'attachmentSource'>,
+): SelectedFile => ({
 	id: file.id,
 	name: file.name,
 	path: file.path,
 	extension: file.extension,
 	type: 'file',
+	attachmentSource: file.attachmentSource,
 });
 
 const normalizeSelectedFolder = (folder: Pick<SelectedFolder, 'id' | 'name' | 'path'>): SelectedFolder => ({
@@ -56,6 +60,7 @@ const createSelectedFile = (
 		path: file.path,
 		extension: file.extension || '',
 		type: 'file',
+		attachmentSource: file.attachmentSource,
 	};
 };
 

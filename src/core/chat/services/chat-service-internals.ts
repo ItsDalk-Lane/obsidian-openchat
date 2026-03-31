@@ -42,6 +42,7 @@ export interface ChatServiceInternals {
 	runtimeDeps: ChatRuntimeDeps;
 	settingsAccessor: ChatSettingsAccessor;
 	obsidianApi: ObsidianApiProvider;
+	resolveVaultBasePath: () => string | null;
 	stateStore: ChatStateStore;
 	fileContentService: FileContentService;
 	messageService: MessageService;
@@ -153,6 +154,7 @@ export const createChatServiceInternals = (
 		runtimeDeps: deps.runtimeDeps,
 		settingsAccessor,
 		obsidianApi,
+		resolveVaultBasePath: deps.host.resolveVaultBasePath,
 		stateStore,
 		fileContentService,
 		messageService,

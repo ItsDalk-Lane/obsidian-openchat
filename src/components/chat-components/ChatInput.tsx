@@ -1,4 +1,4 @@
-import { Fragment, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import type { SlashCommandItem } from 'src/core/chat/types/slashCommand';
 import type { ChatState } from 'src/domains/chat/types';
@@ -21,7 +21,10 @@ import {
 	useChatInputMention,
 	type MentionSelectorPayload,
 } from './useChatInputMention';
+import { useChatInputActions } from './useChatInputActions';
+import { useChatInputAttachmentTransfer } from './useChatInputAttachmentTransfer';
 import { useChatInputImageUpload } from './useChatInputImageUpload';
+import { useChatInputKeyboard } from './useChatInputKeyboard';
 import { useChatInputSlashCommand } from './useChatInputSlashCommand';
 import { useChatInputTriggerMenu } from './useChatInputTriggerMenu';
 
@@ -53,6 +56,37 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 		openImagePicker,
 	} = useChatInputImageUpload(service, () => {
 		textareaRef.current?.focus();
+	});
+	const {
+		isDragOver,
+		handleDragEnter,
+		handleDragOver,
+		handleDragLeave,
+		handleDrop,
+		handlePaste,
+	} = useChatInputAttachmentTransfer({
+		service,
+		onComplete: () => {
+			textareaRef.current?.focus();
+		},
+	});
+	const {
+		providers,
+		submitActionLabel,
+		multiModelProgress,
+		handleSubmit,
+		handleRemoveImage,
+		handleRemoveFile,
+		handleRemoveFolder,
+		handleClearSelectedText,
+		handleFileSelect,
+		handleFolderSelect,
+	} = useChatInputActions({
+		service,
+		state,
+		value,
+		isMultiModel,
+		textareaRef,
 	});
 
 	const slashSelectorItems = useMemo<ChatInputSelectorItem<SlashCommandItem>[]>(
@@ -305,91 +339,22 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 			selectMentionItem,
 		],
 	);
-
-	const handleSubmit = async (event?: FormEvent) => {
-		event?.preventDefault();
-		await service.sendMessage(value);
-	};
-
-	const handleRemoveImage = (image: string) => service.removeSelectedImage(image);
-	const handleRemoveFile = (fileId: string) => service.removeSelectedFile(fileId);
-	const handleRemoveFolder = (folderId: string) => service.removeSelectedFolder(folderId);
-	const handleClearSelectedText = () => service.clearSelectedText();
-	const handleFileSelect = useCallback((file: { path: string; name: string; extension: string }) => {
-		service.addSelectedFile(file);
-		textareaRef.current?.focus();
-	}, [service]);
-	const handleFolderSelect = useCallback((folder: { path: string; name: string }) => {
-		service.addSelectedFolder(folder);
-		textareaRef.current?.focus();
-	}, [service]);
-
-	const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-		if (event.nativeEvent.isComposing) {
-			return;
-		}
-
-		if (selectorVisible) {
-			switch (event.key) {
-				case 'ArrowDown':
-					event.preventDefault();
-					setSelectedIndex((previous) =>
-						previous < filteredItems.length - 1 ? previous + 1 : 0,
-					);
-					return;
-				case 'ArrowUp':
-					event.preventDefault();
-					setSelectedIndex((previous) =>
-						previous > 0 ? previous - 1 : filteredItems.length - 1,
-					);
-					return;
-				case 'Enter':
-				case 'Tab':
-					if (filteredItems.length > 0) {
-						event.preventDefault();
-						const selectedItem = filteredItems[selectedIndex];
-						if (selectedItem) {
-							handleSelectorSelect(selectedItem);
-						}
-					}
-					return;
-				case 'Escape':
-					event.preventDefault();
-					closeMenu();
-					return;
-			}
-		}
-
-		if (event.key === 'Enter' && !event.shiftKey) {
-			event.preventDefault();
-			void handleSubmit();
-		}
-	};
-
-	const multiModelProgress = useMemo(() => {
-		if (!state.parallelResponses || !isMultiModel) {
-			return null;
-		}
-
-		const total = state.parallelResponses.responses.length;
-		const completed = state.parallelResponses.responses.filter((response) => response.isComplete).length;
-		const errors = state.parallelResponses.responses.filter((response) => response.isError).length;
-		const generating = total - completed - errors;
-
-		return { total, completed, errors, generating };
-	}, [isMultiModel, state.parallelResponses]);
-
-	const providers = service.getProviders();
-	const hasConversationMessages =
-		state.activeSession?.messages.some((message) => message.role !== 'system') ?? false;
-	const submitActionLabel = hasConversationMessages
-		? localInstance.chat_send_button_label
-		: localInstance.chat_save_button_label;
+	const handleKeyDown = useChatInputKeyboard({
+		selectorVisible,
+		filteredItems,
+		selectedIndex,
+		setSelectedIndex,
+		handleSelectorSelect,
+		closeMenu,
+		handleSubmit: async () => {
+			await handleSubmit();
+		},
+	});
 
 	return (
 		<Fragment>
 			<form
-				className="chat-input tw-flex tw-w-full tw-flex-col tw-gap-2 tw-p-2"
+				className={`chat-input tw-flex tw-w-full tw-flex-col tw-gap-2 tw-p-2 ${isDragOver ? 'chat-input--drag-over' : ''}`}
 				style={{
 					border: '1px solid var(--background-modifier-border)',
 					borderRadius: 'var(--radius-m)',
@@ -414,7 +379,7 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 
 				<textarea
 					ref={textareaRef}
-					className="tw-w-full tw-resize-none tw-p-3 tw-text-sm"
+					className="chat-input__textarea tw-w-full tw-resize-none tw-p-3 tw-text-sm"
 					style={{
 						border: 'none',
 						outline: 'none',
@@ -433,8 +398,17 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 							applyInputValue(event.target.value);
 						}}
 						onClick={syncCursorIndex}
+						onDragEnter={handleDragEnter}
+						onDragOver={handleDragOver}
+						onDragLeave={handleDragLeave}
+						onDrop={(event) => {
+							void handleDrop(event);
+						}}
 					onKeyDown={handleKeyDown}
 						onKeyUp={syncCursorIndex}
+						onPaste={(event) => {
+							void handlePaste(event);
+						}}
 						onSelect={syncCursorIndex}
 					placeholder={localInstance.input_description_here}
 					disabled={state.isGenerating}

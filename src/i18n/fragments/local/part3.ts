@@ -220,6 +220,15 @@ export interface LocalPart3 {
 	chat_inserted_file: string;
 	chat_insert_target_missing: string;
 	chat_unknown_file: string;
+	chat_input_attachment_added_files: string;
+	chat_input_attachment_added_images: string;
+	chat_input_attachment_added_mixed: string;
+	chat_input_attachment_unsupported_type: string;
+	chat_input_attachment_unsupported_types: string;
+	chat_input_attachment_failed_count: string;
+	chat_input_attachment_process_failed_prefix: string;
+	chat_managed_attachment_delete_failed_prefix: string;
+	chat_managed_attachment_delete_failed_count: string;
 	chat_regenerate_only_ai_message: string;
 	chat_request_in_progress: string;
 	chat_image_generation_model_not_supported: string;

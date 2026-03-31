@@ -105,6 +105,7 @@ export interface ChatHostDeps {
 	settingsAccessor: ChatSettingsAccessor;
 	createFileContentService(): FileContentService;
 	createMessageService(fileContentService: FileContentService): MessageService;
+	resolveVaultBasePath(): string | null;
 	createBuiltinToolsRuntime(
 		settings: BuiltinToolsRuntimeSettings | undefined,
 		skillScanner: SkillScannerService | null,

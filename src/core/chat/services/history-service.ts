@@ -28,6 +28,11 @@ import {
 	writeHistoryFrontmatterOnly,
 	writeHistorySessionFile,
 } from './history-service-support';
+import {
+	MANAGED_IMPORTED_FILES_FRONTMATTER_KEY,
+	mergeManagedImportedFilePaths,
+	readManagedImportedFilePaths,
+} from './chat-managed-attachments';
 
 export interface ChatHistoryEntry {
 	id: string;
@@ -93,9 +98,17 @@ export class HistoryService {
 			if (shouldRewriteLegacyToolCalls(existingContent)) {
 				await this.rewriteMessagesOnly(session.filePath, session.messages);
 			}
+			const frontmatterUpdates = buildHistorySessionFrontmatter(this.parser, session);
+			const mergedManagedImportedFiles = mergeManagedImportedFilePaths(
+				readManagedImportedFilePaths(this.obsidianApi.getFrontmatter(session.filePath)),
+				readManagedImportedFilePaths(frontmatterUpdates),
+			);
+			if (mergedManagedImportedFiles.length > 0) {
+				frontmatterUpdates[MANAGED_IMPORTED_FILES_FRONTMATTER_KEY] = mergedManagedImportedFiles;
+			}
 			await this.updateSessionFrontmatter(
 				session.filePath,
-				buildHistorySessionFrontmatter(this.parser, session),
+				frontmatterUpdates,
 			);
 			return session.filePath;
 		}
@@ -156,8 +169,24 @@ export class HistoryService {
 		}
 	}
 
-	async deleteSession(filePath: string): Promise<void> {
+	async deleteSession(filePath: string): Promise<string[]> {
+		const managedImportedFiles = readManagedImportedFilePaths(this.obsidianApi.getFrontmatter(filePath));
 		await this.obsidianApi.deleteVaultPath(filePath);
+		const failedCleanupPaths: string[] = [];
+		for (const managedImportedFilePath of managedImportedFiles) {
+			try {
+				if (await this.obsidianApi.pathExists(managedImportedFilePath)) {
+					await this.obsidianApi.deleteVaultPath(managedImportedFilePath);
+				}
+			} catch (error) {
+				DebugLogger.warn('[HistoryService] 删除聊天导入附件失败', {
+					path: managedImportedFilePath,
+					error,
+				});
+				failedCleanupPaths.push(managedImportedFilePath);
+			}
+		}
+		return failedCleanupPaths;
 	}
 
 	async createNewSessionFile(session: ChatSession): Promise<string> {

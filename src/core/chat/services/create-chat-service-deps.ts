@@ -12,6 +12,16 @@ import { MessageService } from './message-service';
 import { SubAgentScannerService } from 'src/tools/sub-agents/SubAgentScannerService';
 import { SubAgentWatcherService } from 'src/tools/sub-agents/SubAgentWatcherService';
 
+const resolveVaultBasePath = (host: ChatConsumerHost): string | null => {
+	const adapter = host.app.vault.adapter;
+	const maybeAdapter = adapter as unknown as {
+		getBasePath?: () => string;
+	};
+	return typeof maybeAdapter.getBasePath === 'function'
+		? maybeAdapter.getBasePath()
+		: null;
+};
+
 const createChatSettingsAccessor = (
 	host: ChatConsumerHost,
 ): ChatSettingsAccessor => ({
@@ -42,6 +52,7 @@ export const createChatHostDeps = (
 			host.app,
 			fileContentService,
 		),
+	resolveVaultBasePath: () => resolveVaultBasePath(host),
 	createBuiltinToolsRuntime: async (settings, skillScanner) => {
 		return await createBuiltinToolsRuntime({
 			app: host.app,

@@ -1,11 +1,13 @@
 export const AI_PROMPTS_SUBFOLDER = 'ai prompts';
 export const AI_CHAT_HISTORY_SUBFOLDER = 'chat-history';
+export const AI_CHAT_HISTORY_FILES_SUBFOLDER = 'files';
 export const AI_QUICK_ACTIONS_SUBFOLDER = 'quick-actions';
 export const AI_SYSTEM_PROMPTS_SUBFOLDER = 'system-prompts';
 export const AI_MCP_SERVERS_SUBFOLDER = 'mcp-servers';
 export const AI_MULTI_MODEL_SUBFOLDER = 'multi-model';
 export const AI_SKILLS_SUBFOLDER = 'skills';
 export const AI_AGENTS_SUBFOLDER = 'agents';
+export const AI_CHAT_INPUT_IMPORTS_SUBFOLDER = 'chat-input-imports';
 
 export const trimTrailingSlash = (value: string): string => value.replace(/[\\/]+$/gu, '');
 
@@ -30,6 +32,12 @@ export const getChatHistoryPath = (aiDataFolder: string): string => {
 	return joinAiPath(aiDataFolder, AI_CHAT_HISTORY_SUBFOLDER);
 };
 
+export const getChatHistoryFilesPath = (aiDataFolder: string): string => {
+	return normalizeVaultPath(
+		`${getChatHistoryPath(aiDataFolder)}/${AI_CHAT_HISTORY_FILES_SUBFOLDER}`,
+	);
+};
+
 export const getQuickActionsPath = (aiDataFolder: string): string => {
 	return joinAiPath(aiDataFolder, AI_QUICK_ACTIONS_SUBFOLDER);
 };
@@ -52,4 +60,8 @@ export const getSkillsPath = (aiDataFolder: string): string => {
 
 export const getAgentsPath = (aiDataFolder: string): string => {
 	return joinAiPath(aiDataFolder, AI_AGENTS_SUBFOLDER);
+};
+
+export const getChatInputImportsPath = (aiDataFolder: string): string => {
+	return joinAiPath(aiDataFolder, AI_CHAT_INPUT_IMPORTS_SUBFOLDER);
 };

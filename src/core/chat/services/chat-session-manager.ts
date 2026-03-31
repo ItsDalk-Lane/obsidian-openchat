@@ -4,6 +4,7 @@
  * 从 ChatService 中拆分出来，遵循单一职责原则
  */
 import { t } from 'src/i18n/ai-runtime/helper';
+import { localInstance } from 'src/i18n/locals';
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
 import { HistoryService, ChatHistoryEntry } from './history-service';
 import type { ChatSession, ChatState } from '../types/chat';
@@ -93,7 +94,20 @@ export class ChatSessionManager {
 	 * 删除历史会话
 	 */
 	async deleteHistory(filePath: string): Promise<void> {
-		await this.historyService.deleteSession(filePath);
+		const failedCleanupPaths = await this.historyService.deleteSession(filePath);
+		const activeSession = this.deps.getState().activeSession;
+		if (activeSession?.filePath === filePath) {
+			activeSession.filePath = undefined;
+			this.deps.emitState();
+		}
+		if (failedCleanupPaths.length > 0) {
+			this.obsidianApi.notify(
+				localInstance.chat_managed_attachment_delete_failed_count.replace(
+					'{count}',
+					String(failedCleanupPaths.length),
+				),
+			);
+		}
 	}
 
 	/**

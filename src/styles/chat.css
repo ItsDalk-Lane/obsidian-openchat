@@ -669,6 +669,20 @@
 
 .chat-input {
 	position: relative;
+	transition:
+		border-color 0.15s ease,
+		background-color 0.15s ease,
+		box-shadow 0.15s ease;
+}
+
+.chat-input__textarea {
+	transition: background-color 0.15s ease;
+}
+
+.chat-input--drag-over {
+	border-color: var(--interactive-accent) !important;
+	background: var(--background-modifier-hover);
+	box-shadow: 0 0 0 1px var(--interactive-accent);
 }
 
 .context-pill {

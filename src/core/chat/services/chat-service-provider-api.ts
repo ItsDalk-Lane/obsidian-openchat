@@ -35,6 +35,12 @@ export const createChatServiceProviderApi = (internals: ChatServiceInternals) =>
 	getObsidianApiProvider() {
 		return internals.obsidianApi;
 	},
+	getAiDataFolder(): string {
+		return internals.settingsAccessor.getAiDataFolder();
+	},
+	getVaultBasePath(): string | null {
+		return internals.resolveVaultBasePath();
+	},
 	getCurrentModelTag(): string | null {
 		return internals.stateStore.getMutableState().selectedModelId ?? getDefaultProviderTag(internals);
 	},

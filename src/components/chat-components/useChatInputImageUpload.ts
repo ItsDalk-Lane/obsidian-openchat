@@ -1,21 +1,13 @@
 import { useCallback, useRef, type ChangeEvent } from 'react';
 import type { ChatService } from 'src/core/chat/services/chat-service';
 import { DebugLogger } from 'src/utils/DebugLogger';
+import { fileToBase64 } from './chatInputAttachmentSources';
 
 interface UseChatInputImageUploadReturn {
 	imageInputRef: React.RefObject<HTMLInputElement>;
 	openImagePicker: () => void;
 	handleImageInputChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
 }
-
-const fileToBase64 = async (file: File): Promise<string> => {
-	return await new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onload = () => resolve(reader.result as string);
-		reader.onerror = () => reject(reader.error);
-		reader.readAsDataURL(file);
-	});
-};
 
 export function useChatInputImageUpload(
 	service: ChatService,
