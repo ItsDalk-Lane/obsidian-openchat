@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import Module from 'node:module'
 import test from 'node:test'
 import {
 	createChatCommandFacade,
@@ -7,6 +8,38 @@ import type {
 	ExecuteSkillCommandParams,
 	ExecuteSubAgentCommandParams,
 } from './chat-commands'
+
+const ensureWindowLocalStorage = (): void => {
+	const globalScope = globalThis as typeof globalThis & {
+		window?: { localStorage?: { getItem: (key: string) => string | null } }
+	}
+	globalScope.window = {
+		...(globalScope.window ?? {}),
+		localStorage: {
+			getItem: () => 'en',
+		},
+	}
+}
+
+const installObsidianStub = (): void => {
+	const globalScope = globalThis as typeof globalThis & {
+		__obsidianStubInstalled?: boolean
+	}
+	if (globalScope.__obsidianStubInstalled) {
+		return
+	}
+	const moduleLoader = Module as typeof Module & {
+		_load: (request: string, parent: object | null, isMain: boolean) => unknown
+	}
+	const originalLoad = moduleLoader._load
+	moduleLoader._load = (request, parent, isMain) => {
+		if (request === 'obsidian') {
+			return {}
+		}
+		return originalLoad(request, parent, isMain)
+	}
+	globalScope.__obsidianStubInstalled = true
+}
 
 const createSkillParams = (inputValue: string): ExecuteSkillCommandParams => ({
 	obsidianApi: null as never,
@@ -80,4 +113,45 @@ test('createChatCommandFacade 每次调用都读取最新 deps', async () => {
 	assert.equal(capturedSelectedModelId, 'model-b')
 	assert.equal(skillGetterCalls, 2)
 	assert.equal(subAgentGetterCalls, 1)
+})
+
+test('executeSkillCommand 选择模板后不再切换模板系统提示词标记', async () => {
+	ensureWindowLocalStorage()
+	installObsidianStub()
+	const { executeSkillCommand } = await import('./chat-commands')
+	const sentMessages: string[] = []
+	const state = {
+		inputValue: 'old input',
+	} as ExecuteSkillCommandParams['state']
+
+	await executeSkillCommand(
+		{
+			obsidianApi: {
+				getVaultEntry: () => ({
+					kind: 'file',
+					path: 'AI Prompts/skill-a.md',
+					name: 'skill-a.md',
+				}),
+				notify: () => {},
+				readVaultFile: async () => '请审查下面的实现',
+			},
+			state,
+			emitState: () => {},
+			loadInstalledSkills: async () => ({
+				skills: [{
+					metadata: { name: 'skill-a' },
+					skillFilePath: 'AI Prompts/skill-a.md',
+				}],
+			}) as never,
+			sendMessage: async (content) => {
+				sentMessages.push(content ?? '')
+			},
+		},
+		'skill-a',
+	)
+
+	assert.equal(state.selectedPromptTemplate?.name, 'skill-a')
+	assert.equal(state.selectedPromptTemplate?.content, '请审查下面的实现')
+	assert.equal(state.inputValue, '')
+	assert.deepEqual(sentMessages, [''])
 })

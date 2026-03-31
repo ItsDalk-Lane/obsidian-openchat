@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import Module from 'node:module';
 import test from 'node:test';
 import { DEFAULT_CHAT_SETTINGS } from 'src/domains/chat/config';
 import {
@@ -6,7 +7,39 @@ import {
 } from './chat-provider-message-facade';
 import { getChatMessageManagementSettings } from 'src/domains/chat/service-provider-message-support';
 import type { ChatProviderMessageDeps } from './chat-provider-messages';
-import type { ChatSettings, ChatState } from '../types/chat';
+import type { ChatMessage, ChatSettings, ChatState, ChatSession } from '../types/chat';
+
+const ensureWindowLocalStorage = (): void => {
+	const globalScope = globalThis as typeof globalThis & {
+		window?: { localStorage?: { getItem: (key: string) => string | null } }
+	}
+	globalScope.window = {
+		...(globalScope.window ?? {}),
+		localStorage: {
+			getItem: () => 'en',
+		},
+	}
+};
+
+const installObsidianStub = (): void => {
+	const globalScope = globalThis as typeof globalThis & {
+		__obsidianStubInstalled?: boolean;
+	};
+	if (globalScope.__obsidianStubInstalled) {
+		return;
+	}
+	const moduleLoader = Module as typeof Module & {
+		_load: (request: string, parent: object | null, isMain: boolean) => unknown;
+	};
+	const originalLoad = moduleLoader._load;
+	moduleLoader._load = (request, parent, isMain) => {
+		if (request === 'obsidian') {
+			return {};
+		}
+		return originalLoad(request, parent, isMain);
+	};
+	globalScope.__obsidianStubInstalled = true;
+};
 
 const createProviderMessageDeps = (
 	settings: ChatSettings,
@@ -96,3 +129,78 @@ test('createChatProviderMessageFacade 每次调用都读取最新 settings 快�
 	assert.equal(refreshedSettings.summaryModelTag, 'claude');
 	assert.equal(getterCalls, 2);
 });
+
+test('buildProviderMessagesForAgent 忽略会话里遗留的模板系统提示词字段', async () => {
+	ensureWindowLocalStorage();
+	installObsidianStub();
+	const { buildProviderMessagesForAgent } = await import('./chat-provider-messages');
+	let capturedSystemPrompt: string | undefined;
+	const deps = createProviderMessageDeps(DEFAULT_CHAT_SETTINGS, DEFAULT_CHAT_SETTINGS);
+	deps.messageService = {
+		createMessage: (role, content, extras) => ({
+			id: 'message-ephemeral',
+			role,
+			content,
+			timestamp: 1,
+			images: [],
+			isError: false,
+			metadata: extras?.metadata ?? {},
+			toolCalls: [],
+		}),
+		buildContextProviderMessage: async () => null,
+		toProviderMessages: async (messages: ChatMessage[], options) => {
+			capturedSystemPrompt = options?.systemPrompt;
+			return messages.map((message) => ({
+				role: message.role === 'assistant' ? 'assistant' : 'user',
+				content: message.content,
+			}));
+		},
+	} as never;
+	deps.messageContextOptimizer = {
+		estimateChatTokens: () => 1,
+		optimize: async (messages: ChatMessage[]) => ({
+			messages,
+			historyTokenEstimate: 1,
+			contextCompaction: null,
+		}),
+	} as never;
+	deps.contextCompactionService = {
+		compactContextProviderMessage: async () => ({
+			message: null,
+			summary: '',
+			signature: '',
+			tokenEstimate: 0,
+		}),
+	} as never;
+
+	const userMessage: ChatMessage = {
+		id: 'message-1',
+		role: 'user',
+		content: 'hello',
+		timestamp: 1,
+		images: [],
+		isError: false,
+		metadata: {},
+		toolCalls: [],
+	};
+	const session: ChatSession = {
+		id: 'session-1',
+		title: 'Chat',
+		modelId: 'model-a',
+		messages: [userMessage],
+		createdAt: 1,
+		updatedAt: 1,
+		livePlan: null,
+		contextCompaction: null,
+		requestTokenState: null,
+	};
+
+	const providerMessages = await buildProviderMessagesForAgent(
+		deps,
+		[userMessage],
+		session,
+	)
+
+	assert.equal(capturedSystemPrompt, undefined)
+	assert.deepEqual(providerMessages, [{ role: 'user', content: 'hello' }])
+})

@@ -31,11 +31,8 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 	restoreSessionState(savedState: SavedChatSessionState): void {
 		if (savedState.activeSession) {
 			internals.stateStore.setActiveSession(savedState.activeSession);
-			internals.stateStore.getMutableState().enableTemplateAsSystemPrompt =
-				savedState.activeSession.enableTemplateAsSystemPrompt ?? false;
 		} else {
 			internals.stateStore.setActiveSession(null);
-			internals.stateStore.getMutableState().enableTemplateAsSystemPrompt = false;
 		}
 		internals.attachmentSelectionService.restoreSelection(
 			{ selectedFiles: savedState.selectedFiles, selectedFolders: savedState.selectedFolders },
@@ -64,19 +61,16 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 				localInstance.chat_prompt_template_select_failed_prefix.replace('{message}', message),
 			);
 		}
-	},
-	clearSelectedPromptTemplate(): void { internals.stateStore.getMutableState().selectedPromptTemplate = undefined; internals.service.emitState(); },
-	getPromptTemplateContent(): string | undefined { return internals.stateStore.getMutableState().selectedPromptTemplate?.content; },
-	hasPromptTemplateVariables(): boolean { return /\{\{([^}]+)\}\}/g.test(internals.stateStore.getMutableState().selectedPromptTemplate?.content ?? ''); },
-	async prepareChatRequest(content?: string, options?: { skipImageSupportValidation?: boolean }) {
-		return await getMessageOperationFacade(internals).prepareChatRequest(content, options);
-	},
+		},
+		clearSelectedPromptTemplate(): void { internals.stateStore.getMutableState().selectedPromptTemplate = undefined; internals.service.emitState(); },
+		async prepareChatRequest(content?: string, options?: { skipImageSupportValidation?: boolean }) {
+			return await getMessageOperationFacade(internals).prepareChatRequest(content, options);
+		},
 	async sendMessage(content?: string): Promise<void> { await getMessageOperationFacade(internals).sendMessage(content); },
 	async listHistory() { return internals.sessionManager.listHistory(); },
 	async loadHistory(filePath: string): Promise<void> {
 		const session = await internals.sessionManager.loadHistory(filePath);
 		if (!session) return;
-		session.enableTemplateAsSystemPrompt = session.enableTemplateAsSystemPrompt ?? false;
 		session.filePath = filePath;
 		internals.stateStore.setActiveSession(session);
 		const state = internals.stateStore.getMutableState();
@@ -89,7 +83,6 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 		state.selectedModels = restored.selectedModels;
 		state.layoutMode = restored.layoutMode;
 		state.parallelResponses = undefined;
-		state.enableTemplateAsSystemPrompt = session.enableTemplateAsSystemPrompt;
 		state.selectedPromptTemplate = undefined;
 		internals.service.emitState();
 		internals.service.queueSessionPlanSync(session);

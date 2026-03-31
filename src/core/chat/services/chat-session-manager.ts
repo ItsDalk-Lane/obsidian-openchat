@@ -75,7 +75,6 @@ export class ChatSessionManager {
 	async loadHistory(filePath: string): Promise<ChatSession | null> {
 		const session = await this.historyService.loadSession(filePath);
 		if (session) {
-			session.enableTemplateAsSystemPrompt = session.enableTemplateAsSystemPrompt ?? false;
 			session.filePath = filePath;
 		}
 		return session;

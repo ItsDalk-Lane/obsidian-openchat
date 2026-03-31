@@ -3,8 +3,6 @@ export const enPart4 = {
 	mcp_fs_query_missing_from: "Vault query must include from(...)",
 	chat_trigger_no_active_file: "Please open a Markdown file first",
 	chat_trigger_settings_section: "Editor Trigger Settings",
-	chat_template_system_prompt_toggle: "Template System Prompt",
-	chat_template_system_prompt_toggle_desc: "When enabled, use the selected prompt template as-is as the system prompt; otherwise use the global system prompt.",
 	chat_plan_toggle: "Task Plan",
 	chat_plan_empty_title: "No task plan for this chat yet",
 	chat_plan_empty_desc: "It will appear here automatically after the AI calls write_plan.",

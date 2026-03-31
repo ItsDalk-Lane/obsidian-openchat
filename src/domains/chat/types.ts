@@ -138,8 +138,6 @@ export interface ChatSession {
 	selectedFiles?: SelectedFile[];
 	selectedFolders?: SelectedFolder[];
 	filePath?: string;
-	systemPrompt?: string;
-	enableTemplateAsSystemPrompt?: boolean;
 	multiModelMode?: MultiModelMode;
 
 	layoutMode?: LayoutMode;
@@ -184,7 +182,6 @@ export interface ChatSettings {
 	defaultModel: string;
 	autosaveChat: boolean;
 	openMode: ChatOpenMode;
-	enableSystemPrompt: boolean;
 	enableChatTrigger: boolean;
 	chatTriggerSymbol: string[];
 	chatModalWidth: number;
@@ -196,8 +193,6 @@ export interface ChatSettings {
 	messageManagement: MessageManagementSettings;
 }
 
-export type McpToolMode = 'disabled' | 'auto' | 'manual';
-
 export interface ChatState {
 	activeSession: ChatSession | null;
 	isGenerating: boolean;
@@ -206,7 +201,6 @@ export interface ChatState {
 	selectedModels: string[];
 	enableReasoningToggle: boolean;
 	enableWebSearchToggle: boolean;
-	enableTemplateAsSystemPrompt: boolean;
 	contextNotes: string[];
 	selectedImages: string[];
 	selectedFiles: SelectedFile[];
@@ -219,8 +213,6 @@ export interface ChatState {
 		content: string;
 	};
 	shouldSaveHistory: boolean;
-	mcpToolMode: McpToolMode;
-	mcpSelectedServerIds: string[];
 	multiModelMode: MultiModelMode;
 	parallelResponses?: ParallelResponseGroup;
 	layoutMode: LayoutMode;

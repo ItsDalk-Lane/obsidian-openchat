@@ -7,7 +7,7 @@ import type {
 } from 'src/tools/sub-agents/types';
 import type { SubAgentScannerService } from 'src/tools/sub-agents/SubAgentScannerService';
 import type { ChatRuntimeDeps } from '../runtime/chat-runtime-deps';
-import type { ChatSession, McpToolMode } from '../types/chat';
+import type { ChatSession } from '../types/chat';
 import type { ChatPlanSyncService } from './chat-plan-sync-service';
 import type { ChatHostDeps, ChatSettingsAccessor } from './chat-service-types';
 
@@ -27,8 +27,6 @@ export interface ChatToolRuntimeResolverOptions {
 	subAgentScannerService: SubAgentScannerService;
 	planSyncService: ChatPlanSyncService;
 	getActiveSession: () => ChatSession | null;
-	getMcpToolMode: () => McpToolMode;
-	getMcpSelectedServerIds: () => string[];
 	getMaxToolCallLoops: () => number | undefined;
 	showMcpNoticeOnce: (message: string) => void;
 	chatServiceAdapter: SubAgentChatServiceAdapter;

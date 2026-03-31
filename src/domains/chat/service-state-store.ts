@@ -1,7 +1,6 @@
 import type {
 	ChatSession,
 	ChatState,
-	McpToolMode,
 	SelectedFile,
 	SelectedFolder,
 } from './types'
@@ -88,13 +87,6 @@ export class ChatStateStore {
 
 	updateSelectedFolders(folders: SelectedFolder[], emit = false): void {
 		this.state.selectedFolders = folders
-		if (emit) {
-			this.emit()
-		}
-	}
-
-	updateMcpToolMode(mode: McpToolMode, emit = false): void {
-		this.state.mcpToolMode = mode
 		if (emit) {
 			this.emit()
 		}

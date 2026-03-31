@@ -13,14 +13,11 @@ const createStateStore = () => new ChatStateStore({
 	selectedModels: [],
 	enableReasoningToggle: false,
 	enableWebSearchToggle: false,
-	enableTemplateAsSystemPrompt: false,
 	contextNotes: [],
 	selectedImages: [],
 	selectedFiles: [],
 	selectedFolders: [],
 	shouldSaveHistory: true,
-	mcpToolMode: 'auto',
-	mcpSelectedServerIds: [],
 	multiModelMode: 'single',
 	layoutMode: 'horizontal',
 });
@@ -62,3 +59,29 @@ test('updateSettings 在 autosaveChat 变更时同步 shouldSaveHistory', () => 
 	assert.equal(stateStore.getMutableState().shouldSaveHistory, true);
 	assert.equal(emitCount, 2);
 });
+
+test('createNewSession 不再在 session 上写入模板系统提示词标记', () => {
+	const stateStore = createStateStore();
+	stateStore.getMutableState().selectedModelId = 'model-a';
+
+	const internals = {
+		stateStore,
+		subAgentScannerService: {
+			clearCache: () => {},
+		} as ChatServiceInternals['subAgentScannerService'],
+		attachmentSelectionService: {
+			clearSelection: () => {},
+		} as ChatServiceInternals['attachmentSelectionService'],
+		service: {
+			getDefaultProviderTag: () => 'model-default',
+			stopGeneration: () => {},
+			emitState: () => {},
+			queueSessionPlanSync: () => {},
+		} as ChatServiceInternals['service'],
+	} as ChatServiceInternals;
+
+	const api = createChatServiceStateApi(internals);
+	const session = api.createNewSession('新的聊天');
+
+	assert.equal(session.modelId, 'model-a');
+})

@@ -5,7 +5,6 @@ import {
 import type {
 	ChatSession,
 	ChatState,
-	McpToolMode,
 	SelectedFile,
 	SelectedFolder,
 } from '../types/chat'
@@ -39,10 +38,6 @@ export class ChatStateStore extends DomainChatStateStore {
 
 	setSelectedFolders(folders: SelectedFolder[], emit = false): void {
 		this.updateSelectedFolders(folders, emit)
-	}
-
-	setMcpToolMode(mode: McpToolMode, emit = false): void {
-		this.updateMcpToolMode(mode, emit)
 	}
 
 	setParallelResponses(group: ChatState['parallelResponses'], emit = false): void {

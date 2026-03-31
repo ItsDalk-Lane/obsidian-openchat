@@ -9,14 +9,3 @@ export interface SlashCommandItem {
 	type: SlashCommandType;
 	definition: SkillDefinition | SubAgentDefinition;
 }
-
-export interface SlashCommandMenuProps {
-	items: SlashCommandItem[];
-	filterText: string;
-	visible: boolean;
-	selectedIndex: number;
-	menuPosition: { top: number; left: number };
-	onSelect: (item: SlashCommandItem) => void;
-	onClose: () => void;
-	maxHeight?: number;
-}

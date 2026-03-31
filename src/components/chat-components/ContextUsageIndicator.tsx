@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import type { ChatMessage, ChatSession } from 'src/domains/chat/types';
 import type { ProviderSettings } from 'src/types/provider';
 import { resolveContextBudget } from 'src/core/chat/utils/context-budget';
-import { countMessageTokens, countTextTokens } from 'src/core/chat/utils/token';
+import { countMessageTokens } from 'src/core/chat/utils/token';
 
 interface ContextUsageIndicatorProps {
 	providers: ProviderSettings[];
@@ -128,18 +128,14 @@ export const ContextUsageIndicator = ({
 			};
 		}
 
-		// 计算已消耗的 tokens：包含所有历史消息（用户+助手）+ 系统提示 + 工具定义
+		// 计算已消耗的 tokens：包含所有历史消息（用户+助手）+ 工具定义
 		// requestTokenState.totalTokenEstimate 只记录请求时的估算，不包含模型响应
 		// 所以我们需要用 calculateTotalTokens 获取完整的消息历史消耗，再加上工具定义 tokens
 		const messageTokens = calculateTotalTokens(session.messages);
-		// 系统提示 tokens（如果有）
-		const systemPromptTokens = session.systemPrompt
-			? countTextTokens(session.systemPrompt)
-			: 0;
 		// 工具定义 tokens（从 requestTokenState 获取，如果没有则为 0）
 		const toolTokens = session.requestTokenState?.toolTokenEstimate ?? 0;
 
-		const totalTokens = messageTokens + systemPromptTokens + toolTokens;
+		const totalTokens = messageTokens + toolTokens;
 
 		// 百分比基于总上下文长度计算（包含预留输出空间）
 		const percentage = Math.round((totalTokens / budget.contextLength) * 100);

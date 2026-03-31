@@ -38,7 +38,6 @@ export const DEFAULT_CHAT_SETTINGS: ChatSettings = {
 	defaultModel: '',
 	autosaveChat: true,
 	openMode: 'sidebar',
-	enableSystemPrompt: true,
 	enableChatTrigger: true,
 	chatTriggerSymbol: ['@'],
 	chatModalWidth: 700,

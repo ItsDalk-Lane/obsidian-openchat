@@ -131,10 +131,7 @@ export const buildProviderMessagesForAgent = async (
 	);
 	const fileContentOptions = getChatDefaultFileContentOptions();
 	const explicitSystemPrompt = systemPrompt?.trim();
-	const templateSystemPrompt = session.enableTemplateAsSystemPrompt
-		? session.systemPrompt?.trim()
-		: undefined;
-	let effectiveSystemPrompt = explicitSystemPrompt || templateSystemPrompt;
+	let effectiveSystemPrompt = explicitSystemPrompt;
 
 	const activePlanGuidance = buildLivePlanGuidance(session.livePlan);
 	const skillsPromptBlock = await deps.resolveSkillsSystemPromptBlock(requestTools);

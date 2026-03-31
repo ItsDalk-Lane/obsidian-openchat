@@ -49,11 +49,13 @@ export const prepareChatRequest = async (
 	}
 
 	const trimmed = contentToSend.trim();
+	const selectedPromptTemplate = deps.state.selectedPromptTemplate;
 	if (
 		!trimmed
 		&& deps.state.selectedImages.length === 0
 		&& deps.state.selectedFiles.length === 0
 		&& deps.state.selectedFolders.length === 0
+		&& !selectedPromptTemplate
 	) {
 		return null;
 	}
@@ -89,21 +91,13 @@ export const prepareChatRequest = async (
 	const selectionSnapshot =
 		deps.attachmentSelectionService.getSelectionSnapshot();
 
-	const selectedPromptTemplate = deps.state.selectedPromptTemplate;
-	const useTemplateAsSystemPrompt =
-		deps.state.enableTemplateAsSystemPrompt
-		&& !!selectedPromptTemplate?.content;
-
 	let finalUserMessage = originalUserInput;
 	let taskTemplate: string | undefined;
-	if (selectedPromptTemplate && !useTemplateAsSystemPrompt) {
-		finalUserMessage = `${originalUserInput}\n\n[[${selectedPromptTemplate.name}]]`;
+	if (selectedPromptTemplate) {
+		finalUserMessage = originalUserInput
+			? `${originalUserInput}\n\n[[${selectedPromptTemplate.name}]]`
+			: `[[${selectedPromptTemplate.name}]]`;
 		taskTemplate = selectedPromptTemplate.content;
-	}
-
-	let systemPrompt: string | undefined;
-	if (useTemplateAsSystemPrompt && selectedPromptTemplate) {
-		systemPrompt = selectedPromptTemplate.content;
 	}
 
 	let messageContent = finalUserMessage;
@@ -136,9 +130,6 @@ export const prepareChatRequest = async (
 		session.messages.push(userMessage);
 	}
 	session.updatedAt = Date.now();
-	session.systemPrompt = systemPrompt;
-	session.enableTemplateAsSystemPrompt =
-		deps.state.enableTemplateAsSystemPrompt;
 
 	const currentSelectedFiles = [...selectionSnapshot.selectedFiles];
 	const currentSelectedFolders = [...selectionSnapshot.selectedFolders];
@@ -150,10 +141,7 @@ export const prepareChatRequest = async (
 	deps.emitState();
 
 	if (deps.state.shouldSaveHistory) {
-		if (
-			session.messages.length === 1
-			|| (systemPrompt && session.messages.length === 2)
-		) {
+		if (session.messages.length === 1) {
 			try {
 				const firstMessage = session.messages[0];
 				session.filePath =

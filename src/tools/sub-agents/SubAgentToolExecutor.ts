@@ -168,7 +168,6 @@ export class SubAgentToolExecutor implements ToolExecutor {
 			selectedImages: [],
 			selectedFiles: [],
 			selectedFolders: [],
-			enableTemplateAsSystemPrompt: false,
 			livePlan: null,
 			contextCompaction: null,
 			requestTokenState: null,

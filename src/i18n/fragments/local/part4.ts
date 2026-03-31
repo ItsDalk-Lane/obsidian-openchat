@@ -2,8 +2,6 @@ export interface LocalPart4 {
 	mcp_fs_query_missing_from: string;
 	chat_trigger_no_active_file: string;
 	chat_trigger_settings_section: string;
-	chat_template_system_prompt_toggle: string;
-	chat_template_system_prompt_toggle_desc: string;
 	chat_plan_toggle: string;
 	chat_plan_empty_title: string;
 	chat_plan_empty_desc: string;

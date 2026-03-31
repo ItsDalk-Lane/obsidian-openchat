@@ -29,8 +29,6 @@ const createChatState = (): ChatState => ({
 	selectedFiles: [],
 	selectedFolders: [],
 	shouldSaveHistory: false,
-	mcpToolMode: 'disabled',
-	mcpSelectedServerIds: [],
 	multiModelMode: 'single',
 	layoutMode: 'horizontal',
 })

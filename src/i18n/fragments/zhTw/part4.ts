@@ -3,8 +3,6 @@ export const zhTwPart4 = {
 	mcp_fs_query_missing_from: "Vault 查詢必須包含 from(...)",
 	chat_trigger_no_active_file: "請先開啟一個 Markdown 檔案",
 	chat_trigger_settings_section: "編輯器觸發設定",
-	chat_template_system_prompt_toggle: "模板系統提示詞",
-	chat_template_system_prompt_toggle_desc: "啟用後將目前提示詞模板原樣作為系統提示詞；關閉或未選擇模板時使用全域系統提示詞。",
 	chat_plan_toggle: "任務計畫",
 	chat_plan_empty_title: "目前會話還沒有任務計畫",
 	chat_plan_empty_desc: "AI 呼叫 write_plan 後會自動顯示在這裡。",

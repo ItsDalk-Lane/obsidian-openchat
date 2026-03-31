@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-openchat",
-	"version": "1.0.260331",
+	"version": "1.1.260331",
 	"description": "An Obsidian-native AI assistant with chat, vault search, context handling, and multi-provider LLM support.",
 	"main": "main.js",
 	"scripts": {

@@ -143,7 +143,6 @@ export class HistoryService {
 				createdAt: this.parser.parseTimestamp(frontmatter.created ?? stat?.ctime ?? 0),
 				updatedAt: this.parser.parseTimestamp(frontmatter.updated ?? stat?.mtime ?? 0),
 				selectedImages: [],
-				enableTemplateAsSystemPrompt: this.parser.parseBoolean(frontmatter.enableTemplateAsSystemPrompt, false),
 				multiModelMode: this.parser.parseMultiModelMode(frontmatter.multiModelMode),
 				layoutMode: this.parser.parseLayoutMode(frontmatter.layoutMode),
 				livePlan: this.planResolver.resolveLivePlan(persistedPlan, messagePlan),

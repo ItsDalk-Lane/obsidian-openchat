@@ -1,13 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
-import { normalizeBuiltinServerId } from 'src/tools/runtime/constants';
 import { getChatHistoryPath } from 'src/utils/aiPathSupport';
-import { DebugLogger } from 'src/utils/DebugLogger';
 import type {
 	ChatAttachmentFileInput,
 	ChatAttachmentFolderInput,
 } from 'src/domains/chat/service-attachment-selection';
 import { normalizeMessageManagementSettings } from '../types/chat';
-import type { ChatSession, ChatSettings, McpToolMode, SelectedFile, SelectedFolder } from '../types/chat';
+import type { ChatSession, ChatSettings, SelectedFile, SelectedFolder } from '../types/chat';
 import type { LayoutMode, MultiModelMode, ParallelResponseGroup } from '../types/multiModel';
 import type { ChatServiceInternals } from './chat-service-internals';
 
@@ -94,7 +92,6 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 			updatedAt: now,
 			contextNotes: [],
 			selectedImages: [],
-			enableTemplateAsSystemPrompt: false,
 			multiModelMode: state.multiModelMode,
 			layoutMode: state.layoutMode,
 			livePlan: null,
@@ -107,10 +104,7 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 			mutableState.selectedImages = [];
 			mutableState.selectedText = undefined;
 			mutableState.inputValue = '';
-			mutableState.enableTemplateAsSystemPrompt = false;
 			mutableState.selectedPromptTemplate = undefined;
-			mutableState.mcpToolMode = 'auto';
-			mutableState.mcpSelectedServerIds = [];
 			mutableState.parallelResponses = undefined;
 		});
 		internals.attachmentSelectionService.clearSelection(false);
@@ -188,38 +182,15 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 		internals.stateStore.getMutableState().enableWebSearchToggle = enabled;
 		internals.service.emitState();
 	},
-	setTemplateAsSystemPromptToggle(enabled: boolean): void {
-		const state = internals.stateStore.getMutableState();
-		const session = state.activeSession;
-		if (state.enableTemplateAsSystemPrompt === enabled && (!session || session.enableTemplateAsSystemPrompt === enabled)) {
-			return;
-		}
-		state.enableTemplateAsSystemPrompt = enabled;
-		if (session) {
-			session.enableTemplateAsSystemPrompt = enabled;
-			if (session.filePath) {
-				void internals.sessionManager.updateSessionFrontmatter(session.filePath, {
-					enableTemplateAsSystemPrompt: enabled,
-				}).catch((error) => {
-					DebugLogger.error('[ChatService] 更新模板系统提示词开关失败', error);
-				});
-			}
-		}
-		internals.service.emitState();
-	},
 	getReasoningToggle() { return internals.stateStore.getMutableState().enableReasoningToggle; },
 	getWebSearchToggle() { return internals.stateStore.getMutableState().enableWebSearchToggle; },
-	getTemplateAsSystemPromptToggle() { return internals.stateStore.getMutableState().enableTemplateAsSystemPrompt; },
 	addSelectedFile(file: ChatAttachmentFileInput) { internals.attachmentSelectionService.addSelectedFile(file); },
 	addSelectedFolder(folder: ChatAttachmentFolderInput) { internals.attachmentSelectionService.addSelectedFolder(folder); },
 	removeSelectedFile(fileId: string) { internals.attachmentSelectionService.removeSelectedFile(fileId); },
 	removeSelectedFolder(folderId: string) { internals.attachmentSelectionService.removeSelectedFolder(folderId); },
 	setSelectedFiles(files: SelectedFile[]) { internals.attachmentSelectionService.setSelectedFiles(files); },
 	setSelectedFolders(folders: SelectedFolder[]) { internals.attachmentSelectionService.setSelectedFolders(folders); },
-	getEnabledMcpServers() { return internals.toolRuntimeResolver.getEnabledMcpServers(); },
 	async getBuiltinToolsForSettings() { return await internals.toolRuntimeResolver.getBuiltinToolsForSettings(); },
-	setMcpToolMode(mode: McpToolMode): void { internals.stateStore.setMcpToolMode(mode, true); },
-	setMcpSelectedServerIds(ids: string[]): void { internals.stateStore.getMutableState().mcpSelectedServerIds = ids.map(normalizeBuiltinServerId); internals.service.emitState(); },
 	setModel(tag: string): void {
 		const state = internals.stateStore.getMutableState();
 		state.selectedModelId = tag;

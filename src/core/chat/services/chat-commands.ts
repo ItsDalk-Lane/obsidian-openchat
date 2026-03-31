@@ -84,7 +84,6 @@ export const executeSkillCommand = async (
 			path: skill.skillFilePath,
 			content: bodyContent
 		}
-		params.state.enableTemplateAsSystemPrompt = true
 		params.state.inputValue = ''
 		params.emitState()
 		await params.sendMessage('')

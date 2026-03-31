@@ -15,8 +15,6 @@ export const zhPart4 = {
 	mcp_fs_query_missing_from: "Vault 查询必须包含 from(...)",
 	chat_trigger_no_active_file: "请先打开一个 Markdown 文件",
 	chat_trigger_settings_section: "编辑器触发设置",
-	chat_template_system_prompt_toggle: "模板系统提示词",
-	chat_template_system_prompt_toggle_desc: "启用后将当前提示词模板原样作为系统提示词；关闭或未选择模板时使用全局系统提示词。",
 	chat_plan_toggle: "任务计划",
 	chat_plan_empty_title: "当前会话还没有任务计划",
 	chat_plan_empty_desc: "AI 调用 write_plan 后会自动显示在这里。",

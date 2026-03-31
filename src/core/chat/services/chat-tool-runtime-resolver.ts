@@ -16,7 +16,6 @@ import {
 	BUILTIN_FILESYSTEM_ROUTING_HINT,
 	BUILTIN_FILESYSTEM_TOOL_NAMES,
 	createActualMcpCallTool,
-	getEnabledChatMcpServers,
 } from './chat-tool-runtime-resolver-support';
 import type {
 	ChatToolRuntimeResolverOptions,
@@ -113,7 +112,6 @@ export class ChatToolRuntimeResolver {
 			options?.explicitToolNames !== undefined
 			|| options?.explicitMcpServerIds !== undefined;
 		const normalizedExplicitServerIds = (options?.explicitMcpServerIds ?? []).map(normalizeBuiltinServerId);
-		const normalizedSelectedServerIds = this.options.getMcpSelectedServerIds().map(normalizeBuiltinServerId);
 		const existingNames = new Set<string>();
 		const disabledBuiltinToolNames =
 			this.options.settingsAccessor.getAiRuntimeSettings().mcp?.disabledBuiltinToolNames ?? [];
@@ -121,52 +119,47 @@ export class ChatToolRuntimeResolver {
 		let builtinExecutor: BuiltinToolExecutor | null = null;
 		let mcpExecutor: McpToolExecutor | null = null;
 
-		if (hasExplicitFilters || this.options.getMcpToolMode() !== 'disabled') {
-			const builtinRuntime = await this.ensureBuiltinToolsRuntime(session);
-			if (builtinRuntime) {
-				const allBuiltinTools = await builtinRuntime.listTools();
-				const filteredBuiltinTools = allBuiltinTools
-					.filter((tool) => !disabledBuiltinToolNames.includes(tool.name))
-					.filter((tool) => {
-						if (hasExplicitFilters) {
-							const matchedByName = options?.explicitToolNames?.includes(tool.name) ?? false;
-							const matchedByServer = normalizedExplicitServerIds.includes(BUILTIN_SERVER_ID);
-							return matchedByName || matchedByServer;
-						}
-						if (this.options.getMcpToolMode() === 'manual') {
-							return normalizedSelectedServerIds.includes(BUILTIN_SERVER_ID);
-						}
-						return true;
-					});
+		const builtinRuntime = await this.ensureBuiltinToolsRuntime(session);
+		if (builtinRuntime) {
+			const allBuiltinTools = await builtinRuntime.listTools();
+			const filteredBuiltinTools = allBuiltinTools
+				.filter((tool) => !disabledBuiltinToolNames.includes(tool.name))
+				.filter((tool) => {
+					if (hasExplicitFilters) {
+						const matchedByName = options?.explicitToolNames?.includes(tool.name) ?? false;
+						const matchedByServer = normalizedExplicitServerIds.includes(BUILTIN_SERVER_ID);
+						return matchedByName || matchedByServer;
+					}
+					return true;
+				});
 
-				for (const tool of filteredBuiltinTools) {
-					const description = BUILTIN_FILESYSTEM_TOOL_NAMES.has(tool.name)
-						? `${BUILTIN_FILESYSTEM_ROUTING_HINT}\n\n${tool.description}`
-						: tool.description;
-					requestTools.push({
-						name: tool.name,
-						title: tool.title,
-						description,
-						inputSchema: tool.inputSchema,
-						outputSchema: tool.outputSchema,
-						annotations: tool.annotations,
-						source: 'builtin',
-						sourceId: BUILTIN_SERVER_ID,
-					});
-					existingNames.add(tool.name);
-				}
+			for (const tool of filteredBuiltinTools) {
+				const description = BUILTIN_FILESYSTEM_TOOL_NAMES.has(tool.name)
+					? `${BUILTIN_FILESYSTEM_ROUTING_HINT}\n\n${tool.description}`
+					: tool.description;
+				requestTools.push({
+					name: tool.name,
+					title: tool.title,
+					description,
+					inputSchema: tool.inputSchema,
+					outputSchema: tool.outputSchema,
+					annotations: tool.annotations,
+					source: 'builtin',
+					sourceId: BUILTIN_SERVER_ID,
+				});
+				existingNames.add(tool.name);
+			}
 
-				if (filteredBuiltinTools.length > 0) {
-					builtinExecutor = new BuiltinToolExecutor(
-						builtinRuntime.getRegistry(),
-						builtinRuntime.getContext(),
-						this.options.planSyncService.createBuiltinCallTool(builtinRuntime, session),
-					);
-				}
+			if (filteredBuiltinTools.length > 0) {
+				builtinExecutor = new BuiltinToolExecutor(
+					builtinRuntime.getRegistry(),
+					builtinRuntime.getContext(),
+					this.options.planSyncService.createBuiltinCallTool(builtinRuntime, session),
+				);
 			}
 		}
 
-		if (mcpManager && (hasExplicitFilters || this.options.getMcpToolMode() !== 'disabled')) {
+		if (mcpManager) {
 			const allMcpTools = await mcpManager.getToolsForModelContext();
 			const selectedServerIds = options?.explicitMcpServerIds;
 			const selectedToolNames = options?.explicitToolNames;
@@ -176,9 +169,7 @@ export class ChatToolRuntimeResolver {
 					const matchedByServer = selectedServerIds?.includes(tool.serverId) ?? false;
 					return matchedByName || matchedByServer;
 				})
-				: this.options.getMcpToolMode() === 'manual'
-					? allMcpTools.filter((tool) => this.options.getMcpSelectedServerIds().includes(tool.serverId))
-					: allMcpTools;
+				: allMcpTools;
 
 			for (const tool of filteredMcpTools) {
 				if (existingNames.has(tool.name)) {
@@ -238,14 +229,6 @@ export class ChatToolRuntimeResolver {
 			toolExecutor: executors.length > 0 ? new CompositeToolExecutor(executors) : undefined,
 			maxToolCallLoops: this.options.getMaxToolCallLoops(),
 		};
-	}
-
-	getEnabledMcpServers(): Array<{ id: string; name: string }> {
-		return getEnabledChatMcpServers(
-			this.options.runtimeDeps,
-			this.options.runtimeDeps.getMcpClientManager(),
-			this.getBuiltinToolSettings(),
-		);
 	}
 
 	async getBuiltinToolsForSettings(): Promise<Awaited<ReturnType<BuiltinToolsRuntime['listTools']>>> {

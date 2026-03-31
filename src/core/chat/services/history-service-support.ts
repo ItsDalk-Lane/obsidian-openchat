@@ -41,7 +41,6 @@ export const buildHistorySessionFrontmatter = (
 	updated: parser.formatTimestamp(session.updatedAt),
 	messageCount: session.messages.length,
 	contextNotes: session.contextNotes ?? [],
-	enableTemplateAsSystemPrompt: session.enableTemplateAsSystemPrompt ?? false,
 	multiModelMode: session.multiModelMode ?? 'single',
 	layoutMode: session.layoutMode,
 	livePlan: clonePlanSnapshot(session.livePlan ?? null),
