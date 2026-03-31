@@ -43,6 +43,7 @@ test('DEFAULT_CHAT_SETTINGS 保持 legacy 默认值', () => {
 	assert.equal(DEFAULT_CHAT_SETTINGS.quickActionsStreamOutput, true);
 	assert.equal(DEFAULT_CHAT_SETTINGS.chatModalWidth, 700);
 	assert.equal(DEFAULT_CHAT_SETTINGS.chatModalHeight, 500);
+	assert.equal('showRibbonIcon' in DEFAULT_CHAT_SETTINGS, false);
 	assert.deepEqual(
 		DEFAULT_CHAT_SETTINGS.messageManagement,
 		DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
@@ -62,10 +63,6 @@ test('createChatVaultPort 会把 provider 的 vault 原语收敛成 chat 域端�
 	const provider = {
 		notify(message: string, timeout?: number): void {
 			calls.push(`notify:${message}:${String(timeout)}`);
-		},
-		async buildGlobalSystemPrompt(featureId: string): Promise<string> {
-			calls.push(`prompt:${featureId}`);
-			return `prompt:${featureId}`;
 		},
 		normalizePath(path: string): string {
 			calls.push(`path:${path}`);
@@ -194,9 +191,6 @@ test('createChatVaultPort 会把 provider 的 vault 原语收敛成 chat 域端�
 test('createChatHostPorts 仅暴露 chat 域需要的宿主原语与 vault 子端口', async () => {
 	const provider = {
 		notify(): void {},
-		async buildGlobalSystemPrompt(): Promise<string> {
-			return 'prompt';
-		},
 		normalizePath(path: string): string {
 			return path.replace(/\\/gu, '/');
 		},
@@ -265,7 +259,6 @@ test('createChatHostPorts 仅暴露 chat 域需要的宿主原语与 vault 子�
 	assert.equal('extra' in ports, false);
 	assert.equal('getVaultEntry' in ports, false);
 	assert.equal('vault' in ports, true);
-	assert.equal(await ports.buildGlobalSystemPrompt('chat'), 'prompt');
 	assert.equal(ports.normalizePath('a\\b'), 'a/b');
 	assert.deepEqual(ports.vault.listFolderEntries('folder'), []);
 });

@@ -56,7 +56,6 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 				name: templateFile.name.replace(/\.[^.]+$/u, ''),
 				content: templateContent,
 			};
-			internals.stateStore.getMutableState().showTemplateSelector = false;
 			internals.service.emitState();
 		} catch (error) {
 			DebugLogger.error('[ChatService] 选择提示词模板失败', error);
@@ -92,7 +91,6 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 		state.parallelResponses = undefined;
 		state.enableTemplateAsSystemPrompt = session.enableTemplateAsSystemPrompt;
 		state.selectedPromptTemplate = undefined;
-		state.showTemplateSelector = false;
 		internals.service.emitState();
 		internals.service.queueSessionPlanSync(session);
 	},
@@ -121,7 +119,6 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 	onInstalledSubAgentsChange(listener: Parameters<typeof internals.subAgentWatcherService.onChange>[0]) { return internals.subAgentWatcherService.onChange(listener); },
 	openChatSettingsModal(): void { internals.obsidianApi.openSettingsTab(internals.settingsAccessor.getManifestId()); },
 	async persistChatSettings(partial: Partial<typeof internals.settings>) { await getPersistenceFacade(internals).persistChatSettings(partial); },
-	async persistGlobalSystemPromptsEnabled(enabled: boolean) { await getPersistenceFacade(internals).persistGlobalSystemPromptsEnabled(enabled); },
 	async persistMcpSettings(mcpSettings: McpSettings) { await getPersistenceFacade(internals).persistMcpSettings(mcpSettings); },
 	async rewriteSessionMessages(session: ChatSession) { await getPersistenceFacade(internals).rewriteSessionMessages(session); },
 	readPersistedLayoutMode(): LayoutMode | null { return getPersistenceFacade(internals).readPersistedLayoutMode(); },

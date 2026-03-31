@@ -26,7 +26,7 @@ import {
 	type EditorTabCompletionRuntime,
 	type PendingSuggestionRequest,
 } from './types';
-import type { EventBus, NoticePort, SystemPromptPort } from 'src/providers/providers.types';
+import type { EventBus, NoticePort } from 'src/providers/providers.types';
 
 /** @precondition state 为有效的 EditorState @postcondition 返回与光标对齐的上下文 @throws 从不抛出 @example buildEditorContext(state) */
 export function buildEditorContext(state: EditorState, options: Partial<ContextBuilderOptions> = {}): EditorContext {
@@ -127,12 +127,27 @@ export function isContinuousUsage(history: readonly number[], now: number): bool
 		>= DEFAULT_CONTINUOUS_USAGE_CONFIG.minConsecutiveCount - 1;
 }
 
-/** @precondition providers 为当前可用候选 provider 列表 @postcondition 返回匹配 tag 的 provider 或首个默认 provider @throws 从不抛出 @example selectCompletionProvider('demo', providers) */
-export function selectCompletionProvider(providerTag: string, providers: readonly EditorCompletionProvider[]): EditorCompletionProvider | null {
-	if (!providerTag) {
-		return providers[0] ?? null;
+/** @precondition providers 为当前可用候选 provider 列表 @postcondition 按显式 provider、defaultModel、首项优先级返回 provider @throws 从不抛出 @example selectCompletionProvider('demo', 'fallback', providers) */
+export function selectCompletionProvider(
+	providerTag: string,
+	defaultModelTag: string,
+	providers: readonly EditorCompletionProvider[],
+): EditorCompletionProvider | null {
+	const explicitProvider = providerTag
+		? providers.find((provider) => provider.tag === providerTag) ?? null
+		: null;
+	if (explicitProvider) {
+		return explicitProvider;
 	}
-	return providers.find((provider) => provider.tag === providerTag) ?? null;
+
+	const defaultProvider = defaultModelTag
+		? providers.find((provider) => provider.tag === defaultModelTag) ?? null
+		: null;
+	if (defaultProvider) {
+		return defaultProvider;
+	}
+
+	return providers[0] ?? null;
 }
 
 /**
@@ -147,7 +162,7 @@ export class EditorTabCompletionService {
 	private completionHistory: number[] = [];
 
 	constructor(
-		private readonly obsidianApi: NoticePort & SystemPromptPort,
+		private readonly obsidianApi: NoticePort,
 		private readonly eventBus: EventBus<EditorTabCompletionEvents> | null,
 		private runtime: EditorTabCompletionRuntime,
 	) {}
@@ -173,7 +188,11 @@ export class EditorTabCompletionService {
 			this.obsidianApi.notify(this.runtime.messages.readOnly);
 			return null;
 		}
-		const provider = selectCompletionProvider(settings.providerTag, this.runtime.providers);
+		const provider = selectCompletionProvider(
+			settings.providerTag,
+			this.runtime.defaultModelTag,
+			this.runtime.providers,
+		);
 		if (!provider) {
 			this.obsidianApi.notify(this.runtime.messages.noProvider);
 			return null;
@@ -203,7 +222,7 @@ export class EditorTabCompletionService {
 	async resolveSuggestion(pendingRequest: PendingSuggestionRequest): Promise<string> {
 		const timeoutId = setTimeout(() => pendingRequest.controller.abort(), this.runtime.settings.timeout);
 		try {
-			const messages = await this.buildMessages(pendingRequest.context, pendingRequest.maxSentences);
+			const messages = await this.buildMessages(pendingRequest.context);
 			let suggestion = '';
 			for await (const chunk of pendingRequest.provider.sendCompletion(messages, pendingRequest.controller)) {
 				suggestion += chunk;
@@ -254,17 +273,16 @@ export class EditorTabCompletionService {
 		this.cancel();
 	}
 
-	private async buildMessages(context: EditorContext, maxSentences: number): Promise<EditorCompletionMessage[]> {
-		const globalPrompt = (await this.obsidianApi.buildGlobalSystemPrompt('tab_completion')).trim();
-		const rules = `规则：\n1. 直接输出续写内容，不要解释\n2. ${maxSentences === 1 ? '续写一句话' : `续写${maxSentences}句话左右`}\n3. 不要重复已有内容\n4. ${generateContextPrompt(context)}`;
-		const contextBlock = context.textAfter.trim() ? `${context.textBefore}\n[...后续内容省略...]` : context.textBefore;
-		const template = this.runtime.settings.promptTemplate?.trim() || '{{rules}}\n\n{{context}}';
-		const userPrompt = template.replace(/\{\{rules\}\}/gu, rules).replace(/\{\{context\}\}/gu, contextBlock).trim() || `${rules}\n\n${contextBlock}`;
+	private async buildMessages(context: EditorContext): Promise<EditorCompletionMessage[]> {
+		const contextBlock = context.textAfter.trim()
+			? `${context.textBefore}\n[...后续内容省略...]`
+			: context.textBefore;
+		const systemPrompt = this.runtime.settings.promptTemplate?.trim();
 		const messages: EditorCompletionMessage[] = [];
-		if (globalPrompt) {
-			messages.push({ role: 'system', content: globalPrompt });
+		if (systemPrompt) {
+			messages.push({ role: 'system', content: systemPrompt });
 		}
-		messages.push({ role: 'user', content: userPrompt });
+		messages.push({ role: 'user', content: contextBlock });
 		return messages;
 	}
 }

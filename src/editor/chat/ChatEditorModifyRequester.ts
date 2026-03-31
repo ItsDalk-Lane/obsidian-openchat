@@ -15,15 +15,12 @@ export async function requestModifyTextHelper(
 	provider: ProviderSettings,
 	instruction: string,
 	content: string,
+	systemPrompt?: string,
 ): Promise<string> {
 	const vendor = availableVendors.find(v => v.name === provider.vendor);
 	if (!vendor) {
 		throw new Error(`未知的模型供应商: ${provider.vendor}`);
 	}
-
-	const globalSystemPrompt = (
-		await obsidianApi.buildGlobalSystemPrompt('selection_toolbar')
-	).trim();
 
 	const userInstruction = `任务：根据用户指令修改输入文本。\n\n规则：\n1. 仅输出修改后的最终文本，不要解释\n2. 保持原文语言\n3. 保留 Markdown 结构（如有）\n\n用户指令：\n${instruction}`;
 
@@ -46,7 +43,7 @@ export async function requestModifyTextHelper(
 	});
 	const sourcePath = obsidianApi.getActiveFilePath() ?? '';
 	const messages: ProviderMessage[] = await promptBuilder.buildChatProviderMessages([taskMessage], {
-		systemPrompt: globalSystemPrompt.length > 0 ? globalSystemPrompt : undefined,
+		systemPrompt: systemPrompt || undefined,
 		sourcePath,
 		maxHistoryRounds: 0
 	});

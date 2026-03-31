@@ -28,7 +28,6 @@ const createChatState = (): ChatState => ({
 	selectedImages: [],
 	selectedFiles: [],
 	selectedFolders: [],
-	showTemplateSelector: false,
 	shouldSaveHistory: false,
 	mcpToolMode: 'disabled',
 	mcpSelectedServerIds: [],
@@ -188,7 +187,7 @@ test('ChatStateStore 返回克隆快照并按预期 emit', () => {
 
 test('ChatAttachmentSelectionService 维护选择快照并与 session 同步', () => {
 	const store = new ChatStateStore(createChatState())
-	const service = new ChatAttachmentSelectionService(store, () => true)
+	const service = new ChatAttachmentSelectionService(store)
 
 	service.updateSelectionWithFile({
 		path: 'docs/spec.md',
@@ -232,6 +231,7 @@ test('ChatAttachmentSelectionService 维护选择快照并与 session 同步', (
 			path: 'vault/plan.md',
 			extension: 'md',
 			type: 'file',
+			isAutoAdded: true,
 		}],
 		selectedFolders: [{
 			id: 'vault',
@@ -246,74 +246,38 @@ test('ChatAttachmentSelectionService 维护选择快照并与 session 同步', (
 	sessionSelection.selectedFiles[0]!.name = 'session-mutated.md'
 	assert.equal(store.getMutableState().selectedFiles[0]?.path, 'vault/plan.md')
 	assert.equal(store.getMutableState().selectedFiles[0]?.name, 'plan.md')
+	assert.equal('isAutoAdded' in (store.getMutableState().selectedFiles[0] as Record<string, unknown>), false)
 	assert.equal(store.getMutableState().selectedFolders[0]?.path, 'vault')
 })
 
-test('ChatAttachmentSelectionService 保护手动移除的 auto-added 文件', () => {
+test('ChatAttachmentSelectionService 仅维护显式选择并对重复文件去重', () => {
 	const store = new ChatStateStore(createChatState())
-	const service = new ChatAttachmentSelectionService(store, () => true)
-	const currentFile = {
-		path: 'daily/today.md',
-		name: 'today.md',
-		extension: 'md',
-	}
-
-	service.syncActiveFileSelection(currentFile)
-	assert.equal(service.getAutoAddedFiles()[0]?.path, 'daily/today.md')
-
-	service.updateSelectionWithoutFile('daily/today.md', true)
-	service.syncActiveFileSelection(currentFile)
-	assert.equal(service.getAutoAddedFiles().length, 0)
-
-	service.onChatViewReopened(currentFile)
-	service.syncActiveFileSelection(currentFile)
-	assert.equal(service.getAutoAddedFiles()[0]?.path, 'daily/today.md')
-
-	service.onNoActiveFile()
-	service.updateSelectionWithoutFile('daily/today.md', true)
-	service.syncActiveFileSelection(currentFile)
-	assert.equal(service.getAutoAddedFiles().length, 0)
-})
-
-test('ChatAttachmentSelectionService 只自动添加 markdown 并替换旧 auto-added 文件', () => {
-	const store = new ChatStateStore(createChatState())
-	const service = new ChatAttachmentSelectionService(store, () => true)
+	const service = new ChatAttachmentSelectionService(store)
 
 	service.updateSelectionWithFile({
-		path: 'manual/keep.txt',
-		name: 'keep.txt',
-		extension: 'txt',
-	})
-	service.syncActiveFileSelection({
-		path: 'notes/skip.txt',
-		name: 'skip.txt',
-		extension: 'txt',
-	})
-	assert.equal(service.getAutoAddedFiles().length, 0)
-
-	service.syncActiveFileSelection({
-		path: 'notes/first.md',
-		name: 'first.md',
+		path: 'notes/active.md',
+		name: 'active.md',
 		extension: 'md',
 	})
-	assert.deepEqual(
-		store.getMutableState().selectedFiles.map((file) => file.path),
-		['manual/keep.txt', 'notes/first.md'],
-	)
-
-	service.syncActiveFileSelection({
-		path: 'notes/second.md',
-		name: 'second.md',
+	service.updateSelectionWithFile({
+		path: 'notes/active.md',
+		name: 'active.md',
 		extension: 'md',
 	})
+	service.updateSelectionWithFile({
+		path: 'data/schema.json',
+		name: 'schema.json',
+		extension: 'json',
+	})
+
 	assert.deepEqual(
 		store.getMutableState().selectedFiles.map((file) => file.path),
-		['manual/keep.txt', 'notes/second.md'],
+		['notes/active.md', 'data/schema.json'],
 	)
 
-	service.updateSelectionWithoutAutoAddedFiles()
+	service.updateSelectionWithoutFile('notes/active.md')
 	assert.deepEqual(
 		store.getMutableState().selectedFiles.map((file) => file.path),
-		['manual/keep.txt'],
+		['data/schema.json'],
 	)
 })

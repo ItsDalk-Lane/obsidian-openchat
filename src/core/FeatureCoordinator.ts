@@ -1,7 +1,7 @@
 /**
  * @module core/FeatureCoordinator
  * @description 薄编排入口。
- *   职责仅限于：创建共享基础设施（obsidianApiProvider、systemPromptAssembler），
+ *   职责仅限于：创建共享基础设施（obsidianApiProvider），
  *   持有子装配器与 runtime 协调器引用，编排 initialize / refresh / dispose 顺序。
  *   具体的功能装配、宿主适配、查询门面已分别委托给：
  *   - ChatAssembler（chat 功能装配 + 早期视图恢复）
@@ -10,13 +10,14 @@
  *
  * @dependencies src/core/chat-assembler, src/core/ai-runtime-assembler,
  *   src/core/feature-query-facade, src/domains/skills/ui, src/domains/mcp/ui,
- *   src/providers/obsidian-api, src/core/services/SystemPromptAssembler
- * @side-effects 通过子装配器间接注册视图、命令、状态栏等
+ *   src/providers/obsidian-api
+ * @side-effects 通过子装配器间接注册视图、命令等
  * @invariants 不直接构建 host adapter，不直接持有 ChatFeatureManager 等运行时对象。
  */
 
 import type { App, Command, WorkspaceLeaf } from 'obsidian';
 import type { Extension } from '@codemirror/state';
+import type { ChatTriggerSource } from 'src/core/chat/services/chat-service-types';
 import type { PluginSettings } from 'src/domains/settings/types';
 import type { McpRuntimeManager } from 'src/domains/mcp/types';
 import type { ToolExecutor } from 'src/types/tool';
@@ -28,7 +29,6 @@ import {
     createMcpRuntimeManagerFactory,
 } from 'src/domains/mcp/ui';
 import { createObsidianApiProvider } from 'src/providers/obsidian-api';
-import { SystemPromptAssembler } from 'src/core/services/SystemPromptAssembler';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { SkillsRuntimeCoordinator } from 'src/domains/skills/ui';
 import { ChatAssembler } from './chat-assembler';
@@ -46,15 +46,13 @@ interface FeatureCoordinatorDeps {
     saveSettings(): Promise<void>;
     registerView(type: string, viewCreator: (leaf: WorkspaceLeaf) => unknown): void;
     addCommand(command: Command): void;
-    addRibbonIcon(icon: string, title: string, callback: (evt: MouseEvent) => unknown): HTMLElement;
-    addStatusBarItem(): HTMLElement;
     removeCommand(id: string): void;
     registerEditorExtension(extension: Extension | readonly Extension[]): void;
 }
 
 export class FeatureCoordinator {
     // ── 共享基础设施 ──────────────────────────────────
-    private readonly systemPromptAssembler: SystemPromptAssembler;
+
     private readonly obsidianApiProvider;
 
     // ── 域 runtime 协调器 ─────────────────────────────
@@ -69,10 +67,8 @@ export class FeatureCoordinator {
     private readonly queryFacade: FeatureQueryFacade;
 
     constructor(private plugin: FeatureCoordinatorDeps) {
-        this.systemPromptAssembler = new SystemPromptAssembler(this.plugin.app);
         this.obsidianApiProvider = createObsidianApiProvider(
             this.plugin.app,
-            async (featureId) => await this.systemPromptAssembler.buildGlobalSystemPrompt(featureId as never),
         );
 
         this.skillsRuntime = new SkillsRuntimeCoordinator(this.obsidianApiProvider, {
@@ -131,6 +127,13 @@ export class FeatureCoordinator {
     registerChatViewTypesEarly(): void {
         this.chatAssembler.registerChatViewTypesEarly();
     }
+
+	async activateChatView(
+		mode: PluginSettings['chat']['openMode'],
+		triggerSource: ChatTriggerSource = 'chat_input',
+	): Promise<void> {
+		await this.chatAssembler.activateChatView(mode, triggerSource);
+	}
 
     async initializeChat(settings: PluginSettings): Promise<void> {
         await this.initializeSkills();

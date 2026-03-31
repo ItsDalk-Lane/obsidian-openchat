@@ -71,8 +71,6 @@ export const buildMessageOperationDeps = (internals: ChatServiceInternals) => ({
 	sessionManager: internals.sessionManager,
 	multiModelService: internals.multiModelService,
 	notify: (message: string, timeout?: number) => internals.obsidianApi.notify(message, timeout),
-	buildGlobalSystemPrompt: async (featureId: string) =>
-		await internals.obsidianApi.buildGlobalSystemPrompt(featureId),
 	emitState: () => internals.service.emitState(),
 	createNewSession: () => internals.service.createNewSession(),
 	syncSessionMultiModelState: (session?: ChatSession) =>
@@ -107,8 +105,6 @@ export const buildMessageMutationDeps = (internals: ChatServiceInternals) => ({
 });
 
 export const getProviderMessageDeps = (internals: ChatServiceInternals) => ({
-	buildGlobalSystemPrompt: async (featureId: string) =>
-		await internals.obsidianApi.buildGlobalSystemPrompt(featureId),
 	getActiveFilePath: () => internals.obsidianApi.getActiveFilePath(),
 	state: internals.stateStore.getMutableState(),
 	settings: internals.settings,

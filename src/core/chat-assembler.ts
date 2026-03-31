@@ -13,13 +13,18 @@ import type { App, Command, WorkspaceLeaf } from 'obsidian';
 import { MarkdownView } from 'obsidian';
 import type { Extension } from '@codemirror/state';
 import type { ChatRuntimeDeps } from 'src/core/chat/runtime/chat-runtime-deps';
-import type { ChatConsumerHost } from 'src/core/chat/services/chat-service-types';
+import type {
+	ChatConsumerHost,
+	ChatTriggerSource,
+} from 'src/core/chat/services/chat-service-types';
+import type { ChatOpenMode } from 'src/domains/chat/types';
 import type { ChatViewFactory } from 'src/domains/chat/types-view-coordinator';
 import type { PluginSettings } from 'src/domains/settings/types';
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import { createChatServiceDeps } from 'src/core/chat/services/create-chat-service-deps';
 import { ChatViewCoordinator } from 'src/domains/chat/ui-view-coordinator';
+import { activateChatViewFromAssembler } from './chat-assembler-support';
 import { ChatFeatureManager } from 'src/core/chat/chat-feature-manager';
 import { buildChatViewFactory } from 'src/core/chat/chat-view-factory-builder';
 
@@ -33,7 +38,6 @@ export interface ChatAssemblerHost {
 	saveSettings(): Promise<void>;
 	registerView(type: string, viewCreator: (leaf: WorkspaceLeaf) => unknown): void;
 	addCommand(command: Command): void;
-	addRibbonIcon(icon: string, title: string, callback: (evt: MouseEvent) => unknown): HTMLElement;
 	registerEditorExtension(extension: Extension | readonly Extension[]): void;
 }
 
@@ -83,6 +87,13 @@ export class ChatAssembler {
 		// 避免在真实设置加载完成前显示「暂无聊天会话」的空白状态。
 		// initialize() 具有幂等保护，后续 initializeChat() 中的再次调用只会更新设置并重新发射状态。
 		this.earlyChatService.initialize();
+	}
+
+	async activateChatView(
+		mode: ChatOpenMode,
+		triggerSource: ChatTriggerSource = 'chat_input',
+	): Promise<void> {
+		await activateChatViewFromAssembler(this, mode, triggerSource);
 	}
 
 	async initializeChat(settings: PluginSettings): Promise<void> {
@@ -171,8 +182,6 @@ export class ChatAssembler {
 			addCommand: (command) => {
 				plugin.addCommand(command);
 			},
-			addRibbonIcon: (icon, title, callback) =>
-				plugin.addRibbonIcon(icon, title, callback),
 			getActiveMarkdownFile: () => plugin.app.workspace.getActiveFile(),
 			getActiveMarkdownView: () =>
 				plugin.app.workspace.getActiveViewOfType(MarkdownView),

@@ -70,8 +70,11 @@ export default {
 	'Tab completion context after description': '发送给 AI 的光标后文本长度（字符数）',
 	'Tab completion timeout': '请求超时时间',
 	'Tab completion timeout description': 'AI 请求的最大等待时间（秒）',
-	'Tab completion prompt template': 'Tab 补全提示词模板',
-	'Tab completion prompt template description': '用于构建发送给 AI 的用户消息。可用占位符：{{rules}}（规则）、{{context}}（上下文）。',
+	'Tab completion system prompt': '系统提示词',
+	'Tab completion system prompt description': '在编辑器上下文之前发送给模型的系统提示词，用于指导模型的续写行为。留空则不注入系统提示词。',
+	'Tab completion system prompt edit btn': '编辑',
+	'Tab completion system prompt modal title': 'Tab 补全系统提示词',
+	'Tab completion system prompt placeholder': '输入 Tab 补全的系统提示词内容（留空则不注入）…',
 	'Debug mode': '调试模式',
 	'Debug mode description': '启用后将在控制台输出调试日志。修改后需要重新加载插件才能生效。',
 	'LLM console log': 'LLM 调用日志（messages / 响应预览）',
@@ -191,6 +194,7 @@ export default {
 	'Failed to load models. Please try again later.':
 		'加载模型列表失败，请稍后重试。',
 	'Chat session saved': '聊天会话已保存',
+	'Provider settings saved': '模型提供商设置已保存',
 	'Generation failed. Please try again later.': '生成失败，请稍后再试。',
 	'{mode} mode does not support parameter {field}': '{mode} 模式不支持参数 {field}。',
 	'{mode} mode does not support start_line; it was removed automatically. Use segment mode for line-offset reads.':

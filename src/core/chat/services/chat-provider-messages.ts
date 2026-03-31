@@ -16,7 +16,6 @@ import {
 import { filterMessagesForCompareModel } from 'src/core/chat/utils/compare-context';
 import type { Message as ProviderMessage, ProviderSettings } from 'src/types/provider';
 import type { ToolDefinition } from 'src/types/tool';
-import { DebugLogger } from 'src/utils/DebugLogger';
 import type { ChatContextCompactionService } from './chat-context-compaction-service';
 import type { FileContentOptions } from './file-content-service';
 import type { MessageContextOptimizer } from './message-context-optimizer';
@@ -43,7 +42,6 @@ import {
 } from './chat-provider-message-support';
 
 export interface ChatProviderMessageDeps {
-	buildGlobalSystemPrompt: (featureId: string) => Promise<string>;
 	getActiveFilePath: () => string | null;
 	state: Pick<ChatState, 'contextNotes' | 'multiModelMode' | 'selectedModelId'>;
 	settings: ChatSettings;
@@ -137,19 +135,6 @@ export const buildProviderMessagesForAgent = async (
 		? session.systemPrompt?.trim()
 		: undefined;
 	let effectiveSystemPrompt = explicitSystemPrompt || templateSystemPrompt;
-	if (!effectiveSystemPrompt) {
-		try {
-			const built = await deps.buildGlobalSystemPrompt('ai_chat');
-			if (built && built.trim().length > 0) {
-				effectiveSystemPrompt = built;
-				session.systemPrompt = effectiveSystemPrompt;
-			} else if (!session.enableTemplateAsSystemPrompt) {
-				session.systemPrompt = undefined;
-			}
-		} catch (error) {
-			DebugLogger.warn('[ChatService] 全局系统提示词加载失败，跳过注入', error);
-		}
-	}
 
 	const activePlanGuidance = buildLivePlanGuidance(session.livePlan);
 	const skillsPromptBlock = await deps.resolveSkillsSystemPromptBlock(requestTools);

@@ -157,6 +157,13 @@
 	background-color: var(--background-modifier-hover);
 }
 
+.ff-menu-item.ff-keyboard-active,
+.ff-result-item.ff-keyboard-active,
+.ff-file-item.ff-keyboard-active,
+.ff-folder-item.ff-keyboard-active {
+	background-color: var(--background-modifier-active-hover);
+}
+
 .ff-menu-item:last-child {
 	border-bottom: none;
 }
@@ -362,21 +369,10 @@
 	/* 移除 hover 背景色效果 */
 }
 
-.ff-folder-info {
+.ff-folder-name {
 	flex: 1;
 	min-width: 0;
-}
-
-.ff-folder-name {
 	font-weight: 500;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.ff-folder-path {
-	font-size: 0.75rem;
-	opacity: 0.7;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

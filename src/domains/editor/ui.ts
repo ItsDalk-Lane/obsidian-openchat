@@ -16,7 +16,7 @@ import type {
 	PendingSuggestionRequest,
 	TabCompletionStateValue,
 } from './types';
-import type { EventBus, NoticePort, SystemPromptPort } from 'src/providers/providers.types';
+import type { EventBus, NoticePort } from 'src/providers/providers.types';
 
 const defaultTabCompletionState: TabCompletionStateValue = { isShowing: false, suggestionText: '', suggestionPos: 0, isLoading: false, requestId: null };
 const setSuggestionEffect = StateEffect.define<{ text: string; pos: number; requestId: string }>();
@@ -32,7 +32,7 @@ const confirmSuggestionEffect = StateEffect.define<void>();
 export class EditorDomainController {
 	private readonly service: EditorTabCompletionService;
 
-	constructor(obsidianApi: NoticePort & SystemPromptPort, eventBus: EventBus<EditorTabCompletionEvents> | null, private runtime: EditorTabCompletionRuntime) {
+	constructor(obsidianApi: NoticePort, eventBus: EventBus<EditorTabCompletionEvents> | null, private runtime: EditorTabCompletionRuntime) {
 		this.service = new EditorTabCompletionService(obsidianApi, eventBus, runtime);
 	}
 

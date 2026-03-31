@@ -2,7 +2,7 @@
  * @module core/settings-adapter-assembly
  * @description 组装 settings 域所需的端口实现。
  *   将 legacy 具体实现（SettingsSecretManager、SettingsMigrationService、
- *   SystemPromptDataService、McpServerDataService）包装为域定义的端口契约，
+	*   McpServerDataService）包装为域定义的端口契约，
  *   并由组合根在插件启动时调用。
  *
  * @dependencies obsidian (通过 App 类型), legacy settings services, src/domains/settings/types
@@ -17,7 +17,6 @@ import type {
 	SettingsMigrationPort,
 	SettingsPersistencePort,
 	SettingsSecretPort,
-	SettingsSystemPromptPort,
 } from 'src/domains/settings/types';
 import type { SettingsDomainPorts } from 'src/domains/settings/service';
 import type { SettingsDomainLogger } from 'src/domains/settings/types';
@@ -96,36 +95,6 @@ export function createSettingsMigrationPort(
 	};
 }
 
-// ── 系统提示词端口 ──────────────────────────────────
-
-export function createSettingsSystemPromptPort(
-	app: App,
-): SettingsSystemPromptPort {
-	let servicePromise: Promise<SettingsSystemPromptPort> | null = null;
-
-	function getService(): Promise<SettingsSystemPromptPort> {
-		if (!servicePromise) {
-			servicePromise = import(
-				'src/settings/system-prompts/SystemPromptDataService'
-			).then(({ SystemPromptDataService }) => {
-				type SystemPromptApp = Parameters<typeof SystemPromptDataService.getInstance>[0];
-				return SystemPromptDataService.getInstance(app as SystemPromptApp);
-			}).catch((error) => {
-				servicePromise = null;
-				throw error;
-			});
-		}
-		return servicePromise;
-	}
-
-	return {
-		migrateFromLegacyDefaultSystemMessage: async (params) => {
-			const service = await getService();
-			return service.migrateFromLegacyDefaultSystemMessage(params);
-		},
-	};
-}
-
 // ── MCP 服务器数据端口 ──────────────────────────────
 
 export function createSettingsMcpServerPort(
@@ -178,7 +147,6 @@ export function assembleSettingsDomainPorts(
 		host: createSettingsHostPort(deps.obsidianApi),
 		secret: createSettingsSecretPort(),
 		migration: createSettingsMigrationPort(deps.plugin),
-		systemPrompt: createSettingsSystemPromptPort(deps.app),
 		mcpServer: createSettingsMcpServerPort(deps.app),
 		logger: deps.logger,
 	};

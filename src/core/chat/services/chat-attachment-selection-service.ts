@@ -10,11 +10,8 @@ import { ChatStateStore } from './chat-state-store';
 export type { AttachmentSelectionSnapshot };
 
 export class ChatAttachmentSelectionService extends DomainChatAttachmentSelectionService {
-	constructor(
-		stateStore: ChatStateStore,
-		isAutoAddActiveFileEnabled: () => boolean,
-	) {
-		super(stateStore, isAutoAddActiveFileEnabled);
+	constructor(stateStore: ChatStateStore) {
+		super(stateStore);
 	}
 
 	restoreSelection(snapshot: AttachmentSelectionSnapshot, emit = true): void {
@@ -37,8 +34,8 @@ export class ChatAttachmentSelectionService extends DomainChatAttachmentSelectio
 		this.updateSelectionWithFolder(folder);
 	}
 
-	removeSelectedFile(fileId: string, isManualRemoval = true): void {
-		this.updateSelectionWithoutFile(fileId, isManualRemoval);
+	removeSelectedFile(fileId: string): void {
+		this.updateSelectionWithoutFile(fileId);
 	}
 
 	removeSelectedFolder(folderId: string): void {
@@ -51,17 +48,5 @@ export class ChatAttachmentSelectionService extends DomainChatAttachmentSelectio
 
 	setSelectedFolders(folders: SelectedFolder[]): void {
 		this.updateSelectedFolders(folders);
-	}
-
-	addActiveFile(file: ChatAttachmentFileInput | null): void {
-		this.syncActiveFileSelection(file);
-	}
-
-	removeAutoAddedFile(filePath: string): void {
-		this.updateSelectionWithoutAutoAddedFile(filePath);
-	}
-
-	removeAllAutoAddedFiles(): void {
-		this.updateSelectionWithoutAutoAddedFiles();
 	}
 }

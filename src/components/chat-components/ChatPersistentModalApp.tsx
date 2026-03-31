@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import type { App } from 'obsidian';
 import type { ChatService } from 'src/core/chat/services/chat-service';
 import type { ChatState } from 'src/domains/chat/types';
 import { ChatPlanPanel } from './ChatPlanPanel';
@@ -9,14 +8,13 @@ import { ChatInput } from './ChatInput';
 
 export interface ChatPersistentModalAppProps {
 	service: ChatService;
-	app: App;
 }
 
 /**
  * Chat 持久化模态框 React 应用组件
  * UI结构与ChatView保持一致
  */
-export const ChatPersistentModalApp = ({ service, app }: ChatPersistentModalAppProps) => {
+export const ChatPersistentModalApp = ({ service }: ChatPersistentModalAppProps) => {
 	const [state, setState] = useState<ChatState>(service.getState());
 	const MODAL_VIEWPORT_PADDING = 8;
 
@@ -93,9 +91,8 @@ export const ChatPersistentModalApp = ({ service, app }: ChatPersistentModalAppP
 						<ChatControls
 							service={service}
 							state={state}
-							app={app}
 						/>
-						<ChatInput service={service} state={state} app={app} />
+						<ChatInput service={service} state={state} />
 					</>
 				) : (
 					<div className="tw-flex tw-h-full tw-items-center tw-justify-center tw-text-muted">

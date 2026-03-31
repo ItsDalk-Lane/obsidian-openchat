@@ -9,14 +9,10 @@ import type {
 import { VIEW_TYPE_CHAT_SIDEBAR, VIEW_TYPE_CHAT_TAB } from './config';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
-import {
-	registerChatViewCommands,
-	syncChatRibbonIcon,
-} from './ui-view-coordinator-support';
+import { registerChatViewCommands } from './ui-view-coordinator-support';
 
 export class ChatViewCoordinator {
 	private persistentModal: ChatPersistentModalHandle | null = null;
-	private ribbonEl: HTMLElement | null = null;
 	private viewTypesRegistered = false;
 
 	constructor(
@@ -39,21 +35,6 @@ export class ChatViewCoordinator {
 			this.viewTypesRegistered = true;
 		}
 		this.registerCommands();
-		this.createRibbon();
-	}
-
-	updateRibbonIcon(show: boolean): void {
-		const isCurrentlyShowing = this.ribbonEl !== null;
-		if (isCurrentlyShowing === show) {
-			return;
-		}
-		this.ribbonEl = syncChatRibbonIcon(
-			this.host,
-			this.service,
-			this.ribbonEl,
-			show,
-			async (mode) => await this.activateChatView(mode),
-		);
 	}
 
 	async activateChatView(mode: ChatOpenMode): Promise<void> {
@@ -115,10 +96,6 @@ export class ChatViewCoordinator {
 	openChatInPersistentModal(activeFile?: TFile | null): void {
 		if (this.persistentModal) {
 			this.persistentModal.focus();
-			const file = activeFile ?? this.host.getActiveMarkdownFile();
-			if (file) {
-				this.service.addActiveFile(file);
-			}
 			return;
 		}
 
@@ -137,8 +114,6 @@ export class ChatViewCoordinator {
 	}
 
 	dispose(): void {
-		this.ribbonEl?.remove();
-		this.ribbonEl = null;
 		this.host.detachLeavesOfType(VIEW_TYPE_CHAT_SIDEBAR);
 		this.host.detachLeavesOfType(VIEW_TYPE_CHAT_TAB);
 
@@ -146,17 +121,6 @@ export class ChatViewCoordinator {
 			this.persistentModal.close();
 			this.persistentModal = null;
 		}
-	}
-
-	private createRibbon(): void {
-		const shouldShowRibbon = this.host.getChatSettings().showRibbonIcon ?? true;
-		this.ribbonEl = syncChatRibbonIcon(
-			this.host,
-			this.service,
-			this.ribbonEl,
-			shouldShowRibbon,
-			async (mode) => await this.activateChatView(mode),
-		);
 	}
 
 	private registerCommands(): void {

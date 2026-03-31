@@ -26,6 +26,8 @@ interface QuickActionsPanelParams {
 	collapsible?: boolean
 	updateChatSettings: (partial: Partial<ChatSettings>) => Promise<void>
 	refreshQuickActionsCache?: () => Promise<void>
+	quickActionsSystemPrompt: string
+	updateQuickActionsSystemPrompt: (value: string) => Promise<void>
 }
 
 const CHEVRON_SVG = `
@@ -155,6 +157,68 @@ const openEditModal = async (
 		quickAction,
 		options
 	)
+}
+
+const openSystemPromptModal = (params: QuickActionsPanelParams): void => {
+	const overlay = document.createElement('div')
+	overlay.style.cssText =
+		'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;'
+
+	const modal = document.createElement('div')
+	modal.style.cssText =
+		'background:var(--background-primary);border-radius:12px;width:min(560px,90vw);max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.3);'
+
+	const header = document.createElement('div')
+	header.style.cssText =
+		'display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--background-modifier-border);'
+	const title = document.createElement('span')
+	title.style.cssText = 'font-size:var(--font-ui-medium);font-weight:600;color:var(--text-normal);'
+	title.textContent = localInstance.quick_actions_system_prompt_modal_title
+	const closeBtn = document.createElement('button')
+	closeBtn.style.cssText =
+		'display:flex;align-items:center;justify-content:center;width:32px;height:32px;border:none;border-radius:6px;background:transparent;color:var(--text-muted);cursor:pointer;'
+	closeBtn.innerHTML =
+		'<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
+	closeBtn.onclick = () => overlay.remove()
+	header.append(title, closeBtn)
+
+	const body = document.createElement('div')
+	body.style.cssText = 'flex:1;overflow-y:auto;padding:20px 24px;'
+
+	const textarea = document.createElement('textarea')
+	textarea.value = params.quickActionsSystemPrompt
+	textarea.placeholder = localInstance.quick_actions_system_prompt_placeholder
+	textarea.style.cssText =
+		'width:100%;min-height:200px;resize:vertical;box-sizing:border-box;padding:10px 12px;border:1px solid var(--background-modifier-border);border-radius:8px;background:var(--background-primary);color:var(--text-normal);font-size:var(--font-ui-small);font-family:inherit;'
+	body.appendChild(textarea)
+
+	const footer = document.createElement('div')
+	footer.style.cssText =
+		'display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:16px 24px;border-top:1px solid var(--background-modifier-border);'
+	const cancelBtn = document.createElement('button')
+	cancelBtn.style.cssText =
+		'padding:10px 20px;border:none;border-radius:8px;background:var(--background-modifier-hover);color:var(--text-normal);font-size:var(--font-ui-small);font-weight:500;cursor:pointer;'
+	cancelBtn.textContent = localInstance.cancel
+	cancelBtn.onclick = () => overlay.remove()
+	const saveBtn = document.createElement('button')
+	saveBtn.style.cssText =
+		'padding:10px 20px;border:none;border-radius:8px;background:var(--interactive-accent);color:var(--text-on-accent);font-size:var(--font-ui-small);font-weight:500;cursor:pointer;'
+	saveBtn.textContent = localInstance.save
+	saveBtn.onclick = async () => {
+		await params.updateQuickActionsSystemPrompt(textarea.value)
+		overlay.remove()
+	}
+	footer.append(cancelBtn, saveBtn)
+
+	modal.append(header, body, footer)
+	overlay.appendChild(modal)
+	overlay.onmousedown = (event) => {
+		if (event.target === overlay) {
+			overlay.remove()
+		}
+	}
+	document.body.appendChild(overlay)
+	textarea.focus()
 }
 
 const openManagementModal = (params: QuickActionsPanelParams): void => {
@@ -319,6 +383,16 @@ export const renderQuickActionsSettingsSection = (params: QuickActionsPanelParam
 			toggle.onChange(async (value) => {
 				await params.updateChatSettings({ quickActionsStreamOutput: value })
 			})
+		})
+
+	new Setting(section)
+		.setName(localInstance.quick_actions_system_prompt_label)
+		.addButton((btn) => {
+			btn
+				.setButtonText(localInstance.quick_actions_system_prompt_edit_btn)
+				.onClick(() => {
+					openSystemPromptModal(params)
+				})
 		})
 
 	new Setting(section)

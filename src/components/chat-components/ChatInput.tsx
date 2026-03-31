@@ -1,14 +1,29 @@
-import { CornerDownLeft, StopCircle, Palette, RotateCw } from 'lucide-react';
-import { FormEvent, useEffect, useState, useRef, Fragment, useMemo } from 'react';
+import { Fragment, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatService } from 'src/core/chat/services/chat-service';
+import type { SlashCommandItem } from 'src/core/chat/types/slashCommand';
 import type { ChatState } from 'src/domains/chat/types';
-import { ModelSelector } from './ModelSelector';
-import { TemplateSelector } from './TemplateSelector';
-import { ContextUsageIndicator } from './ContextUsageIndicator';
-import { SlashCommandMenu } from './SlashCommandMenu';
 import { localInstance } from 'src/i18n/locals';
+import { ChatInputFooter } from './ChatInputFooter';
+import { ChatInputOverlays } from './ChatInputOverlays';
+import {
+	ChatInputFileTags,
+	ChatInputImagePreview,
+	ChatInputInfoTags,
+	ChatInputSelectedModelsHint,
+} from './ChatInputSubComponents';
+import {
+	replaceTriggerText,
+	type ChatInputAnchorPosition,
+	type ChatInputSelectorItem,
+	type ChatInputTriggerSource,
+} from './chatInputSelectorUtils';
+import {
+	useChatInputMention,
+	type MentionSelectorPayload,
+} from './useChatInputMention';
+import { useChatInputImageUpload } from './useChatInputImageUpload';
 import { useChatInputSlashCommand } from './useChatInputSlashCommand';
-import { ChatInputInfoTags, ChatInputImagePreview, ChatInputFileTags, ChatInputSelectedModelsHint } from './ChatInputSubComponents';
+import { useChatInputTriggerMenu } from './useChatInputTriggerMenu';
 
 interface ChatInputProps {
 	service: ChatService;
@@ -17,20 +32,78 @@ interface ChatInputProps {
 
 export const ChatInput = ({ service, state }: ChatInputProps) => {
 	const [value, setValue] = useState(state.inputValue);
-	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const [cursorIndex, setCursorIndex] = useState(state.inputValue.length);
 	const [maxHeight, setMaxHeight] = useState(80);
-
 	const [isImageGenerationIntent, setIsImageGenerationIntent] = useState(false);
+	const [templateMenuVisible, setTemplateMenuVisible] = useState(false);
+	const [fileMenuVisible, setFileMenuVisible] = useState(false);
+	const [secondaryMenuAnchor, setSecondaryMenuAnchor] = useState<ChatInputAnchorPosition | null>(null);
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const isMultiModel = state.multiModelMode !== 'single';
 
-	// 斜杠命令状态（来自 hook）
+	const { slashCommandItems, executeSlashCommand } = useChatInputSlashCommand(service);
 	const {
-		slashCommandVisible, setSlashCommandVisible,
-		slashCommandItems, slashCommandFilter,
-		slashCommandSelectedIndex, setSlashCommandSelectedIndex,
-		slashCommandPosition, filteredSlashCommandItems,
-		executeSlashCommand, closeSlashCommandMenu,
-	} = useChatInputSlashCommand(service, value, state.isGenerating, textareaRef);
+		mentionItems,
+		promptTemplateEntries,
+		selectMentionItem,
+	} = useChatInputMention(service);
+	const {
+		imageInputRef,
+		handleImageInputChange,
+		openImagePicker,
+	} = useChatInputImageUpload(service, () => {
+		textareaRef.current?.focus();
+	});
+
+	const slashSelectorItems = useMemo<ChatInputSelectorItem<SlashCommandItem>[]>(
+		() => slashCommandItems.map((item) => ({
+			id: `${item.type}-${item.name}`,
+			name: item.name,
+			description: item.description,
+			kind: item.type,
+			typeLabel:
+				item.type === 'skill'
+					? localInstance.chat_input_selector_type_skill
+					: localInstance.chat_input_selector_type_agent,
+			keywords: [item.name, item.description],
+			payload: item,
+		})),
+		[slashCommandItems],
+	);
+
+	const selectorSources = useMemo<ChatInputTriggerSource[]>(
+		() => [
+			{
+				key: 'slash',
+				trigger: '/',
+				items: slashSelectorItems,
+				emptyText: localInstance.slash_command_empty,
+				noMatchText: localInstance.slash_command_no_match,
+			},
+			{
+				key: 'mention',
+				trigger: '@',
+				items: mentionItems,
+				emptyText: '',
+				noMatchText: localInstance.chat_mention_no_match,
+			},
+		],
+		[mentionItems, slashSelectorItems],
+	);
+
+	const {
+		activeMatch,
+		activeSourceKey,
+		filterText,
+		selectedIndex,
+		setSelectedIndex,
+		anchorPosition: triggerAnchorPosition,
+		menuPosition,
+		visible: selectorVisible,
+		filteredItems,
+		emptyStateText,
+		closeMenu,
+	} = useChatInputTriggerMenu(value, cursorIndex, state.isGenerating, textareaRef, selectorSources);
 
 	useEffect(() => {
 		setIsImageGenerationIntent(service.detectImageGenerationIntent(value));
@@ -38,9 +111,9 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 
 	useEffect(() => {
 		const calculateMaxHeight = () => {
-			const viewportHeight = window.innerHeight;
-			setMaxHeight(Math.floor(viewportHeight / 4));
+			setMaxHeight(Math.floor(window.innerHeight / 4));
 		};
+
 		calculateMaxHeight();
 		window.addEventListener('resize', calculateMaxHeight);
 		return () => window.removeEventListener('resize', calculateMaxHeight);
@@ -48,23 +121,52 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 
 	useEffect(() => {
 		const textarea = textareaRef.current;
-		if (textarea) {
-			textarea.style.height = 'auto';
-			const newHeight = Math.min(textarea.scrollHeight, maxHeight);
-			textarea.style.height = `${newHeight}px`;
+		if (!textarea) {
+			return;
 		}
-	}, [value, maxHeight]);
+
+		textarea.style.height = 'auto';
+		const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
+		textarea.style.height = `${nextHeight}px`;
+	}, [maxHeight, value]);
 
 	useEffect(() => {
 		setValue(state.inputValue);
 	}, [state.inputValue]);
 
 	useEffect(() => {
+		const textarea = textareaRef.current;
+		if (!textarea) {
+			return;
+		}
+
+		setCursorIndex(textarea.selectionStart ?? 0);
+	}, [value]);
+
+	useEffect(() => {
+		if (!selectorVisible) {
+			return;
+		}
+
+		setTemplateMenuVisible(false);
+		setFileMenuVisible(false);
+	}, [selectorVisible]);
+
+	useEffect(() => {
 		const handleShortcut = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') {
-				// 关闭斜杠命令菜单
-				if (slashCommandVisible) {
-					setSlashCommandVisible(false);
+				if (templateMenuVisible) {
+					setTemplateMenuVisible(false);
+					window.requestAnimationFrame(() => textareaRef.current?.focus());
+					return;
+				}
+				if (fileMenuVisible) {
+					setFileMenuVisible(false);
+					window.requestAnimationFrame(() => textareaRef.current?.focus());
+					return;
+				}
+				if (selectorVisible) {
+					closeMenu();
 					return;
 				}
 			}
@@ -84,10 +186,125 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 				service.setLayoutMode('vertical');
 			}
 		};
+
 		window.addEventListener('keydown', handleShortcut);
 		return () => window.removeEventListener('keydown', handleShortcut);
-	}, [isMultiModel, service, slashCommandVisible]);
+	}, [closeMenu, fileMenuVisible, isMultiModel, selectorVisible, service, templateMenuVisible]);
 
+	const applyInputValue = useCallback(
+		(nextValue: string, selectionStart?: number) => {
+			setValue(nextValue);
+			service.setInputValue(nextValue);
+
+			if (typeof selectionStart !== 'number') {
+				return;
+			}
+
+			setCursorIndex(selectionStart);
+
+			window.requestAnimationFrame(() => {
+				const textarea = textareaRef.current;
+				if (!textarea) {
+					return;
+				}
+
+				textarea.focus();
+				textarea.setSelectionRange(selectionStart, selectionStart);
+			});
+		},
+		[service],
+	);
+
+	const replaceCurrentMentionToken = useCallback((shouldFocus = true) => {
+		if (!activeMatch) {
+			return;
+		}
+
+		const mentionCursorIndex =
+			activeMatch.startIndex
+			+ activeMatch.trigger.length
+			+ activeMatch.filterText.length;
+		const nextInput = replaceTriggerText(value, mentionCursorIndex, activeMatch);
+		if (shouldFocus) {
+			applyInputValue(nextInput.value, nextInput.selectionStart);
+			return;
+		}
+
+		setValue(nextInput.value);
+		setCursorIndex(nextInput.selectionStart);
+		service.setInputValue(nextInput.value);
+	}, [activeMatch, applyInputValue, service, value]);
+
+	const resolveSecondaryAnchor = useCallback((): ChatInputAnchorPosition => {
+		return triggerAnchorPosition ?? {
+			top: menuPosition.top,
+			left: menuPosition.left,
+			lineHeight: 20,
+		};
+	}, [menuPosition, triggerAnchorPosition]);
+
+	const syncCursorIndex = useCallback(() => {
+		const textarea = textareaRef.current;
+		if (!textarea) {
+			return;
+		}
+
+		setCursorIndex(textarea.selectionStart ?? 0);
+	}, []);
+
+	const handleSelectorSelect = useCallback(
+		(item: ChatInputSelectorItem) => {
+			if (activeSourceKey === 'slash') {
+				closeMenu();
+				void executeSlashCommand(item.payload as SlashCommandItem);
+				return;
+			}
+
+			if (activeSourceKey !== 'mention' || !activeMatch) {
+				return;
+			}
+
+			const mentionItem = item as ChatInputSelectorItem<MentionSelectorPayload>;
+			const anchor = resolveSecondaryAnchor();
+			closeMenu();
+			void (async () => {
+				const result = await selectMentionItem(mentionItem);
+				switch (result.action) {
+					case 'open-template-menu':
+						replaceCurrentMentionToken(false);
+						setFileMenuVisible(false);
+						setSecondaryMenuAnchor(anchor);
+						setTemplateMenuVisible(true);
+						return;
+					case 'open-file-menu':
+						replaceCurrentMentionToken(false);
+						setTemplateMenuVisible(false);
+						setSecondaryMenuAnchor(anchor);
+						setFileMenuVisible(true);
+						return;
+					case 'upload-image':
+						replaceCurrentMentionToken(false);
+						setTemplateMenuVisible(false);
+						setFileMenuVisible(false);
+						openImagePicker();
+						return;
+					default:
+						replaceCurrentMentionToken();
+						textareaRef.current?.focus();
+				}
+			})();
+		},
+		[
+			activeMatch,
+			activeSourceKey,
+			closeMenu,
+			executeSlashCommand,
+			openImagePicker,
+			replaceCurrentMentionToken,
+			resolveSecondaryAnchor,
+			selectMentionItem,
+		],
+	);
 
 	const handleSubmit = async (event?: FormEvent) => {
 		event?.preventDefault();
@@ -98,105 +315,94 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 	const handleRemoveFile = (fileId: string) => service.removeSelectedFile(fileId);
 	const handleRemoveFolder = (folderId: string) => service.removeSelectedFolder(folderId);
 	const handleClearSelectedText = () => service.clearSelectedText();
-
-	const handleTemplateSelect = async (templatePath: string) => {
-		await service.selectPromptTemplate(templatePath);
+	const handleFileSelect = useCallback((file: { path: string; name: string; extension: string }) => {
+		service.addSelectedFile(file);
 		textareaRef.current?.focus();
-	};
-	const handleTemplateSelectorClose = () => service.setTemplateSelectorVisibility(false);
-	const handleClearTemplate = () => service.clearSelectedPromptTemplate();
+	}, [service]);
+	const handleFolderSelect = useCallback((folder: { path: string; name: string }) => {
+		service.addSelectedFolder(folder);
+		textareaRef.current?.focus();
+	}, [service]);
 
 	const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-		if (event.nativeEvent.isComposing) return;
+		if (event.nativeEvent.isComposing) {
+			return;
+		}
 
-		// 处理斜杠命令菜单的键盘导航
-		if (slashCommandVisible) {
+		if (selectorVisible) {
 			switch (event.key) {
 				case 'ArrowDown':
 					event.preventDefault();
-					setSlashCommandSelectedIndex((prev) =>
-						prev < filteredSlashCommandItems.length - 1 ? prev + 1 : 0
+					setSelectedIndex((previous) =>
+						previous < filteredItems.length - 1 ? previous + 1 : 0,
 					);
 					return;
-
 				case 'ArrowUp':
 					event.preventDefault();
-					setSlashCommandSelectedIndex((prev) =>
-						prev > 0 ? prev - 1 : filteredSlashCommandItems.length - 1
+					setSelectedIndex((previous) =>
+						previous > 0 ? previous - 1 : filteredItems.length - 1,
 					);
 					return;
-
 				case 'Enter':
 				case 'Tab':
-					if (filteredSlashCommandItems.length > 0) {
+					if (filteredItems.length > 0) {
 						event.preventDefault();
-						const selectedItem = filteredSlashCommandItems[slashCommandSelectedIndex];
+						const selectedItem = filteredItems[selectedIndex];
 						if (selectedItem) {
-							void executeSlashCommand(selectedItem);
+							handleSelectorSelect(selectedItem);
 						}
 					}
 					return;
-
 				case 'Escape':
 					event.preventDefault();
-					closeSlashCommandMenu();
+					closeMenu();
 					return;
 			}
 		}
 
 		if (event.key === 'Enter' && !event.shiftKey) {
 			event.preventDefault();
-			handleSubmit();
+			void handleSubmit();
 		}
 	};
 
-	// 多模型生成进度统计
 	const multiModelProgress = useMemo(() => {
-		if (!state.parallelResponses || !isMultiModel) return null;
+		if (!state.parallelResponses || !isMultiModel) {
+			return null;
+		}
+
 		const total = state.parallelResponses.responses.length;
-		const completed = state.parallelResponses.responses.filter((r) => r.isComplete).length;
-		const errors = state.parallelResponses.responses.filter((r) => r.isError).length;
+		const completed = state.parallelResponses.responses.filter((response) => response.isComplete).length;
+		const errors = state.parallelResponses.responses.filter((response) => response.isError).length;
 		const generating = total - completed - errors;
+
 		return { total, completed, errors, generating };
-	}, [state.parallelResponses, isMultiModel]);
+	}, [isMultiModel, state.parallelResponses]);
 
 	const providers = service.getProviders();
-
-	// 模型选择器区域
-	const renderModelSelector = () => (
-		<ModelSelector
-			providers={providers}
-			value={state.selectedModelId ?? ''}
-			onChange={(modelId) => service.setModel(modelId)}
-			selectedModels={state.selectedModels}
-			onModelToggle={(tag) => {
-				if (state.selectedModels.includes(tag)) {
-					service.removeSelectedModel(tag);
-				} else {
-					service.addSelectedModel(tag);
-				}
-			}}
-			multiModelMode={state.multiModelMode}
-			onModeChange={(mode) => service.setMultiModelMode(mode)}
-		/>
-	);
-
-
+	const hasConversationMessages =
+		state.activeSession?.messages.some((message) => message.role !== 'system') ?? false;
+	const submitActionLabel = hasConversationMessages
+		? localInstance.chat_send_button_label
+		: localInstance.chat_save_button_label;
 
 	return (
 		<Fragment>
-			<form className="chat-input tw-flex tw-w-full tw-flex-col tw-gap-2 tw-p-2" style={{
-				border: '1px solid var(--background-modifier-border)',
-				borderRadius: 'var(--radius-m)'
-			}} onSubmit={handleSubmit}>
+			<form
+				className="chat-input tw-flex tw-w-full tw-flex-col tw-gap-2 tw-p-2"
+				style={{
+					border: '1px solid var(--background-modifier-border)',
+					borderRadius: 'var(--radius-m)',
+				}}
+				onSubmit={handleSubmit}
+			>
 				<ChatInputInfoTags
 					selectedPromptTemplate={state.selectedPromptTemplate}
 					selectedText={state.selectedText}
-					onClearTemplate={handleClearTemplate}
+					onClearTemplate={() => service.clearSelectedPromptTemplate()}
 					onClearSelectedText={handleClearSelectedText}
 				/>
 
-				{/* 多模型已选模型提示 */}
 				{!state.isGenerating && isMultiModel && (
 					<ChatInputSelectedModelsHint
 						multiModelMode={state.multiModelMode}
@@ -206,152 +412,89 @@ export const ChatInput = ({ service, state }: ChatInputProps) => {
 					/>
 				)}
 
-				{!state.isGenerating ? (
-					<>
-						<textarea
-							ref={textareaRef}
-							className="tw-w-full tw-resize-none tw-p-3 tw-text-sm"
-							style={{
-								border: 'none', outline: 'none', background: 'transparent',
-								resize: 'none', minHeight: '80px', maxHeight: `${maxHeight}px`,
-								borderRadius: '0', boxShadow: 'none', marginBottom: '0', overflowY: 'auto'
-							}}
-							value={value}
-							onChange={(event) => { setValue(event.target.value); service.setInputValue(event.target.value); }}
-							onKeyDown={handleKeyDown}
-							placeholder={localInstance.input_description_here}
-						/>
-						<ChatInputImagePreview images={state.selectedImages} onRemoveImage={handleRemoveImage} />
-						<ChatInputFileTags selectedFiles={state.selectedFiles} selectedFolders={state.selectedFolders} onRemoveFile={handleRemoveFile} onRemoveFolder={handleRemoveFolder} />
-						<div className="tw-flex tw-items-center tw-justify-between tw-mt-0">
-							<div className="tw-flex tw-items-center tw-gap-2" style={{ flex: 1, minWidth: 0 }}>
-								{renderModelSelector()}
-								{/* 上下文使用指示器 */}
-								<ContextUsageIndicator
-									providers={providers}
-									selectedModelId={state.selectedModelId ?? null}
-									session={state.activeSession}
-									isGenerating={state.isGenerating}
-									size="sm"
-								/>
-							</div>
-							<div className="tw-flex tw-items-center tw-gap-2">
-								<span
-									onClick={(e) => { e.preventDefault(); handleSubmit(); }}
-									className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center"
-										aria-label={state.activeSession?.messages.some((msg) => msg.role !== 'system') ? localInstance.chat_send_button_label : localInstance.chat_save_button_label}
-										title={state.activeSession?.messages.some((msg) => msg.role !== 'system') ? localInstance.chat_send_button_label : localInstance.chat_save_button_label}
-								>
-									<CornerDownLeft className="tw-size-4" />
-								</span>
-							</div>
-						</div>
-					</>
-				) : (
-					<>
-						<textarea
-							ref={textareaRef}
-							className="tw-w-full tw-resize-none tw-p-3 tw-text-sm"
-							style={{
-								border: 'none', outline: 'none', background: 'transparent',
-								resize: 'none', minHeight: '80px', maxHeight: `${maxHeight}px`,
-								borderRadius: '0', boxShadow: 'none', marginBottom: '0', overflowY: 'auto'
-							}}
-							value={value}
-							onChange={(event) => { setValue(event.target.value); service.setInputValue(event.target.value); }}
-							onKeyDown={handleKeyDown}
-							placeholder={localInstance.input_description_here}
-							disabled={state.isGenerating}
-						/>
-						<ChatInputImagePreview images={state.selectedImages} onRemoveImage={handleRemoveImage} />
-						<ChatInputFileTags selectedFiles={state.selectedFiles} selectedFolders={state.selectedFolders} onRemoveFile={handleRemoveFile} onRemoveFolder={handleRemoveFolder} />
-						<div className="tw-flex tw-items-center tw-justify-between tw-mt-0">
-							<div className="tw-flex tw-items-center tw-gap-2" style={{ flex: 1, minWidth: 0 }}>
-								{renderModelSelector()}
-								{/* 上下文使用指示器 */}
-								<ContextUsageIndicator
-									providers={providers}
-									selectedModelId={state.selectedModelId ?? null}
-									session={state.activeSession}
-									isGenerating={state.isGenerating}
-									size="sm"
-								/>
-							</div>
-							<div className="tw-flex tw-items-center tw-gap-2">
-								{/* 停止控制 */}
-								{isMultiModel && multiModelProgress ? (
-									<div className="multi-model-stop-bar tw-flex tw-items-center tw-gap-2">
-										{multiModelProgress.generating > 0 && (
-											<span className="tw-text-xs tw-text-muted">
-												{localInstance.generating_progress
-													.replace('{completed}', String(multiModelProgress.completed + multiModelProgress.errors))
-													.replace('{total}', String(multiModelProgress.total))}
-											</span>
-										)}
-										<span
-											onClick={() => service.stopAllGeneration()}
-											className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center"
-											aria-label={localInstance.stop_all}
-											title={localInstance.stop_all}
-										>
-											<StopCircle className="tw-size-4" />
-										</span>
-										{multiModelProgress.errors > 0 && (
-											<span
-												onClick={() => service.retryAllFailed()}
-												className="tw-cursor-pointer tw-flex tw-items-center"
-												style={{ color: 'var(--text-error, #dc2626)' }}
-												aria-label={localInstance.retry_failed}
-												title={localInstance.retry_failed}
-											>
-												<RotateCw style={{ width: 14, height: 14 }} />
-												<span className="tw-ml-1 tw-text-xs">{localInstance.retry_failed}({multiModelProgress.errors})</span>
-											</span>
-										)}
-									</div>
-								) : (
-									<span
-										onClick={() => service.stopGeneration()}
-										className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center"
-										aria-label={localInstance.chat_stop_button_label}
-										title={localInstance.chat_stop_button_label}
-									>
-										<StopCircle className="tw-size-4" />
-									</span>
-								)}
-
-								{isImageGenerationIntent && (
-									<div className="tw-flex tw-items-center tw-gap-1 tw-ml-2 tw-px-2 tw-py-1 tw-bg-purple-100 tw-text-purple-700 tw-rounded tw-text-xs">
-										<Palette className="tw-size-3" />
-										<span>{localInstance.image_generation_mode}</span>
-									</div>
-								)}
-							</div>
-						</div>
-					</>
-				)}
+				<textarea
+					ref={textareaRef}
+					className="tw-w-full tw-resize-none tw-p-3 tw-text-sm"
+					style={{
+						border: 'none',
+						outline: 'none',
+						background: 'transparent',
+						resize: 'none',
+						minHeight: '80px',
+						maxHeight: `${maxHeight}px`,
+						borderRadius: '0',
+						boxShadow: 'none',
+						marginBottom: '0',
+						overflowY: 'auto',
+					}}
+						value={value}
+						onChange={(event) => {
+							setCursorIndex(event.target.selectionStart ?? 0);
+							applyInputValue(event.target.value);
+						}}
+						onClick={syncCursorIndex}
+					onKeyDown={handleKeyDown}
+						onKeyUp={syncCursorIndex}
+						onSelect={syncCursorIndex}
+					placeholder={localInstance.input_description_here}
+					disabled={state.isGenerating}
+				/>
+				<ChatInputImagePreview
+					images={state.selectedImages}
+					onRemoveImage={handleRemoveImage}
+				/>
+				<ChatInputFileTags
+					selectedFiles={state.selectedFiles}
+					selectedFolders={state.selectedFolders}
+					onRemoveFile={handleRemoveFile}
+					onRemoveFolder={handleRemoveFolder}
+				/>
+				<ChatInputFooter
+					service={service}
+					state={state}
+					isMultiModel={isMultiModel}
+					providers={providers}
+					submitActionLabel={submitActionLabel}
+					multiModelProgress={multiModelProgress}
+					isImageGenerationIntent={isImageGenerationIntent}
+					onSubmit={() => {
+						void handleSubmit();
+					}}
+				/>
 			</form>
 
-			{/* 模板选择器 */}
-			<TemplateSelector
-				visible={state.showTemplateSelector}
+			<ChatInputOverlays
 				service={service}
-				onSelect={handleTemplateSelect}
-				onClose={handleTemplateSelectorClose}
-				inputValue={value}
+				imageInputRef={imageInputRef}
+				onImageInputChange={(event) => {
+					void handleImageInputChange(event);
+				}}
+				templateMenuVisible={templateMenuVisible}
+				fileMenuVisible={fileMenuVisible}
+				secondaryMenuAnchor={secondaryMenuAnchor}
+				promptTemplateEntries={promptTemplateEntries}
+				onCloseTemplateMenu={() => {
+					setTemplateMenuVisible(false);
+					textareaRef.current?.focus();
+				}}
+				onTemplateApplied={() => {
+					textareaRef.current?.focus();
+				}}
+				onCloseFileMenu={() => {
+					setFileMenuVisible(false);
+					textareaRef.current?.focus();
+				}}
+				onSelectFile={handleFileSelect}
+				onSelectFolder={handleFolderSelect}
+				selectorItems={filteredItems}
+				filterText={filterText}
+				selectorVisible={selectorVisible}
+				selectedIndex={selectedIndex}
+				menuPosition={menuPosition}
+				emptyStateText={emptyStateText}
+				onSelectSelectorItem={handleSelectorSelect}
+				onCloseSelector={closeMenu}
 			/>
-
-			{/* 斜杠命令自动补全菜单 */}
-			<SlashCommandMenu
-				items={slashCommandItems}
-				filterText={slashCommandFilter}
-				visible={slashCommandVisible}
-				selectedIndex={slashCommandSelectedIndex}
-				menuPosition={slashCommandPosition}
-				onSelect={executeSlashCommand}
-				onClose={closeSlashCommandMenu}
-			/>
-
 		</Fragment>
 	);
 };

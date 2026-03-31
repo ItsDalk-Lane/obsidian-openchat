@@ -1,17 +1,25 @@
 import { App, TFile, TFolder, normalizePath } from 'obsidian';
+import * as aiPathSupport from './aiPathSupport';
 
-export const AI_PROMPTS_SUBFOLDER = 'ai prompts';
-export const AI_CHAT_HISTORY_SUBFOLDER = 'chat-history';
-export const AI_QUICK_ACTIONS_SUBFOLDER = 'quick-actions';
-export const AI_SYSTEM_PROMPTS_SUBFOLDER = 'system-prompts';
-export const AI_MCP_SERVERS_SUBFOLDER = 'mcp-servers';
-export const AI_MULTI_MODEL_SUBFOLDER = 'multi-model';
-export const AI_SKILLS_SUBFOLDER = 'skills';
-export const AI_AGENTS_SUBFOLDER = 'agents';
+export const AI_AGENTS_SUBFOLDER = aiPathSupport.AI_AGENTS_SUBFOLDER;
+export const AI_CHAT_HISTORY_SUBFOLDER = aiPathSupport.AI_CHAT_HISTORY_SUBFOLDER;
+export const AI_MCP_SERVERS_SUBFOLDER = aiPathSupport.AI_MCP_SERVERS_SUBFOLDER;
+export const AI_MULTI_MODEL_SUBFOLDER = aiPathSupport.AI_MULTI_MODEL_SUBFOLDER;
+export const AI_PROMPTS_SUBFOLDER = aiPathSupport.AI_PROMPTS_SUBFOLDER;
+export const AI_QUICK_ACTIONS_SUBFOLDER = aiPathSupport.AI_QUICK_ACTIONS_SUBFOLDER;
+export const AI_SKILLS_SUBFOLDER = aiPathSupport.AI_SKILLS_SUBFOLDER;
+export const AI_SYSTEM_PROMPTS_SUBFOLDER = aiPathSupport.AI_SYSTEM_PROMPTS_SUBFOLDER;
+export const trimTrailingSlash = aiPathSupport.trimTrailingSlash;
+export const getAgentsPath = aiPathSupport.getAgentsPath;
+export const getChatHistoryPath = aiPathSupport.getChatHistoryPath;
+export const getMcpServersPath = aiPathSupport.getMcpServersPath;
+export const getMultiModelConfigPath = aiPathSupport.getMultiModelConfigPath;
+export const getPromptTemplatePath = aiPathSupport.getPromptTemplatePath;
+export const getQuickActionsPath = aiPathSupport.getQuickActionsPath;
+export const getSkillsPath = aiPathSupport.getSkillsPath;
+export const getSystemPromptsPath = aiPathSupport.getSystemPromptsPath;
 
 const MIGRATION_SUFFIX = '-migrated';
-
-const trimTrailingSlash = (value: string): string => value.replace(/[\\/]+$/g, '');
 
 const getFolderParent = (path: string): string => {
 	const normalized = normalizePath(trimTrailingSlash(path));
@@ -77,38 +85,6 @@ const buildUniqueTargetPath = async (app: App, targetPath: string): Promise<stri
 		}
 		counter += 1;
 	}
-};
-
-export const getPromptTemplatePath = (aiDataFolder: string): string => {
-	return normalizePath(`${trimTrailingSlash(aiDataFolder)}/${AI_PROMPTS_SUBFOLDER}`);
-};
-
-export const getChatHistoryPath = (aiDataFolder: string): string => {
-	return normalizePath(`${trimTrailingSlash(aiDataFolder)}/${AI_CHAT_HISTORY_SUBFOLDER}`);
-};
-
-export const getQuickActionsPath = (aiDataFolder: string): string => {
-	return normalizePath(`${trimTrailingSlash(aiDataFolder)}/${AI_QUICK_ACTIONS_SUBFOLDER}`);
-};
-
-export const getSystemPromptsPath = (aiDataFolder: string): string => {
-	return normalizePath(`${trimTrailingSlash(aiDataFolder)}/${AI_SYSTEM_PROMPTS_SUBFOLDER}`);
-};
-
-export const getMcpServersPath = (aiDataFolder: string): string => {
-	return normalizePath(`${trimTrailingSlash(aiDataFolder)}/${AI_MCP_SERVERS_SUBFOLDER}`);
-};
-
-export const getMultiModelConfigPath = (aiDataFolder: string): string => {
-	return normalizePath(`${trimTrailingSlash(aiDataFolder)}/${AI_MULTI_MODEL_SUBFOLDER}`);
-};
-
-export const getSkillsPath = (aiDataFolder: string): string => {
-	return normalizePath(`${trimTrailingSlash(aiDataFolder)}/${AI_SKILLS_SUBFOLDER}`);
-};
-
-export const getAgentsPath = (aiDataFolder: string): string => {
-	return normalizePath(`${trimTrailingSlash(aiDataFolder)}/${AI_AGENTS_SUBFOLDER}`);
 };
 
 export const ensureAIDataFolders = async (app: App, aiDataFolder: string): Promise<void> => {

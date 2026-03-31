@@ -39,8 +39,6 @@ export const DEFAULT_CHAT_SETTINGS: ChatSettings = {
 	autosaveChat: true,
 	openMode: 'sidebar',
 	enableSystemPrompt: true,
-	autoAddActiveFile: true,
-	showRibbonIcon: true,
 	enableChatTrigger: true,
 	chatTriggerSymbol: ['@'],
 	chatModalWidth: 700,

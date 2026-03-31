@@ -235,7 +235,6 @@ test('QuickActionExecutionService executeQuickAction 会对缺少模型配置返
 	const service = new QuickActionExecutionService(
 		{
 			readVaultFile: async () => '',
-			buildGlobalSystemPrompt: async () => '',
 		} as never,
 		{
 			createSendRequest: () => null,
@@ -255,13 +254,98 @@ test('QuickActionExecutionService executeQuickAction 会对缺少模型配置返
 	})
 })
 
+test('QuickActionExecutionService 未指定模型时优先使用 defaultModel', async () => {
+	installTestWindow()
+	const { QuickActionExecutionService } = await import('./service-execution')
+	const selectedVendors: string[] = []
+	const service = new QuickActionExecutionService(
+		{
+			readVaultFile: async () => '',
+		} as never,
+		{
+			createSendRequest: (vendorName) => {
+				selectedVendors.push(vendorName)
+				return async function* () {
+					yield 'ok'
+				}
+			},
+		},
+		() => ({
+			defaultModel: 'claude-3',
+			providers: [
+				{
+					tag: 'gpt-4.1',
+					vendor: 'OpenAI',
+					options: {},
+				},
+				{
+					tag: 'claude-3',
+					vendor: 'Anthropic',
+					options: {},
+				},
+			],
+		}),
+		() => 'Templates',
+	)
+
+	const result = await service.executeQuickActionStreamResult(
+		createQuickAction({ id: 'leaf', name: 'Leaf', order: 0, actionType: 'normal' }),
+		'selected text',
+	)
+
+	assert.equal(result.ok, true)
+	assert.deepEqual(selectedVendors, ['Anthropic'])
+})
+
+test('QuickActionExecutionService defaultModel 无效时回退到首个 provider', async () => {
+	installTestWindow()
+	const { QuickActionExecutionService } = await import('./service-execution')
+	const selectedVendors: string[] = []
+	const service = new QuickActionExecutionService(
+		{
+			readVaultFile: async () => '',
+		} as never,
+		{
+			createSendRequest: (vendorName) => {
+				selectedVendors.push(vendorName)
+				return async function* () {
+					yield 'ok'
+				}
+			},
+		},
+		() => ({
+			defaultModel: 'missing-model',
+			providers: [
+				{
+					tag: 'gpt-4.1',
+					vendor: 'OpenAI',
+					options: {},
+				},
+				{
+					tag: 'claude-3',
+					vendor: 'Anthropic',
+					options: {},
+				},
+			],
+		}),
+		() => 'Templates',
+	)
+
+	const result = await service.executeQuickActionStreamResult(
+		createQuickAction({ id: 'leaf', name: 'Leaf', order: 0, actionType: 'normal' }),
+		'selected text',
+	)
+
+	assert.equal(result.ok, true)
+	assert.deepEqual(selectedVendors, ['OpenAI'])
+})
+
 test('QuickActionExecutionService executeQuickActionStreamResult 会为 Result-first consumer 返回 typed 错误', async () => {
 	installTestWindow()
 	const { QuickActionExecutionService } = await import('./service-execution')
 	const service = new QuickActionExecutionService(
 		{
 			readVaultFile: async () => '',
-			buildGlobalSystemPrompt: async () => '',
 		} as never,
 		{
 			createSendRequest: () => null,
@@ -301,7 +385,6 @@ test('QuickActionExecutionService executeQuickActionStream 会通过兼容异常
 	const service = new QuickActionExecutionService(
 		{
 			readVaultFile: async () => '',
-			buildGlobalSystemPrompt: async () => '',
 		} as never,
 		{
 			createSendRequest: () => null,

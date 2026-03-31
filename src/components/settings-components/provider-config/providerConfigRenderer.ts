@@ -453,7 +453,7 @@ export const renderProviderConfigContent = (params: RenderProviderConfigParams) 
 					return
 				}
 				await params.saveSettingsDirect()
-				params.notify(localInstance.system_prompt_saved)
+				params.notify(t('Provider settings saved'))
 				if (vendor.name === openRouterVendor.name) {
 					params.renderRoot(params.rootContainer, false, params.currentOpenProviderIndex)
 				}

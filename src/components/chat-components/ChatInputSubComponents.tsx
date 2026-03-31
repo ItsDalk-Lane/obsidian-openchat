@@ -109,14 +109,11 @@ export const ChatInputFileTags = ({
                         {selectedFiles.map((file) => (
                                 <div
                                         key={file.id}
-                                        className={`file-tag tw-flex tw-items-center tw-gap-1 tw-px-2 tw-py-1 tw-rounded tw-text-xs tw-relative group ${
-                                                file.isAutoAdded ? 'tw-bg-green-100 tw-text-green-700' : 'tw-bg-gray-100 tw-text-gray-700'
-                                        }`}
+                                                                                className="file-tag tw-flex tw-items-center tw-gap-1 tw-px-2 tw-py-1 tw-rounded tw-text-xs tw-relative group tw-bg-gray-100 tw-text-gray-700"
                                 >
                                         <FileText className="tw-size-3 tw-flex-shrink-0" />
                                         <span className="tw-max-w-40 tw-truncate" title={file.path}>
                                                 {file.name}
-                                                {file.isAutoAdded && <span className="ml-1 tw-px-1 tw-bg-green-600 tw-text-white tw-rounded tw-text-[10px]">活跃</span>}
                                                 {file.extension === 'pdf' && <span className="ml-1 tw-px-1 tw-bg-blue-500 tw-text-white tw-rounded tw-text-[10px]">pdf</span>}
                                                 {file.extension === 'canvas' && <span className="ml-1 tw-px-1 tw-bg-green-500 tw-text-white tw-rounded tw-text-[10px]">canvas</span>}
                                         </span>

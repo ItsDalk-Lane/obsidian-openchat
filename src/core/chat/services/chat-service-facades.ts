@@ -53,7 +53,6 @@ import {
 import {
 	persistActiveSessionMultiModelFrontmatter as persistActiveSessionMultiModelFrontmatterHelper,
 	persistChatSettings as persistChatSettingsHelper,
-	persistGlobalSystemPromptsEnabled as persistGlobalSystemPromptsEnabledHelper,
 	persistLayoutMode as persistLayoutModeHelper,
 	persistMcpSettings as persistMcpSettingsHelper,
 	persistSessionMultiModelFrontmatter as persistSessionMultiModelFrontmatterHelper,
@@ -145,7 +144,6 @@ export const getPersistenceFacade = (
 			() => getChatPersistenceDeps(internals),
 			{
 				persistChatSettings: persistChatSettingsHelper,
-				persistGlobalSystemPromptsEnabled: persistGlobalSystemPromptsEnabledHelper,
 				persistMcpSettings: persistMcpSettingsHelper,
 				rewriteSessionMessages: rewriteSessionMessagesHelper,
 				readPersistedLayoutMode: readPersistedLayoutModeHelper,

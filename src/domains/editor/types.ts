@@ -43,6 +43,7 @@ export interface EditorTabCompletionSettings {
 }
 
 export interface EditorTabCompletionRuntime {
+	readonly defaultModelTag: string;
 	readonly providers: readonly EditorCompletionProvider[];
 	readonly settings: EditorTabCompletionSettings;
 	readonly messages: TabCompletionMessages;

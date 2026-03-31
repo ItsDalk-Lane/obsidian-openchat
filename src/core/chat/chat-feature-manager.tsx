@@ -52,11 +52,6 @@ export class ChatFeatureManager {
 	updateChatSettings(settings: Partial<ChatSettings>): void {
 		this.service.updateSettings(settings);
 
-		// 转发到视图协调器
-		if ('showRibbonIcon' in settings) {
-			this.viewCoordinator.updateRibbonIcon(settings.showRibbonIcon ?? false);
-		}
-
 		// 转发到编辑器集成
 		this.editorIntegration.updateSettings(settings);
 	}

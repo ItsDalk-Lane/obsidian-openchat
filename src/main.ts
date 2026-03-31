@@ -9,6 +9,7 @@ import './styles/base.css';
 import './styles/chat.css';
 import { PluginSettingsController } from 'src/domains/settings/ui';
 import { PluginStartupCoordinator } from './core/PluginStartupCoordinator';
+import { getRibbonActivationOpenMode } from './core/ribbon-activation-settings';
 import { createObsidianApiProvider } from 'src/providers/obsidian-api';
 import { assembleSettingsDomainPorts } from './core/settings-adapter-assembly';
 
@@ -44,6 +45,7 @@ export default class OpenChatPlugin extends Plugin {
 		// 在任何 await 之前同步注册聊天视图类型
 		// 确保 Obsidian 恢复工作区布局时能立即识别视图，消除标题栏占位图标
 		this.featureCoordinator.registerChatViewTypesEarly();
+		this.registerChatRibbon();
 		this.settingTab = new PluginSettingTab(this);
 		this.addSettingTab(this.settingTab);
 		this.featureCoordinator.initializeAiRuntime(this.settings);
@@ -119,5 +121,30 @@ export default class OpenChatPlugin extends Plugin {
 		}
 
 		return await this.bootstrapSettingsPromise;
+	}
+
+	private registerChatRibbon(): void {
+		const ribbonEl = this.addRibbonIcon('message-circle', 'AI Chat', () => {
+			void this.openChatFromRibbon();
+		});
+		ribbonEl.addClass('chat-ribbon-icon');
+	}
+
+	private async openChatFromRibbon(): Promise<void> {
+		let openMode = this.settings.chat.openMode;
+		try {
+			openMode = await getRibbonActivationOpenMode({
+				ensureBootstrapSettingsLoaded: async () => await this.ensureBootstrapSettingsLoaded(),
+				getCurrentSettings: () => this.settings,
+			});
+		} catch (error) {
+			DebugLogger.error('[OpenChatPlugin] Ribbon 打开前加载设置失败，使用点击前的打开方式', error);
+			this.bootstrapObsidianApiProvider.notify('设置加载失败，使用点击前的打开方式继续打开。');
+		}
+
+		await this.featureCoordinator.activateChatView(
+			openMode,
+			'chat_input',
+		);
 	}
 }

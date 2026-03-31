@@ -20,11 +20,11 @@ export function buildChatViewFactory(
 ): ChatViewFactory {
 	return {
 		createSidebarView: (leaf) =>
-			new ChatView(leaf, host, service, 'sidebar', VIEW_TYPE_CHAT_SIDEBAR),
+			new ChatView(leaf, service, 'sidebar', VIEW_TYPE_CHAT_SIDEBAR),
 		createTabView: (leaf) =>
-			new ChatView(leaf, host, service, 'tab', VIEW_TYPE_CHAT_TAB),
+			new ChatView(leaf, service, 'tab', VIEW_TYPE_CHAT_TAB),
 		createModal: (options) => new ChatModal(host.app, service, options),
 		createPersistentModal: (options) =>
-			new ChatPersistentModal(host.app, host, service, options),
+			new ChatPersistentModal(host.app, service, options),
 	};
 }

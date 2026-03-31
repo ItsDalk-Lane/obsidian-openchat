@@ -3,7 +3,7 @@
  * @description 定义 settings 域拥有的 AI runtime 类型。
  *
  * @dependencies src/LLMProviders/modelCapability, src/types/mcp,
- *   src/types/provider, src/types/system-prompt
+ *   src/types/provider
  * @side-effects 无
  * @invariants 仅定义数据结构，不包含默认值、归一化或迁移逻辑。
  *
@@ -14,7 +14,6 @@
 import type { ModelCapabilityCache } from 'src/LLMProviders/modelCapability';
 import type { McpSettings } from 'src/types/mcp';
 import type { ProviderSettings } from 'src/types/provider';
-import type { SystemPromptsDataFile } from 'src/types/system-prompt';
 
 export interface ToolExecutionSettings {
 	maxToolCalls: number;
@@ -30,10 +29,6 @@ export interface AiRuntimeSettings {
 	providers: ProviderSettings[];
 	vendorApiKeys?: Record<string, string>;
 	vendorApiKeysByDevice?: Record<string, Record<string, string>>;
-	enableGlobalSystemPrompts: boolean;
-	enableDefaultSystemMsg?: boolean;
-	defaultSystemMsg?: string;
-	systemPromptsData?: SystemPromptsDataFile;
 	enableStreamLog: boolean;
 	debugMode: boolean;
 	debugLevel: 'debug' | 'info' | 'warn' | 'error';
@@ -49,4 +44,5 @@ export interface AiRuntimeSettings {
 	mcp?: McpSettings;
 	toolExecution?: ToolExecutionSettings;
 	modelCapabilityCache?: ModelCapabilityCache;
+	quickActionsSystemPrompt?: string;
 }

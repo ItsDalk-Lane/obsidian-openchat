@@ -65,7 +65,6 @@ test('createChatPersistenceFacade 每次调用都读取最新 deps', async () =>
 			persistChatSettings: async (deps) => {
 				capturedRecentTurns = deps.settingsAccessor.getChatSettings().messageManagement.recentTurns
 			},
-			persistGlobalSystemPromptsEnabled: async () => {},
 			persistMcpSettings: async () => {},
 			rewriteSessionMessages: async () => {},
 			readPersistedLayoutMode: (deps) => {

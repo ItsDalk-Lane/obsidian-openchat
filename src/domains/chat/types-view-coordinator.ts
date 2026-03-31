@@ -13,7 +13,6 @@ import type { ChatSettings } from './types';
 /** ChatService 方法子集：仅包含 ChatViewCoordinator 实际调用的方法 */
 export interface ChatViewCoordinatorServicePort {
 	setNextTriggerSource(source: string): void;
-	addActiveFile(file: TFile): void;
 	createNewSession(): void;
 	saveActiveSession(): Promise<void>;
 }
@@ -24,11 +23,6 @@ export interface ChatViewCoordinatorHost {
 	getChatSettings(): Readonly<ChatSettings>;
 	registerView(viewType: string, viewCreator: (leaf: WorkspaceLeaf) => unknown): void;
 	addCommand(command: Command): void;
-	addRibbonIcon(
-		icon: string,
-		title: string,
-		callback: (event: MouseEvent) => void,
-	): HTMLElement;
 	getActiveMarkdownFile(): TFile | null;
 	findLeafByViewType(viewType: string): WorkspaceLeaf | null;
 	revealLeaf(leaf: WorkspaceLeaf): void;

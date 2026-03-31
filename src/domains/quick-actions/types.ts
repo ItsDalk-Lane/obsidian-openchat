@@ -99,7 +99,9 @@ export interface QuickActionProviderConfig {
 
 /** 快捷操作使用的运行时设置视图（只需 providers 列表）。 */
 export interface QuickActionRuntimeSettings {
+	readonly defaultModel: string;
 	readonly providers: readonly QuickActionProviderConfig[];
+	readonly quickActionsSystemPrompt?: string;
 }
 
 /** 请求发送函数签名。 */

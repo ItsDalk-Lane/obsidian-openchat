@@ -32,7 +32,11 @@ export const createChatEditorQuickActionExecutionService = (
 	new QuickActionExecutionService(
 		service.getObsidianApiProvider(),
 		createQuickActionProviderAdapter(),
-		() => host.getAiRuntimeSettings(),
+		() => ({
+			defaultModel: host.getChatSettings().defaultModel,
+			providers: host.getAiRuntimeSettings().providers,
+			quickActionsSystemPrompt: host.getAiRuntimeSettings().quickActionsSystemPrompt,
+		}),
 		() => getPromptTemplatePath(host.getAiDataFolder()),
 	);
 

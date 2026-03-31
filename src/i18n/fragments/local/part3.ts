@@ -100,11 +100,12 @@ export interface LocalPart3 {
 	chat_settings_button_title: string;
 	chat_settings_modal_title: string;
 	tab_ai_chat: string;
-	tab_system_prompts: string;
 	tab_mcp_servers: string;
 	tab_skills: string;
 	tab_sub_agents: string;
 	tab_tools: string;
+		tab_advanced: string;
+		tab_chat_interface: string;
 	chat_settings_default_model: string;
 	chat_settings_default_model_desc: string;
 	chat_settings_no_models: string;
@@ -117,8 +118,6 @@ export interface LocalPart3 {
 	chat_settings_open_mode_tab: string;
 	chat_settings_open_mode_window: string;
 	chat_settings_open_mode_persistent_modal: string;
-	chat_settings_auto_add_active_file: string;
-	chat_settings_auto_add_active_file_desc: string;
 	chat_settings_show_ribbon_icon: string;
 	chat_settings_show_ribbon_icon_desc: string;
 	chat_settings_message_management: string;
@@ -157,6 +156,7 @@ export interface LocalPart3 {
 	chat_history_button_title: string;
 	chat_new_chat: string;
 	chat_history_title: string;
+	chat_history_autosave: string;
 	chat_history_refresh: string;
 	chat_history_close: string;
 	chat_history_empty: string;

@@ -13,10 +13,11 @@ import { ObsidianAppContext } from "src/contexts/obsidianAppContext";
 import { t } from "src/i18n/ai-runtime/helper";
 import { localInstance } from "src/i18n/locals";
 import { GeneralSettingTabItem } from "./GeneralSettingTabItem";
+import { AdvancedSettingTabItem } from "./AdvancedSettingTabItem";
+import { ChatInterfaceSettingTabItem } from "./ChatInterfaceSettingTabItem";
 import { ChatSettingsProvider } from "src/components/chat-components/ChatSettingsContext";
 import {
 	AiChatSettingsTab,
-	SystemPromptSettingsTab,
 	ToolsSettingsTab,
 } from "src/components/chat-components/chatSettingsGeneralTabs";
 import {
@@ -32,15 +33,6 @@ import {
 	type PluginSettingTabRuntime,
 } from "./plugin-setting-host";
 
-
-const GENERAL_AI_RUNTIME_PANEL_OPTIONS: AiRuntimeSettingsPanelOptions = {
-	sections: {
-		providers: false,
-		vendorApiKeys: false,
-		quickActions: false,
-		tabCompletion: false,
-	},
-}
 
 const QUICK_ACTIONS_PANEL_OPTIONS: AiRuntimeSettingsPanelOptions = {
 	sections: {
@@ -72,67 +64,8 @@ const TAB_COMPLETION_PANEL_OPTIONS: AiRuntimeSettingsPanelOptions = {
 	},
 }
 
-const GeneralSettingsTabContent = ({
-	host,
-	aiRuntimePanelOptions,
-}: {
-	host: PluginSettingTabHost
-	aiRuntimePanelOptions: AiRuntimeSettingsPanelOptions
-}) => {
-	const {
-		chatSettings,
-		messageManagement,
-		recentTurnsDraft,
-		setRecentTurnsDraft,
-		persistChatSettings,
-	} = useChatSettingsContext()
-
-	return (
-		<GeneralSettingTabItem host={host}>
-			<AiRuntimeSettingsTabItem
-				host={host}
-				panelOptions={aiRuntimePanelOptions}
-			/>
-			<AiChatSettingsTab
-				chatSettings={chatSettings}
-				messageManagement={messageManagement}
-				recentTurnsDraft={recentTurnsDraft}
-				setRecentTurnsDraft={setRecentTurnsDraft}
-				persistChatSettings={persistChatSettings}
-				embedded
-			/>
-		</GeneralSettingTabItem>
-	)
-}
-
 const ModelsTabContent = ({ host }: { host: PluginSettingTabHost }) => {
 	return <ModelSettingsTabItem host={host} />
-}
-
-const GeneralSettingsFallbackContent = ({
-	host,
-	aiRuntimePanelOptions,
-}: {
-	host: PluginSettingTabHost
-	aiRuntimePanelOptions: AiRuntimeSettingsPanelOptions
-}) => (
-	<GeneralSettingTabItem host={host}>
-		<AiRuntimeSettingsTabItem
-			host={host}
-			panelOptions={aiRuntimePanelOptions}
-		/>
-	</GeneralSettingTabItem>
-)
-
-const SystemPromptsTabContent = ({ app }: { app: import("obsidian").App }) => {
-	const { aiRuntimeSettings, persistGlobalSystemPrompts } = useChatSettingsContext()
-	return (
-		<SystemPromptSettingsTab
-			app={app}
-			aiRuntimeSettings={aiRuntimeSettings}
-			persistGlobalSystemPrompts={persistGlobalSystemPrompts}
-		/>
-	)
 }
 
 const McpServersTabContent = () => {
@@ -226,23 +159,49 @@ const TabCompletionTabContent = ({
 	/>
 )
 
+const AdvancedTabContent = ({ host }: { host: PluginSettingTabHost }) => (
+	<AdvancedSettingTabItem host={host} />
+)
+
+const ChatInterfaceTabContent = ({ host }: { host: PluginSettingTabHost }) => {
+	const {
+		chatSettings,
+		messageManagement,
+		recentTurnsDraft,
+		setRecentTurnsDraft,
+		persistChatSettings,
+	} = useChatSettingsContext()
+
+	return (
+		<>
+			<ChatInterfaceSettingTabItem host={host} />
+			<AiChatSettingsTab
+				chatSettings={chatSettings}
+				messageManagement={messageManagement}
+				recentTurnsDraft={recentTurnsDraft}
+				setRecentTurnsDraft={setRecentTurnsDraft}
+				persistChatSettings={persistChatSettings}
+				embedded
+			/>
+		</>
+	)
+}
+
+const ChatInterfaceFallbackContent = ({ host }: { host: PluginSettingTabHost }) => (
+	<ChatInterfaceSettingTabItem host={host} />
+)
+
 export class PluginSettingTab extends ObPluginSettingTab {
 	plugin: PluginSettingTabHost;
 	root: Root | null = null;
-	private generalAiRuntimePanelState: AiRuntimeSettingsPanelState = {};
 	private quickActionsPanelState: AiRuntimeSettingsPanelState = {};
 	private tabCompletionPanelState: AiRuntimeSettingsPanelState = {};
-	private readonly generalAiRuntimePanelOptions: AiRuntimeSettingsPanelOptions;
 	private readonly quickActionsPanelOptions: AiRuntimeSettingsPanelOptions;
 	private readonly tabCompletionPanelOptions: AiRuntimeSettingsPanelOptions;
 
 	constructor(plugin: PluginSettingTabRuntime) {
 		super(plugin.app, plugin as Plugin);
 		this.plugin = createPluginSettingTabHost(plugin);
-		this.generalAiRuntimePanelOptions = {
-			...GENERAL_AI_RUNTIME_PANEL_OPTIONS,
-			state: this.generalAiRuntimePanelState,
-		};
 		this.quickActionsPanelOptions = {
 			...QUICK_ACTIONS_PANEL_OPTIONS,
 			state: this.quickActionsPanelState,
@@ -263,14 +222,19 @@ export class PluginSettingTab extends ObPluginSettingTab {
 			{
 				id: "general_setting",
 				title: localInstance.general_setting,
-				content: service
-					? <GeneralSettingsTabContent host={this.plugin} aiRuntimePanelOptions={this.generalAiRuntimePanelOptions} />
-					: <GeneralSettingsFallbackContent host={this.plugin} aiRuntimePanelOptions={this.generalAiRuntimePanelOptions} />,
+				content: <GeneralSettingTabItem host={this.plugin} />,
 			},
 			{
 				id: "models_setting",
 				title: localInstance.tab_models,
 				content: <ModelsTabContent host={this.plugin} />,
+			},
+			{
+				id: "chat_interface_setting",
+				title: localInstance.tab_chat_interface,
+				content: service
+					? <ChatInterfaceTabContent host={this.plugin} />
+					: <ChatInterfaceFallbackContent host={this.plugin} />,
 			},
 			{
 				id: "quick_actions_setting",
@@ -286,11 +250,6 @@ export class PluginSettingTab extends ObPluginSettingTab {
 
 		const chatItems = service
 			? [
-				{
-					id: "chat_system_prompts",
-					title: localInstance.tab_system_prompts,
-					content: <SystemPromptsTabContent app={this.app} />,
-				},
 				{
 					id: "chat_mcp_servers",
 					title: localInstance.tab_mcp_servers,
@@ -314,7 +273,13 @@ export class PluginSettingTab extends ObPluginSettingTab {
 			]
 			: [];
 
-		const allItems = [...baseItems, ...chatItems];
+		const advancedItem = {
+			id: "advanced_setting",
+			title: localInstance.tab_advanced,
+			content: <AdvancedTabContent host={this.plugin} />,
+		};
+
+		const allItems = [...baseItems, ...chatItems, advancedItem];
 
 		this.root.render(
 			<StrictMode>

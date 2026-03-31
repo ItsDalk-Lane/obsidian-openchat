@@ -29,6 +29,11 @@ export interface FileMenuSearchResult {
 	matches: string[];
 }
 
+export interface VaultEntrySearchIndex {
+	files: FileMenuFileItem[];
+	folders: FileMenuFolderItem[];
+}
+
 const ROOT_PATH = '/';
 
 const stripExtension = (name: string): string => {
@@ -51,10 +56,10 @@ const getParentPath = (path: string): string => {
 const shouldIncludePath = (path: string): boolean =>
 	path !== '.obsidian' && !path.startsWith('.obsidian/');
 
-const collectVaultEntries = (
+export const collectVaultEntries = (
 	obsidianApi: ObsidianApiProvider,
 	folderPath = ROOT_PATH,
-): { files: FileMenuFileItem[]; folders: FileMenuFolderItem[] } => {
+): VaultEntrySearchIndex => {
 	const files: FileMenuFileItem[] = [];
 	const folders: FileMenuFolderItem[] = [];
 

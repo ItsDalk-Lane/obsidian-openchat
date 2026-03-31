@@ -1,6 +1,7 @@
 import { X, RotateCcw, ExternalLink, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
+import { ToggleSwitch } from 'src/components/toggle-switch/ToggleSwitch';
 import { ChatHistoryEntry } from 'src/core/chat/services/history-service';
 import { localInstance } from 'src/i18n/locals';
 
@@ -11,6 +12,9 @@ interface ChatHistoryPanelProps {
 	onClose: () => void;
 	onRefresh: () => Promise<void> | void;
 	onDelete?: (item: ChatHistoryEntry) => void;
+	autosaveChatEnabled: boolean;
+	onAutosaveChatChange: (enabled: boolean) => void;
+	isAutosavePending?: boolean;
 	anchorRef?: React.RefObject<HTMLElement>;
 	panelRef?: React.RefObject<HTMLDivElement>;
 }
@@ -102,7 +106,7 @@ function groupHistoryByTime(items: ChatHistoryEntry[]): GroupedHistory[] {
 		});
 }
 
-export const ChatHistoryPanel = ({ items, onSelect, onOpenFile, onClose, onRefresh, onDelete, anchorRef, panelRef }: ChatHistoryPanelProps) => {
+export const ChatHistoryPanel = ({ items, onSelect, onOpenFile, onClose, onRefresh, onDelete, autosaveChatEnabled, onAutosaveChatChange, isAutosavePending = false, anchorRef, panelRef }: ChatHistoryPanelProps) => {
 	const getPanelPosition = () => {
 		if (anchorRef?.current) {
 			const buttonRect = anchorRef.current.getBoundingClientRect();
@@ -165,7 +169,23 @@ export const ChatHistoryPanel = ({ items, onSelect, onOpenFile, onClose, onRefre
 			bottom: position.bottom !== undefined ? `${position.bottom}px` : undefined
 		}}>
 			<header className="chat-history-panel__header">
-				<h3>{localInstance.chat_history_title}</h3>
+				<div className="chat-history-panel__header-main">
+					<h3>{localInstance.chat_history_title}</h3>
+					<div
+						className="chat-history-panel__autosave"
+						title={localInstance.chat_settings_autosave_desc}
+					>
+						<span className="chat-history-panel__autosave-label">
+							{localInstance.chat_history_autosave}
+						</span>
+						<ToggleSwitch
+							checked={autosaveChatEnabled}
+							onChange={onAutosaveChatChange}
+							disabled={isAutosavePending}
+							ariaLabel={localInstance.chat_history_autosave}
+						/>
+					</div>
+				</div>
 				<div className="chat-history-panel__header-actions">
 					<span onClick={onRefresh} aria-label={localInstance.chat_history_refresh} title={localInstance.chat_history_refresh} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent">
 						<RotateCcw className="tw-size-4" />

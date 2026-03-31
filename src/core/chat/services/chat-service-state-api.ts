@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { normalizeBuiltinServerId } from 'src/tools/runtime/constants';
-import { getChatHistoryPath } from 'src/utils/AIPathManager';
+import { getChatHistoryPath } from 'src/utils/aiPathSupport';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type {
 	ChatAttachmentFileInput,
@@ -10,7 +10,10 @@ import { normalizeMessageManagementSettings } from '../types/chat';
 import type { ChatSession, ChatSettings, McpToolMode, SelectedFile, SelectedFolder } from '../types/chat';
 import type { LayoutMode, MultiModelMode, ParallelResponseGroup } from '../types/multiModel';
 import type { ChatServiceInternals } from './chat-service-internals';
-import { getDefaultProviderTag } from './chat-service-deps-support';
+
+const resolveDefaultProviderTag = (internals: ChatServiceInternals): string | null => {
+	return internals.service.getDefaultProviderTag();
+};
 
 export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 	initialize(initialSettings?: Partial<ChatSettings>): void {
@@ -26,7 +29,7 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 			internals.stateStore.getMutableState().layoutMode = persistedLayoutMode;
 		}
 		if (!internals.stateStore.getMutableState().selectedModelId) {
-			internals.stateStore.getMutableState().selectedModelId = getDefaultProviderTag(internals);
+			internals.stateStore.getMutableState().selectedModelId = resolveDefaultProviderTag(internals);
 		}
 		if (
 			internals.stateStore.getMutableState().selectedModels.length === 0
@@ -45,7 +48,7 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 	},
 	onChatPanelOpen(): void {
 		internals.stateStore.getMutableState().selectedModelId =
-			internals.settings.defaultModel || getDefaultProviderTag(internals);
+			internals.settings.defaultModel || resolveDefaultProviderTag(internals);
 		internals.service.emitState();
 	},
 	getState() {
@@ -85,7 +88,7 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 		const session: ChatSession = {
 			id: `chat-${uuidv4()}`,
 			title: initialTitle,
-			modelId: state.selectedModelId ?? getDefaultProviderTag(internals) ?? '',
+			modelId: state.selectedModelId ?? resolveDefaultProviderTag(internals) ?? '',
 			messages: [],
 			createdAt: now,
 			updatedAt: now,
@@ -106,7 +109,6 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 			mutableState.inputValue = '';
 			mutableState.enableTemplateAsSystemPrompt = false;
 			mutableState.selectedPromptTemplate = undefined;
-			mutableState.showTemplateSelector = false;
 			mutableState.mcpToolMode = 'auto';
 			mutableState.mcpSelectedServerIds = [];
 			mutableState.parallelResponses = undefined;
@@ -209,18 +211,11 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 	getWebSearchToggle() { return internals.stateStore.getMutableState().enableWebSearchToggle; },
 	getTemplateAsSystemPromptToggle() { return internals.stateStore.getMutableState().enableTemplateAsSystemPrompt; },
 	addSelectedFile(file: ChatAttachmentFileInput) { internals.attachmentSelectionService.addSelectedFile(file); },
-	addActiveFile(file: ChatAttachmentFileInput | null) { internals.attachmentSelectionService.addActiveFile(file); },
-	removeAutoAddedFile(filePath: string) { internals.attachmentSelectionService.removeAutoAddedFile(filePath); },
-	removeAllAutoAddedFiles() { internals.attachmentSelectionService.removeAllAutoAddedFiles(); },
-	getAutoAddedFiles(): SelectedFile[] { return internals.attachmentSelectionService.getAutoAddedFiles(); },
-	onNoActiveFile() { internals.attachmentSelectionService.onNoActiveFile(); },
-	onChatViewReopened(currentFile: ChatAttachmentFileInput | null) { internals.attachmentSelectionService.onChatViewReopened(currentFile); },
 	addSelectedFolder(folder: ChatAttachmentFolderInput) { internals.attachmentSelectionService.addSelectedFolder(folder); },
-	removeSelectedFile(fileId: string, isManualRemoval = true) { internals.attachmentSelectionService.removeSelectedFile(fileId, isManualRemoval); },
+	removeSelectedFile(fileId: string) { internals.attachmentSelectionService.removeSelectedFile(fileId); },
 	removeSelectedFolder(folderId: string) { internals.attachmentSelectionService.removeSelectedFolder(folderId); },
 	setSelectedFiles(files: SelectedFile[]) { internals.attachmentSelectionService.setSelectedFiles(files); },
 	setSelectedFolders(folders: SelectedFolder[]) { internals.attachmentSelectionService.setSelectedFolders(folders); },
-	setTemplateSelectorVisibility(visible: boolean): void { internals.stateStore.getMutableState().showTemplateSelector = visible; internals.service.emitState(); },
 	getEnabledMcpServers() { return internals.toolRuntimeResolver.getEnabledMcpServers(); },
 	async getBuiltinToolsForSettings() { return await internals.toolRuntimeResolver.getBuiltinToolsForSettings(); },
 	setMcpToolMode(mode: McpToolMode): void { internals.stateStore.setMcpToolMode(mode, true); },
@@ -275,7 +270,7 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 		internals.sessionManager.setHistoryFolder(getChatHistoryPath(internals.settingsAccessor.getAiDataFolder()));
 		if ('autosaveChat' in settings) internals.stateStore.setShouldSaveHistory(Boolean(internals.settings.autosaveChat));
 		if (!internals.stateStore.getMutableState().selectedModelId) {
-			internals.stateStore.getMutableState().selectedModelId = internals.settings.defaultModel || getDefaultProviderTag(internals);
+			internals.stateStore.getMutableState().selectedModelId = internals.settings.defaultModel || resolveDefaultProviderTag(internals);
 		}
 		internals.service.emitState();
 	},

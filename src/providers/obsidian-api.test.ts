@@ -178,17 +178,16 @@ function createRuntimeFixture(options?: {
 	};
 }
 
-test('ObsidianApiProvider 委托通知、路径归一化、提示词与目录初始化', async () => {
+test('ObsidianApiProvider 委托通知、路径归一化与目录初始化', async () => {
 	let ensuredFolder = '';
 	const { runtime, notifications } = createRuntimeFixture();
 	runtime.ensureAiDataFolders = async (folder) => {
 		ensuredFolder = folder;
 	};
-	const provider = createObsidianApiProviderFromRuntime(runtime, async (featureId) => `prompt:${featureId}`);
+	const provider = createObsidianApiProviderFromRuntime(runtime);
 	provider.notify('hello', 1500);
 	assert.deepEqual(notifications, [{ message: 'hello', timeout: 1500 }]);
 	assert.equal(provider.normalizePath('folder\\child'), 'folder/child');
-	assert.equal(await provider.buildGlobalSystemPrompt('editor'), 'prompt:editor');
 	await provider.ensureAiDataFolders('System/AI Data');
 	assert.equal(ensuredFolder, 'System/AI Data');
 });
@@ -200,7 +199,6 @@ test('ObsidianApiProvider 规范化 HTTP 响应并为空文本兜底', async () 
 			requestJson: { ok: true },
 			requestArrayBuffer: new Uint8Array([1, 2]).buffer,
 		}).runtime,
-		async () => '',
 	);
 	const response = await provider.requestHttp({ url: 'https://example.com', method: 'GET' });
 	assert.deepEqual(response, {
@@ -269,7 +267,7 @@ test('ObsidianApiProvider 会代理 vault 查询与读写能力', async () => {
 			'folder/file.md': { size: 11, mtime: 20, ctime: 10 },
 		},
 	});
-	const provider = createObsidianApiProviderFromRuntime(runtime, async () => '');
+	const provider = createObsidianApiProviderFromRuntime(runtime);
 
 	assert.deepEqual(provider.getVaultEntry('folder\\file.md'), {
 		path: 'folder/file.md',
@@ -300,7 +298,7 @@ test('ObsidianApiProvider 会代理 vault 查询与读写能力', async () => {
 });
 
 test('ObsidianApiProvider 会委托 YAML 解析', () => {
-	const provider = createObsidianApiProviderFromRuntime(createRuntimeFixture().runtime, async () => '');
+	const provider = createObsidianApiProviderFromRuntime(createRuntimeFixture().runtime);
 	assert.deepEqual(provider.parseYaml('name: demo'), { raw: 'name: demo' });
 	assert.equal(provider.stringifyYaml({ demo: true }), '{"demo":true}');
 });
@@ -311,7 +309,7 @@ test('ObsidianApiProvider 会委托 frontmatter、本地存储与设置打开能
 			'note.md': { title: 'demo' },
 		},
 	});
-	const provider = createObsidianApiProviderFromRuntime(fixture.runtime, async () => '');
+	const provider = createObsidianApiProviderFromRuntime(fixture.runtime);
 	assert.deepEqual(provider.getFrontmatter('note.md'), { title: 'demo' });
 	assert.equal(provider.readLocalStorage('layout'), null);
 	provider.writeLocalStorage('layout', 'tabs');
@@ -340,7 +338,7 @@ test('ObsidianApiProvider 会委托 frontmatter、本地存储与设置打开能
 
 test('ObsidianApiProvider 会映射 Vault 事件并在清理时注销全部监听器', () => {
 	const { runtime, listeners, offRefs } = createRuntimeFixture();
-	const provider = createObsidianApiProviderFromRuntime(runtime, async () => '');
+	const provider = createObsidianApiProviderFromRuntime(runtime);
 	const received: Array<{ type: string; path: string; oldPath?: string }> = [];
 	const dispose = provider.onVaultChange((event) => {
 		received.push(event);

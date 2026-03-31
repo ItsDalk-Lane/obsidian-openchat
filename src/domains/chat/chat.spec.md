@@ -16,16 +16,20 @@ context compaction、provider message 纯 helper、文件意图分析、
 
 当前已迁入 domain UI 接缝的内容：
 
-- `ui-view-coordinator.ts`：chat 视图激活、sidebar/window/tab 切换、Ribbon 同步
-- `ui-view-coordinator-support.ts`：chat 命令注册与 Ribbon 壳辅助
+- `ui-view-coordinator.ts`：chat 视图激活、sidebar/window/tab 切换
+- `ui-view-coordinator-support.ts`：chat 命令注册
 - `ui-markdown.ts`：Markdown 渲染与内部链接打开，统一经 `ObsidianApiProvider`
+
+当前保留在 plugin 入口层的内容：
+
+- `main.ts`：在 onload 中单次注册 AI Chat ribbon，并委托协调器激活视图
 
 ## 核心行为
 
 ### 行为 1：提供稳定的共享类型与默认设置
 
 - 触发条件：consumer 读取 chat 域导出的设置类型、会话类型或默认值。
-- 预期结果：默认值与 legacy 行为保持一致，不改变字段名、默认语义与持久化格式。
+- 预期结果：默认值与当前受支持的 chat 行为保持一致，不引入已废弃的自动活跃文件配置字段。
 - 边界情况：
   - 当 messageManagement 配置缺失时，应回退到默认 recentTurns 与 enabled 值。
   - 当 summaryModelTag 为空白字符串时，应规范化为 undefined。
@@ -87,17 +91,40 @@ context compaction、provider message 纯 helper、文件意图分析、
   - 当订阅建立时，应立即收到当前快照。
   - 当 dispose 后，不再保留旧订阅者。
 
-### 行为 9：维护附件选择快照与活跃文件自动添加逻辑
+### 行为 9：维护附件选择快照与显式文件选择逻辑
 
-- 触发条件：consumer 通过附件选择服务添加文件/文件夹、同步 session 选择，或处理活跃文件变更。
-- 预期结果：附件选择快照可克隆恢复；活跃 Markdown 文件可按设置自动加入附件列表；
-  手动移除过的 auto-added 文件在同一会话内不会被立即重新加回。
+- 触发条件：consumer 通过附件选择服务添加文件/文件夹，或从 session 快照恢复已选附件。
+- 预期结果：附件选择快照可克隆恢复；显式添加的文件会去重；恢复旧 session 时会清理已废弃的
+  `isAutoAdded` 等遗留字段，只保留当前稳定类型字段。
 - 边界情况：
-  - 当输入文件不是 Markdown 或 auto add 开关关闭时，不应自动加入。
-  - 当切换到新的活跃文件时，应替换旧的 auto-added 文件，但保留手动选择的文件。
-  - 当重新打开 chat 视图时，当前文件的手动移除保护应被重置。
+  - 当重复添加同一路径文件时，不应重复插入。
+  - 当 session 附件里带有历史遗留字段时，恢复后不应继续保留这些字段。
 
-### 行为 10：将历史消息格式化为可读且可逆的持久化文本
+### 行为 10：在输入框中通过 `@` 统一触发模板、文件与附件入口
+
+- 触发条件：consumer 在 chat 输入框中输入 `@`，且触发符位于行首或前一个字符为空格/换行。
+- 预期结果：
+  - 当 `@` 后没有搜索文本时，弹出与 `/` 命令一致的浮动选择菜单，依次显示“提示模板”、“上传文件”、
+    “上传图片”三个操作项，以及当前活跃文件的 `Active` 选项。
+  - 选中“提示模板”后，关闭 `@` 菜单，并在 `@` 符号锚点位置打开一个小型模板下拉菜单；该菜单列出
+    AI prompts 目录下所有 `.md` 模板，支持搜索、上下箭头导航、Enter/Tab 选择与 Escape 关闭；选中后
+    直接调用 `selectPromptTemplate()` 应用模板。
+  - 选中“上传文件”后，关闭 `@` 菜单，并在同一锚点位置打开 `FileMenuPopup`；用户可以继续选择文件或
+    文件夹作为普通手动附件。
+  - 选中“上传图片”后，关闭 `@` 菜单并触发原生图片文件选择器；所选图片会转成 base64 后加入
+    selectedImages。
+  - 当 `@` 后输入搜索文本时，空态操作项会被替换为模板、文件夹、文件的搜索结果；匹配维度包括名称与
+    描述，排序优先级固定为模板 > 文件夹 > 文件；选中模板会应用模板，选中文件或文件夹会添加附件。
+  - 无论选择哪一类 `@` 条目，输入框中的本次 `@token` 都会被移除。
+- 边界情况：
+  - 当没有活跃文件时，空查询菜单不显示 `Active` 项，但仍显示三个操作项。
+  - 当 `@` 前一个字符不是空格/换行/行首时，不应触发菜单。
+  - 当搜索没有匹配结果时，应显示专用的“无匹配”提示，而不是自动关闭菜单。
+  - 当 `@` 菜单已经被用户显式关闭且输入值未变化时，不应立即重复弹出。
+  - 当打开模板下拉菜单或 `FileMenuPopup` 时，`@` 主菜单必须先关闭，不能同时显示两个弹层。
+  - 当输入框出现软换行、滚动或窗口尺寸变化时，`@` 锚点与二级菜单位置应保持正确。
+
+### 行为 11：将历史消息格式化为可读且可逆的持久化文本
 
 - 触发条件：consumer 调用 serializeHistoryMessage 持久化 chat 消息。
 - 预期结果：history formatter 会把 reasoning 与 MCP marker 转为可读 callout，
@@ -106,7 +133,7 @@ context compaction、provider message 纯 helper、文件意图分析、
   - 当消息内容里已经带有 MCP marker 时，不应再从 toolCalls 追加重复的工具历史块。
   - 当 history text 再交给历史解析 helper 时，reasoning 与 MCP callout 应能恢复为 marker 文本。
 
-### 行为 11：构建、归一化并裁剪历史摘要
+### 行为 12：构建、归一化并裁剪历史摘要
 
 - 触发条件：consumer 调用历史摘要 helper，为 context compaction 生成、修复或压缩 summary。
 - 预期结果：summary build 会保留可见正文、工具/路径/约束等关键信息，并记录被折叠的 reasoning 数量；
@@ -117,7 +144,7 @@ context compaction、provider message 纯 helper、文件意图分析、
   - 当生成摘要缺少预期 section heading 时，应直接回退 fallback。
   - 当预算非常小但仍需压缩时，非关键 section 可截断字符，IMPORTANT DETAILS 尽量不做字符裁剪。
 
-### 行为 12：按预算压缩历史消息并维护 context compaction 状态
+### 行为 13：按预算压缩历史消息并维护 context compaction 状态
 
 - 触发条件：consumer 调用 MessageContextOptimizer，或 provider message 组装链路触发历史压缩。
 - 预期结果：optimizer 会保留 pinned 消息、最近 user turn 与 sticky tail 的临时上下文，
@@ -127,12 +154,22 @@ context compaction、provider message 纯 helper、文件意图分析、
   - 当已有 compaction 的 coveredRange 与 signature 完全匹配时，应优先复用已有摘要。
   - 当追加历史满足增量条件时，summary generator 应只接收新增 delta summary，而不是整段历史重算。
 
-### 行为 13：提供 provider message 组装链路的纯辅助逻辑
+### 行为 14：通过历史面板控制自动保存状态
+
+- 触发条件：consumer 打开聊天历史面板并切换自动保存开关，或 provider message 组装链路读取
+  autosaveChat / shouldSaveHistory 状态。
+- 预期结果：自动保存设置通过历史面板标题栏中的 toggle 控制；持久化设置后，
+  `shouldSaveHistory` 运行时状态会立即与 `autosaveChat` 同步，后续历史写入链路统一读取该状态。
+- 边界情况：
+  - 当设置持久化失败时，应回滚到之前的 autosave 状态。
+  - 当不同聊天容器（sidebar、tab、modal）打开同一服务时，自动保存状态应保持一致。
+
+### 行为 15：提供 provider message 组装链路的纯辅助逻辑
 
 - 触发条件：legacy provider message facade 读取 messageManagement、默认 file content options、
   compaction/request token 状态比较与 context payload 选择上下文。
 - 预期结果：domain helper 只提供纯数据归一化、状态比较和 compaction 编排；
-  真正的 App、PromptBuilder、SystemPromptAssembler 与 frontmatter 持久化仍保留在 legacy。
+ 真正的 App、PromptBuilder 与 frontmatter 持久化仍保留在 legacy。
 - 边界情况：
   - 当 raw context message 不存在时，应清空 contextSummary 相关字段，避免保留过期上下文摘要。
   - 当 request token state 内容未变化时，不应触发重复持久化。
@@ -141,7 +178,7 @@ context compaction、provider message 纯 helper、文件意图分析、
 
 - 该阶段的 chat 域不直接访问 obsidian。
 - 该阶段的 chat 域允许通过 `ChatConsumerHost` / `ObsidianApiProvider`
-  承接视图激活、Ribbon 与 Markdown 渲染接缝，但不直接持有 `Plugin` 或调用裸 `workspace.*`。
+  承接视图激活与 Markdown 渲染接缝，但不直接持有 `Plugin` 或调用裸 `workspace.*`。
 - 该阶段的 chat 域不负责 MCP、skills、sub-agent 或 provider 装配。
 
 ## 依赖

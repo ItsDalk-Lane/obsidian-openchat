@@ -83,11 +83,6 @@ export interface ChatConsumerHost {
 	openSettingsTab(): void;
 	registerView(viewType: string, viewCreator: (leaf: WorkspaceLeaf) => unknown): void;
 	addCommand(command: Command): void;
-	addRibbonIcon(
-		icon: string,
-		title: string,
-		callback: (event: MouseEvent) => void,
-	): HTMLElement;
 	getActiveMarkdownFile(): TFile | null;
 	getActiveMarkdownView(): MarkdownView | null;
 	getOpenMarkdownFiles(): TFile[];

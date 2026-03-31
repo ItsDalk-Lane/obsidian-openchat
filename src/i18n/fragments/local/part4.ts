@@ -25,8 +25,14 @@ export interface LocalPart4 {
 	selection_toolbar_max_buttons: string;
 	selection_toolbar_max_buttons_desc: string;
 	selection_toolbar_settings_section: string;
+	system_prompt_feature_selection_toolbar_desc: string;
 	selection_toolbar_stream_output: string;
 	selection_toolbar_stream_output_desc: string;
+	// Quick Action System Prompt
+	quick_actions_system_prompt_label: string;
+	quick_actions_system_prompt_edit_btn: string;
+	quick_actions_system_prompt_modal_title: string;
+	quick_actions_system_prompt_placeholder: string;
 	// Quick Action Management
 	quick_action_management: string;
 	quick_action_management_hint: string;
@@ -214,4 +220,19 @@ export interface LocalPart4 {
 	tab_completion_failed_prefix: string;
 	slash_command_empty: string;
 	slash_command_no_match: string;
+	chat_input_selector_type_skill: string;
+	chat_input_selector_type_agent: string;
+	chat_input_selector_type_template: string;
+	chat_input_selector_type_file: string;
+	chat_input_selector_type_folder: string;
+	chat_input_selector_type_image: string;
+	chat_input_selector_type_active: string;
+	chat_mention_active: string;
+	chat_mention_action_template_name: string;
+	chat_mention_action_template_desc: string;
+	chat_mention_action_upload_file_name: string;
+	chat_mention_action_upload_file_desc: string;
+	chat_mention_action_upload_image_name: string;
+	chat_mention_action_upload_image_desc: string;
+	chat_mention_no_match: string;
 }

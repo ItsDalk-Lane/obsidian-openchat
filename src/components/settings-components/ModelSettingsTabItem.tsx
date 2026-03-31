@@ -18,7 +18,7 @@ interface Props {
 
 const MODEL_SETTINGS_PANEL_OPTIONS: AiRuntimeSettingsPanelOptions = {
 	sections: {
-		modelSelection: true,
+		modelSelection: false,
 		providers: true,
 		vendorApiKeys: false,
 		quickActions: false,

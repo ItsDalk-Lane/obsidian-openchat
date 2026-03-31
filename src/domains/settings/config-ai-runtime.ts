@@ -28,7 +28,6 @@ export const DEFAULT_AI_RUNTIME_SETTINGS: AiRuntimeSettings = {
 	providers: [],
 	vendorApiKeys: {},
 	vendorApiKeysByDevice: {},
-	enableGlobalSystemPrompts: false,
 	enableStreamLog: false,
 	debugMode: false,
 	debugLevel: 'error',
@@ -40,10 +39,11 @@ export const DEFAULT_AI_RUNTIME_SETTINGS: AiRuntimeSettings = {
 	tabCompletionContextLengthAfter: 500,
 	tabCompletionTimeout: 5000,
 	tabCompletionProviderTag: '',
-	tabCompletionPromptTemplate: '{{rules}}\n\n{{context}}',
+	tabCompletionPromptTemplate: 'You are a writing continuation assistant. Continue the text naturally based on the editor context provided by the user. Output only the continuation without any explanation. Match the original language, style, and format. Do not repeat existing content.',
 	mcp: DEFAULT_MCP_SETTINGS,
 	toolExecution: DEFAULT_TOOL_EXECUTION_SETTINGS,
 	modelCapabilityCache: {},
+	quickActionsSystemPrompt: '',
 };
 
 function cloneValue<T>(value: T): T {

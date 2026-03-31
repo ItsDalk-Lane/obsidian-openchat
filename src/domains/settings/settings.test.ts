@@ -56,10 +56,6 @@ function createTestPorts(overrides?: {
 	migrateAIDataStorage?: (settings: PluginSettings) => Promise<void>;
 	cleanupLegacyAIStorage?: () => Promise<void>;
 	loadServers?: (aiDataFolder: string) => Promise<unknown[]>;
-	migrateFromLegacyDefaultSystemMessage?: (params: {
-		enabled?: boolean;
-		content?: string | null;
-	}) => Promise<boolean>;
 	syncServers?: (aiDataFolder: string, servers: unknown[]) => Promise<unknown[]>;
 	logger?: SettingsDomainPorts['logger'];
 }): SettingsDomainPorts {
@@ -101,11 +97,6 @@ function createTestPorts(overrides?: {
 			cleanupLegacyAIStorage:
 				overrides?.cleanupLegacyAIStorage
 				?? (async () => {}),
-		},
-		systemPrompt: {
-			migrateFromLegacyDefaultSystemMessage:
-				overrides?.migrateFromLegacyDefaultSystemMessage
-				?? (async () => false),
 		},
 		mcpServer: {
 			loadServers: overrides?.loadServers ?? (async () => []),
@@ -300,7 +291,7 @@ test('SettingsDomainService loadBootstrapSettings 在空数据下回退到默认
 	assert.deepEqual(loaded.chat.quickActions, []);
 });
 
-test('SettingsDomainService hydratePersistedSettings 在默认系统消息迁移失败时记录错误并继续返回设置', async () => {
+test('SettingsDomainService hydratePersistedSettings 会剥离旧系统提示词字段并继续返回设置', async () => {
 	installTestWindow();
 	const { SettingsDomainService } = await import('./service');
 	const { DEFAULT_SETTINGS } = await import('./config');
@@ -310,9 +301,6 @@ test('SettingsDomainService hydratePersistedSettings 在默认系统消息迁移
 			aiRuntime: { enableDefaultSystemMsg: true, defaultSystemMsg: 'legacy prompt' },
 		}),
 		decryptAiRuntimeSettings: (settings) => ({ ...DEFAULT_SETTINGS.aiRuntime, ...(settings ?? {}) }),
-		migrateFromLegacyDefaultSystemMessage: async () => {
-			throw new Error('migrate failed');
-		},
 		loadServers: async () => [],
 		logger: {
 			...createNoopLogger(),
@@ -323,8 +311,28 @@ test('SettingsDomainService hydratePersistedSettings 在默认系统消息迁移
 	}));
 	const bootstrapSettings = await settingsService.loadBootstrapSettings();
 	const loaded = await settingsService.hydratePersistedSettings(bootstrapSettings);
-	assert.equal(loaded.aiRuntime.enableGlobalSystemPrompts, DEFAULT_SETTINGS.aiRuntime.enableGlobalSystemPrompts);
-	assert.equal(loggedMessages.includes('[SettingsDomain] 迁移默认系统消息失败（忽略，继续加载）'), true);
+	assert.equal('enableGlobalSystemPrompts' in loaded.aiRuntime, false);
+	assert.equal('enableDefaultSystemMsg' in loaded.aiRuntime, false);
+	assert.equal('defaultSystemMsg' in loaded.aiRuntime, false);
+	assert.deepEqual(loggedMessages, []);
+});
+
+test('SettingsDomainService loadBootstrapSettings 会剥离已废弃的 ribbon 字段', async () => {
+	installTestWindow();
+	const { SettingsDomainService } = await import('./service');
+	const { DEFAULT_SETTINGS } = await import('./config');
+	const settingsService = new SettingsDomainService(createTestPorts({
+		loadData: async () => ({
+			chat: {
+				showRibbonIcon: false,
+				enableQuickActions: false,
+			},
+		}),
+		decryptAiRuntimeSettings: () => ({ ...DEFAULT_SETTINGS.aiRuntime }),
+	}));
+	const loaded = await settingsService.loadBootstrapSettings();
+	assert.equal('showRibbonIcon' in loaded.chat, false);
+	assert.equal(loaded.chat.enableQuickActions, false);
 });
 
 test('SettingsDomainService hydratePersistedSettings 会合并成功读取的 MCP 服务器列表', async () => {
@@ -349,7 +357,7 @@ test('SettingsDomainService hydratePersistedSettings 会合并成功读取的 MC
 	assert.equal(loaded.aiRuntime.mcp?.enabled, true);
 });
 
-test('SettingsDomainService hydratePersistedSettings 会迁移默认系统消息并在 MCP 读取失败时回退空列表', async () => {
+test('SettingsDomainService hydratePersistedSettings 会剥离旧系统提示词字段并在 MCP 读取失败时回退空列表', async () => {
 	installTestWindow();
 	const { SettingsDomainService } = await import('./service');
 	const { DEFAULT_SETTINGS } = await import('./config');
@@ -374,7 +382,6 @@ test('SettingsDomainService hydratePersistedSettings 会迁移默认系统消息
 				...(settings ?? {}),
 			};
 		},
-		migrateFromLegacyDefaultSystemMessage: async () => true,
 		loadServers: async () => {
 			throw new Error('mcp unavailable');
 		},
@@ -390,7 +397,8 @@ test('SettingsDomainService hydratePersistedSettings 会迁移默认系统消息
 	const loaded = await settingsService.hydratePersistedSettings(bootstrapSettings);
 
 	assert.equal(loaded.aiDataFolder, 'Custom/AI Data');
-	assert.equal(loaded.aiRuntime.enableGlobalSystemPrompts, true);
+	assert.equal('enableGlobalSystemPrompts' in loaded.aiRuntime, false);
+	assert.equal('defaultSystemMsg' in loaded.aiRuntime, false);
 	assert.deepEqual(loaded.aiRuntime.mcp?.servers, []);
 	assert.equal(loaded.chat.enableQuickActions, true);
 	assert.equal(loaded.chat.maxQuickActionButtons, 7);
@@ -487,6 +495,7 @@ test('SettingsDomainService save 会剥离运行时字段和旧字段并同步 M
 	assert.equal('quickActions' in persistedChat, false);
 	assert.equal('skills' in persistedChat, false);
 	assert.equal('chatFolder' in persistedChat, false);
+	assert.equal('showRibbonIcon' in persistedChat, false);
 	const persistedAiRuntime = (savedPayload?.aiRuntime ?? {}) as Record<string, unknown>;
 	assert.equal('vendorApiKeys' in persistedAiRuntime, false);
 	assert.equal('editorStatus' in persistedAiRuntime, false);

@@ -12,7 +12,6 @@ import type {
 	HttpRequestOptions,
 	HttpResponseData,
 	NoticePort,
-	SystemPromptPort,
 	VaultChangeEvent,
 	VaultEntry,
 	VaultPathPort,
@@ -80,7 +79,6 @@ export interface ChatToolSettingsPort {
 
 export interface ChatHostPorts {
 	notify(message: string, timeout?: number): void;
-	buildGlobalSystemPrompt(featureId: string): Promise<string>;
 	normalizePath(path: string): string;
 	ensureAiDataFolders(aiDataFolder: string): Promise<void>;
 	requestHttp(options: HttpRequestOptions): Promise<HttpResponseData>;
@@ -109,13 +107,12 @@ export function createChatVaultPort(provider: ChatVaultProviderPort): ChatVaultP
 
 /** createChatHostPorts 所需的最小宿主能力 */
 export type ChatHostProviderPort =
-	NoticePort & SystemPromptPort & VaultPathPort & VaultReadPort &
+	NoticePort & VaultPathPort & VaultReadPort &
 	VaultWritePort & VaultWatchPort & HttpRequestPort & YamlPort;
 
 export function createChatHostPorts(provider: ChatHostProviderPort): ChatHostPorts {
 	return {
 		notify: (message, timeout) => provider.notify(message, timeout),
-		buildGlobalSystemPrompt: (featureId) => provider.buildGlobalSystemPrompt(featureId),
 		normalizePath: (path) => provider.normalizePath(path),
 		ensureAiDataFolders: (aiDataFolder) => provider.ensureAiDataFolders(aiDataFolder),
 		requestHttp: (options) => provider.requestHttp(options),

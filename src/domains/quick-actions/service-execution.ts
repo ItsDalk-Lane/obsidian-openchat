@@ -1,4 +1,4 @@
-import type { SystemPromptPort, VaultReadPort } from 'src/providers/providers.types';
+import type { VaultReadPort } from 'src/providers/providers.types';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import {
@@ -21,7 +21,7 @@ import type {
 export type { QuickActionExecutionResult } from './types';
 
 /** QuickActionExecutionService 所需的最小宿主能力 */
-export type QuickActionExecutionHostPort = VaultReadPort & SystemPromptPort;
+export type QuickActionExecutionHostPort = VaultReadPort;
 
 function getQuickActionType(quickAction: QuickAction): 'normal' | 'group' {
 	if (quickAction.actionType) {
@@ -238,6 +238,7 @@ export class QuickActionExecutionService {
 			promptContentResult.value,
 			selection,
 			quickAction.customPromptRole,
+			this.getAiRuntimeSettings().quickActionsSystemPrompt,
 		);
 		const sendRequest = this.providerAdapter.createSendRequest(
 			providerSettingsResult.value.vendor,
@@ -321,6 +322,14 @@ export class QuickActionExecutionService {
 				return ok(provider);
 			}
 		}
+		if (aiRuntimeSettings.defaultModel) {
+			const defaultProvider = providers.find(
+				(item) => item.tag === aiRuntimeSettings.defaultModel,
+			);
+			if (defaultProvider) {
+				return ok(defaultProvider);
+			}
+		}
 		return ok(providers[0]);
 	}
 
@@ -365,15 +374,13 @@ export class QuickActionExecutionService {
 		promptContent: string,
 		selection: string,
 		customPromptRole?: 'system' | 'user',
+		featureSystemPrompt?: string,
 	): Promise<QuickActionMessage[]> {
 		const messages: QuickActionMessage[] = [];
 
 		if (useDefaultSystemPrompt) {
-			const globalSystemPrompt = (
-				await this.obsidianApi.buildGlobalSystemPrompt('selection_toolbar')
-			).trim();
-			if (globalSystemPrompt.length > 0) {
-				messages.push({ role: 'system', content: globalSystemPrompt });
+			if (featureSystemPrompt) {
+				messages.push({ role: 'system', content: featureSystemPrompt });
 			}
 			messages.push({
 				role: 'user',

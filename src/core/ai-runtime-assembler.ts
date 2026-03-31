@@ -4,7 +4,7 @@
  *   负责构建 AiRuntimeCommandHost，管理 AiRuntimeCommandManager 的生命周期。
  *
  * @dependencies obsidian (通过 type-only), src/commands/ai-runtime/*, src/providers/*
- * @side-effects 注册 Obsidian 命令、状态栏项目与编辑器扩展
+ * @side-effects 注册 Obsidian 命令与编辑器扩展
  * @invariants 不直接持有 Plugin 实例，只接收最小宿主接口。
  */
 
@@ -20,7 +20,6 @@ import { AiRuntimeCommandManager } from 'src/commands/ai-runtime/AiRuntimeComman
  */
 export interface AiRuntimeAssemblerHost {
 	readonly app: App;
-	addStatusBarItem(): HTMLElement;
 	addCommand(command: Command): void;
 	removeCommand(id: string): void;
 	registerEditorExtension(extension: Extension | readonly Extension[]): void;
@@ -39,15 +38,20 @@ export class AiRuntimeAssembler {
 
 	initialize(settings: PluginSettings): void {
 		const aiRuntimeSettings = settings.aiRuntime;
+		const defaultModelTag = settings.chat.defaultModel;
 		if (!this.aiRuntimeCommandManager) {
 			this.aiRuntimeCommandManager = new AiRuntimeCommandManager(
 				this.commandHost,
 				this.obsidianApiProvider,
 				aiRuntimeSettings,
+				defaultModelTag,
 			);
 			this.aiRuntimeCommandManager.initialize();
 		} else {
-			this.aiRuntimeCommandManager.updateSettings(aiRuntimeSettings);
+			this.aiRuntimeCommandManager.updateSettings(
+				aiRuntimeSettings,
+				defaultModelTag,
+			);
 		}
 	}
 
@@ -64,7 +68,6 @@ function buildAiRuntimeCommandHost(
 	return {
 		getApp: () => host.app,
 		getObsidianApiProvider: () => obsidianApiProvider,
-		addStatusBarItem: () => host.addStatusBarItem(),
 		addCommand: (command) => {
 			host.addCommand(command);
 		},

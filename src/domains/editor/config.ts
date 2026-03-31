@@ -21,7 +21,8 @@ export const DEFAULT_EDITOR_TAB_COMPLETION_SETTINGS: EditorTabCompletionSettings
 	contextLengthAfter: DEFAULT_EDITOR_CONTEXT_OPTIONS.maxCharsAfter,
 	timeout: 5000,
 	providerTag: '',
-	promptTemplate: '{{rules}}\n\n{{context}}',
+	promptTemplate:
+		'You are a writing continuation assistant. Continue the text naturally based on the editor context provided by the user. Output only the continuation without any explanation. Match the original language, style, and format. Do not repeat existing content.',
 };
 
 export const DEFAULT_CONTINUOUS_USAGE_CONFIG: ContinuousUsageConfig = {

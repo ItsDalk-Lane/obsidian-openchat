@@ -58,14 +58,10 @@ export interface ObsidianApiRuntime {
 
 export function createObsidianApiProviderFromRuntime(
 	runtime: ObsidianApiRuntime,
-	buildGlobalSystemPrompt: (featureId: string) => Promise<string>,
 ): ObsidianApiProvider {
 	return {
 		notify(message: string, timeout?: number): void {
 			runtime.notify(message, timeout);
-		},
-		async buildGlobalSystemPrompt(featureId: string): Promise<string> {
-			return await buildGlobalSystemPrompt(featureId);
 		},
 		normalizePath(path: string): string {
 			return runtime.normalizePath(path);

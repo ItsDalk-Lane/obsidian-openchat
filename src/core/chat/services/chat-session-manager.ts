@@ -8,7 +8,7 @@ import type { ObsidianApiProvider } from 'src/providers/providers.types';
 import { HistoryService, ChatHistoryEntry } from './history-service';
 import type { ChatSession, ChatState } from '../types/chat';
 import type { MultiModelMode, LayoutMode } from '../types/multiModel';
-import { getChatHistoryPath } from 'src/utils/AIPathManager';
+import { getChatHistoryPath } from 'src/utils/aiPathSupport';
 import { DebugLogger } from '../../../utils/DebugLogger';
 import type { MessageService } from './message-service';
 

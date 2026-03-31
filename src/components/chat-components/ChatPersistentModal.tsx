@@ -4,7 +4,6 @@ import { createRoot, Root } from 'react-dom/client';
 import { ObsidianAppContext } from 'src/contexts/obsidianAppContext';
 import { localInstance } from 'src/i18n/locals';
 import { ChatService } from 'src/core/chat/services/chat-service';
-import type { ChatConsumerHost } from 'src/core/chat/services/chat-service-types';
 import { ChatPersistentModalApp } from './ChatPersistentModalApp';
 import { setupModalDragging } from './chatPersistentModalDrag';
 
@@ -21,19 +20,15 @@ export interface ChatPersistentModalOptions {
 /**
  * AI Chat 持久化模态框
  * 与临时模态框(ChatModal)的区别:
- * 1. 保存聊天历史(shouldSaveHistory=true)
- * 2. 不创建新会话,继续使用当前会话
- * 3. 关闭时不恢复会话状态
- * 4. 注册事件监听器,实现文件自动管理
+ * 1. 不创建新会话,继续使用当前会话
+ * 2. 关闭时不恢复会话状态
+ * 3. 自动保存行为始终跟随全局设置
  */
 export class ChatPersistentModal extends Modal {
 	private root: Root | null = null;
 	private readonly service: ChatService;
 	private readonly options: ChatPersistentModalOptions;
 	private readonly onCloseCallback?: () => void;
-
-	// 事件监听器引用(用于清理)
-	private eventCleanups: Array<() => void> = [];
 
 	// 拖动清理函数
 	private dragCleanup: (() => void) | null = null;
@@ -57,14 +52,6 @@ export class ChatPersistentModal extends Modal {
 
 	constructor(
 		app: App,
-		private readonly host: Pick<
-			ChatConsumerHost,
-			| 'app'
-			| 'getOpenMarkdownFiles'
-			| 'onWorkspaceLayoutChange'
-			| 'onActiveMarkdownFileChange'
-			| 'onMarkdownFileOpen'
-		>,
 		service: ChatService,
 		options: ChatPersistentModalOptions
 	) {
@@ -100,25 +87,8 @@ export class ChatPersistentModal extends Modal {
 		// 按全局配置同步历史记录保存开关，避免与“自动保存聊天记录”设置冲突
 		this.service.setShouldSaveHistory(this.service.getAutosaveChatEnabled());
 
-		// 不创建新会话,继续使用当前会话(与ChatModal不同)
-		// 不保存会话状态(与ChatModal不同)
-
-		// 重新打开模态框时,清除当前文件的手动移除标记
-		// 这样在同一文件中重新打开模态框时,文件可以重新被自动添加
-		if (this.options.activeFile) {
-			this.service.onChatViewReopened(this.options.activeFile);
-		}
-
 		// 模态框真正打开时（非最小化恢复），重置模型为配置的默认模型
 		this.service.onChatPanelOpen();
-
-		// 注册事件监听器(核心功能,从ChatView复制)
-		this.registerEventListeners();
-
-		// 自动添加当前活动文件到上下文
-		if (this.options.activeFile) {
-			this.service.addActiveFile(this.options.activeFile);
-		}
 
 		// 创建 React 根节点并渲染
 		this.root = createRoot(contentEl);
@@ -147,13 +117,6 @@ export class ChatPersistentModal extends Modal {
 			this.floatingButton = null;
 		}
 
-		// 不恢复会话状态(与ChatModal不同)
-		// 不清理文件(与ChatModal不同)
-		// 保持当前会话和文件选择状态
-
-		// 清理事件监听器
-		this.unregisterEventListeners();
-
 		// 清理拖动事件监听器
 		this.dragCleanup?.();
 		this.dragCleanup = null;
@@ -167,83 +130,6 @@ export class ChatPersistentModal extends Modal {
 		// 卸载 React 组件
 		this.root?.unmount();
 		this.root = null;
-	}
-
-	/**
-	 * 注册事件监听器
-	 * 从ChatView复制并修改,实现文件自动管理功能
-	 */
-	private registerEventListeners() {
-		// 1. active-leaf-change事件:监听文件切换
-		this.eventCleanups.push(this.host.onActiveMarkdownFileChange((file) => {
-			if (!file) {
-				// 如果文件为null,说明没有活动文件,移除所有自动添加的文件并重置标记
-				this.service.removeAllAutoAddedFiles();
-				this.service.onNoActiveFile();
-			} else {
-				// 添加新的活动文件(会自动移除之前的自动添加文件)
-				this.service.addActiveFile(file);
-				// 同时检查并清理已关闭的文件
-				this.checkAndCleanAutoAddedFiles();
-			}
-		}));
-
-		// 2. file-open事件:监听文件打开/关闭
-		this.eventCleanups.push(this.host.onMarkdownFileOpen((file) => {
-			if (!file) {
-				// 文件被关闭,检查自动添加的文件是否仍打开
-				this.checkAndCleanAutoAddedFiles();
-				// 如果没有任何打开的Markdown文件,重置标记
-				const openFiles = this.getOpenMarkdownFiles();
-				if (openFiles.size === 0) {
-					this.service.onNoActiveFile();
-				}
-			} else {
-				this.service.addActiveFile(file);
-			}
-		}));
-
-		// 3. layout-change事件:监听布局变化(检测标签页关闭)
-		this.eventCleanups.push(this.host.onWorkspaceLayoutChange(() => {
-			// 延迟执行检查,确保布局已更新
-			setTimeout(() => {
-				this.checkAndCleanAutoAddedFiles();
-			}, 50);
-		}));
-	}
-
-	/**
-	 * 清理事件监听器
-	 */
-	private unregisterEventListeners() {
-		this.eventCleanups.forEach((cleanup) => {
-			cleanup();
-		});
-		this.eventCleanups = [];
-	}
-
-	/**
-	 * 获取当前所有打开的Markdown文件路径
-	 * 从ChatView复制
-	 */
-	private getOpenMarkdownFiles(): Set<string> {
-		return new Set(this.host.getOpenMarkdownFiles().map((file) => file.path));
-	}
-
-	/**
-	 * 检查自动添加的文件是否仍然打开,如果未打开则清除
-	 * 从ChatView复制
-	 */
-	private checkAndCleanAutoAddedFiles() {
-		const openFiles = this.getOpenMarkdownFiles();
-		const autoAddedFiles = this.service.getAutoAddedFiles();
-
-		for (const file of autoAddedFiles) {
-			if (!openFiles.has(file.path)) {
-				// 自动添加的文件已关闭,从上下文中移除
-				this.service.removeSelectedFile(file.id, false);
-			}
-		}
 	}
 
 	private renderReact() {

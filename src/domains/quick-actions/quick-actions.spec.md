@@ -62,7 +62,7 @@ AI 执行逻辑。它通过窄端口组合访问 Vault、系统提示词与 prov
 - `src/types/chat.ts`：纯 shim 共享 `QuickAction` / `QuickActionType`
 - 宿主能力只能通过 `src/providers/providers.types.ts` 中的窄端口组合
 - `QuickActionDataHostPort`：VaultPathPort & VaultReadPort & VaultWritePort & YamlPort
-- `QuickActionExecutionHostPort`：VaultReadPort & SystemPromptPort
+- `QuickActionExecutionHostPort`：VaultReadPort
 - `QuickActionProviderAdapter`：封装 vendor 查找、options 归一化与 sendRequest 创建
 - `src/editor/selectionToolbar/*` 中迁出的旧路径只保留 re-export shim
 

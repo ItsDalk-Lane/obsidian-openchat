@@ -26,7 +26,6 @@ export interface SelectedFile {
 	path: string;
 	extension: string;
 	type: 'file';
-	isAutoAdded?: boolean;
 }
 
 export interface SelectedFolder {
@@ -186,8 +185,6 @@ export interface ChatSettings {
 	autosaveChat: boolean;
 	openMode: ChatOpenMode;
 	enableSystemPrompt: boolean;
-	autoAddActiveFile: boolean;
-	showRibbonIcon: boolean;
 	enableChatTrigger: boolean;
 	chatTriggerSymbol: string[];
 	chatModalWidth: number;
@@ -221,7 +218,6 @@ export interface ChatState {
 		name: string;
 		content: string;
 	};
-	showTemplateSelector: boolean;
 	shouldSaveHistory: boolean;
 	mcpToolMode: McpToolMode;
 	mcpSelectedServerIds: string[];

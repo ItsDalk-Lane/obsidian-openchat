@@ -17,11 +17,6 @@ export interface NoticePort {
 	notify(message: string, timeout?: number): void;
 }
 
-/** 全局系统提示词构建能力 */
-export interface SystemPromptPort {
-	buildGlobalSystemPrompt(featureId: string): Promise<string>;
-}
-
 /** Vault 路径归一化与目录结构保障能力 */
 export interface VaultPathPort {
 	normalizePath(path: string): string;
@@ -109,7 +104,6 @@ export interface InternalLinkPort {
  */
 export interface ObsidianApiProvider extends
 	NoticePort,
-	SystemPromptPort,
 	VaultPathPort,
 	VaultReadPort,
 	VaultWritePort,

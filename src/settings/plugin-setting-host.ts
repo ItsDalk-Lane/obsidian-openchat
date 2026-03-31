@@ -1,6 +1,7 @@
 import type { Plugin, PluginManifest, App } from 'obsidian';
 import type { ChatService } from 'src/core/chat/services/chat-service';
 import type { ChatSettings } from 'src/domains/chat/types';
+import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime';
 import type { McpRuntimeManager } from 'src/domains/mcp/types';
 import type { PluginSettings } from 'src/domains/settings/types';
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
@@ -27,6 +28,7 @@ export interface PluginSettingTabHost {
 	readonly manifest: PluginManifest;
 	readonly settings: PluginSettings;
 	getObsidianApiProvider(): ObsidianApiProvider;
+	getAiRuntimeSettings(): Readonly<AiRuntimeSettings>;
 	replaceSettings(value: Partial<PluginSettings>): Promise<void>;
 	saveSettings(): Promise<void>;
 	tryEnsureAIDataFolders(folderPath?: string): Promise<void>;
@@ -51,6 +53,9 @@ export function createPluginSettingTabHost(
 		},
 		getObsidianApiProvider(): ObsidianApiProvider {
 			return plugin.featureCoordinator.getObsidianApiProvider();
+		},
+		getAiRuntimeSettings(): Readonly<AiRuntimeSettings> {
+			return plugin.settings.aiRuntime;
 		},
 		async replaceSettings(value: Partial<PluginSettings>): Promise<void> {
 			await plugin.replaceSettings(value);

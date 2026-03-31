@@ -21,7 +21,6 @@ import type {
 	SettingsMigrationPort,
 	SettingsPersistencePort,
 	SettingsSecretPort,
-	SettingsSystemPromptPort,
 } from './types';
 
 /** SettingsDomainService 所需的全部端口，由组合根一次性注入 */
@@ -30,14 +29,13 @@ export interface SettingsDomainPorts {
 	readonly host: SettingsHostPort;
 	readonly secret: SettingsSecretPort;
 	readonly migration: SettingsMigrationPort;
-	readonly systemPrompt: SettingsSystemPromptPort;
 	readonly mcpServer: SettingsMcpServerPort;
 	readonly logger: SettingsDomainLogger;
 }
 
 const CHAT_RUNTIME_ONLY_FIELDS = ['quickActions', 'skills'] as const;
-const CHAT_LEGACY_FIELDS = ['chatFolder', 'enableInternalLinkParsing', 'parseLinksInTemplates', 'maxLinkParseDepth', 'linkParseTimeout', 'enableSelectionToolbar', 'maxToolbarButtons', 'selectionToolbarStreamOutput'] as const;
-const AI_RUNTIME_LEGACY_FIELDS = ['enableDefaultSystemMsg', 'defaultSystemMsg', 'systemPromptsData', 'enableInternalLink', 'maxLinkParseDepth', 'linkParseTimeout'] as const;
+const CHAT_LEGACY_FIELDS = ['chatFolder', 'enableInternalLinkParsing', 'parseLinksInTemplates', 'maxLinkParseDepth', 'linkParseTimeout', 'enableSelectionToolbar', 'maxToolbarButtons', 'selectionToolbarStreamOutput', 'showRibbonIcon', 'autoAddActiveFile'] as const;
+const AI_RUNTIME_LEGACY_FIELDS = ['enableDefaultSystemMsg', 'defaultSystemMsg', 'enableGlobalSystemPrompts', 'systemPromptsData', 'enableInternalLink', 'maxLinkParseDepth', 'linkParseTimeout'] as const;
 const AI_RUNTIME_RUNTIME_ONLY_FIELDS = ['editorStatus', 'vendorApiKeys'] as const;
 const LEGACY_TOP_LEVEL_FIELDS = ['promptTemplateFolder', 'tars'] as const;
 
@@ -51,7 +49,6 @@ export class SettingsDomainService {
 	private readonly host: SettingsHostPort;
 	private readonly secret: SettingsSecretPort;
 	private readonly migration: SettingsMigrationPort;
-	private readonly systemPrompt: SettingsSystemPromptPort;
 	private readonly mcpServer: SettingsMcpServerPort;
 	private readonly logger: SettingsDomainLogger;
 
@@ -60,7 +57,6 @@ export class SettingsDomainService {
 		this.host = ports.host;
 		this.secret = ports.secret;
 		this.migration = ports.migration;
-		this.systemPrompt = ports.systemPrompt;
 		this.mcpServer = ports.mcpServer;
 		this.logger = ports.logger;
 	}
@@ -74,11 +70,8 @@ export class SettingsDomainService {
 		const aiRuntimeSettings = cloneAiRuntimeSettings(
 			this.secret.decryptAiRuntimeSettings(persistedAiRuntime),
 		);
+		deleteFields(aiRuntimeSettings as unknown as Record<string, unknown>, AI_RUNTIME_LEGACY_FIELDS);
 		const aiDataFolder = this.migration.resolveAiDataFolder(persisted, rawChatSettings);
-		deleteFields(
-			aiRuntimeSettings as unknown as Record<string, unknown>,
-			['enableDefaultSystemMsg', 'defaultSystemMsg', 'systemPromptsData'],
-		);
 
 		return {
 			...DEFAULT_SETTINGS,
@@ -89,21 +82,9 @@ export class SettingsDomainService {
 		};
 	}
 
-	/** @precondition settings 来自 bootstrap 阶段且包含完整基础配置 @postcondition 返回补齐系统提示词迁移与 MCP Markdown 配置后的设置快照 @throws 当关键 hydrate 依赖失败且未被内部降级时抛出 @example await service.hydratePersistedSettings(settings) */
+	/** @precondition settings 来自 bootstrap 阶段且包含完整基础配置 @postcondition 返回补齐 MCP Markdown 配置后的设置快照 @throws 当关键 hydrate 依赖失败且未被内部降级时抛出 @example await service.hydratePersistedSettings(settings) */
 	async hydratePersistedSettings(settings: PluginSettings): Promise<PluginSettings> {
 		const hydratedAiRuntime = cloneAiRuntimeSettings(settings.aiRuntime);
-		try {
-			const migrated = await this.systemPrompt.migrateFromLegacyDefaultSystemMessage({
-				enabled: getBooleanField(hydratedAiRuntime, 'enableDefaultSystemMsg'),
-				content: getStringOrNullField(hydratedAiRuntime, 'defaultSystemMsg'),
-			});
-			if (migrated) {
-				hydratedAiRuntime.enableGlobalSystemPrompts = true;
-			}
-		} catch (error) {
-			this.logger.error('[SettingsDomain] 迁移默认系统消息失败（忽略，继续加载）', error);
-		}
-
 		try {
 			const markdownServers = await this.mcpServer.loadServers(settings.aiDataFolder);
 			hydratedAiRuntime.mcp = {
@@ -120,10 +101,6 @@ export class SettingsDomainService {
 			};
 		}
 
-		deleteFields(
-			hydratedAiRuntime as unknown as Record<string, unknown>,
-			['enableDefaultSystemMsg', 'defaultSystemMsg', 'systemPromptsData'],
-		);
 		return {
 			...settings,
 			aiRuntime: hydratedAiRuntime,
@@ -133,7 +110,6 @@ export class SettingsDomainService {
 	/** @precondition settings 为待持久化的完整设置快照 @postcondition data.json 被更新且运行时字段不会被写回 @throws 当持久化本身失败时抛出 @example await service.save(settings) */
 	async save(settings: PluginSettings): Promise<void> {
 		const encryptedAiRuntime = this.secret.encryptAiRuntimeSettings(settings.aiRuntime);
-		deleteFields(encryptedAiRuntime as unknown as Record<string, unknown>, ['enableDefaultSystemMsg', 'defaultSystemMsg']);
 		const persisted = (await this.persistence.loadData()) ?? {};
 		const persistedChat = asRecord(persisted.chat);
 		const persistedAiRuntime = this.migration.resolvePersistedAiRuntime(persisted);
@@ -220,16 +196,6 @@ function deleteFields(value: Record<string, unknown>, fields: readonly string[])
 	for (const field of fields) {
 		delete value[field];
 	}
-}
-
-function getBooleanField(value: unknown, field: string): boolean | undefined {
-	const fieldValue = asRecord(value)[field];
-	return typeof fieldValue === 'boolean' ? fieldValue : undefined;
-}
-
-function getStringOrNullField(value: unknown, field: string): string | null | undefined {
-	const fieldValue = asRecord(value)[field];
-	return typeof fieldValue === 'string' || fieldValue === null ? fieldValue : undefined;
 }
 
 function stripRemovedBuiltinMcpFields(value: Record<string, unknown>): void {

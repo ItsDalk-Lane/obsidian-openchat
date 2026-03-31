@@ -58,14 +58,6 @@ export interface SettingsMigrationPort {
 	cleanupLegacyAIStorage(): Promise<void>;
 }
 
-/** 系统提示词迁移端口（由组合根在宿主侧预创建） */
-export interface SettingsSystemPromptPort {
-	migrateFromLegacyDefaultSystemMessage(params: {
-		enabled?: boolean;
-		content?: string | null;
-	}): Promise<boolean>;
-}
-
 /** MCP 服务器 Markdown 数据同步端口（由组合根在宿主侧预创建） */
 export interface SettingsMcpServerPort {
 	loadServers(aiDataFolder: string): Promise<unknown[]>;

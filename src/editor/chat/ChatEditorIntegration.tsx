@@ -54,6 +54,7 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 				provider,
 				instruction,
 				ctx.contentForAI,
+				this.host.getAiRuntimeSettings().quickActionsSystemPrompt || undefined,
 			);
 			if (!result.trim()) {
 				this.host.notify(localInstance.ai_no_usable_content);

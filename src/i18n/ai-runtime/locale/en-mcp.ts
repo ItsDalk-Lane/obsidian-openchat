@@ -70,8 +70,11 @@ export default {
 	'Tab completion context after description': 'Number of characters after the cursor sent to AI',
 	'Tab completion timeout': 'Request timeout',
 	'Tab completion timeout description': 'Maximum wait time for AI requests in seconds',
-	'Tab completion prompt template': 'Tab completion prompt template',
-	'Tab completion prompt template description': 'Template used to build the user message sent to AI. Available placeholders: {{rules}} and {{context}}.',
+	'Tab completion system prompt': 'System prompt',
+	'Tab completion system prompt description': 'System prompt sent to the AI model before the editor context. Leave empty to skip system-level instructions.',
+	'Tab completion system prompt edit btn': 'Edit',
+	'Tab completion system prompt modal title': 'Tab Completion System Prompt',
+	'Tab completion system prompt placeholder': 'Enter the system prompt for Tab completion (leave empty to skip injection)...',
 	'Debug mode': 'Debug mode',
 	'Debug mode description': 'When enabled, debug logs will be printed to the console. Reload the plugin after changing this setting.',
 	'LLM console log': 'LLM console log (messages / response preview)',
@@ -204,6 +207,7 @@ export default {
 	'Failed to load models. Please try again later.':
 		'Failed to load models. Please try again later.',
 	'Chat session saved': 'Chat session saved',
+	'Provider settings saved': 'Provider settings saved',
 	'Generation failed. Please try again later.': 'Generation failed. Please try again later.',
 	'{mode} mode does not support parameter {field}': '{mode} mode does not support parameter {field}',
 	'{mode} mode does not support start_line; it was removed automatically. Use segment mode for line-offset reads.':

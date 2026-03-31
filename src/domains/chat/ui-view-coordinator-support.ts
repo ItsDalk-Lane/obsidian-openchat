@@ -83,25 +83,3 @@ export const registerChatViewCommands = (
 		},
 	});
 };
-
-export const syncChatRibbonIcon = (
-	host: ChatViewCoordinatorHost,
-	service: ChatViewCoordinatorServicePort,
-	existingRibbonEl: HTMLElement | null,
-	show: boolean,
-	activateChatView: (mode: ChatOpenMode) => Promise<void>,
-): HTMLElement | null => {
-	if (existingRibbonEl) {
-		existingRibbonEl.remove();
-	}
-	if (!show) {
-		return null;
-	}
-	const ribbonEl = host.addRibbonIcon('message-circle', 'AI Chat', () => {
-		const openMode = host.getChatSettings().openMode;
-		service.setNextTriggerSource('chat_input');
-		void activateChatView(openMode);
-	});
-	ribbonEl?.addClass('chat-ribbon-icon');
-	return ribbonEl;
-};

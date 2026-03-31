@@ -12,7 +12,6 @@ const createProviderMessageDeps = (
 	settings: ChatSettings,
 	pluginChatSettings: ChatSettings,
 ): ChatProviderMessageDeps => ({
-	buildGlobalSystemPrompt: async () => '',
 	getActiveFilePath: () => null,
 	state: {
 		contextNotes: [],

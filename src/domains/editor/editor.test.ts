@@ -12,16 +12,16 @@ import {
 	selectCompletionProvider,
 } from './service';
 import { ContextType, type EditorCompletionMessage, type EditorCompletionProvider, type EditorTabCompletionEvents, type EditorTabCompletionRuntime } from './types';
-import type { EventBus, NoticePort, SystemPromptPort } from 'src/providers/providers.types';
+import type { EventBus, NoticePort } from 'src/providers/providers.types';
 
 function createEditorState(doc: string, anchor: number = doc.length): EditorState {
 	return EditorState.create({ doc, selection: { anchor } });
 }
 
-/** 编辑器域仅需 NoticePort & SystemPromptPort */
-type EditorHostPort = NoticePort & SystemPromptPort;
+/** 编辑器域仅需 NoticePort */
+type EditorHostPort = NoticePort;
 
-function createFakeObsidianApiProvider(globalPrompt = ''): EditorHostPort & {
+function createFakeObsidianApiProvider(): EditorHostPort & {
 	notifications: Array<{ message: string; timeout?: number }>;
 } {
 	const notifications: Array<{ message: string; timeout?: number }> = [];
@@ -29,9 +29,6 @@ function createFakeObsidianApiProvider(globalPrompt = ''): EditorHostPort & {
 		notifications,
 		notify(message: string, timeout?: number): void {
 			notifications.push({ message, timeout });
-		},
-		async buildGlobalSystemPrompt(): Promise<string> {
-			return globalPrompt;
 		},
 	};
 }
@@ -56,14 +53,16 @@ function createFakeEventBus(): {
 }
 
 function createCompletionProvider(options?: {
+	tag?: string;
+	vendor?: string;
 	chunks?: readonly string[];
 	error?: Error;
 }): EditorCompletionProvider & { readonly receivedMessages: readonly EditorCompletionMessage[][] } {
 	const receivedMessages: EditorCompletionMessage[][] = [];
 	return {
 		receivedMessages,
-		tag: 'alpha',
-		vendor: 'test-vendor',
+		tag: options?.tag ?? 'alpha',
+		vendor: options?.vendor ?? 'test-vendor',
 		async *sendCompletion(messages: readonly EditorCompletionMessage[]): AsyncGenerator<string, void, unknown> {
 			receivedMessages.push([...messages]);
 			if (options?.error) {
@@ -76,9 +75,13 @@ function createCompletionProvider(options?: {
 	};
 }
 
-function createRuntime(provider: EditorCompletionProvider, overrides?: Partial<EditorTabCompletionRuntime>): EditorTabCompletionRuntime {
+function createRuntime(
+	providerOrProviders: EditorCompletionProvider | readonly EditorCompletionProvider[],
+	overrides?: Partial<EditorTabCompletionRuntime>,
+): EditorTabCompletionRuntime {
 	return {
-		providers: [provider],
+		defaultModelTag: '',
+		providers: Array.isArray(providerOrProviders) ? [...providerOrProviders] : [providerOrProviders],
 		settings: normalizeEditorTabCompletionSettings({ enabled: true }),
 		messages: {
 			readOnly: '只读',
@@ -156,8 +159,10 @@ test('selectCompletionProvider 优先使用指定 tag', () => {
 		{ tag: 'alpha', vendor: 'a', async *sendCompletion() {} },
 		{ tag: 'beta', vendor: 'b', async *sendCompletion() {} },
 	];
-	assert.equal(selectCompletionProvider('beta', providers)?.tag, 'beta');
-	assert.equal(selectCompletionProvider('', providers)?.tag, 'alpha');
+	assert.equal(selectCompletionProvider('beta', '', providers)?.tag, 'beta');
+	assert.equal(selectCompletionProvider('', 'beta', providers)?.tag, 'beta');
+	assert.equal(selectCompletionProvider('', 'missing', providers)?.tag, 'alpha');
+	assert.equal(selectCompletionProvider('missing', 'beta', providers)?.tag, 'beta');
 });
 
 test('normalizeEditorTabCompletionSettings 会清理空白配置', () => {
@@ -168,7 +173,7 @@ test('normalizeEditorTabCompletionSettings 会清理空白配置', () => {
 	});
 	assert.equal(settings.triggerKey, 'Alt');
 	assert.equal(settings.providerTag, 'alpha');
-	assert.equal(settings.promptTemplate, '{{rules}}\n\n{{context}}');
+	assert.match(settings.promptTemplate, /writing continuation assistant/);
 });
 
 test('EditorTabCompletionService 在只读模式下通知并停止请求', () => {
@@ -202,18 +207,48 @@ test('EditorTabCompletionService 发射 requested 事件并对重复触发做防
 	assert.equal(eventBus.emitted[0]?.payload.providerTag, 'alpha');
 });
 
+test('EditorTabCompletionService 在未指定 providerTag 时使用 defaultModelTag', async () => {
+	const alphaProvider = createCompletionProvider({ tag: 'alpha', vendor: 'vendor-a' });
+	const betaProvider = createCompletionProvider({ tag: 'beta', vendor: 'vendor-b' });
+	const obsidianApi = createFakeObsidianApiProvider();
+	const eventBus = createFakeEventBus();
+	const service = new EditorTabCompletionService(
+		obsidianApi,
+		eventBus.bus,
+		createRuntime([alphaProvider, betaProvider], {
+			settings: normalizeEditorTabCompletionSettings({ enabled: true, providerTag: '' }),
+			defaultModelTag: 'beta',
+		}),
+	);
+
+	await withMockedDateNow([1000], async () => {
+		const pending = service.startSuggestionRequest({
+			state: createEditorState('text'),
+			editable: true,
+		});
+		assert.ok(pending);
+		assert.equal(pending.provider.tag, 'beta');
+	});
+
+	assert.equal(eventBus.emitted[0]?.eventName, 'editor.tab-completion.requested');
+	assert.equal(eventBus.emitted[0]?.payload.providerTag, 'beta');
+});
+
 test('EditorTabCompletionService resolveSuggestion 会组装 prompt、裁剪结果并发射完成事件', async () => {
 	const provider = createCompletionProvider({ chunks: ['第一句。第二句。'] });
-	const obsidianApi = createFakeObsidianApiProvider('global prompt');
+	const obsidianApi = createFakeObsidianApiProvider();
 	const eventBus = createFakeEventBus();
-	const service = new EditorTabCompletionService(obsidianApi, eventBus.bus, createRuntime(provider));
+	const service = new EditorTabCompletionService(obsidianApi, eventBus.bus, createRuntime(provider, {
+		settings: normalizeEditorTabCompletionSettings({ enabled: true, promptTemplate: 'global prompt' }),
+	}));
 	const pending = await withMockedDateNow([1000], async () => service.startSuggestionRequest({ state: createEditorState('段落内容'), editable: true }));
 	assert.ok(pending);
 	const suggestion = await service.resolveSuggestion(pending);
 	assert.equal(suggestion, '第一句。');
 	assert.equal(provider.receivedMessages[0]?.[0]?.role, 'system');
 	assert.equal(provider.receivedMessages[0]?.[0]?.content, 'global prompt');
-	assert.match(provider.receivedMessages[0]?.[1]?.content ?? '', /规则/);
+	assert.equal(provider.receivedMessages[0]?.[1]?.role, 'user');
+	assert.equal(provider.receivedMessages[0]?.[1]?.content, '段落内容');
 	assert.equal(eventBus.emitted.at(-1)?.eventName, 'editor.tab-completion.completed');
 	assert.equal(eventBus.emitted.at(-1)?.payload.textLength, suggestion.length);
 });

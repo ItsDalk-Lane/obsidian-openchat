@@ -18,7 +18,6 @@ const createOperationDeps = (
 	sessionManager: null as never,
 	multiModelService,
 	notify: () => {},
-	buildGlobalSystemPrompt: async () => '',
 	emitState: () => {},
 	createNewSession: () => null as never,
 	syncSessionMultiModelState: () => {},

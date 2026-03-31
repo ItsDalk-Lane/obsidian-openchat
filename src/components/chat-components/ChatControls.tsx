@@ -1,10 +1,9 @@
-import { History, MessageCirclePlus, Settings, Zap, Paperclip, ImageUp } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
+import { History, MessageCirclePlus, Settings } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import type { ChatState } from 'src/domains/chat/types';
 import type { ChatHistoryEntry } from 'src/core/chat/services/history-service';
 import { ChatHistoryPanel } from './ChatHistory';
-import { FileMenuPopup } from './FileMenuPopup';
 import { ModeSelector } from './ModeSelector';
 import { LayoutSelector } from './LayoutSelector';
 import { ToggleButtons } from './ToggleButtons';
@@ -23,10 +22,11 @@ export const ChatControls = ({
 	const obsidianApi = service.getObsidianApiProvider();
 	const [historyOpen, setHistoryOpen] = useState(false);
 	const [historyItems, setHistoryItems] = useState<ChatHistoryEntry[]>([]);
-	const [showFileMenu, setShowFileMenu] = useState(false);
-	const fileMenuButtonRef = useRef<HTMLSpanElement>(null);
+	const [autosaveOverride, setAutosaveOverride] = useState<boolean | null>(null);
+	const [isAutosavePending, setIsAutosavePending] = useState(false);
 	const historyPanelRef = useRef<HTMLDivElement>(null);
 	const historyButtonRef = useRef<HTMLSpanElement>(null);
+	const autosaveChatEnabled = autosaveOverride ?? service.getAutosaveChatEnabled();
 
 	useEffect(() => {
 		if (historyOpen) {
@@ -79,57 +79,27 @@ export const ChatControls = ({
 		setHistoryOpen(false);
 	};
 
-	const handleTemplateButtonClick = () => {
-		service.setTemplateSelectorVisibility(true);
+	const handleAutosaveChatChange = async (enabled: boolean) => {
+		if (isAutosavePending) {
+			return;
+		}
+
+		const previousEnabled = service.getAutosaveChatEnabled();
+		setAutosaveOverride(enabled);
+		setIsAutosavePending(true);
+		service.setShouldSaveHistory(enabled);
+
+		try {
+			await service.persistChatSettings({ autosaveChat: enabled });
+		} catch (error) {
+			DebugLogger.warn('[ChatControls] 更新自动保存设置失败', error);
+			service.setShouldSaveHistory(previousEnabled);
+			setAutosaveOverride(previousEnabled);
+		} finally {
+			setIsAutosavePending(false);
+			setAutosaveOverride(null);
+		}
 	};
-
-	const handleImageUpload = () => {
-		const input = document.createElement('input');
-		input.type = 'file';
-		input.accept = 'image/*';
-		input.multiple = true;
-		input.onchange = async (e) => {
-			const target = e.target as HTMLInputElement;
-			const files = Array.from(target.files || []);
-			if (files.length > 0) {
-				const converted = await Promise.all(files.map(async (file) => {
-					try {
-						return await fileToBase64(file);
-					} catch (error) {
-						DebugLogger.error('[ChatControls] Failed to convert image to base64', error);
-						return null;
-					}
-				}));
-
-				const validImages = converted.filter((item): item is string => typeof item === 'string' && item.length > 0);
-				if (validImages.length > 0) {
-					service.addSelectedImages(validImages);
-				}
-			}
-		};
-		input.click();
-	};
-
-	const handleFileUpload = () => {
-		setShowFileMenu(true);
-	};
-
-	const handleFileSelect = (file: { path: string; name: string; extension: string }) => {
-		service.addSelectedFile(file);
-	};
-
-	const handleFolderSelect = (folder: { path: string; name: string }) => {
-		service.addSelectedFolder(folder);
-	};
-
-	// 辅助函数：将File转换为base64字符串
-	const fileToBase64 = (file: File): Promise<string> =>
-		new Promise((resolve, reject) => {
-			const reader = new FileReader();
-			reader.onload = () => resolve(reader.result as string);
-			reader.onerror = () => reject(reader.error);
-			reader.readAsDataURL(file);
-		});
 
 	
 	return (
@@ -152,34 +122,6 @@ export const ChatControls = ({
 			</div>
 			<div className="tw-flex-1"></div>
 			<div className="tw-flex tw-items-center tw-gap-2">
-				<span onClick={handleTemplateButtonClick} aria-label={localInstance.select_template} title={localInstance.select_template} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center tw-p-1 tw-rounded hover:tw-bg-purple-100">
-					<Zap className="tw-size-4" />
-				</span>
-				<span
-					ref={fileMenuButtonRef}
-					onClick={(e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						handleFileUpload();
-					}}
-					className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center"
-					aria-label={localInstance.chat_upload_file}
-					title={localInstance.chat_upload_file}
-				>
-					<Paperclip className="tw-size-4" />
-				</span>
-				<span
-					onClick={(e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						handleImageUpload();
-					}}
-					className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center"
-					aria-label={localInstance.chat_upload_image}
-					title={localInstance.chat_upload_image}
-				>
-					<ImageUp className="tw-size-4" />
-				</span>
 				<span ref={historyButtonRef} onClick={() => setHistoryOpen((prev) => !prev)} aria-label={localInstance.chat_history_button_title} title={localInstance.chat_history_button_title} className="tw-cursor-pointer tw-text-muted hover:tw-text-accent tw-flex tw-items-center tw-justify-center">
 					<History className="tw-size-4" />
 				</span>
@@ -207,20 +149,16 @@ export const ChatControls = ({
 							await service.deleteHistory(item.filePath);
 							setHistoryItems(await service.listHistory());
 						}}
+						autosaveChatEnabled={autosaveChatEnabled}
+						onAutosaveChatChange={(enabled) => {
+							void handleAutosaveChatChange(enabled);
+						}}
+						isAutosavePending={isAutosavePending}
 						anchorRef={historyButtonRef}
 						panelRef={historyPanelRef}
 					/>
 				</div>
 			)}
-			{/* 文件菜单弹出窗口 */}
-			<FileMenuPopup
-				isOpen={showFileMenu}
-				onClose={() => setShowFileMenu(false)}
-				service={service}
-				onSelectFile={handleFileSelect}
-				onSelectFolder={handleFolderSelect}
-				buttonRef={fileMenuButtonRef}
-			/>
 		</div>
 	);
 };

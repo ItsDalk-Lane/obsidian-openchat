@@ -54,7 +54,6 @@ export interface ChatSettingsContextValue {
 	allBuiltinTools: McpToolInfo[]
 	// Callbacks
 	persistChatSettings: (partial: Partial<ChatSettings>) => Promise<boolean>
-	persistGlobalSystemPrompts: (enabled: boolean) => Promise<boolean>
 	openMcpServerEditor: (existingServer: McpServerConfig | null) => void
 	openMcpJsonImportModal: (manual: boolean) => void
 	handleToggleSingleBuiltinTool: (toolName: string, enabled: boolean) => Promise<void>
@@ -231,26 +230,6 @@ export const ChatSettingsProvider = ({ app, service, children }: ChatSettingsPro
 			}
 		},
 		[chatSettings, reloadSnapshots, service]
-	)
-
-	const persistGlobalSystemPrompts = useCallback(
-		async (enabled: boolean): Promise<boolean> => {
-			const previousAiRuntimeSettings = aiRuntimeSettings
-			setAiRuntimeSettings((current) => ({
-				...current,
-				enableGlobalSystemPrompts: enabled,
-			}))
-			try {
-				await service.persistGlobalSystemPromptsEnabled(enabled)
-				reloadSnapshots()
-				return true
-			} catch {
-				setAiRuntimeSettings(previousAiRuntimeSettings)
-				reloadSnapshots()
-				return false
-			}
-		},
-		[aiRuntimeSettings, reloadSnapshots, service]
 	)
 
 	const persistMcpSettings = useCallback(
@@ -441,7 +420,6 @@ export const ChatSettingsProvider = ({ app, service, children }: ChatSettingsPro
 			mcpStateMap,
 			allBuiltinTools,
 			persistChatSettings,
-			persistGlobalSystemPrompts,
 			openMcpServerEditor,
 			openMcpJsonImportModal,
 			handleToggleSingleBuiltinTool,
@@ -467,7 +445,6 @@ export const ChatSettingsProvider = ({ app, service, children }: ChatSettingsPro
 			mcpStateMap,
 			allBuiltinTools,
 			persistChatSettings,
-			persistGlobalSystemPrompts,
 			openMcpServerEditor,
 			openMcpJsonImportModal,
 			handleToggleSingleBuiltinTool,

@@ -17,7 +17,6 @@ export interface ChatMessageOperationDeps {
 	sessionManager: ChatSessionManager;
 	multiModelService: MultiModelChatService | null;
 	notify: (message: string, timeout?: number) => void;
-	buildGlobalSystemPrompt: (featureId: string) => Promise<string>;
 	emitState: () => void;
 	createNewSession: () => ChatSession;
 	syncSessionMultiModelState: (session?: ChatSession) => void;
@@ -105,11 +104,6 @@ export const prepareChatRequest = async (
 	let systemPrompt: string | undefined;
 	if (useTemplateAsSystemPrompt && selectedPromptTemplate) {
 		systemPrompt = selectedPromptTemplate.content;
-	} else {
-		const built = await deps.buildGlobalSystemPrompt('ai_chat');
-		if (built && built.trim().length > 0) {
-			systemPrompt = built;
-		}
 	}
 
 	let messageContent = finalUserMessage;

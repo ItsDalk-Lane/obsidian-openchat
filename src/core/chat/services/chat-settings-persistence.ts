@@ -70,24 +70,6 @@ export const persistChatSettings = async (
 	}
 };
 
-export const persistGlobalSystemPromptsEnabled = async (
-	deps: Pick<ChatPersistenceDeps, 'settingsAccessor' | 'obsidianApi'>,
-	enabled: boolean
-): Promise<void> => {
-	const previousAiRuntimeSettings = cloneValue(deps.settingsAccessor.getAiRuntimeSettings());
-	deps.settingsAccessor.setAiRuntimeSettings({
-		...previousAiRuntimeSettings,
-		enableGlobalSystemPrompts: enabled,
-	});
-	try {
-		await deps.settingsAccessor.saveSettings();
-	} catch (error) {
-		deps.settingsAccessor.setAiRuntimeSettings(previousAiRuntimeSettings);
-		handleSettingsSaveError(deps, error);
-		throw error;
-	}
-};
-
 export const persistMcpSettings = async (
 	deps: ChatPersistenceDeps,
 	mcpSettings: McpSettings

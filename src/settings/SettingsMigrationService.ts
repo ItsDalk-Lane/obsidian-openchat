@@ -12,7 +12,6 @@ import {
 } from 'src/utils/AIPathManager';
 
 const LEGACY_QUICK_ACTIONS_DATA_FILE = '.obsidian/plugins/openchat/skills.json';
-const LEGACY_SYSTEM_PROMPTS_DATA_FILE = '.obsidian/plugins/openchat/system-prompts.json';
 const LEGACY_AI_RUNTIME_CONTAINER_KEY = 'tars';
 const LEGACY_AI_RUNTIME_SETTINGS_KEY = 'settings';
 
@@ -113,11 +112,7 @@ export class SettingsMigrationService {
             delete nextChat.skills;
             changed = true;
         }
-        if (Object.prototype.hasOwnProperty.call(nextAiRuntime, 'systemPromptsData')) {
-            delete nextAiRuntime.systemPromptsData;
-            changed = true;
-        }
-        for (const legacyAiRuntimeField of ['enableInternalLink', 'maxLinkParseDepth', 'linkParseTimeout', 'enableDefaultSystemMsg', 'defaultSystemMsg'] as const) {
+        for (const legacyAiRuntimeField of ['enableInternalLink', 'maxLinkParseDepth', 'linkParseTimeout', 'enableDefaultSystemMsg', 'defaultSystemMsg', 'enableGlobalSystemPrompts', 'systemPromptsData'] as const) {
             if (Object.prototype.hasOwnProperty.call(nextAiRuntime, legacyAiRuntimeField)) {
                 delete nextAiRuntime[legacyAiRuntimeField];
                 changed = true;
@@ -175,11 +170,10 @@ export class SettingsMigrationService {
             nextData.chat = nextChat;
             nextData.aiRuntime = nextAiRuntime;
             await this.plugin.saveData(nextData);
-            DebugLogger.info('[SettingsDomain] 已清理 data.json 中的旧快捷操作/系统提示词/MCP 服务器存储位点');
+            DebugLogger.info('[SettingsDomain] 已清理 data.json 中的旧快捷操作/MCP 服务器存储位点');
         }
 
         await this.removeLegacyFileIfExists(LEGACY_QUICK_ACTIONS_DATA_FILE);
-        await this.removeLegacyFileIfExists(LEGACY_SYSTEM_PROMPTS_DATA_FILE);
         this.cleanupRuntimeLegacyFields();
     }
 
@@ -293,8 +287,12 @@ export class SettingsMigrationService {
                 delete (runtimeSettings.chat as unknown as Record<string, unknown>).skills;
             }
         }
-        if (runtimeSettings.aiRuntime && 'systemPromptsData' in (runtimeSettings.aiRuntime as unknown as Record<string, unknown>)) {
-            delete (runtimeSettings.aiRuntime as unknown as Record<string, unknown>).systemPromptsData;
+        if (runtimeSettings.aiRuntime) {
+            for (const legacyAiRuntimeField of ['enableInternalLink', 'maxLinkParseDepth', 'linkParseTimeout', 'enableDefaultSystemMsg', 'defaultSystemMsg', 'enableGlobalSystemPrompts', 'systemPromptsData'] as const) {
+                if (legacyAiRuntimeField in (runtimeSettings.aiRuntime as unknown as Record<string, unknown>)) {
+                    delete (runtimeSettings.aiRuntime as unknown as Record<string, unknown>)[legacyAiRuntimeField];
+                }
+            }
         }
     }
 }

@@ -1,5 +1,5 @@
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
-import { getChatHistoryPath } from 'src/utils/AIPathManager';
+import { getChatHistoryPath } from 'src/utils/aiPathSupport';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { SubAgentScannerService } from 'src/tools/sub-agents/SubAgentScannerService';
 import { SubAgentWatcherService } from 'src/tools/sub-agents/SubAgentWatcherService';
@@ -87,7 +87,6 @@ export const createChatServiceInternals = (
 		selectedFiles: [],
 		selectedFolders: [],
 		selectedText: undefined,
-		showTemplateSelector: false,
 		shouldSaveHistory: true,
 		mcpToolMode: 'auto',
 		mcpSelectedServerIds: [],
@@ -106,7 +105,6 @@ export const createChatServiceInternals = (
 	);
 	const attachmentSelectionService = new ChatAttachmentSelectionService(
 		stateStore,
-		() => internals.settings.autoAddActiveFile,
 	);
 	const planSyncService = new ChatPlanSyncService(stateStore, historyService);
 	const subAgentScannerService = deps.host.createSubAgentScannerService();
@@ -137,8 +135,6 @@ export const createChatServiceInternals = (
 				attachmentSelectionService.applySessionSelection(session),
 			emitState: () => service.emitState(),
 			queueSessionPlanSync: (session) => service.queueSessionPlanSync(session),
-			persistSessionMultiModelFrontmatter: async (session) =>
-				await service.persistSessionMultiModelFrontmatter(session),
 		},
 	);
 	const imageResolver = new ChatImageResolver(obsidianApi);

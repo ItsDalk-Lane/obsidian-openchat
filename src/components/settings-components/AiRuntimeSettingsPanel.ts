@@ -233,6 +233,10 @@ export class AiRuntimeSettingsPanel {
 					this.activeQuickActionsListContainer = nextContainer
 				},
 				refreshQuickActionsCache: this.settingsContext.refreshQuickActionsCache,
+				updateQuickActionsSystemPrompt: async (value: string) => {
+					this.settings.quickActionsSystemPrompt = value
+					await this.saveSettings()
+				},
 				isProvidersCollapsed: () => this.isProvidersCollapsed,
 				setProvidersCollapsed: (value) => {
 					this.isProvidersCollapsed = value

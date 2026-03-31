@@ -28,10 +28,10 @@ import type {
 } from './providers.types';
 
 /**
- * @precondition app 为有效的 Obsidian App 实例，buildGlobalSystemPrompt 由外层注入
+ * @precondition app 为有效的 Obsidian App 实例
  * @postcondition 返回可复用的 Provider 对象
  * @throws 从不抛出
- * @example createObsidianApiProvider(app, async () => '')
+ * @example createObsidianApiProvider(app)
  */
 const AI_DATA_SUBFOLDERS = [
 	'ai prompts',
@@ -46,11 +46,9 @@ const AI_DATA_SUBFOLDERS = [
 
 export function createObsidianApiProvider(
 	app: App,
-	buildGlobalSystemPrompt: (featureId: string) => Promise<string>,
 ): ObsidianApiProvider {
 	return createObsidianApiProviderFromRuntime(
 		createObsidianApiRuntime(app),
-		buildGlobalSystemPrompt,
 	);
 }
 

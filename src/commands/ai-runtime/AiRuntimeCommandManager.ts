@@ -2,7 +2,6 @@ import { Extension } from '@codemirror/state'
 import { t } from 'src/i18n/ai-runtime/helper'
 import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors'
 import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime'
-import { StatusBarManager } from './StatusBarManager'
 import { buildProviderOptionsWithReasoningDisabled } from 'src/LLMProviders/utils'
 import { localInstance } from 'src/i18n/locals'
 import { createEventBus } from 'src/providers/event-bus'
@@ -19,7 +18,6 @@ import { DebugLogger } from 'src/utils/DebugLogger'
 import type { AiRuntimeCommandHost } from './ai-runtime-command-host'
 
 export class AiRuntimeCommandManager {
-	private statusBarManager: StatusBarManager | null = null
 	private aborterInstance: AbortController | null = null
 	private registeredCommandIds: Set<string> = new Set()
 	private tabCompletionExtensions: Extension[] = []
@@ -30,17 +28,12 @@ export class AiRuntimeCommandManager {
 	constructor(
 		private readonly host: AiRuntimeCommandHost,
 		private readonly obsidianApiProvider: ObsidianApiProvider,
-		private settings: AiRuntimeSettings
+		private settings: AiRuntimeSettings,
+		private defaultModelTag: string,
 	) {}
 
 	initialize() {
 		this.settings.editorStatus = this.settings.editorStatus ?? { isTextInserting: false }
-		const statusBarItem = this.host.addStatusBarItem()
-		this.statusBarManager = new StatusBarManager(
-			this.host.getApp(),
-			(message, timeout) => this.host.notify(message, timeout),
-			statusBarItem,
-		)
 
 		this.ensureTabCompletionRegistered()
 		this.syncTabCompletionRuntime()
@@ -71,13 +64,12 @@ export class AiRuntimeCommandManager {
 
 		this.disposeTabCompletion()
 
-		this.statusBarManager?.dispose()
-		this.statusBarManager = null
 		this.aborterInstance = null
 	}
 
-	updateSettings(settings: AiRuntimeSettings) {
+	updateSettings(settings: AiRuntimeSettings, defaultModelTag: string) {
 		this.settings = settings
+		this.defaultModelTag = defaultModelTag
 		this.syncTabCompletionRuntime()
 	}
 
@@ -113,6 +105,7 @@ export class AiRuntimeCommandManager {
 
 	private createTabCompletionRuntime(): EditorTabCompletionRuntime {
 		return {
+			defaultModelTag: this.defaultModelTag,
 			providers: this.createCompletionProviders(),
 			settings: normalizeEditorTabCompletionSettings({
 				enabled: this.settings.enableTabCompletion,

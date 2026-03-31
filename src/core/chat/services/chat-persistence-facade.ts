@@ -5,7 +5,6 @@ import type { LayoutMode, MultiModelMode } from '../types/multiModel'
 
 export interface ChatPersistenceFacade {
 	persistChatSettings(partial: Partial<ChatSettings>): Promise<void>
-	persistGlobalSystemPromptsEnabled(enabled: boolean): Promise<void>
 	persistMcpSettings(mcpSettings: McpSettings): Promise<void>
 	rewriteSessionMessages(session: ChatSession): Promise<void>
 	readPersistedLayoutMode(): LayoutMode | null
@@ -24,10 +23,6 @@ export interface ChatPersistenceFacadeOperations {
 	persistChatSettings(
 		deps: ChatPersistenceDeps,
 		partial: Partial<ChatSettings>,
-	): Promise<void>
-	persistGlobalSystemPromptsEnabled(
-		deps: ChatPersistenceDeps,
-		enabled: boolean,
 	): Promise<void>
 	persistMcpSettings(
 		deps: ChatPersistenceDeps,
@@ -68,8 +63,6 @@ export const createChatPersistenceFacade = (
 ): ChatPersistenceFacade => ({
 	persistChatSettings: async (partial) =>
 		await operations.persistChatSettings(getDeps(), partial),
-	persistGlobalSystemPromptsEnabled: async (enabled) =>
-		await operations.persistGlobalSystemPromptsEnabled(getDeps(), enabled),
 	persistMcpSettings: async (mcpSettings) =>
 		await operations.persistMcpSettings(getDeps(), mcpSettings),
 	rewriteSessionMessages: async (session) =>
