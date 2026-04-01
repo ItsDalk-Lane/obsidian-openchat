@@ -2,6 +2,8 @@
  * MCP 工具参数验证与规范化辅助函数
  */
 
+import type { ToolValidationIssue } from 'src/core/agents/loop/types'
+
 import { getBuiltinToolHint, type ToolHintCoercion } from './toolHints'
 
 export function hasUsableValue(value: unknown): boolean {
@@ -83,7 +85,21 @@ export function validateToolArgs(
 	schema: Record<string, unknown> | undefined,
 	args: Record<string, unknown>,
 ): string[] {
-	if (!schema || typeof schema !== 'object') return []
+	return validateToolArgsDetailed(toolName, schema, args).issues.map((issue) => issue.message)
+}
+
+export interface ToolArgsValidationResult {
+	readonly issues: ToolValidationIssue[]
+}
+
+export function validateToolArgsDetailed(
+	toolName: string,
+	schema: Record<string, unknown> | undefined,
+	args: Record<string, unknown>,
+): ToolArgsValidationResult {
+	if (!schema || typeof schema !== 'object') {
+		return { issues: [] }
+	}
 
 	const toolHint = getBuiltinToolHint(toolName)
 	const required = Array.isArray(schema.required)
@@ -94,19 +110,27 @@ export function validateToolArgs(
 			? (schema.properties as Record<string, unknown>)
 			: {}
 
-	const errors: string[] = []
+	const issues: ToolValidationIssue[] = []
 	const propertyNames = new Set(Object.keys(properties))
 	const shouldRejectUnknownFields = propertyNames.size > 0 || Boolean(toolHint)
 
 	for (const key of required) {
 		if (!hasUsableValue(args[key])) {
-			errors.push(`缺少必填参数: ${key}`)
+			issues.push({
+				code: 'missing-required',
+				field: key,
+				message: `缺少必填参数: ${key}`,
+			})
 		}
 	}
 
 	for (const key of Object.keys(args)) {
 		if (shouldRejectUnknownFields && !propertyNames.has(key)) {
-			errors.push(`未知参数: ${key}`)
+			issues.push({
+				code: 'unknown-parameter',
+				field: key,
+				message: `未知参数: ${key}`,
+			})
 		}
 	}
 
@@ -136,13 +160,24 @@ export function validateToolArgs(
 		)
 
 		if (!matches) {
-			errors.push(`参数类型不匹配: ${key} 期望 ${expectedType}，实际 ${normalizedActualType}`)
+			issues.push({
+				code: 'type-mismatch',
+				field: key,
+				expected: expectedType,
+				actual: normalizedActualType,
+				message: `参数类型不匹配: ${key} 期望 ${expectedType}，实际 ${normalizedActualType}`,
+			})
 			continue
 		}
 
 		const enumValues = getSchemaEnum(propSchema)
 		if (enumValues && typeof value === 'string' && !enumValues.includes(value)) {
-			errors.push(`参数取值无效: ${key} 仅接受 ${enumValues.join(', ')}`)
+			issues.push({
+				code: 'invalid-enum',
+				field: key,
+				acceptedValues: enumValues,
+				message: `参数取值无效: ${key} 仅接受 ${enumValues.join(', ')}`,
+			})
 		}
 
 		if (expectedType === 'array' && Array.isArray(value)) {
@@ -156,7 +191,12 @@ export function validateToolArgs(
 					return itemActualType !== itemType
 				})
 				if (hasInvalid) {
-					errors.push(`数组参数类型不匹配: ${key} 的元素必须是 ${itemType}`)
+					issues.push({
+						code: 'array-item-type-mismatch',
+						field: key,
+						expected: itemType,
+						message: `数组参数类型不匹配: ${key} 的元素必须是 ${itemType}`,
+					})
 				}
 			}
 		}
@@ -165,7 +205,11 @@ export function validateToolArgs(
 	for (const group of toolHint?.mutuallyExclusive ?? []) {
 		const activeFields = group.filter((field) => hasUsableValue(args[field]))
 		if (activeFields.length > 1) {
-			errors.push(`参数互斥: ${activeFields.join(', ')} 不能同时提供`)
+			issues.push({
+				code: 'mutually-exclusive',
+				relatedFields: activeFields,
+				message: `参数互斥: ${activeFields.join(', ')} 不能同时提供`,
+			})
 		}
 	}
 
@@ -173,17 +217,27 @@ export function validateToolArgs(
 		if (args[rule.field] !== rule.when) continue
 		for (const requiredField of rule.requires ?? []) {
 			if (!hasUsableValue(args[requiredField])) {
-				errors.push(rule.message ?? `参数依赖: 当 ${rule.field}=${String(rule.when)} 时必须提供 ${requiredField}`)
+				issues.push({
+					code: 'conditional-required',
+					field: requiredField,
+					relatedFields: [rule.field, requiredField],
+					message: rule.message ?? `参数依赖: 当 ${rule.field}=${String(rule.when)} 时必须提供 ${requiredField}`,
+				})
 			}
 		}
 		for (const forbiddenField of rule.forbids ?? []) {
 			if (hasUsableValue(args[forbiddenField])) {
-				errors.push(rule.message ?? `参数不兼容: 当 ${rule.field}=${String(rule.when)} 时不能提供 ${forbiddenField}`)
+				issues.push({
+					code: 'conditional-forbidden',
+					field: forbiddenField,
+					relatedFields: [rule.field, forbiddenField],
+					message: rule.message ?? `参数不兼容: 当 ${rule.field}=${String(rule.when)} 时不能提供 ${forbiddenField}`,
+				})
 			}
 		}
 	}
 
-	return errors
+	return { issues }
 }
 
 export function getSchemaMeta(schema: Record<string, unknown> | undefined): {

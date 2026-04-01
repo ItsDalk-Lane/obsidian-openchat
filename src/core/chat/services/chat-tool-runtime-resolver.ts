@@ -9,9 +9,18 @@ import { SubAgentToolExecutor } from 'src/tools/sub-agents/SubAgentToolExecutor'
 import { subAgentDefinitionsToTools } from 'src/tools/sub-agents/subAgentTools';
 import { CompositeToolExecutor } from 'src/core/agents/loop/CompositeToolExecutor';
 import type { ToolDefinition, ToolExecutor } from 'src/core/agents/loop/types';
-import { McpToolExecutor, mcpToolToToolDefinition } from 'src/services/mcp/McpToolExecutor';
+import { McpToolExecutor } from 'src/services/mcp/McpToolExecutor';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { ChatSession } from '../types/chat';
+import { resolveToolSurfaceSettings } from './chat-tool-feature-flags';
+import { isBuiltinToolEnabledForDefaultSurface } from './chat-tool-feature-flags';
+import {
+	buildDiscoveryCatalog as buildToolDiscoveryCatalog,
+	compileExecutableToolDefinition,
+	createBuiltinToolDefinition,
+	createMcpToolDefinition,
+	createSubAgentDiscoveryTool,
+} from './chat-tool-discovery-catalog';
 import {
 	BUILTIN_FILESYSTEM_ROUTING_HINT,
 	BUILTIN_FILESYSTEM_TOOL_NAMES,
@@ -21,6 +30,10 @@ import type {
 	ChatToolRuntimeResolverOptions,
 	ResolveToolRuntimeOptions,
 } from './chat-tool-runtime-resolver-types';
+import type {
+	DiscoveryCatalog,
+	DiscoveryCatalogBuildOptions,
+} from './chat-tool-selection-types';
 
 export class ChatToolRuntimeResolver {
 	private builtinToolsRuntime: BuiltinToolsRuntime | null = null;
@@ -32,6 +45,17 @@ export class ChatToolRuntimeResolver {
 
 	private getBuiltinToolSettings() {
 		return this.options.settingsAccessor.getAiRuntimeSettings().mcp;
+	}
+
+	private getToolSurfaceFlags() {
+		return resolveToolSurfaceSettings(this.options.settingsAccessor.getAiRuntimeSettings());
+	}
+
+	private createScopedGetTools(options?: ResolveToolRuntimeOptions) {
+		return async () => {
+			const nextRuntime = await this.resolveToolRuntime(options);
+			return nextRuntime.requestTools;
+		};
 	}
 
 	async closeBuiltinToolsRuntime(): Promise<void> {
@@ -115,6 +139,10 @@ export class ChatToolRuntimeResolver {
 		const existingNames = new Set<string>();
 		const disabledBuiltinToolNames =
 			this.options.settingsAccessor.getAiRuntimeSettings().mcp?.disabledBuiltinToolNames ?? [];
+		const toolSurfaceFlags = this.getToolSurfaceFlags();
+		const executorOptions = {
+			enableRuntimeArgumentCompletion: toolSurfaceFlags.runtimeArgCompletionV2,
+		};
 
 		let builtinExecutor: BuiltinToolExecutor | null = null;
 		let mcpExecutor: McpToolExecutor | null = null;
@@ -125,28 +153,26 @@ export class ChatToolRuntimeResolver {
 			const filteredBuiltinTools = allBuiltinTools
 				.filter((tool) => !disabledBuiltinToolNames.includes(tool.name))
 				.filter((tool) => {
+					const exposedByDefault = isBuiltinToolEnabledForDefaultSurface(tool.name, toolSurfaceFlags);
 					if (hasExplicitFilters) {
 						const matchedByName = options?.explicitToolNames?.includes(tool.name) ?? false;
-						const matchedByServer = normalizedExplicitServerIds.includes(BUILTIN_SERVER_ID);
+						const matchedByServer =
+							normalizedExplicitServerIds.includes(BUILTIN_SERVER_ID) && exposedByDefault;
 						return matchedByName || matchedByServer;
 					}
-					return true;
+					return exposedByDefault;
 				});
 
 			for (const tool of filteredBuiltinTools) {
-				const description = BUILTIN_FILESYSTEM_TOOL_NAMES.has(tool.name)
-					? `${BUILTIN_FILESYSTEM_ROUTING_HINT}\n\n${tool.description}`
-					: tool.description;
-				requestTools.push({
-					name: tool.name,
-					title: tool.title,
-					description,
-					inputSchema: tool.inputSchema,
-					outputSchema: tool.outputSchema,
-					annotations: tool.annotations,
-					source: 'builtin',
-					sourceId: BUILTIN_SERVER_ID,
+				const baseTool = createBuiltinToolDefinition({
+					...tool,
+					description: BUILTIN_FILESYSTEM_TOOL_NAMES.has(tool.name)
+						? `${BUILTIN_FILESYSTEM_ROUTING_HINT}\n\n${tool.description}`
+						: tool.description,
+				}, {
+					surfaceFlags: toolSurfaceFlags,
 				});
+				requestTools.push(compileExecutableToolDefinition(baseTool));
 				existingNames.add(tool.name);
 			}
 
@@ -155,14 +181,23 @@ export class ChatToolRuntimeResolver {
 					builtinRuntime.getRegistry(),
 					builtinRuntime.getContext(),
 					this.options.planSyncService.createBuiltinCallTool(builtinRuntime, session),
+					executorOptions,
 				);
 			}
 		}
 
 		if (mcpManager) {
-			const allMcpTools = await mcpManager.getToolsForModelContext();
 			const selectedServerIds = options?.explicitMcpServerIds;
 			const selectedToolNames = options?.explicitToolNames;
+			const scopedServerIds = toolSurfaceFlags.scopedMcpResolve && selectedServerIds && selectedServerIds.length > 0
+				? selectedServerIds
+				: undefined;
+			const serverNameById = new Map(
+				mcpManager.getEnabledServerSummaries().map((server) => [server.id, server.name]),
+			);
+			const allMcpTools = await mcpManager.getToolsForModelContext(
+				scopedServerIds ? { serverIds: scopedServerIds } : undefined,
+			);
 			const filteredMcpTools = hasExplicitFilters
 				? allMcpTools.filter((tool) => {
 					const matchedByName = selectedToolNames?.includes(tool.name) ?? false;
@@ -180,12 +215,14 @@ export class ChatToolRuntimeResolver {
 					continue;
 				}
 				existingNames.add(tool.name);
-				requestTools.push(mcpToolToToolDefinition(tool));
+				requestTools.push(compileExecutableToolDefinition(
+					createMcpToolDefinition(tool, serverNameById.get(tool.serverId)),
+				));
 			}
 
 			const mcpCallTool = createActualMcpCallTool(mcpManager);
 			if (mcpCallTool) {
-				mcpExecutor = new McpToolExecutor(mcpCallTool);
+				mcpExecutor = new McpToolExecutor(mcpCallTool, executorOptions);
 			}
 
 			if (!hasExplicitFilters && filteredMcpTools.length === 0) {
@@ -206,7 +243,7 @@ export class ChatToolRuntimeResolver {
 					continue;
 				}
 				existingNames.add(tool.name);
-				requestTools.push(tool);
+				requestTools.push(compileExecutableToolDefinition(createSubAgentDiscoveryTool(tool)));
 			}
 			executors.push(new SubAgentToolExecutor(
 				this.options.subAgentScannerService,
@@ -227,8 +264,39 @@ export class ChatToolRuntimeResolver {
 		return {
 			requestTools,
 			toolExecutor: executors.length > 0 ? new CompositeToolExecutor(executors) : undefined,
+			getTools: this.createScopedGetTools(options),
 			maxToolCallLoops: this.options.getMaxToolCallLoops(),
 		};
+	}
+
+	async buildDiscoveryCatalog(options?: DiscoveryCatalogBuildOptions): Promise<DiscoveryCatalog> {
+		const session = options?.session ?? this.options.getActiveSession() ?? undefined;
+		const builtinRuntime = await this.ensureBuiltinToolsRuntime(session);
+		const disabledBuiltinToolNames =
+			this.options.settingsAccessor.getAiRuntimeSettings().mcp?.disabledBuiltinToolNames ?? [];
+		const toolSurfaceFlags = this.getToolSurfaceFlags();
+		const builtinTools = builtinRuntime
+			? (await builtinRuntime.listTools())
+				.filter((tool) => !disabledBuiltinToolNames.includes(tool.name))
+				.filter((tool) => isBuiltinToolEnabledForDefaultSurface(tool.name, toolSurfaceFlags))
+				.map((tool) => createBuiltinToolDefinition({
+					...tool,
+					description: BUILTIN_FILESYSTEM_TOOL_NAMES.has(tool.name)
+						? `${BUILTIN_FILESYSTEM_ROUTING_HINT}\n\n${tool.description}`
+						: tool.description,
+				}, {
+					surfaceFlags: toolSurfaceFlags,
+				}))
+			: [];
+		const mcpManager = this.options.runtimeDeps.getMcpClientManager();
+		const subAgents = options?.includeSubAgents === false
+			? []
+			: (await this.options.subAgentScannerService.scan()).agents;
+		return buildToolDiscoveryCatalog({
+			tools: builtinTools,
+			serverEntries: mcpManager?.getEnabledServerSummaries() ?? [],
+			subAgents,
+		});
 	}
 
 	async getBuiltinToolsForSettings(): Promise<Awaited<ReturnType<BuiltinToolsRuntime['listTools']>>> {
@@ -236,7 +304,9 @@ export class ChatToolRuntimeResolver {
 		if (!runtime) {
 			return [];
 		}
-		return await runtime.listTools();
+		const toolSurfaceFlags = this.getToolSurfaceFlags();
+		return (await runtime.listTools())
+			.filter((tool) => isBuiltinToolEnabledForDefaultSurface(tool.name, toolSurfaceFlags));
 	}
 
 	dispose(): void {

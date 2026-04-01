@@ -5,6 +5,7 @@ import type {
 	SubAgentExecutionStatus,
 } from 'src/domains/chat/types';
 import type {
+	GetToolsFn,
 	ToolDefinition,
 	ToolExecutionRecord,
 	ToolExecutor,
@@ -61,6 +62,7 @@ export interface ToolRuntimeResolutionOptions {
 export interface ResolvedToolRuntime {
 	requestTools: ToolDefinition[];
 	toolExecutor?: ToolExecutor;
+	getTools?: GetToolsFn;
 	maxToolCallLoops?: number;
 }
 

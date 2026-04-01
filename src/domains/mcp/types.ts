@@ -85,6 +85,10 @@ export interface McpToolDefinition {
 	readonly serverId: string
 }
 
+export interface McpToolQueryScope {
+	readonly serverIds?: string[]
+}
+
 /** MCP 工具调用函数签名 */
 export type McpCallToolFn = (
 	serverId: string,
@@ -132,8 +136,8 @@ export interface McpRuntimeManager {
 	getSettings(): McpSettings
 	updateSettings(settings: McpSettings): Promise<void>
 	getAvailableTools(): Promise<McpToolDefinition[]>
-	getAvailableToolsWithLazyStart(): Promise<McpToolDefinition[]>
-	getToolsForModelContext(): Promise<McpToolDefinition[]>
+	getAvailableToolsWithLazyStart(scope?: McpToolQueryScope): Promise<McpToolDefinition[]>
+	getToolsForModelContext(scope?: McpToolQueryScope): Promise<McpToolDefinition[]>
 	callTool(serverId: string, toolName: string, args: Record<string, unknown>): Promise<string>
 	callActualTool(serverId: string, toolName: string, args: Record<string, unknown>): Promise<string>
 	connectServer(serverId: string): Promise<void>

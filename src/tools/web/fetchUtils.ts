@@ -1,4 +1,3 @@
-import { htmlToMarkdown, requestUrl } from 'obsidian';
 import { Readability } from '@mozilla/readability';
 
 /**
@@ -158,6 +157,7 @@ export function matchRobotsPath(urlPath: string, pattern: string): boolean {
  * 检查 robots.txt 是否允许访问
  */
 export async function checkRobotsTxt(url: string, userAgent: string): Promise<void> {
+	const { requestUrl } = await import('obsidian');
 	const robotsTxtUrl = getRobotsTxtUrl(url);
 
 	try {
@@ -244,8 +244,9 @@ export function extractHtmlContent(html: string, url: string): string {
 /**
  * 将 HTML 内容转换为 Markdown
  */
-export function convertHtmlToMarkdown(html: string): string {
+export async function convertHtmlToMarkdown(html: string): Promise<string> {
 	try {
+		const { htmlToMarkdown } = await import('obsidian');
 		return htmlToMarkdown(html);
 	} catch {
 		// 回退：简单移除 HTML 标签

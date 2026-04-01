@@ -13,10 +13,27 @@ const localeMap: Record<string, LocaleDictionary> = {
 	zh: zhCN,
 };
 
-const lang = window.localStorage.getItem('language');
-const locale = localeMap[lang || 'zh'] ?? zhCN;
+const getStoredLanguage = (): string | null => {
+	const hostWindow = globalThis as typeof globalThis & {
+		window?: {
+			localStorage?: {
+				getItem: (key: string) => string | null;
+			};
+		};
+	};
+
+	return hostWindow.window?.localStorage?.getItem('language') ?? null;
+};
+
+const resolveLocale = (): LocaleDictionary => {
+	const lang = getStoredLanguage();
+	return localeMap[lang || 'zh'] ?? zhCN;
+};
 
 export function t(str: keyof typeof en | string): string {
+	const lang = getStoredLanguage();
+	const locale = resolveLocale();
+
 	if (!locale) {
 		DebugLogger.error('Error: locale not found', lang);
 	}

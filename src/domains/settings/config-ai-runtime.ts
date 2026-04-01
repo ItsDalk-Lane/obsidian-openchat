@@ -16,11 +16,25 @@ import type { McpSettings } from 'src/types/mcp';
 import type {
 	AiRuntimeSettings,
 	ToolExecutionSettings,
+	ToolSurfaceSettings,
 } from './types-ai-runtime';
 
 export const DEFAULT_TOOL_EXECUTION_SETTINGS: ToolExecutionSettings = {
 	maxToolCalls: 10,
 	timeoutMs: 30000,
+};
+
+export const DEFAULT_TOOL_SURFACE_SETTINGS: ToolSurfaceSettings = {
+	toolDiscoveryCatalogV2: true,
+	twoStageToolSelection: true,
+	scopedMcpResolve: true,
+	runtimeArgCompletionV2: true,
+	workflowToolsDefaultHidden: true,
+	workflowModeV1: true,
+	timeWrappersV1: true,
+	vaultWrappersV1: true,
+	fetchWrappersV1: true,
+	nativeDeferredAdapter: false,
 };
 
 export const DEFAULT_AI_RUNTIME_SETTINGS: AiRuntimeSettings = {
@@ -42,6 +56,7 @@ export const DEFAULT_AI_RUNTIME_SETTINGS: AiRuntimeSettings = {
 	tabCompletionPromptTemplate: 'You are a writing continuation assistant. Continue the text naturally based on the editor context provided by the user. Output only the continuation without any explanation. Match the original language, style, and format. Do not repeat existing content.',
 	mcp: DEFAULT_MCP_SETTINGS,
 	toolExecution: DEFAULT_TOOL_EXECUTION_SETTINGS,
+	toolSurface: DEFAULT_TOOL_SURFACE_SETTINGS,
 	modelCapabilityCache: {},
 	quickActionsSystemPrompt: '',
 };
@@ -172,6 +187,10 @@ export function cloneAiRuntimeSettings(
 	merged.mcp = normalizeMcpSettings(
 		merged.mcp as McpSettings | Record<string, unknown> | undefined,
 	);
+	merged.toolSurface = {
+		...cloneValue(DEFAULT_TOOL_SURFACE_SETTINGS),
+		...(merged.toolSurface ?? {}),
+	};
 	syncToolExecutionSettings(merged);
 	return merged;
 }

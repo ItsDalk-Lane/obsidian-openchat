@@ -21,7 +21,7 @@ export const BUILTIN_FILESYSTEM_TOOL_NAMES = new Set([
 	'find_paths',
 	'search_content',
 	'query_index',
-	'get_file_info',
+	'stat_path',
 	'open_file',
 ]);
 

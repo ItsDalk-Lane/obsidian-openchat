@@ -323,6 +323,65 @@ test('McpRuntimeManagerImpl 的健康检查只透传启用的服务器', async (
 	assert.deepEqual(checkedServers.map((server) => server.id), ['server-enabled']);
 });
 
+test('McpRuntimeManagerImpl scope 化工具解析时只连接候选 server', async () => {
+	const { logger } = createLogger();
+	const states = new Map<string, McpServerState>([
+		['server-1', { serverId: 'server-1', status: 'idle', tools: [] }],
+		['server-2', { serverId: 'server-2', status: 'idle', tools: [] }],
+	]);
+	const ensureConnectedCalls: string[] = [];
+	let allowEnsureConnected = false;
+	const fakeProcessManager = {
+		getAllStates() {
+			return [...states.values()];
+		},
+		getState(serverId: string) {
+			return states.get(serverId);
+		},
+		async ensureConnected(config: McpServerConfig) {
+			if (!allowEnsureConnected) {
+				return { callTool: async () => '' };
+			}
+			ensureConnectedCalls.push(config.id);
+			states.set(config.id, {
+				serverId: config.id,
+				status: 'running',
+				tools: [createTool(config.id, `tool-${config.id}`)],
+			});
+			return { callTool: async () => '' };
+		},
+		async disconnect() {},
+		async dispose() {},
+	} as unknown as McpProcessManager;
+
+	const manager = new McpRuntimeManagerImpl(
+		{
+			enabled: true,
+			servers: [
+				createServerConfig({ id: 'server-1' }),
+				createServerConfig({ id: 'server-2', name: 'Server 2' }),
+			],
+		},
+		createRuntimeDependencies(logger),
+		{
+			createProcessManager() {
+				return fakeProcessManager;
+			},
+			createHealthChecker() {
+				return { async check() { return []; } } as unknown as McpHealthChecker;
+			},
+		},
+	);
+
+	ensureConnectedCalls.length = 0;
+	allowEnsureConnected = true;
+	const tools = await manager.getToolsForModelContext({ serverIds: ['server-2'] });
+
+	assert.deepEqual(ensureConnectedCalls, ['server-2']);
+	assert.deepEqual(tools.map((tool) => tool.serverId), ['server-2']);
+	await manager.dispose();
+});
+
 test('McpProcessManager 会复用运行中的客户端并同步状态与工具列表', async () => {
 	const { logger } = createLogger();
 	const snapshots: McpServerState[][] = [];

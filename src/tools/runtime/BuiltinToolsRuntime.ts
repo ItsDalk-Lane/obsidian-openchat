@@ -30,11 +30,13 @@ import {
 	createSkillTools,
 } from '../skill/skill-tools';
 import { createTimeTools } from '../time/time-tools';
+import { createTimeWrapperTools } from '../time/time-wrapper-tools';
 import { createBingSearchTools } from '../web/bing-search-tools';
 import {
 	createFetchTools,
 	type FetchToolsOptions,
 } from '../web/fetch-tools';
+import { createFetchWrapperTools } from '../web/fetch-wrapper-tools';
 import { registerFilesystemTools } from '../vault/filesystemTools';
 
 export interface BuiltinToolsRuntime {
@@ -96,6 +98,12 @@ export async function createBuiltinToolsRuntime(
 				?? DEFAULT_MCP_SETTINGS.builtinTimeDefaultTimezone
 				?? 'UTC',
 		}));
+		registry.registerAll(createTimeWrapperTools({
+			defaultTimezone:
+				settings.builtinTimeDefaultTimezone
+				?? DEFAULT_MCP_SETTINGS.builtinTimeDefaultTimezone
+				?? 'UTC',
+		}));
 		registry.registerAll(createLinkTools());
 	}
 
@@ -108,6 +116,7 @@ export async function createBuiltinToolsRuntime(
 			ignoreRobotsTxt: settings.builtinFetchIgnoreRobotsTxt === true,
 		};
 		registry.registerAll(createFetchTools(fetchOptions));
+		registry.registerAll(createFetchWrapperTools(fetchOptions));
 	}
 
 	if (settings.builtinBingSearchEnabled !== false) {

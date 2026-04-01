@@ -224,11 +224,14 @@ export function withClaudeToolCallLoopSupport(
 
 						let resultText: string
 						let status: 'completed' | 'failed' = 'completed'
+						let errorContext: import('./types').ToolErrorContext | undefined
 						try {
 							const result = await executor.execute(request, currentTools, {
 								abortSignal: controller.signal,
 							})
 							resultText = result.content
+							status = result.status ?? (result.errorContext ? 'failed' : 'completed')
+							errorContext = result.errorContext
 						} catch (err) {
 							resultText = `工具调用失败: ${err instanceof Error ? err.message : String(err)}`
 							status = 'failed'
@@ -245,6 +248,7 @@ export function withClaudeToolCallLoopSupport(
 							result: resultText,
 							status,
 							timestamp: Date.now(),
+							errorContext,
 						})
 						return {
 							toolBlock,

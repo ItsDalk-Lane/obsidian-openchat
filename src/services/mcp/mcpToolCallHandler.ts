@@ -11,7 +11,12 @@ import type {
 	McpCallToolFnForProvider,
 	McpToolDefinitionForProvider,
 } from 'src/types/provider'
-import { normalizeToolArgs, validateToolArgs } from './mcpToolArgHelpers'
+import { normalizeToolArgs } from './mcpToolArgHelpers'
+import {
+	buildToolArgumentParseErrorContext,
+	buildToolArgumentValidationErrorContext,
+	formatToolErrorContext,
+} from 'src/core/agents/loop/tool-call-validation'
 import {
 	type ToolFailureTracker,
 	buildToolArgCandidates,
@@ -154,13 +159,17 @@ export async function executeMcpToolCalls(
 			}
 			args = parsed as Record<string, unknown>
 		} catch (err) {
-			const parseError = err instanceof Error ? err.message : String(err)
+			const errorContext = buildToolArgumentParseErrorContext(
+				toolName,
+				call.function.arguments || '{}',
+				err,
+			)
 			DebugLogger.warn(`[MCP] 工具参数解析失败: ${toolName}`, err)
 			results.push({
 				role: 'tool',
 				tool_call_id: call.id,
 				name: toolName,
-				content: `工具调用失败: 参数 JSON 解析失败（${parseError}）; 原始参数=${(call.function.arguments || '').slice(0, 300)}`,
+				content: formatToolErrorContext(errorContext),
 			})
 			continue
 		}
@@ -185,14 +194,17 @@ export async function executeMcpToolCalls(
 			continue
 		}
 
-		const argValidationErrors = validateToolArgs(toolName, toolDef?.inputSchema, args)
-		if (argValidationErrors.length > 0) {
-			const validationText = argValidationErrors.join('; ')
-			const recoveryHint = buildToolRecoveryHint(toolName)
-			DebugLogger.warn(`[MCP] 工具参数校验失败: ${toolName}: ${validationText}`)
-			const failureContent =
-				`工具调用失败: 参数校验失败（${validationText}）。当前参数=${safeJsonPreview(args)}。` +
-				`参数约束=${summarizeSchema(toolDef?.inputSchema)}。${recoveryHint}`
+		const validationContext = buildToolArgumentValidationErrorContext({
+			name: toolName,
+			inputSchema: toolDef?.inputSchema ?? {},
+		}, args, {
+			notes: normalized.notes,
+			argsPreview: safeJsonPreview(args),
+			schemaSummary: summarizeSchema(toolDef?.inputSchema),
+		})
+		if (validationContext.issues.length > 0) {
+			DebugLogger.warn(`[MCP] 工具参数校验失败: ${toolName}: ${validationContext.summary}`)
+			const failureContent = formatToolErrorContext(validationContext)
 			recordToolFailure(failureTracker, failureSignature, failureContent)
 			results.push({
 				role: 'tool',

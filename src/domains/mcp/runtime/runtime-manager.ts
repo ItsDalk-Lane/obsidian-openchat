@@ -15,6 +15,7 @@ import type {
 	McpServerConfig,
 	McpServerState,
 	McpSettings,
+	McpToolQueryScope,
 	McpToolDefinition,
 	McpToolInfo,
 } from '../types'
@@ -115,11 +116,20 @@ export class McpRuntimeManagerImpl implements McpRuntimeManager {
 	}
 
 	/** @precondition MCP 已启用或允许返回空数组 @postcondition 必要时懒启动服务器后返回工具列表 @throws 从不抛出 @example await manager.getAvailableToolsWithLazyStart() */
-	async getAvailableToolsWithLazyStart(): Promise<McpToolDefinition[]> {
+	async getAvailableToolsWithLazyStart(scope?: McpToolQueryScope): Promise<McpToolDefinition[]> {
 		if (!this.isMcpEnabled()) {
 			return []
 		}
-		const enabledServers = this.settings.servers.filter((server) => server.enabled)
+		const scopedServerIds = new Set(scope?.serverIds ?? [])
+		const enabledServers = this.settings.servers.filter((server) => {
+			if (!server.enabled) {
+				return false
+			}
+			if (scopedServerIds.size === 0) {
+				return true
+			}
+			return scopedServerIds.has(server.id)
+		})
 		await Promise.allSettled(enabledServers.map(async (server) => {
 			const state = this.processManager.getState(server.id)
 			if (state?.status === 'running' || state?.status === 'connecting') {
@@ -131,8 +141,8 @@ export class McpRuntimeManagerImpl implements McpRuntimeManager {
 	}
 
 	/** @precondition 无 @postcondition 返回适合模型上下文注入的工具定义列表 @throws 从不抛出 @example await manager.getToolsForModelContext() */
-	async getToolsForModelContext(): Promise<McpToolDefinition[]> {
-		return await this.getAvailableToolsWithLazyStart()
+	async getToolsForModelContext(scope?: McpToolQueryScope): Promise<McpToolDefinition[]> {
+		return await this.getAvailableToolsWithLazyStart(scope)
 	}
 
 	/** @precondition serverId 与 toolName 指向已配置工具 @postcondition 委托到底层工具调用实现 @throws 当服务器不存在、已禁用或调用失败时抛出 @example await manager.callTool('server', 'tool', {}) */

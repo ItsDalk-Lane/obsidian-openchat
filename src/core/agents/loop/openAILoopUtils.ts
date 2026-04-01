@@ -437,13 +437,15 @@ export async function executeToolCalls(
 
 		try {
 			const result = await toolExecutor.execute(request, tools, { abortSignal })
+			const status = result.status ?? (result.errorContext ? 'failed' : 'completed')
 			onToolCallResult?.({
 				id: result.toolCallId,
 				name: result.name,
 				arguments: parsedArguments,
 				result: result.content,
-				status: 'completed',
+				status,
 				timestamp: Date.now(),
+				errorContext: result.errorContext,
 			})
 			return {
 				role: 'tool',

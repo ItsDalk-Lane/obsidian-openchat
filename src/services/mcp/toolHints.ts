@@ -222,6 +222,54 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 			open_in_new_panel: 'boolean',
 		},
 	},
+	get_current_time: {
+		aliases: {
+			timezoneName: 'timezone',
+			timeZone: 'timezone',
+		},
+		usageHint: '只查询某个时区的当前时间。',
+	},
+	convert_time: {
+		aliases: {
+			sourceTimezone: 'source_timezone',
+			targetTimezone: 'target_timezone',
+		},
+		usageHint: '只做单个时间在两个时区之间的换算。',
+	},
+	calculate_time_range: {
+		aliases: {
+			naturalTime: 'natural_time',
+			timezoneName: 'timezone',
+			timeZone: 'timezone',
+		},
+		usageHint: '只把自然语言时间表达解析为时间范围。',
+	},
+	fetch_webpage: {
+		aliases: {
+			startIndex: 'start_index',
+			maxLength: 'max_length',
+		},
+		valueCoercions: {
+			start_index: 'integer',
+			max_length: 'integer',
+			raw: 'boolean',
+		},
+		usageHint: '只抓取单个已知网页；不知道网址时先用 bing_search。',
+		fallbackTool: 'bing_search',
+	},
+	fetch_webpages_batch: {
+		aliases: {
+			startIndex: 'start_index',
+			maxLength: 'max_length',
+		},
+		valueCoercions: {
+			start_index: 'integer',
+			max_length: 'integer',
+			raw: 'boolean',
+		},
+		usageHint: '只在已经知道多个网址时做批量抓取。',
+		fallbackTool: 'fetch_webpage',
+	},
 	search_content: {
 		aliases: {
 			fileType: 'file_types',
@@ -292,6 +340,32 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 	},
 	run_script: {
 		usageHint: '只做工具编排，不执行本机 shell 命令。',
+	},
+	list_directory_tree: {
+		aliases: {
+			path: 'directory_path',
+			directoryPath: 'directory_path',
+			excludePatterns: 'exclude_patterns',
+			maxDepth: 'max_depth',
+			maxNodes: 'max_nodes',
+		},
+		valueCoercions: {
+			max_depth: 'integer',
+			max_nodes: 'integer',
+		},
+		usageHint: '只在需要递归树形目录时使用。',
+		fallbackTool: 'list_directory',
+	},
+	list_vault_overview: {
+		aliases: {
+			fileExtensions: 'file_extensions',
+			vaultLimit: 'vault_limit',
+		},
+		valueCoercions: {
+			vault_limit: 'integer',
+		},
+		usageHint: '只在需要整个 Vault 的轻量文件路径总览时使用。',
+		fallbackTool: 'list_directory',
 	},
 };
 

@@ -12,9 +12,16 @@ import type {
 	ToolDefinition,
 	ToolExecutionOptions,
 } from 'src/core/agents/loop/types'
+import { completeToolArguments } from 'src/core/agents/loop/tool-call-argument-completion'
+import {
+	buildToolArgumentParseErrorContext,
+	formatToolErrorContext,
+} from 'src/core/agents/loop/tool-call-validation'
 import type { McpCallToolFnForProvider, McpToolDefinitionForProvider } from 'src/types/provider'
 import { executeMcpToolCalls } from './mcpToolCallHandler'
 import type { OpenAIToolCall, ToolLoopMessage } from './mcpToolCallHandler'
+import { DebugLogger } from 'src/utils/DebugLogger'
+import { isToolFailureContent } from './mcpToolCallHandlerInternals'
 
 interface ToolFailureTrackerEntry {
 	count: number
@@ -30,30 +37,89 @@ type ToolFailureTracker = Map<string, ToolFailureTrackerEntry>
  */
 export class McpToolExecutor implements ToolExecutor {
 	private failureTracker: ToolFailureTracker = new Map()
+	private readonly enableRuntimeArgumentCompletion: boolean
 
 	constructor(
 		private mcpCallTool: McpCallToolFnForProvider,
-	) {}
+		options?: {
+			readonly enableRuntimeArgumentCompletion?: boolean
+		},
+	) {
+		this.enableRuntimeArgumentCompletion = options?.enableRuntimeArgumentCompletion ?? true
+	}
+
+	canHandle(call: ToolCallRequest, tools: ToolDefinition[]): boolean {
+		return tools.some((tool) => tool.name === call.name && tool.source === 'mcp')
+	}
 
 	async execute(
 		call: ToolCallRequest,
 		tools: ToolDefinition[],
 		_options?: ToolExecutionOptions,
 	): Promise<ToolCallResult> {
+		const targetTool = tools.find((tool) => tool.name === call.name && tool.source === 'mcp')
+		if (!targetTool) {
+			return {
+				toolCallId: call.id,
+				name: call.name,
+				content: '工具调用失败: 未找到 MCP 工具定义',
+				status: 'failed',
+			}
+		}
+
+		let serializedArguments = call.arguments
+		if (this.enableRuntimeArgumentCompletion) {
+			let parsedArgs: Record<string, unknown>
+			try {
+				parsedArgs = JSON.parse(call.arguments) as Record<string, unknown>
+			} catch (error) {
+				const errorContext = buildToolArgumentParseErrorContext(call.name, call.arguments, error)
+				return {
+					toolCallId: call.id,
+					name: call.name,
+					content: formatToolErrorContext(errorContext),
+					status: 'failed',
+					errorContext,
+				}
+			}
+
+			const completion = completeToolArguments(targetTool, parsedArgs, undefined, {
+				enableRuntimeCompletion: true,
+			})
+			if (completion.notes.length > 0) {
+				DebugLogger.debug('[McpToolExecutor] 参数已补全', {
+					toolName: call.name,
+					notes: completion.notes,
+				})
+			}
+			if (completion.errors.length > 0) {
+				return {
+					toolCallId: call.id,
+					name: call.name,
+					content: formatToolErrorContext(completion.errorContext!),
+					status: 'failed',
+					errorContext: completion.errorContext,
+				}
+			}
+			serializedArguments = JSON.stringify(completion.args)
+		}
+
 		const openAIToolCall: OpenAIToolCall = {
 			id: call.id,
 			type: 'function',
 			function: {
 				name: call.name,
-				arguments: call.arguments,
+				arguments: serializedArguments,
 			},
 		}
 
-		const mcpTools: McpToolDefinitionForProvider[] = tools.map((tool) => ({
+		const mcpTools: McpToolDefinitionForProvider[] = tools
+			.filter((tool) => tool.source === 'mcp')
+			.map((tool) => ({
 			name: tool.name,
 			title: tool.title,
 			description: tool.description,
-			inputSchema: tool.inputSchema,
+			inputSchema: tool.runtimePolicy?.validationSchema ?? tool.inputSchema,
 			outputSchema: tool.outputSchema,
 			annotations: tool.annotations,
 			serverId: tool.sourceId,
@@ -67,12 +133,14 @@ export class McpToolExecutor implements ToolExecutor {
 		)
 
 		const result = results[0]
+		const content = typeof result?.content === 'string'
+			? result.content
+			: '工具调用失败: 未收到结果'
 		return {
 			toolCallId: call.id,
 			name: call.name,
-			content: typeof result?.content === 'string'
-				? result.content
-				: `工具调用失败: 未收到结果`,
+			content,
+			status: isToolFailureContent(content) ? 'failed' : 'completed',
 		}
 	}
 }

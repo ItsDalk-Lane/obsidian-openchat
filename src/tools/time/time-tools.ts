@@ -80,7 +80,7 @@ const parseGetTimeArgs = (value: GetTimeArgs): GetTimeArgs => {
 	return value;
 };
 
-const timeResultSchema = z.object({
+export const timeResultSchema = z.object({
 	timezone: z.string(),
 	datetime: z.string(),
 	day_of_week: z.string(),
@@ -90,7 +90,7 @@ const timeResultSchema = z.object({
 	iso_week_year: z.number().int(),
 });
 
-const getTimeResultSchema = z.object({
+export const getTimeResultSchema = z.object({
 	mode: z.enum(['current', 'convert', 'range']),
 	source: timeResultSchema.optional(),
 	target: timeResultSchema.optional(),
@@ -109,7 +109,7 @@ const getTimeResultSchema = z.object({
 	parsed_expression: z.string().optional(),
 });
 
-interface RegisterTimeToolsOptions {
+export interface RegisterTimeToolsOptions {
 	defaultTimezone: string;
 }
 

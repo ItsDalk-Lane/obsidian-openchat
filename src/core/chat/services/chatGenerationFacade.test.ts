@@ -24,6 +24,7 @@ const createGenerationDeps = (
 	findProviderByTagExact: () => null,
 	getModelDisplayName: () => '',
 	createSubAgentStateUpdater: () => (() => {}) as never,
+	prepareToolTurn: async () => null as never,
 	resolveToolRuntime: async () => null as never,
 	buildProviderMessagesWithOptions: async () => [],
 	normalizeToolExecutionRecord: (record) => record,
