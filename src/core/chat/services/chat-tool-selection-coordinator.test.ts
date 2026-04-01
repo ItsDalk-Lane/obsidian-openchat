@@ -294,3 +294,44 @@ test('ChatToolSelectionCoordinator 在关闭 workflow 默认隐藏时允许 sub-
 	assert.deepEqual(prepared.candidateScope.candidateToolNames, ['sub_agent_researcher']);
 	assert.deepEqual(prepared.executableToolSet.tools.map((tool) => tool.name), ['sub_agent_researcher']);
 });
+
+test('ChatToolSelectionCoordinator 不会把文件名中的 workflow 工具标识误判为 workflow 意图', async () => {
+	const allTools = [
+		createTool('run_shell', '执行 shell。'.repeat(20), {
+			type: 'object',
+			properties: { command: { type: 'string' } },
+			required: ['command'],
+		}),
+		createTool('read_file', '读取文件。'.repeat(20), {
+			type: 'object',
+			properties: { file_path: { type: 'string' } },
+			required: ['file_path'],
+		}),
+	];
+	const fakeResolver = {
+		async buildDiscoveryCatalog() {
+			return buildDiscoveryCatalog({ tools: allTools, serverEntries: [] });
+		},
+		async resolveToolRuntime(options?: { explicitToolNames?: string[] }) {
+			const requestTools = allTools.filter((tool) => options?.explicitToolNames?.includes(tool.name));
+			return {
+				requestTools,
+				getTools: async () => requestTools,
+			};
+		},
+	} as unknown as ChatToolRuntimeResolver;
+	const coordinator = new ChatToolSelectionCoordinator({
+		toolRuntimeResolver: fakeResolver,
+		settingsAccessor: createSettingsAccessor(),
+	});
+
+	const prepared = await coordinator.prepareTurn({
+		session: createSession('请读取 run_shell.ts 文件的内容并解释实现逻辑'),
+		includeSubAgents: false,
+	});
+
+	assert.equal(prepared.mode, 'atomic-tools');
+	assert.ok(prepared.candidateScope.candidateToolNames.includes('read_file'));
+	assert.ok(!prepared.candidateScope.candidateToolNames.includes('run_shell'));
+	assert.deepEqual(prepared.executableToolSet.tools.map((tool) => tool.name), ['read_file']);
+});

@@ -10,8 +10,36 @@ interface WorkflowIntentMatcher {
 
 const normalizeText = (value: string): string => value.toLowerCase();
 
+const escapeRegex = (value: string): string => {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+const isStandaloneIdentifier = (keyword: string): boolean => {
+	return /[_-]/.test(keyword);
+};
+
+const isAsciiWord = (keyword: string): boolean => {
+	return /^[a-z][a-z\s]+$/.test(keyword);
+};
+
 const includesKeyword = (text: string, keyword: string): boolean => {
-	return text.includes(normalizeText(keyword));
+	const normalizedKeyword = normalizeText(keyword).trim();
+	if (!normalizedKeyword) {
+		return false;
+	}
+	if (isStandaloneIdentifier(normalizedKeyword)) {
+		const pattern = new RegExp(
+			`(^|[^a-z0-9_.-])${escapeRegex(normalizedKeyword)}($|[^a-z0-9_.-])`,
+		);
+		return pattern.test(text);
+	}
+	if (isAsciiWord(normalizedKeyword)) {
+		const pattern = new RegExp(
+			`(^|[^a-z0-9_.-])${escapeRegex(normalizedKeyword)}($|[^a-z0-9_.-])`,
+		);
+		return pattern.test(text);
+	}
+	return text.includes(normalizedKeyword);
 };
 
 const includesAnyKeyword = (text: string, keywords: readonly string[]): boolean => {
@@ -29,22 +57,34 @@ const WORKFLOW_INTENT_MATCHERS: readonly WorkflowIntentMatcher[] = [
 	{
 		toolName: 'run_shell',
 		requiresAll: [
-			['run', 'execute', 'use', '调用', '执行', '运行', '打开'],
+			['run', 'execute', 'use', '调用', '使用', '执行', '运行', '打开'],
 			['shell', 'terminal', 'bash', 'zsh', 'command', '终端', '命令行', '命令'],
 		],
 		anyOf: ['run_shell'],
 	},
 	{
 		toolName: 'run_script',
-		anyOf: ['run_script', 'orchestrate', 'workflow', '编排', '脚本工作流'],
+		requiresAll: [
+			['run', 'execute', 'use', '调用', '使用', '执行', '运行'],
+				['script', 'workflow', 'orchestrate', '脚本', '编排'],
+		],
+		anyOf: ['run_script'],
 	},
 	{
 		toolName: 'write_plan',
-		anyOf: ['write_plan', 'todo', 'task plan', 'plan', '更新计划', '写计划', '任务计划'],
+		requiresAll: [
+			['write', 'update', 'maintain', '调用', '使用', '写', '更新', '维护'],
+			['todo', 'task plan', 'plan', '待办', '计划'],
+		],
+		anyOf: ['write_plan'],
 	},
 	{
 		toolName: SKILL_TOOL_NAME,
-		anyOf: ['skill', 'skills', '技能'],
+		requiresAll: [
+			['run', 'invoke', 'use', '调用', '使用', '运行', '执行'],
+			['skill', 'skills', '技能'],
+		],
+		anyOf: [SKILL_TOOL_NAME],
 	},
 ];
 
@@ -88,6 +128,9 @@ export const matchesWorkflowIntent = (query: string, entry: DiscoveryEntry): boo
 	}
 	if (matcher?.requiresAll && matchesAllKeywordGroups(normalizedQuery, matcher.requiresAll)) {
 		return true;
+	}
+	if (matcher) {
+		return false;
 	}
 
 	if (entry.toolName.startsWith(SUB_AGENT_TOOL_PREFIX)) {

@@ -5,6 +5,7 @@ import { cloneAiRuntimeSettings } from 'src/domains/settings/config-ai-runtime';
 import type { ToolSurfaceSettings } from 'src/domains/settings/types-ai-runtime';
 import { BuiltinToolRegistry, type BuiltinToolInfo } from 'src/tools/runtime/tool-registry';
 import type { BuiltinTool } from 'src/tools/runtime/types';
+import { SKILL_TOOL_NAME } from 'src/tools/skill/skill-tools';
 import { createTimeTools } from 'src/tools/time/time-tools';
 import { createTimeWrapperTools } from 'src/tools/time/time-wrapper-tools';
 import { createFetchTools } from 'src/tools/web/fetch-tools';
@@ -108,8 +109,25 @@ function createSurfaceDefinitions(toolSurface?: ToolSurfaceSettings): ToolDefini
 		createBuiltinStub('find_paths', z.object({
 			query: z.string(),
 		})),
+		createBuiltinStub('search_content', z.object({
+			pattern: z.string(),
+		})),
+		createBuiltinStub('query_index', z.object({
+			data_source: z.string(),
+			query: z.string(),
+		})),
+		createBuiltinStub('bing_search', z.object({
+			query: z.string(),
+		})),
 		createBuiltinStub('run_shell', z.object({
 			command: z.string(),
+		})),
+		createBuiltinStub('write_plan', z.object({
+			items: z.array(z.string()).optional(),
+		})),
+		createBuiltinStub(SKILL_TOOL_NAME, z.object({
+			skillName: z.string().optional(),
+			task: z.string().optional(),
 		})),
 		createBuiltinStub('list_directory', listDirectorySchema),
 		createBuiltinStub('list_directory_tree', listDirectoryTreeSchema),

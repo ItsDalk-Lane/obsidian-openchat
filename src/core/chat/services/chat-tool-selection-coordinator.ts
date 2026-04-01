@@ -128,6 +128,10 @@ export class ChatToolSelectionCoordinator implements ToolSelectionCoordinator {
 		DebugLogger.debug('[ToolSelection] 已准备候选工具集', {
 			query,
 			mode: candidateScope.mode,
+			reasons: candidateScope.reasons,
+			discoveryEntryCount: discoveryCatalog.entries.length,
+			workflowEntryCount: discoveryCatalog.workflowEntries.length,
+			serverEntryCount: discoveryCatalog.serverEntries.length,
 			candidateToolNames: candidateScope.candidateToolNames,
 			candidateServerIds: candidateScope.candidateServerIds,
 			requestToolNames: executableToolSet.tools.map((tool) => tool.name),
