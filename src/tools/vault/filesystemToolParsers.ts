@@ -1,7 +1,7 @@
 import { t } from 'src/i18n/ai-runtime/helper';
+import type { QueryIndexArgs } from './query-index/schema';
 import type {
 	ListDirectoryArgs,
-	QueryIndexArgs,
 	ReadMultipleFilesArgs,
 	ReadTextFileArgs,
 } from './filesystemToolSchemas';

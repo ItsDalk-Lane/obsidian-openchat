@@ -1,9 +1,13 @@
 import type { BuiltinToolsRuntime } from 'src/tools/runtime/BuiltinToolsRuntime';
 import { clonePlanSnapshot } from 'src/tools/runtime/plan-state';
 import {
-	normalizeStructuredToolResult,
+	normalizeBuiltinToolExecutionResult,
 	serializeMcpToolResult,
 } from 'src/tools/runtime/tool-result';
+import type {
+	BuiltinTool,
+	BuiltinToolExecutionContext,
+} from 'src/tools/runtime/types';
 import type { ChatSession } from '../types/chat';
 import { HistoryService } from './history-service';
 import { ChatStateStore } from './chat-state-store';
@@ -63,7 +67,10 @@ export class ChatPlanSyncService {
 	): void {
 		this.pendingPlanSync = this.pendingPlanSync
 			.catch((error) => {
-				DebugLogger.warn('[ChatService] 前一个任务计划同步失败，继续执行后续同步:', error);
+				DebugLogger.warn(
+					'[ChatService] 前一个任务计划同步失败，继续执行后续同步:',
+					error,
+				);
 			})
 			.then(async () => {
 				const runtime = await ensureRuntime(session);
@@ -99,28 +106,31 @@ export class ChatPlanSyncService {
 	createBuiltinCallTool(
 		runtime: BuiltinToolsRuntime,
 		session?: ChatSession,
-	): (name: string, args: Record<string, unknown>) => Promise<unknown> {
+	): (
+		tool: BuiltinTool<unknown, unknown, unknown>,
+		args: unknown,
+		context: BuiltinToolExecutionContext<unknown>,
+	) => Promise<unknown> {
 		let guardedPlanSnapshot = session && this.hasLivePlan(session)
 			? clonePlanSnapshot(session.livePlan ?? null)
 			: null;
 
-		return async (name: string, args: Record<string, unknown>) => {
+		return async (tool, args, context) => {
 			let shouldRefreshGuardedPlan = false;
-			if (guardedPlanSnapshot && name === 'write_plan') {
+			if (guardedPlanSnapshot && tool.name === 'write_plan') {
 				shouldRefreshGuardedPlan = true;
-				if (!isPlanRewriteRequest(guardedPlanSnapshot, args)) {
-					validatePlanContinuationWritePlanArgs(guardedPlanSnapshot, args);
+				if (!isPlanRewriteRequest(guardedPlanSnapshot, args as Record<string, unknown>)) {
+					validatePlanContinuationWritePlanArgs(
+						guardedPlanSnapshot,
+						args as Record<string, unknown>,
+					);
 				}
 			}
 
-			const result = await runtime.getRegistry().call(
-				name,
-				args,
-				runtime.getContext(),
-			);
+			const result = await tool.execute(args, context);
 			if (shouldRefreshGuardedPlan) {
 				const serialized = serializeMcpToolResult(
-					normalizeStructuredToolResult(result),
+					normalizeBuiltinToolExecutionResult(tool, result, context),
 				);
 				const nextGuardedPlan = parsePlanSnapshotFromWritePlanResult(serialized);
 				if (nextGuardedPlan) {

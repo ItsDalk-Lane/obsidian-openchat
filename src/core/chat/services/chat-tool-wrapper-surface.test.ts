@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { cloneAiRuntimeSettings } from 'src/domains/settings/config-ai-runtime';
 import type { ToolSurfaceSettings } from 'src/domains/settings/types-ai-runtime';
+import { buildBuiltinTool } from 'src/tools/runtime/build-tool';
 import { BuiltinToolRegistry, type BuiltinToolInfo } from 'src/tools/runtime/tool-registry';
 import type { BuiltinTool, ToolContext } from 'src/tools/runtime/types';
 import { createTimeTools } from 'src/tools/time/time-tools';
@@ -343,6 +344,47 @@ test('legacy wrapper 工具会标记为兼容入口', () => {
 	assert.equal(legacyFetch.compatibility?.deprecationStatus, 'legacy');
 	assert.match(legacyTime.discovery?.oneLinePurpose ?? '', /get_current_time/);
 	assert.match(legacyFetch.discovery?.oneLinePurpose ?? '', /fetch_webpage/);
+});
+
+test('builtin 邻近 surface/runtimePolicy 会进入 surface 与 executable 定义', () => {
+	const registry = new BuiltinToolRegistry();
+	registry.register(buildBuiltinTool({
+		name: 'adjacent_surface_tool',
+		description: 'adjacent tool',
+		inputSchema: listDirectorySchema,
+		surface: {
+			family: 'builtin.test.surface',
+			visibility: 'candidate-only',
+			oneLinePurpose: '来自工具本体的单行用途',
+			capabilityTags: ['adjacent'],
+			requiredArgsSummary: ['directory_path'],
+			argumentComplexity: 'low',
+			riskLevel: 'read-only',
+		},
+		runtimePolicy: {
+			defaultArgs: {
+				response_format: 'json',
+			},
+			hiddenSchemaFields: ['response_format'],
+		},
+		execute: async () => null,
+	}));
+
+	const toolInfo = registry.listTools('builtin')
+		.find((tool) => tool.name === 'adjacent_surface_tool');
+	assert.ok(toolInfo);
+
+	const compiled = compileExecutableToolDefinition(createBuiltinToolDefinition(toolInfo));
+	assert.equal(compiled.identity?.familyId, 'builtin.test.surface');
+	assert.equal(compiled.discovery?.oneLinePurpose, '来自工具本体的单行用途');
+	assert.equal(compiled.discovery?.discoveryVisibility, 'candidate-only');
+	assert.deepEqual(compiled.discovery?.capabilityTags, ['adjacent']);
+	assert.deepEqual(compiled.runtimePolicy?.defaultArgs, {
+		response_format: 'json',
+	});
+	assert.ok(!Object.keys(
+		compiled.inputSchema.properties as Record<string, unknown>,
+	).includes('response_format'));
 });
 
 test('vault wrapper 会把窄 schema 映射为 legacy list_directory 参数', () => {

@@ -2,7 +2,7 @@ import type {
 	QueryIndexArgs,
 	QueryIndexDataSource,
 	QueryIndexScalar,
-} from './filesystemToolSchemas';
+} from './query-index/schema';
 
 const QUERY_INDEX_PUBLIC_FIELDS: Record<QueryIndexDataSource, Record<string, string>> = {
 	file: {

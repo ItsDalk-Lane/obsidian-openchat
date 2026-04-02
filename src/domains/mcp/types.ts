@@ -85,6 +85,28 @@ export interface McpToolDefinition {
 	readonly serverId: string
 }
 
+export interface McpResourceInfo {
+	readonly serverId: string
+	readonly uri: string
+	readonly name: string
+	readonly title?: string
+	readonly description?: string
+	readonly mimeType?: string
+	readonly size?: number
+}
+
+export type McpResourceContent =
+	| {
+		readonly uri: string
+		readonly mimeType?: string
+		readonly text: string
+	}
+	| {
+		readonly uri: string
+		readonly mimeType?: string
+		readonly blob: string
+	}
+
 export interface McpToolQueryScope {
 	readonly serverIds?: string[]
 }
@@ -147,6 +169,8 @@ export interface McpRuntimeManager {
 	getAllStates(): McpServerState[]
 	getState(serverId: string): McpServerState | undefined
 	getToolsForServer(serverId: string): Promise<McpToolInfo[]>
+	getResourcesForServer(serverId: string): Promise<McpResourceInfo[]>
+	readResource(serverId: string, uri: string): Promise<McpResourceContent[]>
 	onStateChange(listener: (states: McpServerState[]) => void): () => void
 	dispose(): Promise<void> | void
 }

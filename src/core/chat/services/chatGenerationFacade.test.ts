@@ -20,6 +20,7 @@ const createGenerationDeps = (
 	notify: () => {},
 	getAvailableAttachmentPath: async () => '',
 	writeVaultBinary: async () => {},
+	requestToolUserInput: async () => ({ outcome: 'cancelled' }),
 	getDefaultProviderTag: () => selectedModelId,
 	findProviderByTagExact: () => null,
 	getModelDisplayName: () => '',

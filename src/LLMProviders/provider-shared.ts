@@ -6,6 +6,8 @@ import type {
 	ToolDefinition,
 	ToolExecutionRecord,
 	ToolExecutor,
+	ToolUserInputRequest,
+	ToolUserInputResponse,
 } from 'src/core/agents/loop/types'
 
 export type MsgRole = 'user' | 'assistant' | 'system' | 'tool'
@@ -82,6 +84,10 @@ export interface BaseOptions {
 	getTools?: GetToolsFn
 	/** 工具执行完成后的回调，用于回填结构化 toolCalls */
 	onToolCallResult?: (record: ToolExecutionRecord) => void
+	/** 工具执行期间向宿主请求用户澄清输入 */
+	requestToolUserInput?: (
+		request: ToolUserInputRequest
+	) => Promise<ToolUserInputResponse>
 
 	/**
 	 * @deprecated 使用 tools 代替。保留用于向后兼容过渡期

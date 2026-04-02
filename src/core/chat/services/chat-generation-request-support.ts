@@ -86,6 +86,7 @@ export const buildProviderOptions = (
 		enableReasoning,
 		enableThinking,
 		enableWebSearch,
+		requestToolUserInput: deps.requestToolUserInput,
 		apiKey: String(providerOptionsRaw.apiKey ?? ''),
 		baseURL: String(providerOptionsRaw.baseURL ?? ''),
 		model: String(providerOptionsRaw.model ?? ''),

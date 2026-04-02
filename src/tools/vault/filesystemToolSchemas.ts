@@ -1,4 +1,3 @@
-import { DEFAULT_SEARCH_MAX_RESULTS } from '../runtime/constants';
 import { z } from 'zod';
 
 export const responseFormatSchema = z
@@ -24,9 +23,6 @@ export const mutationToolAnnotations = {
 
 export const DEFAULT_READ_SEGMENT_LINES = 200;
 export const MAX_READ_SEGMENT_LINES = 1_000;
-
-export type QueryIndexDataSource = 'file' | 'property' | 'tag' | 'task';
-export type QueryIndexScalar = string | number | boolean | null;
 
 export const readTextFileSchema = z.object({
 	file_path: z
@@ -262,157 +258,6 @@ export const deleteFileSchema = z.object({
 		.describe('删除文件夹时是否强制递归删除隐藏内容，默认 true'),
 }).strict();
 
-export const searchContentSchema = z.object({
-	pattern: z
-		.string()
-		.min(1)
-		.describe(
-			'要搜索的内容。match_mode=literal 时按普通文本匹配；match_mode=regex 时按正则表达式匹配'
-		),
-	match_mode: z
-		.enum(['literal', 'regex'])
-		.default('literal')
-		.describe("匹配模式：literal 表示普通文本匹配，regex 表示正则匹配"),
-	scope_path: z
-		.string()
-		.optional()
-		.default('/')
-		.describe('限制搜索范围的目录路径；默认为整个 Vault'),
-	file_types: z
-		.array(z.string().min(1))
-		.optional()
-		.default([])
-		.describe('可选的扩展名过滤数组，例如 ["md", "ts"]；元素不要带点号'),
-	max_results: z
-		.number()
-		.int()
-		.positive()
-		.optional()
-		.default(DEFAULT_SEARCH_MAX_RESULTS)
-		.describe('返回的最大匹配数量，默认 50'),
-	case_sensitive: z
-		.boolean()
-		.optional()
-		.default(false)
-		.describe('是否区分大小写，默认 false'),
-	context_lines: z
-		.number()
-		.int()
-		.min(0)
-		.optional()
-		.default(0)
-		.describe('返回匹配行前后的上下文行数，默认 0'),
-	response_format: responseFormatSchema,
-}).strict();
-
-export const queryIndexScalarSchema = z.union([
-	z.string(),
-	z.number(),
-	z.boolean(),
-	z.null(),
-]);
-
-export const queryIndexSchema = z.object({
-	data_source: z
-		.enum(['file', 'property', 'tag', 'task'])
-		.describe('索引数据源：file 文件元数据，property 属性统计，tag 标签统计，task 任务数据'),
-	select: z
-		.object({
-			fields: z
-				.array(z.string().min(1))
-				.optional()
-				.default([])
-				.describe('要返回的字段名数组，字段名使用公开的 snake_case 形式'),
-			aggregates: z
-				.array(
-					z
-						.object({
-							aggregate: z
-								.enum(['count', 'sum', 'avg'])
-								.describe('聚合函数：count 统计行数，sum/avg 统计数字字段'),
-							field: z
-								.string()
-								.optional()
-								.describe('sum/avg 必填；count 留空时统计行数'),
-							alias: z
-								.string()
-								.optional()
-								.describe('结果列别名；不填时自动生成 snake_case 别名'),
-						})
-						.strict()
-				)
-				.optional()
-				.default([])
-				.describe('可选的聚合计算数组'),
-		})
-		.strict()
-		.describe('要返回的字段和聚合定义'),
-	filters: z
-		.object({
-			match: z
-				.enum(['all', 'any'])
-				.default('all')
-				.describe('多个条件如何组合：all 表示全部满足，any 表示满足任一条件'),
-			conditions: z
-				.array(
-					z
-						.object({
-							field: z
-								.string()
-								.min(1)
-								.describe('过滤字段名，使用公开的 snake_case 字段'),
-							operator: z
-								.enum(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'in', 'matches'])
-								.describe('过滤运算符'),
-							value: z
-								.union([
-									queryIndexScalarSchema,
-									z.array(queryIndexScalarSchema).min(1),
-								])
-								.describe('过滤值；operator=in 时应传数组'),
-						})
-						.strict()
-				)
-				.min(1)
-				.describe('过滤条件数组'),
-		})
-		.optional()
-		.describe('可选的过滤条件'),
-	group_by: z
-		.string()
-		.optional()
-		.describe('可选的分组字段，使用公开的 snake_case 字段'),
-	order_by: z
-		.object({
-			field: z
-				.string()
-				.min(1)
-				.describe('排序字段，使用 select 中已有的字段名或别名'),
-			direction: z
-				.enum(['asc', 'desc'])
-				.default('asc')
-				.describe('排序方向，默认 asc'),
-		})
-		.strict()
-		.optional()
-		.describe('可选的排序定义'),
-	limit: z
-		.number()
-		.int()
-		.positive()
-		.max(500)
-		.default(100)
-		.describe('返回行数上限，默认 100'),
-	offset: z
-		.number()
-		.int()
-		.min(0)
-		.default(0)
-		.describe('结果偏移量，默认 0'),
-	response_format: responseFormatSchema,
-}).strict();
-
 export type ReadTextFileArgs = z.infer<typeof readTextFileSchema>;
 export type ReadMultipleFilesArgs = z.infer<typeof readMultipleFilesSchema>;
 export type ListDirectoryArgs = z.infer<typeof listDirectorySchema>;
-export type QueryIndexArgs = z.infer<typeof queryIndexSchema>;

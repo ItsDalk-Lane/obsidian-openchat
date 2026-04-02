@@ -176,6 +176,7 @@ async function* runNonStreamingIteration(
 		toolExecutor,
 		context.controller.signal,
 		context.settings.onToolCallResult,
+		context.settings.requestToolUserInput,
 		context.toolNameMapping,
 	)
 	for (const [index, call] of toolCallsResult.entries()) {
@@ -321,6 +322,7 @@ async function* runStreamingIteration(
 		toolExecutor,
 		context.controller.signal,
 		context.settings.onToolCallResult,
+		context.settings.requestToolUserInput,
 		context.toolNameMapping,
 	)
 	for (const [index, call] of toolCallsFinal.entries()) {

@@ -126,6 +126,9 @@ function createSurfaceDefinitions(toolSurface?: ToolSurfaceSettings): ToolDefini
 		createBuiltinStub('run_shell', z.object({
 			command: z.string(),
 		})),
+		createBuiltinStub('run_script', z.object({
+			script: z.string(),
+		})),
 		createBuiltinStub('write_plan', z.object({
 			items: z.array(z.string()).optional(),
 		})),

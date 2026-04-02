@@ -8,7 +8,13 @@
  */
 
 import { serializeMcpToolResult } from '../internal/tool-result'
-import type { McpServerConfig, McpServerStatus, McpToolInfo } from '../types'
+import type {
+	McpResourceContent,
+	McpResourceInfo,
+	McpServerConfig,
+	McpServerStatus,
+	McpToolInfo,
+} from '../types'
 import { createMcpTransport, isMcpRemoteTransport } from '../transport/transport-factory'
 import type { ITransport, JsonRpcMessage, JsonRpcResponse } from '../transport/transport.types'
 import { isJsonRpcNotification, isJsonRpcResponse } from '../transport/transport.types'
@@ -102,6 +108,71 @@ export class McpProtocolClient {
 		this.onToolsChange(this.tools)
 		this.dependencies.logger.info(`[MCP] ${this.config.name}: 获取到 ${this.tools.length} 个工具`)
 		return this.tools
+	}
+
+	/** @precondition transport 已连接 @postcondition 返回当前服务器可读取资源列表 @throws 当 resources/list 失败时抛出 @example await client.listResources() */
+	async listResources(): Promise<McpResourceInfo[]> {
+		const resources: McpResourceInfo[] = []
+		let cursor: string | undefined
+		do {
+			const result = await this.sendRequest('resources/list', cursor ? { cursor } : {}) as {
+				resources?: Array<{
+					uri: string
+					name: string
+					title?: string
+					description?: string
+					mimeType?: string
+					size?: number
+				}>
+				nextCursor?: string
+			}
+			for (const resource of result.resources ?? []) {
+				resources.push({
+					serverId: this.config.id,
+					uri: resource.uri,
+					name: resource.name,
+					title: resource.title,
+					description: resource.description,
+					mimeType: resource.mimeType,
+					size: resource.size,
+				})
+			}
+			cursor = typeof result.nextCursor === 'string' && result.nextCursor.trim().length > 0
+				? result.nextCursor
+				: undefined
+		} while (cursor)
+		return resources
+	}
+
+	/** @precondition transport 已连接且 uri 来自资源列表 @postcondition 返回对应资源内容数组 @throws 当 resources/read 失败时抛出 @example await client.readResource('repo://docs/arch') */
+	async readResource(uri: string): Promise<McpResourceContent[]> {
+		const result = await this.sendRequest('resources/read', { uri }) as {
+			contents?: Array<{
+				uri: string
+				mimeType?: string
+				text?: string
+				blob?: string
+			}>
+		}
+		const contents: McpResourceContent[] = []
+		for (const content of result.contents ?? []) {
+			if (typeof content.text === 'string') {
+				contents.push({
+					uri: content.uri,
+					mimeType: content.mimeType,
+					text: content.text,
+				})
+				continue
+			}
+			if (typeof content.blob === 'string') {
+				contents.push({
+					uri: content.uri,
+					mimeType: content.mimeType,
+					blob: content.blob,
+				})
+			}
+		}
+		return contents
 	}
 
 	/** @precondition transport 已连接 @postcondition 返回工具调用结果文本，必要时执行重试与重连 @throws 当最终调用失败时抛出 @example await client.callTool('tool', {}) */

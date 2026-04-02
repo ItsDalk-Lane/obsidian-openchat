@@ -27,6 +27,13 @@ export const TOOL_SELECTION_REGRESSION_CASES: readonly ToolSelectionRegressionCa
 		excludedToolNames: ['read_file'],
 	},
 	{
+		name: '显式 run_script 意图进入 workflow 面',
+		prompt: '请使用 run_script 编排读取和总结当前文件的流程',
+		expectedMode: 'workflow',
+		expectedToolNames: ['run_script'],
+		excludedToolNames: ['read_file'],
+	},
+	{
 		name: '时区换算优先使用时间 wrapper',
 		prompt: '请把 Asia/Shanghai 的 09:30 转换到 Europe/London 时间',
 		expectedMode: 'atomic-tools',

@@ -228,6 +228,7 @@ export function withClaudeToolCallLoopSupport(
 						try {
 							const result = await executor.execute(request, currentTools, {
 								abortSignal: controller.signal,
+								requestUserInput: settings.requestToolUserInput,
 							})
 							resultText = result.content
 							status = result.status ?? (result.errorContext ? 'failed' : 'completed')

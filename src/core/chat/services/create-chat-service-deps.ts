@@ -43,9 +43,11 @@ const createChatSettingsAccessor = (
 export const createChatHostDeps = (
 	host: ChatConsumerHost,
 	obsidianApi: ObsidianApiProvider,
+	runtimeDeps: ChatRuntimeDeps,
 ): ChatHostDeps => ({
 	obsidianApi,
 	settingsAccessor: createChatSettingsAccessor(host),
+	requestToolUserInput: (request) => host.requestToolUserInput(request),
 	createFileContentService: () => new FileContentService(obsidianApi),
 	createMessageService: (fileContentService) =>
 		new MessageService(
@@ -58,6 +60,7 @@ export const createChatHostDeps = (
 			app: host.app,
 			settings,
 			skillScanner,
+			mcpManager: runtimeDeps.getMcpClientManager(),
 		});
 	},
 	createSubAgentScannerService: () =>
@@ -73,6 +76,6 @@ export const createChatServiceDeps = (
 	runtimeDeps: ChatRuntimeDeps,
 	obsidianApi: ObsidianApiProvider,
 ): ChatServiceDeps => ({
-	host: createChatHostDeps(host, obsidianApi),
+	host: createChatHostDeps(host, obsidianApi, runtimeDeps),
 	runtimeDeps,
 });

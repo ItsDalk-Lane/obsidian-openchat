@@ -16,6 +16,10 @@ import type {
 	SelectedFolder,
 } from '../types/chat';
 import type { ToolExecutionRecord } from 'src/types/tool';
+import type {
+	ToolUserInputRequest,
+	ToolUserInputResponse,
+} from 'src/types/tool';
 import type { AttachmentSelectionSnapshot } from './chat-attachment-selection-service';
 import type { FileContentService } from './file-content-service';
 import type { MessageService } from './message-service';
@@ -81,6 +85,9 @@ export interface ChatSettingsAccessor {
 export interface ChatConsumerHost {
 	app: App;
 	notify(message: string, timeout?: number): void;
+	requestToolUserInput(
+		request: ToolUserInputRequest,
+	): Promise<ToolUserInputResponse>;
 	getManifestId(): string;
 	getAiDataFolder(): string;
 	getPluginSettings(): Readonly<PluginSettings>;
@@ -112,6 +119,7 @@ export interface ChatConsumerHost {
 export interface ChatHostDeps {
 	obsidianApi: ObsidianApiProvider;
 	settingsAccessor: ChatSettingsAccessor;
+	requestToolUserInput: ChatConsumerHost['requestToolUserInput'];
 	createFileContentService(): FileContentService;
 	createMessageService(fileContentService: FileContentService): MessageService;
 	resolveVaultBasePath(): string | null;

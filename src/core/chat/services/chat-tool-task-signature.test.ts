@@ -318,6 +318,17 @@ test('buildTaskSignature 在未知 skill 名称时保留 workflow discovery 阶�
 	assert.ok(signature.reasons.includes('workflow-target-unknown'));
 });
 
+test('buildTaskSignature 在显式 run_script 意图时直达 workflow tool', () => {
+	const signature = buildTaskSignature({
+		query: '请使用 run_script 编排读取和总结当前文件的流程',
+		session: createSession(),
+	});
+
+	assert.equal(signature.nextAction, 'workflow');
+	assert.equal(signature.explicitToolName, 'run_script');
+	assert.equal(signature.confidence, 'high');
+});
+
 test('buildTaskSignature 会从上一轮工具记录识别 post-discovery 阶段', () => {
 	const signature = buildTaskSignature({
 		query: '请读取第一个候选文件的内容',

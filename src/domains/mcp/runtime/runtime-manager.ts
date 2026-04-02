@@ -11,6 +11,8 @@ import type { HttpRequestOptions, HttpResponseData } from 'src/providers/provide
 import type {
 	McpDomainLogger,
 	McpHealthResult,
+	McpResourceContent,
+	McpResourceInfo,
 	McpRuntimeManager,
 	McpServerConfig,
 	McpServerState,
@@ -222,6 +224,40 @@ export class McpRuntimeManagerImpl implements McpRuntimeManager {
 			this.dependencies.logger.warn(`[MCP] 获取服务器工具失败: ${serverId}`, error)
 		}
 		return this.processManager.getState(serverId)?.tools ?? []
+	}
+
+	/** @precondition serverId 为已配置服务器标识 @postcondition 返回该服务器的资源列表，必要时会尝试连接 @throws 从不抛出 @example await manager.getResourcesForServer('server') */
+	async getResourcesForServer(serverId: string): Promise<McpResourceInfo[]> {
+		if (!this.isMcpEnabled()) {
+			return []
+		}
+		const config = this.settings.servers.find((server) => server.id === serverId)
+		if (!config || !config.enabled) {
+			return []
+		}
+		try {
+			const client = await this.processManager.ensureConnected(config)
+			return await client.listResources()
+		} catch (error) {
+			this.dependencies.logger.warn(`[MCP] 获取服务器资源失败: ${serverId}`, error)
+			return []
+		}
+	}
+
+	/** @precondition serverId 与 uri 指向已配置资源 @postcondition 返回资源内容数组 @throws 当服务器不存在、已禁用或读取失败时抛出 @example await manager.readResource('server', 'repo://docs/arch') */
+	async readResource(serverId: string, uri: string): Promise<McpResourceContent[]> {
+		if (!this.isMcpEnabled()) {
+			throw new Error('MCP 功能未启用')
+		}
+		const config = this.settings.servers.find((server) => server.id === serverId)
+		if (!config) {
+			throw new Error(`MCP 服务器不存在: ${serverId}`)
+		}
+		if (!config.enabled) {
+			throw new Error(`MCP 服务器已禁用: ${config.name}`)
+		}
+		const client = await this.processManager.ensureConnected(config)
+		return await client.readResource(uri)
 	}
 
 	/** @precondition listener 为幂等状态监听器 @postcondition 返回注销该监听器的函数 @throws 从不抛出 @example const off = manager.onStateChange(listener) */

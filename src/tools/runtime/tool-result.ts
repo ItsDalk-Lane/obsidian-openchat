@@ -1,4 +1,5 @@
 import { DEFAULT_TOOL_RESULT_TEXT_LIMIT } from './constants';
+import type { BuiltinTool, BuiltinToolExecutionContext } from './types';
 
 export interface McpToolResultContentItem {
 	type?: string;
@@ -115,4 +116,15 @@ export function normalizeStructuredToolResult(result: unknown): McpToolResultLik
 			},
 		],
 	};
+}
+
+export function normalizeBuiltinToolExecutionResult<TResult, TProgress = never>(
+	tool: Pick<BuiltinTool<unknown, TResult, TProgress>, 'serializeResult'>,
+	result: TResult,
+	context: BuiltinToolExecutionContext<TProgress>
+): McpToolResultLike {
+	const serialized = tool.serializeResult
+		? tool.serializeResult(result, context)
+		: result;
+	return normalizeStructuredToolResult(serialized);
 }

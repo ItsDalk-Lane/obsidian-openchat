@@ -27,6 +27,7 @@ import { ChatViewCoordinator } from 'src/domains/chat/ui-view-coordinator';
 import { activateChatViewFromAssembler } from './chat-assembler-support';
 import { ChatFeatureManager } from 'src/core/chat/chat-feature-manager';
 import { buildChatViewFactory } from 'src/core/chat/chat-view-factory-builder';
+import { requestToolUserInputViaModal } from 'src/components/modal/ToolUserInputModal';
 
 /**
  * ChatAssembler 对宿主 Plugin 的最小依赖接口。
@@ -157,6 +158,8 @@ export class ChatAssembler {
 			notify: (message, timeout) => {
 				obsidianApi.notify(message, timeout);
 			},
+			requestToolUserInput: async (request) =>
+				await requestToolUserInputViaModal(plugin.app, request),
 			getManifestId: () => plugin.manifest.id,
 			getAiDataFolder: () => plugin.settings.aiDataFolder,
 			getPluginSettings: () => plugin.settings,

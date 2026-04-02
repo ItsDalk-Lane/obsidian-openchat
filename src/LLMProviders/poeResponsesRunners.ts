@@ -118,6 +118,7 @@ export const emitToolMarkers = async function* (
 		toolExecutor: context.toolExecutor,
 		abortSignal: context.controller.signal,
 		onToolCallResult: context.onToolCallResult,
+		requestUserInput: context.requestToolUserInput,
 	})
 	await context.refreshToolCandidates()
 	for (const marker of executed.markers) {

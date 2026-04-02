@@ -6,6 +6,8 @@ import type {
 	ToolDefinition,
 	ToolExecutionRecord,
 	ToolExecutor,
+	ToolUserInputRequest,
+	ToolUserInputResponse,
 } from './types'
 import type {
 	ContentPart,
@@ -424,6 +426,9 @@ export async function executeToolCalls(
 	toolExecutor: ToolExecutor,
 	abortSignal?: AbortSignal,
 	onToolCallResult?: (record: ToolExecutionRecord) => void,
+	requestUserInput?: (
+		request: ToolUserInputRequest
+	) => Promise<ToolUserInputResponse>,
 	toolNameMapping?: ToolNameMapping,
 ): Promise<ToolLoopMessage[]> {
 	return await Promise.all(toolCalls.map(async (call) => {
@@ -436,7 +441,10 @@ export async function executeToolCalls(
 		const parsedArguments = parseToolArguments(call.function.arguments)
 
 		try {
-			const result = await toolExecutor.execute(request, tools, { abortSignal })
+			const result = await toolExecutor.execute(request, tools, {
+				abortSignal,
+				requestUserInput,
+			})
 			const status = result.status ?? (result.errorContext ? 'failed' : 'completed')
 			onToolCallResult?.({
 				id: result.toolCallId,

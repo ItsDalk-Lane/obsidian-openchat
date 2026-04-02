@@ -1,4 +1,5 @@
 import { moment, type App } from 'obsidian';
+import type { McpRuntimeManager } from 'src/domains/mcp/types';
 import type { SkillScannerService } from 'src/domains/skills/service';
 import {
 	DEFAULT_MCP_SETTINGS,
@@ -23,8 +24,13 @@ import {
 	serializeMcpToolResult,
 } from './tool-result';
 import type { ToolContext } from './types';
+import { createCanvasTools } from '../canvas/canvas-tools';
 import { createLinkTools } from '../link/link-tools';
+import { createGraphTools } from '../graph/graph-tools';
+import { createIntegrationTools } from '../integration/integration-tools';
+import { createMcpResourceTools } from '../mcp/resources/mcp-resource-tools';
 import { createPlanTools } from '../plan/plan-tools';
+import { createObsidianCommandTools } from '../obsidian/commands/obsidian-tools';
 import { createScriptTools } from '../script/script-tools';
 import {
 	createSkillTools,
@@ -37,6 +43,7 @@ import {
 	type FetchToolsOptions,
 } from '../web/fetch-tools';
 import { createFetchWrapperTools } from '../web/fetch-wrapper-tools';
+import { createWorkflowTools } from '../workflow/workflow-tools';
 import { registerFilesystemTools } from '../vault/filesystemTools';
 
 export interface BuiltinToolsRuntime {
@@ -67,6 +74,7 @@ interface CreateBuiltinToolsRuntimeOptions {
 	app: App;
 	settings?: BuiltinToolsRuntimeSettings;
 	skillScanner?: SkillScannerService | null;
+	mcpManager?: McpRuntimeManager | null;
 }
 
 export async function createBuiltinToolsRuntime(
@@ -104,7 +112,15 @@ export async function createBuiltinToolsRuntime(
 				?? DEFAULT_MCP_SETTINGS.builtinTimeDefaultTimezone
 				?? 'UTC',
 		}));
+		registry.registerAll(createCanvasTools(options.app));
 		registry.registerAll(createLinkTools());
+		registry.registerAll(createGraphTools(options.app));
+		registry.registerAll(createIntegrationTools(options.app));
+		registry.registerAll(createObsidianCommandTools(options.app));
+		if (options.mcpManager) {
+			registry.registerAll(createMcpResourceTools(options.mcpManager));
+		}
+		registry.registerAll(createWorkflowTools());
 	}
 
 	if (settings.builtinFilesystemEnabled !== false) {

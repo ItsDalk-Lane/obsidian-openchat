@@ -310,6 +310,7 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 				hasToolRuntime,
 				toolExecutor: resolvedToolExecutor,
 				onToolCallResult,
+				requestToolUserInput: settings.requestToolUserInput,
 				mcpCallTool,
 				maxToolCallLoops: resolvedMaxToolCallLoops,
 				retryOptions: POE_RETRY_OPTIONS,

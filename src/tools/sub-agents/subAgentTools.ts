@@ -9,6 +9,10 @@ import {
 	buildSubAgentToolName,
 } from './types';
 
+/**
+ * Sub-Agent 工具刻意维持在 ToolDefinition + ToolExecutor 体系中，
+ * 不参与 BuiltinTool 迁移主线。
+ */
 export const subAgentToToolDefinition = (definition: SubAgentDefinition): ToolDefinition => {
 	return {
 		name: buildSubAgentToolName(definition.metadata.name),

@@ -47,7 +47,7 @@ function createScanner(agents: readonly SubAgentDefinition[]): SubAgentScannerSe
 		},
 	};
 
-	return scanner as SubAgentScannerService;
+	return scanner as unknown as SubAgentScannerService;
 }
 
 test('discover_sub_agents 会按 query 过滤并返回 agent 元数据', async () => {

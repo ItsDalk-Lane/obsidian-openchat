@@ -23,6 +23,7 @@ import { ChatImageResolver } from './chat-image-resolver';
 import { ChatContextCompactionService } from './chat-context-compaction-service';
 import type {
 	ChatServiceDeps,
+	ChatHostDeps,
 	ChatSettingsAccessor,
 	ChatTriggerSource,
 } from './chat-service-types';
@@ -43,6 +44,7 @@ export interface ChatServiceInternals {
 	runtimeDeps: ChatRuntimeDeps;
 	settingsAccessor: ChatSettingsAccessor;
 	obsidianApi: ObsidianApiProvider;
+	requestToolUserInput: ChatHostDeps['requestToolUserInput'];
 	resolveVaultBasePath: () => string | null;
 	stateStore: ChatStateStore;
 	fileContentService: FileContentService;
@@ -162,6 +164,7 @@ export const createChatServiceInternals = (
 		runtimeDeps: deps.runtimeDeps,
 		settingsAccessor,
 		obsidianApi,
+		requestToolUserInput: deps.host.requestToolUserInput,
 		resolveVaultBasePath: deps.host.resolveVaultBasePath,
 		stateStore,
 		fileContentService,

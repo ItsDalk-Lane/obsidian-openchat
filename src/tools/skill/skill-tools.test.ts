@@ -113,7 +113,7 @@ test('invoke_skill 会加载 skill 正文并附加调用上下文标记', async 
 	const result = await tool.execute({
 		skill: 'pdf',
 		args: '--pages 1-2',
-	}, TOOL_CONTEXT);
+	}, TOOL_CONTEXT) as string;
 
 	assert.equal(typeof result, 'string');
 	assert.match(result, /Base Path: System\/AI Data\/skills\/pdf\//);
@@ -125,7 +125,7 @@ test('invoke_skill 会加载 skill 正文并附加调用上下文标记', async 
 test('invoke_skill 在技能不存在时会提示先调用 discover_skills', async () => {
 	const scanner = createScanner([PDF_SKILL]);
 	const tool = requireTool(scanner, INVOKE_SKILL_TOOL_NAME);
-	const result = await tool.execute({ skill: 'missing' }, TOOL_CONTEXT);
+	const result = await tool.execute({ skill: 'missing' }, TOOL_CONTEXT) as string;
 
 	assert.equal(
 		result,

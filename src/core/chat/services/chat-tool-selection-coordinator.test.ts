@@ -196,6 +196,47 @@ test('ChatToolSelectionCoordinator 遇到显式 workflow 意图时只暴露 work
 	assert.deepEqual(prepared.candidateScope.candidateToolNames, ['run_shell']);
 });
 
+test('ChatToolSelectionCoordinator 会把显式 run_script 意图收敛到 workflow 工具', async () => {
+	const allTools = [
+		createTool('run_script', '执行受限脚本编排。'.repeat(20), {
+			type: 'object',
+			properties: { script: { type: 'string' } },
+			required: ['script'],
+		}),
+		createTool('read_file', '读取文件。'.repeat(20), {
+			type: 'object',
+			properties: { file_path: { type: 'string' } },
+			required: ['file_path'],
+		}),
+	];
+	const fakeResolver = {
+		async buildDiscoveryCatalog() {
+			return buildDiscoveryCatalog({ tools: allTools, serverEntries: [] });
+		},
+		async resolveToolRuntime(options?: { explicitToolNames?: string[] }) {
+			const requestTools = allTools.filter((tool) => options?.explicitToolNames?.includes(tool.name));
+			return {
+				requestTools,
+				getTools: async () => requestTools,
+			};
+		},
+	} as unknown as ChatToolRuntimeResolver;
+	const coordinator = new ChatToolSelectionCoordinator({
+		toolRuntimeResolver: fakeResolver,
+		settingsAccessor: createSettingsAccessor(),
+	});
+
+	const prepared = await coordinator.prepareTurn({
+		session: createSession('请使用 run_script 编排读取和总结当前文件的流程'),
+		includeSubAgents: false,
+	});
+
+	assert.equal(prepared.mode, 'workflow');
+	assert.ok(prepared.discoveryCatalog.workflowEntries.some((entry) => entry.toolName === 'run_script'));
+	assert.deepEqual(prepared.executableToolSet.tools.map((tool) => tool.name), ['run_script']);
+	assert.deepEqual(prepared.candidateScope.candidateToolNames, ['run_script']);
+});
+
 test('ChatToolSelectionCoordinator 在关闭 workflow 模式时仍保持 escape-hatch 的 workflow 暴露语义', async () => {
 	const workflowTool = createTool('run_shell', '执行 shell。'.repeat(20), {
 		type: 'object',

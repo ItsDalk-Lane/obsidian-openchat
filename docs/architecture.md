@@ -217,6 +217,61 @@ chat 域文件较多，按 service 职责分组如下，方便查找：
 - AI runtime 命令层通过 `AiRuntimeCommandHost` 收敛状态栏、命令注册与 Notice，
    `AiRuntimeCommandManager` 不再直接持有 `Plugin`
 
+## Builtin Tool Runtime
+
+### 当前事实来源
+
+- `src/tools/runtime/**` 负责 `BuiltinTool` 契约、`buildBuiltinTool()`、
+   `BuiltinToolExecutor`、registry 与 `BuiltinToolsRuntime`。
+- 已迁移或新增的 builtin tool 默认以单工具目录为事实来源：
+   `tool.ts`、`schema.ts`、`description.ts`、`service.ts`；
+   共享逻辑落在各域 `_shared/`。
+- `chat-tool-discovery-blueprints.ts` 已降为 fallback / legacy bridge /
+   non-BuiltinTool 例外层；已迁移 builtin tool 的默认 surface 与
+   `runtimePolicy` 由工具邻近元数据提供。
+- `sub-agents` 继续保持独立 `ToolDefinition` 体系，不进入
+   `BuiltinToolsRuntime`；其 discover / delegate surface 只在 resolver
+   侧参与 catalog 组装。
+
+### 当前注册范围
+
+- `BuiltinToolsRuntime.ts` 当前会按 settings、宿主能力与可选依赖注册以下 builtin 家族：
+  - script：`run_script`、`run_shell`
+  - workflow：`write_plan`、`ask_user`
+  - time：`get_time` 与三个 canonical wrapper
+  - vault：读取/目录发现/搜索/索引/写入/删除/移动，以及 daily note 与 property 工具
+  - web：`bing_search`、`fetch` 与两个 fetch wrapper
+  - link / graph：`get_first_link_path`、`backlink_analyze`
+  - obsidian：`list_commands`、`run_command`
+  - canvas：`read_canvas`、`edit_canvas`
+  - mcp resources：仅在存在 `mcpManager` 时注册
+  - dataview integration：仅在 Dataview 插件可用时暴露 `dataview_query`
+  - skills：仅在存在 `skillScanner` 时注册
+- `search_content` 与 `query_index` 已迁入
+   `src/tools/vault/search-content/**` 与 `src/tools/vault/query-index/**`；
+   `src/tools/vault/filesystemSearchHandlers.ts` 现在只保留兼容桥接注册与
+   `stat_path` legacy handler。
+
+### 工具调用流
+
+```text
+聊天轮次需要工具能力
+    → core/chat/services/chat-tool-runtime-resolver.ts
+       生成 discovery catalog、candidate scope 与 executable tool set
+    → tools/runtime/BuiltinToolsRuntime.ts
+       按 settings / capability / optional integration 注册 builtin registry
+    → tools/runtime/BuiltinToolExecutor.ts
+       依次执行 argument completion、schema 校验、validateInput()、
+       checkPermissions()、tool.execute() 与 output validation
+    → 如需用户确认或澄清，执行器通过 requestConfirmation() /
+       requestUserInput() 回到宿主 UI
+    → chat-tool-discovery-blueprints.ts 只为 legacy bridge、override 与
+       non-BuiltinTool 例外兜底，不再充当已迁移 builtin tool 的主事实来源
+```
+
+- 详细决策见 `docs/decisions/2026-04-01-tool-surface-two-stage.md` 与
+   `docs/decisions/2026-04-02-builtin-tool-runtime-catalog.md`。
+
 ## 机械化执行
 
 这些规则不是建议，是通过以下机制强制执行的：

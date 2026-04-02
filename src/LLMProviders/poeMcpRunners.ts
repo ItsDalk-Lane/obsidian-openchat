@@ -3,6 +3,8 @@ import type {
 	ToolDefinition,
 	ToolExecutionRecord,
 	ToolExecutor,
+	ToolUserInputRequest,
+	ToolUserInputResponse,
 } from 'src/core/agents/loop/types'
 import type { OpenAIToolCall } from 'src/services/mcp/mcpToolCallHandler'
 import { executeMcpToolCalls } from 'src/services/mcp/mcpToolCallHandler'
@@ -45,6 +47,9 @@ export const executePoeMcpToolCalls = async (
 		toolExecutor?: ToolExecutor
 		abortSignal?: AbortSignal
 		onToolCallResult?: (record: ToolExecutionRecord) => void
+		requestUserInput?: (
+			request: ToolUserInputRequest
+		) => Promise<ToolUserInputResponse>
 	}
 ): Promise<{
 	nextInputItems: Array<{ type: 'function_call_output'; call_id: string; output: string }>
@@ -66,7 +71,10 @@ export const executePoeMcpToolCalls = async (
 						arguments: call.arguments || '{}'
 					},
 					activeTools,
-					{ abortSignal: options?.abortSignal }
+					{
+						abortSignal: options?.abortSignal,
+						requestUserInput: options?.requestUserInput,
+					}
 				)
 				const outputText = typeof result.content === 'string' ? result.content : String(result.content)
 				options?.onToolCallResult?.({

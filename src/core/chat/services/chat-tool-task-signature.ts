@@ -185,6 +185,9 @@ const resolveWorkflowTool = (query: string): string | undefined => {
 	if (query.includes('run shell') || query.includes('shell 命令') || query.includes('终端里执行')) {
 		return 'run_shell';
 	}
+	if (query.includes('run_script') || query.includes('run script') || query.includes('脚本编排')) {
+		return 'run_script';
+	}
 	if (query.includes('write plan') || query.includes('任务计划') || query.includes('待办事项')) {
 		return 'write_plan';
 	}

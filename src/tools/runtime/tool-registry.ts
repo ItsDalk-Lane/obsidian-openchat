@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { McpToolAnnotations } from 'src/services/mcp/types';
-import type { BuiltinTool, ToolContext } from './types';
+import { buildBuiltinTool, type BuiltinToolInput } from './build-tool';
+import type {
+	BuiltinTool,
+	BuiltinToolRuntimePolicy,
+	BuiltinToolSurfaceSpec,
+	ToolContext,
+} from './types';
 
 export interface BuiltinToolInfo {
 	name: string;
@@ -10,6 +16,8 @@ export interface BuiltinToolInfo {
 	inputSchema: Record<string, unknown>;
 	outputSchema?: Record<string, unknown>;
 	annotations?: McpToolAnnotations;
+	surface?: BuiltinToolSurfaceSpec;
+	runtimePolicy?: BuiltinToolRuntimePolicy;
 	serverId: string;
 }
 
@@ -44,7 +52,8 @@ export class BuiltinToolRegistry {
 	}
 
 	register<TArgs>(tool: BuiltinTool<TArgs>): void {
-		this.tools.set(tool.name, tool as BuiltinTool<unknown>);
+		const normalizedTool = buildBuiltinTool(tool as BuiltinToolInput<TArgs>);
+		this.tools.set(normalizedTool.name, normalizedTool as BuiltinTool<unknown>);
 	}
 
 	registerAll(tools: BuiltinTool[]): void {
@@ -75,6 +84,8 @@ export class BuiltinToolRegistry {
 				? this.zodSchemaToJsonSchema(tool.outputSchema)
 				: undefined,
 			annotations: tool.annotations,
+			surface: tool.surface,
+			runtimePolicy: tool.runtimePolicy,
 			serverId,
 		}));
 	}

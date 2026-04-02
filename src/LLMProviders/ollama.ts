@@ -353,6 +353,7 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 					try {
 						const result = await toolExecutor.execute(request, currentTools, {
 							abortSignal: controller.signal,
+							requestUserInput: settings.requestToolUserInput,
 						})
 						const resultContent = normalizeToolResultContent(result.content)
 						settings.onToolCallResult?.({

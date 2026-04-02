@@ -1,5 +1,9 @@
 import type { Message as ProviderMessage, ProviderSettings } from 'src/types/provider';
 import type { ToolDefinition, ToolExecutionRecord } from 'src/types/tool';
+import type {
+	ToolUserInputRequest,
+	ToolUserInputResponse,
+} from 'src/types/tool';
 import { t } from 'src/i18n/ai-runtime/helper';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
@@ -28,6 +32,9 @@ export interface ChatGenerationDeps {
 	notify: (message: string, timeout?: number) => void;
 	getAvailableAttachmentPath: (filename: string) => Promise<string>;
 	writeVaultBinary: (filePath: string, content: ArrayBuffer) => Promise<void>;
+	requestToolUserInput: (
+		request: ToolUserInputRequest
+	) => Promise<ToolUserInputResponse>;
 	getDefaultProviderTag: () => string | null;
 	findProviderByTagExact: (tag?: string) => ProviderSettings | null;
 	getModelDisplayName: (provider: ProviderSettings) => string;

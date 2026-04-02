@@ -36,6 +36,12 @@ export interface SubAgentDefinition {
 	systemPrompt: string;
 }
 
+export type SubAgentInfo = SubAgentDefinition;
+
+export interface SubAgentScannerOptions {
+	readonly rootPath?: string;
+}
+
 export interface SubAgentScanError {
 	path: string;
 	reason: string;

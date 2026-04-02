@@ -7,8 +7,14 @@ export type {
 	ToolDiscoveryVisibility,
 	ToolDefinition,
 	ToolErrorContext,
+	ToolConfirmationRequest,
+	ToolConfirmationResponse,
+	ToolUserInputOption,
+	ToolUserInputRequest,
+	ToolUserInputResponse,
 	ToolIdentity,
 	ToolArgumentComplexity,
+	ToolProgressEvent,
 	ToolRepairHint,
 	ToolRepairHintKind,
 	ToolRiskLevel,
@@ -20,4 +26,3 @@ export type {
 	ToolExecutionRecord,
 	ToolExecutor,
 } from 'src/core/agents/loop/types';
-

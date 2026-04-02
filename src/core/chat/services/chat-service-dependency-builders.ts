@@ -31,6 +31,8 @@ export const buildGenerationDeps = (internals: ChatServiceInternals) => ({
 		await internals.obsidianApi.getAvailableAttachmentPath(filename),
 	writeVaultBinary: async (filePath: string, content: ArrayBuffer) =>
 		await internals.obsidianApi.writeVaultBinary(filePath, content),
+	requestToolUserInput: async (request) =>
+		await internals.requestToolUserInput(request),
 	getDefaultProviderTag: () => getDefaultProviderTag(internals),
 	findProviderByTagExact: (tag?: string) => findProviderByTagExact(internals, tag),
 	getModelDisplayName: (provider: import('src/types/provider').ProviderSettings) =>

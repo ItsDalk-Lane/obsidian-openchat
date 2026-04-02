@@ -3,6 +3,8 @@ import type {
 	ToolDefinition,
 	ToolExecutionRecord,
 	ToolExecutor,
+	ToolUserInputRequest,
+	ToolUserInputResponse,
 } from 'src/core/agents/loop/types'
 
 import type { BaseOptions, Message, ResolveEmbedAsBinary } from './provider-shared'
@@ -31,6 +33,9 @@ export interface PoeRequestContext {
 	hasToolRuntime: boolean
 	toolExecutor?: ToolExecutor
 	onToolCallResult?: (record: ToolExecutionRecord) => void
+	requestToolUserInput?: (
+		request: ToolUserInputRequest
+	) => Promise<ToolUserInputResponse>
 	mcpCallTool?: NonNullable<BaseOptions['mcpCallTool']>
 	maxToolCallLoops: number
 	retryOptions: PoeRetryOptions

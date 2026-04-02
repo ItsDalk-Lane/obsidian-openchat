@@ -28,7 +28,29 @@ export function normalizeAndValidatePath(rawPath: string): string {
     if (invalidChars.test(text)) {
         throw new Error("文件路径包含非法字符: < > : \" | ? *");
     }
-    return normalizePath(text);
+    const normalized = normalizePath(text);
+    const segments = normalized.split("/").filter(Boolean);
+    if (segments.some((segment) => segment === "..")) {
+        throw new Error("文件路径不能包含 ..");
+    }
+    return normalized;
+}
+
+export function isLikelyDestructiveTextReplacement(
+    previousText: string,
+    nextText: string
+): boolean {
+    const previousLength = previousText.trim().length;
+    if (previousLength === 0) {
+        return false;
+    }
+
+    const nextLength = nextText.trim().length;
+    if (nextLength === 0) {
+        return true;
+    }
+
+    return nextLength < previousLength / 2;
 }
 
 /** 将用户提供的冲突策略映射为内部枚举 */

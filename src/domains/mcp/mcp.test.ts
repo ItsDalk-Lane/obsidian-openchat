@@ -5,6 +5,8 @@ import { McpDomainService } from './service';
 import { McpRuntimeCoordinator } from './ui';
 import type {
 	McpDomainLogger,
+	McpResourceContent,
+	McpResourceInfo,
 	McpRuntimeManager,
 	McpServerConfig,
 	McpServerState,
@@ -106,6 +108,8 @@ function createFakeManager(): McpRuntimeManager & {
 		getAllStates() { return []; },
 		getState() { return undefined; },
 		async getToolsForServer() { return []; },
+		async getResourcesForServer(): Promise<McpResourceInfo[]> { return []; },
+		async readResource(): Promise<McpResourceContent[]> { return []; },
 		onStateChange() { return () => {}; },
 		async dispose() {
 			this.disposed = true;
@@ -203,7 +207,8 @@ test('McpRuntimeCoordinator 会把 settings.aiRuntime.mcp 交给 service 初始�
 		}],
 	});
 
-	assert.equal(lastSettings?.servers[0]?.id, 'server-3');
+	const resolvedSettings = lastSettings as unknown as McpSettings;
+	assert.equal(resolvedSettings.servers[0]?.id, 'server-3');
 });
 
 test('McpRuntimeManagerImpl 会在设置移除服务器时断开旧连接', async () => {
@@ -276,9 +281,10 @@ test('McpRuntimeManagerImpl 会把状态变化广播给监听器并隔离异常�
 		seen.push(states);
 	});
 
-	emitStates?.([{ serverId: 'server-1', status: 'running', tools: [] }]);
+	const emitStateChange = emitStates as unknown as (states: McpServerState[]) => void;
+	emitStateChange([{ serverId: 'server-1', status: 'running', tools: [] }]);
 	unsubscribe();
-	emitStates?.([{ serverId: 'server-1', status: 'error', tools: [], lastError: 'boom' }]);
+	emitStateChange([{ serverId: 'server-1', status: 'error', tools: [], lastError: 'boom' }]);
 
 	assert.equal(seen.length, 1);
 	assert.equal(seen[0]?.[0]?.status, 'running');

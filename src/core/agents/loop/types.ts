@@ -93,12 +93,19 @@ export interface ToolRepairHint {
 }
 
 export interface ToolErrorContext {
-	readonly kind: 'argument-parse' | 'argument-validation'
+	readonly kind:
+		| 'argument-parse'
+		| 'argument-validation'
+		| 'tool-validation'
+		| 'tool-permission'
+		| 'tool-user-input'
+		| 'output-validation'
 	readonly summary: string
 	readonly issues: readonly ToolValidationIssue[]
 	readonly repairHints: readonly ToolRepairHint[]
 	readonly notes?: readonly string[]
 	readonly argumentsPreview?: string
+	readonly resultPreview?: string
 	readonly schemaSummary?: string
 }
 
@@ -147,8 +154,70 @@ export interface ToolCallResult {
 	readonly errorContext?: ToolErrorContext
 }
 
+export interface ToolConfirmationRequest {
+	readonly toolCallId: string
+	readonly toolName: string
+	readonly title: string
+	readonly body?: string
+	readonly confirmLabel?: string
+}
+
+export interface ToolConfirmationResponse {
+	readonly decision: 'allow' | 'deny'
+}
+
+export interface ToolUserInputOption {
+	readonly label: string
+	readonly value: string
+	readonly description?: string
+}
+
+export interface ToolUserInputRequest {
+	readonly toolCallId: string
+	readonly toolName: string
+	readonly question: string
+	readonly options?: readonly ToolUserInputOption[]
+	readonly allowFreeText?: boolean
+}
+
+export type ToolUserInputResponse =
+	| {
+		readonly outcome: 'selected'
+		readonly selectedValue: string
+	}
+	| {
+		readonly outcome: 'free-text'
+		readonly freeText: string
+	}
+	| {
+		readonly outcome: 'cancelled'
+	}
+
+export interface ToolProgressEvent {
+	readonly toolCallId: string
+	readonly toolName: string
+	readonly phase?:
+		| 'preflight'
+		| 'confirmation'
+		| 'user-input'
+		| 'executing'
+		| 'completed'
+		| 'failed'
+	readonly message?: string
+	readonly progress?: unknown
+	readonly activityDescription?: string | null
+	readonly toolUseSummary?: string | null
+}
+
 export interface ToolExecutionOptions {
 	readonly abortSignal?: AbortSignal
+	readonly requestConfirmation?: (
+		request: ToolConfirmationRequest
+	) => Promise<ToolConfirmationResponse>
+	readonly requestUserInput?: (
+		request: ToolUserInputRequest
+	) => Promise<ToolUserInputResponse>
+	readonly reportProgress?: (event: ToolProgressEvent) => void
 }
 
 /** 工具执行记录（用于回填到会话消息） */
