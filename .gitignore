@@ -14,6 +14,8 @@ node_modules
 # They should be uploaded to GitHub releases instead.
 main.js
 styles.css
+!openchat/*/main.js
+!openchat/*/styles.css
 # Exclude sourcemaps
 *.map
 
