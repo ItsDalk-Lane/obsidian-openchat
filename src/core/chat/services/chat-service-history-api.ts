@@ -20,20 +20,26 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 	},
 	saveSessionState(): SavedChatSessionState {
 		const selection = internals.attachmentSelectionService.getSelectionSnapshot();
+		const state = internals.stateStore.getMutableState();
 		return {
-			activeSession: internals.stateStore.getMutableState().activeSession
-				? JSON.parse(JSON.stringify(internals.stateStore.getMutableState().activeSession))
+			activeSession: state.activeSession
+				? JSON.parse(JSON.stringify(state.activeSession))
 				: null,
 			selectedFiles: selection.selectedFiles,
 			selectedFolders: selection.selectedFolders,
+			selectedText: state.selectedText,
+			selectedTextContext: state.selectedTextContext,
 		};
 	},
 	restoreSessionState(savedState: SavedChatSessionState): void {
+		const state = internals.stateStore.getMutableState();
 		if (savedState.activeSession) {
 			internals.stateStore.setActiveSession(savedState.activeSession);
 		} else {
 			internals.stateStore.setActiveSession(null);
 		}
+		state.selectedText = savedState.selectedText;
+		state.selectedTextContext = savedState.selectedTextContext;
 		internals.attachmentSelectionService.restoreSelection(
 			{ selectedFiles: savedState.selectedFiles, selectedFolders: savedState.selectedFolders },
 			false,
@@ -84,6 +90,8 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 		state.layoutMode = restored.layoutMode;
 		state.parallelResponses = undefined;
 		state.selectedPromptTemplate = undefined;
+		state.selectedText = undefined;
+		state.selectedTextContext = undefined;
 		internals.service.emitState();
 		internals.service.queueSessionPlanSync(session);
 	},

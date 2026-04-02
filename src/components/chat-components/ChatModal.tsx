@@ -2,7 +2,10 @@ import { App, Modal, TFile } from 'obsidian';
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { ObsidianAppContext } from 'src/contexts/obsidianAppContext';
-import type { ChatState } from 'src/domains/chat/types';
+import type {
+	ChatState,
+	SelectedTextContext,
+} from 'src/domains/chat/types';
 import { localInstance } from 'src/i18n/locals';
 import { ChatService } from 'src/core/chat/services/chat-service';
 import { ChatPlanPanel } from './ChatPlanPanel';
@@ -18,6 +21,7 @@ export interface ChatModalOptions {
 	height: number;
 	activeFile?: TFile | null;
 	initialSelection?: string; // 初始选中文本，用于快捷操作
+	initialSelectionContext?: SelectedTextContext;
 }
 
 /**
@@ -70,7 +74,10 @@ export class ChatModal extends Modal {
 
 		// 如果有初始选中文本，设置为选中文本标签（不直接显示在输入框中）
 		if (this.options.initialSelection) {
-			this.service.setSelectedText(this.options.initialSelection);
+			this.service.setSelectedText(
+				this.options.initialSelection,
+				this.options.initialSelectionContext,
+			);
 		}
 
 		// 创建 React 根节点并渲染

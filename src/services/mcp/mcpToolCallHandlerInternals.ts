@@ -3,15 +3,7 @@
  */
 
 import { getBuiltinToolHint } from './toolHints'
-import {
-	getSchemaMeta,
-	isRepoLikeKey,
-	isUrlLikeKey,
-	isGithubRepoSlug,
-	isGithubUrl,
-	toGithubUrl,
-	toGithubSlug,
-} from './mcpToolArgHelpers'
+import { getSchemaMeta } from './mcpToolArgHelpers'
 
 export interface ToolFailureTrackerEntry {
 	count: number
@@ -108,83 +100,9 @@ export function buildToolArgCandidates(
 	schema: Record<string, unknown> | undefined,
 	args: Record<string, unknown>,
 ): Record<string, unknown>[] {
-	const { required, properties } = getSchemaMeta(schema)
-	const hints = extractRepoHints(args)
-	const candidates: Record<string, unknown>[] = []
-	const seen = new Set<string>()
-
-	const addCandidate = (candidate: Record<string, unknown>): void => {
-		const key = safeJsonPreview(candidate, 2000)
-		if (seen.has(key)) return
-		seen.add(key)
-		candidates.push(candidate)
-	}
-
-	addCandidate(args)
-
-	if (required.length > 0) {
-		const requiredOnly: Record<string, unknown> = {}
-		for (const key of required) {
-			if (key in args) {
-				requiredOnly[key] = args[key]
-			}
-		}
-		if (Object.keys(requiredOnly).length > 0) {
-			addCandidate(requiredOnly)
-		}
-	}
-
-	const legacyAlternate = maybeBuildAlternateArgsForServerError(schema, args)
-	if (legacyAlternate) addCandidate(legacyAlternate)
-
-	const isRepoTool =
-		/(repo|repository|github|structure|search_doc)/i.test(toolName)
-		|| Object.keys(properties).some((name) => isRepoLikeKey(name) || isUrlLikeKey(name))
-	if (!isRepoTool) {
-		return candidates
-	}
-
-	const schemaKeys = Object.keys(properties)
-	const repoLikeKeys = schemaKeys.filter((name) => isRepoLikeKey(name) || isUrlLikeKey(name))
-	const targetKeys =
-		repoLikeKeys.length > 0
-			? repoLikeKeys
-			: required.length > 0
-				? required
-				: ['repo_url', 'repository_url', 'repo', 'repository']
-	const genericRepoKeys = ['repo_url', 'repository_url', 'repo', 'repository', 'repo_name']
-	const allCandidateKeys = Array.from(new Set([...targetKeys, ...genericRepoKeys]))
-
-	for (const key of allCandidateKeys) {
-		if (hints.url && (isUrlLikeKey(key) || /repo_url|repository_url/i.test(key))) {
-			addCandidate({ ...args, [key]: hints.url })
-			if (required.length > 0) {
-				const requiredOnly: Record<string, unknown> = {}
-				for (const reqKey of required) {
-					if (reqKey in args) requiredOnly[reqKey] = args[reqKey]
-				}
-				addCandidate({ ...requiredOnly, [key]: hints.url })
-			}
-		}
-		if (hints.slug && (isRepoLikeKey(key) || /repo|repository/i.test(key))) {
-			addCandidate({ ...args, [key]: hints.slug })
-			if (required.length > 0) {
-				const requiredOnly: Record<string, unknown> = {}
-				for (const reqKey of required) {
-					if (reqKey in args) requiredOnly[reqKey] = args[reqKey]
-				}
-				addCandidate({ ...requiredOnly, [key]: hints.slug })
-			}
-		}
-	}
-
-	if (hints.owner && hints.repoName) {
-		addCandidate({ ...args, owner: hints.owner, repo: hints.repoName })
-		addCandidate({ owner: hints.owner, repo: hints.repoName })
-		addCandidate({ ...args, owner: hints.owner, repository: hints.repoName })
-	}
-
-	return candidates.slice(0, 8)
+	void toolName
+	void schema
+	return [args]
 }
 
 export function isRecoverableServerToolError(err: unknown): boolean {

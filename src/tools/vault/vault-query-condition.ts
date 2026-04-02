@@ -1,5 +1,5 @@
 import { localInstance } from 'src/i18n/locals';
-import { resolveRegex } from './helpers';
+import { resolveRegex } from './regex';
 import {
 	type ConditionNode,
 	type QueryPlan,

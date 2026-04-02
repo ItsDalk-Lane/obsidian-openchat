@@ -20,13 +20,21 @@ import type {
 	SubAgentStateCallback,
 } from './types';
 import {
+	DELEGATE_SUB_AGENT_TOOL_NAME,
+	DISCOVER_SUB_AGENTS_TOOL_NAME,
 	DEFAULT_SUB_AGENT_MAX_TOKENS,
+	MAX_SUB_AGENT_NAME_LENGTH,
+	MAX_SUB_AGENT_QUERY_LENGTH,
+	MAX_SUB_AGENT_TASK_LENGTH,
 	SUB_AGENT_TOOL_PREFIX,
 	parseSubAgentNameFromToolName,
 } from './types';
 
 interface SubAgentToolInput {
+	agent?: string;
 	task: string;
+	query?: string;
+	invalidReason?: string;
 }
 
 export class SubAgentToolExecutor implements ToolExecutor {
@@ -38,7 +46,9 @@ export class SubAgentToolExecutor implements ToolExecutor {
 	) {}
 
 	canHandle(call: ToolCallRequest): boolean {
-		return call.name.startsWith(SUB_AGENT_TOOL_PREFIX);
+		return call.name === DISCOVER_SUB_AGENTS_TOOL_NAME
+			|| call.name === DELEGATE_SUB_AGENT_TOOL_NAME
+			|| call.name.startsWith(SUB_AGENT_TOOL_PREFIX);
 	}
 
 	async execute(
@@ -46,12 +56,24 @@ export class SubAgentToolExecutor implements ToolExecutor {
 		_tools: ToolDefinition[],
 		options?: ToolExecutionOptions,
 	): Promise<ToolCallResult> {
+		if (call.name === DISCOVER_SUB_AGENTS_TOOL_NAME) {
+			return await this.executeDiscover(call);
+		}
+
 		const input = this.parseInput(call.arguments);
+		if (input.invalidReason) {
+			return this.createResult(call, input.invalidReason);
+		}
 		if (!input.task) {
 			return this.createResult(call, 'Sub Agent 调用失败：缺少有效的 task 参数。');
 		}
 
-		const agentName = parseSubAgentNameFromToolName(call.name);
+		const agentName = call.name === DELEGATE_SUB_AGENT_TOOL_NAME
+			? (input.agent ?? '')
+			: parseSubAgentNameFromToolName(call.name);
+		if (!agentName) {
+			return this.createResult(call, 'Sub Agent 调用失败：缺少有效的 agent 参数。');
+		}
 		const definition = await this.scanner.findByName(agentName);
 		if (!definition) {
 			return this.createResult(call, `Sub Agent 调用失败：未找到名为 ${agentName} 的 Sub Agent。`);
@@ -144,11 +166,72 @@ export class SubAgentToolExecutor implements ToolExecutor {
 		}
 	}
 
+	private async executeDiscover(call: ToolCallRequest): Promise<ToolCallResult> {
+		const input = this.parseInput(call.arguments);
+		if (input.invalidReason) {
+			return this.createResult(call, input.invalidReason);
+		}
+		const query = input.query?.toLowerCase();
+		const scanResult = await this.scanner.scan();
+		const agents = scanResult.agents
+			.filter((agent) => {
+				if (!query) {
+					return true;
+				}
+				return agent.metadata.name.toLowerCase().includes(query)
+					|| agent.metadata.description.toLowerCase().includes(query);
+			})
+			.map((agent) => ({
+				name: agent.metadata.name,
+				description: agent.metadata.description,
+				tools: [...(agent.metadata.tools ?? [])],
+				mcps: [...(agent.metadata.mcps ?? [])],
+				model: agent.metadata.models ?? null,
+				maxTokens: agent.metadata.maxTokens ?? null,
+			}));
+		return {
+			toolCallId: call.id,
+			name: call.name,
+			content: JSON.stringify({
+				agents,
+				meta: {
+					query: input.query?.trim() || null,
+					returned: agents.length,
+					total: scanResult.agents.length,
+				},
+			}),
+			status: 'completed',
+		};
+	}
+
 	private parseInput(rawArguments: string): SubAgentToolInput {
 		try {
 			const parsed = JSON.parse(rawArguments) as Partial<SubAgentToolInput>;
+			const agent = typeof parsed.agent === 'string' ? parsed.agent.trim() : undefined;
+			const task = typeof parsed.task === 'string' ? parsed.task.trim() : '';
+			const query = typeof parsed.query === 'string' ? parsed.query.trim() : undefined;
+			if (agent && agent.length > MAX_SUB_AGENT_NAME_LENGTH) {
+				return {
+					task: '',
+					invalidReason: `Sub Agent 调用失败：agent 参数过长，最多 ${MAX_SUB_AGENT_NAME_LENGTH} 个字符。`,
+				};
+			}
+			if (task.length > MAX_SUB_AGENT_TASK_LENGTH) {
+				return {
+					task: '',
+					invalidReason: `Sub Agent 调用失败：task 参数过长，最多 ${MAX_SUB_AGENT_TASK_LENGTH} 个字符。`,
+				};
+			}
+			if (query && query.length > MAX_SUB_AGENT_QUERY_LENGTH) {
+				return {
+					task: '',
+					invalidReason: `Sub Agent 调用失败：query 参数过长，最多 ${MAX_SUB_AGENT_QUERY_LENGTH} 个字符。`,
+				};
+			}
 			return {
-				task: typeof parsed.task === 'string' ? parsed.task.trim() : '',
+				agent,
+				task,
+				query,
 			};
 		} catch {
 			return { task: '' };

@@ -11,6 +11,7 @@ import type {
 	ChatSession,
 	ChatSettings,
 	ChatState,
+	SelectedTextContext,
 	SelectedFile,
 	SelectedFolder,
 } from '../types/chat';
@@ -21,6 +22,10 @@ import type { MessageService } from './message-service';
 import type { ResolvedToolRuntime, SubAgentStateCallback } from 'src/tools/sub-agents/types';
 import type { SubAgentScannerService } from 'src/tools/sub-agents/SubAgentScannerService';
 import type { SubAgentWatcherService } from 'src/tools/sub-agents/SubAgentWatcherService';
+import type {
+	ProviderToolDiscoveryPayload,
+	ProviderToolExecutablePayload,
+} from './chat-tool-selection-types';
 
 export type ChatTriggerSource =
 	| 'chat_input'
@@ -51,10 +56,14 @@ export interface GenerateAssistantOptions {
 	manageGeneratingState?: boolean;
 	maxTokensOverride?: number;
 	toolRuntimeOverride?: ResolvedToolRuntime;
+	providerDiscoveryPayload?: ProviderToolDiscoveryPayload;
+	providerExecutablePayload?: ProviderToolExecutablePayload;
 }
 
 export interface SavedChatSessionState extends AttachmentSelectionSnapshot {
 	activeSession: ChatSession | null;
+	selectedText?: string;
+	selectedTextContext?: SelectedTextContext;
 }
 
 export interface ChatSettingsAccessor {

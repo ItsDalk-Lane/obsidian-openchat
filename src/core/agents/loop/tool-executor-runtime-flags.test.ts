@@ -89,6 +89,71 @@ test('BuiltinToolExecutor 会根据 runtimeArgCompletionV2 开关决定是否补
 	assert.equal(calledArgs.length, 1);
 });
 
+test('BuiltinToolExecutor 会把当前轮选区上下文注入具体工具参数', async () => {
+	const tool: ToolDefinition = {
+		name: 'read_file',
+		description: '读取文件',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				file_path: { type: 'string' },
+				start_line: { type: 'integer' },
+				line_count: { type: 'integer' },
+			},
+			required: ['file_path'],
+		},
+		source: 'builtin',
+		sourceId: 'builtin',
+		runtimePolicy: {
+			contextDefaults: [
+				{ field: 'file_path', source: 'selected-text-file-path' },
+				{ field: 'file_path', source: 'active-file-path' },
+				{ field: 'start_line', source: 'selected-text-start-line' },
+				{ field: 'line_count', source: 'selected-text-line-count' },
+			],
+		},
+	};
+	const calledArgs: Record<string, unknown>[] = [];
+	const context = {
+		app: {
+			workspace: {
+				getActiveFile: () => ({ path: 'notes/current.md' }),
+			},
+		},
+	} as never;
+	const executor = new BuiltinToolExecutor(
+		{} as never,
+		context,
+		async (_name, args) => {
+			calledArgs.push(args);
+			return args;
+		},
+		{
+			enableRuntimeArgumentCompletion: true,
+			runtimeArgumentContext: {
+				selectedTextFilePath: 'docs/spec.md',
+				selectedTextRange: {
+					from: 20,
+					to: 60,
+					startLine: 3,
+					endLine: 6,
+				},
+			},
+		},
+	);
+
+	const result = await executor.execute({
+		id: 'call-3',
+		name: 'read_file',
+		arguments: '{}',
+	}, [tool]);
+
+	assert.equal(result.status, 'completed');
+	assert.equal(calledArgs[0]?.file_path, 'docs/spec.md');
+	assert.equal(calledArgs[0]?.start_line, 3);
+	assert.equal(calledArgs[0]?.line_count, 4);
+});
+
 test('McpToolExecutor 会在 runtimeArgCompletionV2 开启时注入默认参数', async () => {
 	const tool = createMcpTool();
 	const receivedArgs: Record<string, unknown>[] = [];

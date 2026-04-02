@@ -6,6 +6,7 @@ export interface ToolSelectionRegressionCase {
 	readonly expectedMode: 'atomic-tools' | 'workflow';
 	readonly expectedToolNames: readonly string[];
 	readonly excludedToolNames?: readonly string[];
+	readonly activeFilePath?: string;
 	readonly toolSurface?: ToolSurfaceSettings;
 }
 
@@ -16,6 +17,7 @@ export const TOOL_SELECTION_REGRESSION_CASES: readonly ToolSelectionRegressionCa
 		expectedMode: 'atomic-tools',
 		expectedToolNames: ['read_file'],
 		excludedToolNames: ['run_shell'],
+		activeFilePath: 'docs/current-note.md',
 	},
 	{
 		name: '显式 shell 意图进入 workflow 面',
@@ -37,6 +39,13 @@ export const TOOL_SELECTION_REGRESSION_CASES: readonly ToolSelectionRegressionCa
 		expectedMode: 'atomic-tools',
 		expectedToolNames: ['fetch_webpage'],
 		excludedToolNames: ['fetch'],
+	},
+	{
+		name: '单层目录浏览优先使用 flat wrapper',
+		prompt: '请列出 projects 目录当前一层的内容',
+		expectedMode: 'atomic-tools',
+		expectedToolNames: ['list_directory_flat'],
+		excludedToolNames: ['list_directory_tree', 'list_vault_overview', 'list_directory'],
 	},
 	{
 		name: 'Vault 总览优先使用 overview wrapper',
@@ -84,7 +93,7 @@ export const TOOL_SELECTION_REGRESSION_CASES: readonly ToolSelectionRegressionCa
 		name: '显式 skill 意图进入 workflow 面',
 		prompt: '请使用 skill code-audit 检查当前项目的规范问题',
 		expectedMode: 'workflow',
-		expectedToolNames: ['Skill'],
+		expectedToolNames: ['invoke_skill'],
 		excludedToolNames: ['read_file'],
 	},
 	{
@@ -98,7 +107,7 @@ export const TOOL_SELECTION_REGRESSION_CASES: readonly ToolSelectionRegressionCa
 		name: '运行时说明不应误入 shell workflow',
 		prompt: '请总结 Obsidian 的运行时架构设计',
 		expectedMode: 'atomic-tools',
-		expectedToolNames: ['read_file'],
+		expectedToolNames: ['find_paths'],
 		excludedToolNames: ['run_shell'],
 	},
 	{
@@ -106,7 +115,7 @@ export const TOOL_SELECTION_REGRESSION_CASES: readonly ToolSelectionRegressionCa
 		prompt: '请读取 skills.md 文件的使用说明并总结要点',
 		expectedMode: 'atomic-tools',
 		expectedToolNames: ['read_file'],
-		excludedToolNames: ['Skill'],
+		excludedToolNames: ['invoke_skill'],
 	},
 	{
 		name: '文件名包含 run_shell 时不应误入 workflow',

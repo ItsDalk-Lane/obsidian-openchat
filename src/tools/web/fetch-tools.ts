@@ -32,16 +32,18 @@ export function createFetchTools(
 	return [{
 		name: 'fetch',
 			title: '获取网页内容',
-			description: `从互联网抓取网页内容，并可选地将 HTML 正文提取为 Markdown。支持单个 URL 和批量 URL 两种模式。
+			description: `兼容型网页抓取工具：统一承载单网页和批量网页抓取。默认请优先使用 \`fetch_webpage\` 或 \`fetch_webpages_batch\` 这两个更窄的 wrapper。
 
 ## 何时使用
 
-- 需要访问网页内容或获取最新在线信息时
+- 需要兼容旧 prompt、旧脚本或旧工具调用时
+- wrapper surface 被关闭，仍需要一个同时兼容单网页和批量网页的入口时
 - 需要把网页正文提取成更适合模型消费的 Markdown 时
-- 需要批量抓取多个已知 URL 时
 
 ## 何时不使用
 
+- **不要用于抓取单个已知 URL**：这种情况请直接使用 \`fetch_webpage\`
+- **不要用于抓取多个已知 URL**：这种情况请直接使用 \`fetch_webpages_batch\`
 - **不要用于读取 Vault 本地文件**：本地文件请使用 \`read_file\`
 - **不要用于搜索未知网页**：需要先找网页时请使用 \`bing_search\`
 - **不要把它当作浏览器自动化工具**：它只负责抓取和提取内容

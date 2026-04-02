@@ -93,20 +93,6 @@ export const getFolderOrThrow = (app: App, path: string): TFolder => {
 	return file;
 };
 
-export const resolveRegex = (regex?: string): RegExp | null => {
-	const value = String(regex ?? '').trim();
-	if (!value) return null;
-	try {
-		return new RegExp(value);
-	} catch (error) {
-		throw new Error(
-			`非法正则表达式: ${
-				error instanceof Error ? error.message : String(error)
-			}`
-		);
-	}
-};
-
 export const getFileStat = (file: TFile): {
 	size: number;
 	mtime: number;

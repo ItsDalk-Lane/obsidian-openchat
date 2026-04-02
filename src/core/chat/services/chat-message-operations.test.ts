@@ -27,6 +27,7 @@ const createState = (overrides: Partial<ChatState> = {}): ChatState => ({
 	selectedImages: [],
 	selectedFiles: [],
 	selectedFolders: [],
+	selectedTextContext: undefined,
 	shouldSaveHistory: false,
 	multiModelMode: 'single',
 	layoutMode: 'horizontal',
@@ -116,4 +117,27 @@ test('prepareChatRequest 在只有模板时也会生成用户消息', async () =
 	assert.equal(prepared?.userMessage.metadata?.taskUserInput, '')
 	assert.equal(prepared?.userMessage.metadata?.taskTemplate, '只执行模板内容')
 	assert.equal(session.messages.length, 1)
+})
+
+test('prepareChatRequest 会把选区范围和文件路径写入用户消息 metadata', async () => {
+	const session = createSession();
+	const state = createState({
+		activeSession: session,
+		selectedText: '代码片段',
+		selectedTextContext: {
+			filePath: 'docs/spec.md',
+			range: { from: 8, to: 16 },
+			triggerSource: 'selection',
+		},
+	});
+
+	const prepared = await prepareChatRequest(createDeps(state, session), '请解释这里')
+
+	assert.ok(prepared)
+	assert.deepEqual(prepared?.userMessage.metadata?.selectedTextContext, {
+		filePath: 'docs/spec.md',
+		range: { from: 8, to: 16 },
+		triggerSource: 'selection',
+	})
+	assert.equal(state.selectedTextContext, undefined)
 })

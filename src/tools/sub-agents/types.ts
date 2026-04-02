@@ -12,7 +12,12 @@ import type {
 } from 'src/types/tool';
 
 export const SUB_AGENT_TOOL_PREFIX = 'sub_agent_';
+export const DISCOVER_SUB_AGENTS_TOOL_NAME = 'discover_sub_agents';
+export const DELEGATE_SUB_AGENT_TOOL_NAME = 'delegate_sub_agent';
 export const DEFAULT_SUB_AGENT_MAX_TOKENS = 4096;
+export const MAX_SUB_AGENT_NAME_LENGTH = 120;
+export const MAX_SUB_AGENT_QUERY_LENGTH = 200;
+export const MAX_SUB_AGENT_TASK_LENGTH = 4000;
 
 export type { SubAgentExecutionState, SubAgentExecutionStatus };
 

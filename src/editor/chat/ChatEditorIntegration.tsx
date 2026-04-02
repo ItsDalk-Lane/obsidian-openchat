@@ -9,7 +9,7 @@ import type { ProviderSettings } from 'src/types/provider';
 import { ChatModal } from 'src/components/chat-components/ChatModal';
 import { QuickActionResultModal } from 'src/editor/selectionToolbar/QuickActionResultModal';
 import { localInstance } from 'src/i18n/locals';
-
+import { buildInitialSelectionContext } from './chat-editor-selection-context';
 export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 	protected async executeModifyRequest(instruction: string): Promise<void> {
 		if (!this.currentEditorView) {
@@ -104,6 +104,12 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 		const settings = this.host.getChatSettings();
 		const activeFile = this.host.getActiveMarkdownFile();
 		const initialSelection = triggerSource === 'symbol' ? (fullText || selection) : selection;
+		const initialSelectionContext = buildInitialSelectionContext(
+			this.currentSelectionInfo,
+			activeFile?.path,
+			triggerSource,
+			fullText,
+		);
 		this.service.setNextTriggerSource(triggerSource === 'symbol' ? 'at_trigger' : 'selection_toolbar');
 
 		const modal = new ChatModal(
@@ -113,7 +119,8 @@ export class ChatEditorIntegration extends ChatEditorIntegrationBase {
 				width: settings.chatModalWidth ?? 700,
 				height: settings.chatModalHeight ?? 500,
 				activeFile: activeFile,
-				initialSelection: initialSelection
+				initialSelection: initialSelection,
+				initialSelectionContext,
 			}
 		);
 		modal.open();

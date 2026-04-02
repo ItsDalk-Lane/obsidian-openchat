@@ -16,10 +16,14 @@ export const composeChatSystemPrompt =(params: {
 	configuredSystemPrompt?: string;
 	livePlanGuidance?: string | null;
 	skillsPromptBlock?: string | null;
+	toolSurfaceGuidance?: string | null;
+	selectionContextGuidance?: string | null;
 }): string | undefined => {
 	const layers = [
 		params.configuredSystemPrompt,
 		params.livePlanGuidance ?? undefined,
+		params.selectionContextGuidance ?? undefined,
+		params.toolSurfaceGuidance ?? undefined,
 		params.skillsPromptBlock ?? undefined,
 	]
 		.map((value) => value?.trim())
@@ -37,6 +41,7 @@ export interface PromptBuilderChatContext {
 	sourcePath?: string;
 	maxHistoryRounds?: number;
 	prebuiltContextMessage?: ProviderMessage | null;
+	selectedTextSource?: string | null;
 	/** 任务模板内容，用于智能判断文件角色 */
 	taskTemplate?: string;
 	/** 是否启用智能文件角色判断 */
@@ -48,6 +53,7 @@ export interface PromptBuilderContextMessageParams {
 	selectedFolders: SelectedFolder[];
 	contextNotes: string[];
 	selectedText: string | null;
+	selectedTextSource?: string | null;
 	fileContentOptions?: FileContentOptions;
 	sourcePath: string;
 	embeds?: EmbedCache[];
@@ -132,6 +138,7 @@ export class PromptBuilder {
 				selectedFolders,
 				contextNotes,
 				selectedText,
+				selectedTextSource: ctx?.selectedTextSource ?? null,
 				fileContentOptions,
 				sourcePath,
 				embeds: contextEmbeds
@@ -216,7 +223,10 @@ export class PromptBuilder {
 
 		// 2) 选中文本 / 符号触发全文
 		if (params.selectedText && params.selectedText.trim().length > 0) {
-			documents.push({ source: 'selected_text', content: params.selectedText });
+			documents.push({
+				source: params.selectedTextSource?.trim() || 'selected_text',
+				content: params.selectedText,
+			});
 		}
 
 		// 3) 文件/文件夹内容

@@ -30,6 +30,7 @@ const WRAPPER_TOOL_FLAGS: Record<string, WrapperSurfaceFlagName> = {
 	get_current_time: 'timeWrappersV1',
 	convert_time: 'timeWrappersV1',
 	calculate_time_range: 'timeWrappersV1',
+	list_directory_flat: 'vaultWrappersV1',
 	list_directory_tree: 'vaultWrappersV1',
 	list_vault_overview: 'vaultWrappersV1',
 	fetch_webpage: 'fetchWrappersV1',
@@ -38,6 +39,7 @@ const WRAPPER_TOOL_FLAGS: Record<string, WrapperSurfaceFlagName> = {
 
 const LEGACY_TOOL_WRAPPER_FLAGS: Record<string, WrapperSurfaceFlagName> = {
 	get_time: 'timeWrappersV1',
+	list_directory: 'vaultWrappersV1',
 	fetch: 'fetchWrappersV1',
 };
 
@@ -83,31 +85,7 @@ export const getBuiltinToolSurfaceOverride = (
 	toolName: string,
 	flags: ResolvedToolSurfaceSettings,
 ): BuiltinToolSurfaceOverride | undefined => {
-	if (toolName !== 'list_directory' || !flags.vaultWrappersV1) {
-		return undefined;
-	}
-
-	return {
-		oneLinePurpose: '浏览一个已知目录的一层内容。',
-		whenToUse: ['已经知道准确目录路径，只想看当前目录的直接子项'],
-		whenNotToUse: ['需要树形递归时用 list_directory_tree', '需要全库总览时用 list_vault_overview'],
-		requiredArgsSummary: ['directory_path'],
-		capabilityTags: ['directory', 'folder', 'flat list', '目录浏览', '当前目录'],
-		argumentComplexity: 'medium',
-		runtimePolicy: {
-			defaultArgs: {
-				response_format: 'json',
-				view: 'flat',
-			},
-			hiddenSchemaFields: [
-				'response_format',
-				'view',
-				'exclude_patterns',
-				'max_depth',
-				'max_nodes',
-				'file_extensions',
-				'vault_limit',
-			],
-		},
-	};
+	void toolName;
+	void flags;
+	return undefined;
 };

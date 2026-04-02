@@ -5,7 +5,10 @@ import { cloneAiRuntimeSettings } from 'src/domains/settings/config-ai-runtime';
 import type { ToolSurfaceSettings } from 'src/domains/settings/types-ai-runtime';
 import { BuiltinToolRegistry, type BuiltinToolInfo } from 'src/tools/runtime/tool-registry';
 import type { BuiltinTool } from 'src/tools/runtime/types';
-import { SKILL_TOOL_NAME } from 'src/tools/skill/skill-tools';
+import {
+	DISCOVER_SKILLS_TOOL_NAME,
+	INVOKE_SKILL_TOOL_NAME,
+} from 'src/tools/skill/skill-tools';
 import { createTimeTools } from 'src/tools/time/time-tools';
 import { createTimeWrapperTools } from 'src/tools/time/time-wrapper-tools';
 import { createFetchTools } from 'src/tools/web/fetch-tools';
@@ -15,6 +18,7 @@ import {
 	structuredOutputSchema,
 } from 'src/tools/vault/filesystemToolSchemas';
 import {
+	listDirectoryFlatSchema,
 	listDirectoryTreeSchema,
 	listVaultOverviewSchema,
 } from 'src/tools/vault/filesystemWrapperSupport';
@@ -125,11 +129,22 @@ function createSurfaceDefinitions(toolSurface?: ToolSurfaceSettings): ToolDefini
 		createBuiltinStub('write_plan', z.object({
 			items: z.array(z.string()).optional(),
 		})),
-		createBuiltinStub(SKILL_TOOL_NAME, z.object({
+		createBuiltinStub(INVOKE_SKILL_TOOL_NAME, z.object({
 			skillName: z.string().optional(),
 			task: z.string().optional(),
 		})),
+		createBuiltinStub(DISCOVER_SKILLS_TOOL_NAME, z.object({
+			query: z.string().optional(),
+		})),
+		createBuiltinStub('discover_sub_agents', z.object({
+			query: z.string().optional(),
+		})),
+		createBuiltinStub('delegate_sub_agent', z.object({
+			agent: z.string().optional(),
+			task: z.string().optional(),
+		})),
 		createBuiltinStub('list_directory', listDirectorySchema),
+		createBuiltinStub('list_directory_flat', listDirectoryFlatSchema),
 		createBuiltinStub('list_directory_tree', listDirectoryTreeSchema),
 		createBuiltinStub('list_vault_overview', listVaultOverviewSchema),
 	]);
@@ -174,6 +189,7 @@ function createCoordinator(caseItem: ToolSelectionRegressionCase): ChatToolSelec
 	return new ChatToolSelectionCoordinator({
 		toolRuntimeResolver: fakeResolver,
 		settingsAccessor: createSettingsAccessor(caseItem.toolSurface),
+		getActiveFilePath: () => caseItem.activeFilePath ?? null,
 	});
 }
 

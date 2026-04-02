@@ -220,7 +220,7 @@ const formatMcpToolBlocksForHistory = (content: string): string => {
 		.replace(
 			/\{\{FF_MCP_TOOL_START\}\}:([^:]+):([\s\S]*?)\{\{FF_MCP_TOOL_END\}\}:/g,
 			(_match: string, toolName: string, toolContent: string) => {
-				if (toolName.startsWith('sub_agent_')) {
+				if (toolName.startsWith('sub_agent_') || toolName === 'delegate_sub_agent') {
 					return ''
 				}
 				const quotedLines = (toolContent ?? '')

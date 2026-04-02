@@ -1,4 +1,5 @@
 import {
+	DELEGATE_SUB_AGENT_TOOL_NAME,
 	SUB_AGENT_TOOL_PREFIX,
 	type SubAgentDefinition,
 } from 'src/tools/sub-agents/types';
@@ -305,6 +306,7 @@ export const buildDiscoveryCatalog = (params: {
 		const isWorkflowEntry = entry.visibility === 'workflow-only'
 			|| entry.source === 'workflow'
 			|| entry.source === 'escape-hatch'
+			|| entry.toolName === DELEGATE_SUB_AGENT_TOOL_NAME
 			|| entry.toolName.startsWith(SUB_AGENT_TOOL_PREFIX);
 		if (isWorkflowEntry) {
 			workflowEntries.push(entry);
@@ -319,12 +321,17 @@ export const buildDiscoveryCatalog = (params: {
 	for (const subAgent of params.subAgents ?? []) {
 		workflowEntries.push({
 			stableId: normalizeStableId(`workflow.delegate.${subAgent.metadata.name}`),
-			toolName: `${SUB_AGENT_TOOL_PREFIX}${subAgent.metadata.name}`,
+			toolName: DELEGATE_SUB_AGENT_TOOL_NAME,
 			familyId: 'workflow.delegate',
 			displayName: subAgent.metadata.name,
 			oneLinePurpose: subAgent.metadata.description.trim(),
 			visibility: 'workflow-only',
-			capabilityTags: ['sub-agent', 'delegate', '委托'],
+			capabilityTags: [
+				'sub-agent',
+				'delegate',
+				'委托',
+				subAgent.metadata.name.toLowerCase(),
+			],
 			source: 'workflow',
 			sourceId: 'sub-agents',
 			riskLevel: 'mutating',

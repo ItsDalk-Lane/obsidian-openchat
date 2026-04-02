@@ -51,6 +51,8 @@ export interface ChatGenerationDeps {
 			systemPrompt?: string;
 			modelTag?: string;
 			requestTools?: ToolDefinition[];
+			providerDiscoveryPayload?: PreparedToolTurn['providerDiscoveryPayload'];
+			providerExecutablePayload?: PreparedToolTurn['providerExecutablePayload'];
 		}
 	) => Promise<ProviderMessage[]>;
 	normalizeToolExecutionRecord: (

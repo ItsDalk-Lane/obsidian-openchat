@@ -119,17 +119,17 @@ export function createTimeTools(
 	return [{
 		name: 'get_time',
 			title: '获取或转换时间',
-			description: `获取当前时间、进行时区换算，或把自然语言时间表达解析为时间区间。
+			description: `兼容型时间工具：统一承载当前时间、时区换算和自然语言时间范围解析。默认请优先使用 \`get_current_time\`、\`convert_time\` 或 \`calculate_time_range\` 这三个更窄的 wrapper。
 
 ## 何时使用
 
-- 用户询问某个时区的当前时间时
-- 需要把一个时间从源时区换算到目标时区时
-- 需要把“昨天”“上周”“last week”“最近7天”之类的自然语言时间表达转换为起止时间戳时
+- 需要兼容旧 prompt、旧脚本或旧工具调用时
+- wrapper surface 被关闭，仍希望用单个多模式工具承载 current/convert/range 时
 - 需要补充星期、DST、ISO 周等时间信息时
 
 ## 何时不使用
 
+- **默认不要直接用于单一时间任务**：当前时间请用 \`get_current_time\`，时区换算请用 \`convert_time\`，自然语言时间范围解析请用 \`calculate_time_range\`
 - **不要用于复杂日程规划**：它只提供取时、时区换算和常见自然语言时间范围解析
 - **不要用于文件或网络操作**：请使用对应工具
 

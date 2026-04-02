@@ -23,6 +23,8 @@ export const generateAssistantResponseForModelImpl = async (
 		throw new Error(`未找到模型配置: ${modelTag}`);
 	}
 	let requestTools = options?.toolRuntimeOverride?.requestTools ?? [];
+	let providerDiscoveryPayload = options?.providerDiscoveryPayload;
+	let providerExecutablePayload = options?.providerExecutablePayload;
 	const {
 		providerOptions,
 		enableReasoning,
@@ -71,6 +73,8 @@ export const generateAssistantResponseForModelImpl = async (
 				taskDescription: options?.taskDescription,
 			});
 			requestTools = preparedToolTurn.executableToolSet.tools;
+			providerDiscoveryPayload = preparedToolTurn.providerDiscoveryPayload;
+			providerExecutablePayload = preparedToolTurn.providerExecutablePayload;
 			providerOptions.tools = preparedToolTurn.executableToolSet.tools;
 			if (preparedToolTurn.executableToolSet.getTools) {
 				providerOptions.getTools = preparedToolTurn.executableToolSet.getTools;
@@ -111,6 +115,8 @@ export const generateAssistantResponseForModelImpl = async (
 		systemPrompt: options?.systemPromptOverride,
 		modelTag,
 		requestTools,
+		providerDiscoveryPayload,
+		providerExecutablePayload,
 	});
 	DebugLogger.logLlmMessages('ChatService.generateAssistantResponseForModel', messages, {
 		level: 'debug',

@@ -182,7 +182,7 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 		valueCoercions: {
 			dry_run: 'boolean',
 		},
-		usageHint: t('Use this for partial edits to known files; read with read_file first.'),
+		usageHint: t('Use this for minimal partial edits to known files; keep edits narrowly scoped and read the target segment with read_file first when needed.'),
 	},
 	create_directory: {
 		aliases: {
@@ -321,6 +321,22 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 		usageHint: '仅在已经知道 directory_path 时浏览目录。',
 		fallbackTool: 'find_paths',
 	},
+	list_directory_flat: {
+		aliases: {
+			path: 'directory_path',
+			directoryPath: 'directory_path',
+			includeSizes: 'include_sizes',
+			sortBy: 'sort_by',
+			responseFormat: 'response_format',
+		},
+		valueCoercions: {
+			include_sizes: 'boolean',
+			limit: 'integer',
+			offset: 'integer',
+		},
+		usageHint: '只浏览一个已知目录的一层内容。',
+		fallbackTool: 'find_paths',
+	},
 	query_index: {
 		aliases: {
 			dataSource: 'data_source',
@@ -354,7 +370,7 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 			max_nodes: 'integer',
 		},
 		usageHint: '只在需要递归树形目录时使用。',
-		fallbackTool: 'list_directory',
+		fallbackTool: 'list_directory_flat',
 	},
 	list_vault_overview: {
 		aliases: {
@@ -365,7 +381,7 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 			vault_limit: 'integer',
 		},
 		usageHint: '只在需要整个 Vault 的轻量文件路径总览时使用。',
-		fallbackTool: 'list_directory',
+		fallbackTool: 'list_directory_flat',
 	},
 };
 

@@ -1,12 +1,12 @@
 import type { ToolDefinition, ToolExecutionRecord } from 'src/types/tool';
-import { SKILL_TOOL_NAME } from 'src/tools/skill/skill-tools';
 import {
-	buildSkillsSystemPromptBlock,
-} from 'src/domains/skills/service';
+	DISCOVER_SKILLS_TOOL_NAME,
+	INVOKE_SKILL_TOOL_NAME,
+	LEGACY_INVOKE_SKILL_TOOL_NAME,
+} from 'src/tools/skill/skill-tools';
 import {
 	resolveToolExecutionSettings,
 } from 'src/domains/settings/config-ai-runtime';
-import { DebugLogger } from 'src/utils/DebugLogger';
 import { detectImageGenerationIntent } from './chat-image-intent';
 import {
 	findProviderByTagExact as findProviderByTagExactHelper,
@@ -159,7 +159,7 @@ export const normalizeToolExecutionRecord = (
 	record: ToolExecutionRecord,
 ): ToolExecutionRecord => {
 	const normalizedArguments = { ...(record.arguments ?? {}) };
-	if (record.name === SKILL_TOOL_NAME) {
+	if (record.name === INVOKE_SKILL_TOOL_NAME || record.name === LEGACY_INVOKE_SKILL_TOOL_NAME) {
 		const skillName = typeof normalizedArguments.skill === 'string'
 			? normalizedArguments.skill.trim()
 			: '';
@@ -180,19 +180,17 @@ export const resolveSkillsSystemPromptBlock = async (
 	internals: ChatServiceInternals,
 	requestTools: ToolDefinition[],
 ): Promise<string | undefined> => {
-	const includesSkillTool = requestTools.some((tool) => tool.name === SKILL_TOOL_NAME);
+	const includesSkillTool = requestTools.some((tool) =>
+		tool.name === INVOKE_SKILL_TOOL_NAME || tool.name === DISCOVER_SKILLS_TOOL_NAME,
+	);
 	if (!includesSkillTool) {
 		return undefined;
 	}
-	const cachedSkills = internals.service.getInstalledSkillsSnapshot();
-	if (cachedSkills) {
-		return buildSkillsSystemPromptBlock(cachedSkills.skills);
-	}
-	try {
-		const loadedSkills = await internals.service.loadInstalledSkills();
-		return buildSkillsSystemPromptBlock(loadedSkills.skills);
-	} catch (error) {
-		DebugLogger.warn('[ChatService] 构建 skills system prompt 失败，回退为空列表', error);
-		return buildSkillsSystemPromptBlock([]);
-	}
+	void internals;
+	return [
+		'<skills>',
+		'Use discover_skills to inspect available skills when the exact skill name is unknown.',
+		'Use invoke_skill only after you know the target skill name or when the user gives a slash command such as /commit or /pdf.',
+		'</skills>',
+	].join('\n');
 };

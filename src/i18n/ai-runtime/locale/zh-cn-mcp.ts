@@ -232,6 +232,8 @@ export default {
 		'整文件写入或覆盖时使用；局部编辑请用 edit_file。',
 	'Use this for partial edits to known files; read with read_file first.':
 		'局部编辑已知文件时使用；读取内容前先用 read_file。',
+	'Use this for minimal partial edits to known files; keep edits narrowly scoped and read the target segment with read_file first when needed.':
+		'已知文件的最小局部编辑请用它；让 edits 尽量收窄到必要片段，定位不稳时先用 read_file 读取目标范围。',
 	'Failed to move action. Please try again.': '移动动作失败，请重试。',
 	'Failed to keep child actions. Please try again.': '保留子动作失败，请重试。',
 	'Failed to delete child actions. Please try again.': '删除子动作失败，请重试。',

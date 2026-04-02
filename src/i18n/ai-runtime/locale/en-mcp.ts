@@ -246,6 +246,8 @@ export default {
 		'Use this for whole-file writes or overwrites; use edit_file for partial edits.',
 	'Use this for partial edits to known files; read with read_file first.':
 		'Use this for partial edits to known files; read with read_file first.',
+	'Use this for minimal partial edits to known files; keep edits narrowly scoped and read the target segment with read_file first when needed.':
+		'Use this for minimal partial edits to known files; keep edits narrowly scoped and read the target segment with read_file first when needed.',
 	'Failed to move action. Please try again.':
 		'Failed to move action. Please try again.',
 	'Failed to keep child actions. Please try again.':

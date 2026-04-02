@@ -101,6 +101,7 @@ docs/
 | 文档                          | 用途                                   |
 | ----------------------------- | -------------------------------------- |
 | `docs/architecture.md`        | 分层架构、依赖方向、文件尺寸规则       |
+| `docs/decisions/2026-04-01-tool-surface-two-stage.md` | 工具调用两阶段 surface 与兼容策略 |
 | `docs/golden-principles.md`   | 编码品味、命名、错误处理、性能         |
 | `docs/quality-grades.md`      | 质量评分记录                           |
 | `docs/garbage-collection.md`  | 垃圾回收与提交前检查清单               |
@@ -116,5 +117,5 @@ docs/
 2. 理解上下文 → 制定计划
 3. 执行变更 → 写代码 + 写/更新测试
 4. 运行 `npm run lint` + `npm run test` 验证
-5. 如果新增了域或改了架构 → 更新 `docs/architecture.md`
+5. 如果新增了域、改了架构或改了工具调用 contract → 更新 `docs/architecture.md` 与对应 `docs/decisions/*`
 6. 如果改了行为 → 更新对应的 `spec.md`

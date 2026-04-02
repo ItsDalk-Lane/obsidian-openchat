@@ -6,9 +6,13 @@ import type { BuiltinToolsRuntime } from 'src/tools/runtime/BuiltinToolsRuntime'
 import { BuiltinToolExecutor } from 'src/tools/runtime/BuiltinToolExecutor';
 import type { ResolvedToolRuntime } from 'src/tools/sub-agents/types';
 import { SubAgentToolExecutor } from 'src/tools/sub-agents/SubAgentToolExecutor';
-import { subAgentDefinitionsToTools } from 'src/tools/sub-agents/subAgentTools';
+import {
+	createDelegateSubAgentToolDefinition,
+	createDiscoverSubAgentsToolDefinition,
+} from 'src/tools/sub-agents/subAgentTools';
 import { CompositeToolExecutor } from 'src/core/agents/loop/CompositeToolExecutor';
 import type { ToolDefinition, ToolExecutor } from 'src/core/agents/loop/types';
+import type { ToolArgumentCompletionContext } from 'src/core/agents/loop/tool-call-argument-completion';
 import { McpToolExecutor } from 'src/services/mcp/McpToolExecutor';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { ChatSession } from '../types/chat';
@@ -51,11 +55,50 @@ export class ChatToolRuntimeResolver {
 		return resolveToolSurfaceSettings(this.options.settingsAccessor.getAiRuntimeSettings());
 	}
 
+	private resolveRuntimeArgumentContext(
+		session?: ChatSession,
+	): Omit<ToolArgumentCompletionContext, 'activeFilePath'> | undefined {
+		const latestUserMessage = [...(session?.messages ?? [])]
+			.reverse()
+			.find((message) => message.role === 'user' && !message.metadata?.hiddenFromModel);
+		const selectedTextContext = latestUserMessage?.metadata?.selectedTextContext;
+		if (!selectedTextContext || typeof selectedTextContext !== 'object') {
+			return undefined;
+		}
+		const filePath = typeof selectedTextContext.filePath === 'string'
+			&& selectedTextContext.filePath.trim().length > 0
+			? selectedTextContext.filePath.trim()
+			: undefined;
+		const range = selectedTextContext.range;
+		const selectedTextRange = range
+			&& typeof range === 'object'
+			&& typeof range.from === 'number'
+			&& typeof range.to === 'number'
+				? {
+					from: range.from,
+					to: range.to,
+					...(typeof range.startLine === 'number' ? { startLine: range.startLine } : {}),
+					...(typeof range.endLine === 'number' ? { endLine: range.endLine } : {}),
+				}
+				: undefined;
+		if (!filePath && !selectedTextRange) {
+			return undefined;
+		}
+		return {
+			selectedTextFilePath: filePath,
+			selectedTextRange,
+		};
+	}
+
 	private createScopedGetTools(options?: ResolveToolRuntimeOptions) {
 		return async () => {
 			const nextRuntime = await this.resolveToolRuntime(options);
 			return nextRuntime.requestTools;
 		};
+	}
+
+	private isDefaultVisibleTool(tool: ToolDefinition): boolean {
+		return tool.discovery?.discoveryVisibility === 'default';
 	}
 
 	async closeBuiltinToolsRuntime(): Promise<void> {
@@ -142,6 +185,7 @@ export class ChatToolRuntimeResolver {
 		const toolSurfaceFlags = this.getToolSurfaceFlags();
 		const executorOptions = {
 			enableRuntimeArgumentCompletion: toolSurfaceFlags.runtimeArgCompletionV2,
+			runtimeArgumentContext: this.resolveRuntimeArgumentContext(session),
 		};
 
 		let builtinExecutor: BuiltinToolExecutor | null = null;
@@ -150,29 +194,29 @@ export class ChatToolRuntimeResolver {
 		const builtinRuntime = await this.ensureBuiltinToolsRuntime(session);
 		if (builtinRuntime) {
 			const allBuiltinTools = await builtinRuntime.listTools();
-			const filteredBuiltinTools = allBuiltinTools
+			const surfacedBuiltinTools = allBuiltinTools
 				.filter((tool) => !disabledBuiltinToolNames.includes(tool.name))
-				.filter((tool) => {
-					const exposedByDefault = isBuiltinToolEnabledForDefaultSurface(tool.name, toolSurfaceFlags);
-					if (hasExplicitFilters) {
-						const matchedByName = options?.explicitToolNames?.includes(tool.name) ?? false;
-						const matchedByServer =
-							normalizedExplicitServerIds.includes(BUILTIN_SERVER_ID) && exposedByDefault;
-						return matchedByName || matchedByServer;
-					}
-					return exposedByDefault;
-				});
-
-			for (const tool of filteredBuiltinTools) {
-				const baseTool = createBuiltinToolDefinition({
+				.filter((tool) => isBuiltinToolEnabledForDefaultSurface(tool.name, toolSurfaceFlags))
+				.map((tool) => createBuiltinToolDefinition({
 					...tool,
 					description: BUILTIN_FILESYSTEM_TOOL_NAMES.has(tool.name)
 						? `${BUILTIN_FILESYSTEM_ROUTING_HINT}\n\n${tool.description}`
 						: tool.description,
 				}, {
 					surfaceFlags: toolSurfaceFlags,
+				}));
+			const filteredBuiltinTools = surfacedBuiltinTools
+				.filter((tool) => {
+					if (hasExplicitFilters) {
+						const matchedByName = options?.explicitToolNames?.includes(tool.name) ?? false;
+						const matchedByServer = normalizedExplicitServerIds.includes(BUILTIN_SERVER_ID);
+						return matchedByName || matchedByServer;
+					}
+					return this.isDefaultVisibleTool(tool);
 				});
-				requestTools.push(compileExecutableToolDefinition(baseTool));
+
+			for (const tool of filteredBuiltinTools) {
+				requestTools.push(compileExecutableToolDefinition(tool));
 				existingNames.add(tool.name);
 			}
 
@@ -204,7 +248,7 @@ export class ChatToolRuntimeResolver {
 					const matchedByServer = selectedServerIds?.includes(tool.serverId) ?? false;
 					return matchedByName || matchedByServer;
 				})
-				: allMcpTools;
+				: [];
 
 			for (const tool of filteredMcpTools) {
 				if (existingNames.has(tool.name)) {
@@ -225,7 +269,7 @@ export class ChatToolRuntimeResolver {
 				mcpExecutor = new McpToolExecutor(mcpCallTool, executorOptions);
 			}
 
-			if (!hasExplicitFilters && filteredMcpTools.length === 0) {
+			if (hasExplicitFilters && filteredMcpTools.length === 0) {
 				const hasEnabledMcpServer = mcpManager.getSettings().servers.some((server) => server.enabled);
 				if (hasEnabledMcpServer) {
 					this.options.showMcpNoticeOnce('MCP 已启用，但当前没有可用工具，请检查服务器状态与配置。');
@@ -235,7 +279,16 @@ export class ChatToolRuntimeResolver {
 
 		if (options?.includeSubAgents !== false) {
 			const scanResult = await this.options.subAgentScannerService.scan();
-			for (const tool of subAgentDefinitionsToTools(scanResult.agents)) {
+			const subAgentTools = [
+				createSubAgentDiscoveryTool(createDiscoverSubAgentsToolDefinition()),
+				createSubAgentDiscoveryTool(createDelegateSubAgentToolDefinition()),
+			].filter((tool) => {
+				if (hasExplicitFilters) {
+					return options?.explicitToolNames?.includes(tool.name) ?? false;
+				}
+				return this.isDefaultVisibleTool(tool);
+			});
+			for (const tool of subAgentTools) {
 				if (existingNames.has(tool.name)) {
 					DebugLogger.warn('[ChatService] Sub Agent 工具名称冲突，已跳过', {
 						toolName: tool.name,
@@ -243,14 +296,16 @@ export class ChatToolRuntimeResolver {
 					continue;
 				}
 				existingNames.add(tool.name);
-				requestTools.push(compileExecutableToolDefinition(createSubAgentDiscoveryTool(tool)));
+				requestTools.push(compileExecutableToolDefinition(tool));
 			}
-			executors.push(new SubAgentToolExecutor(
-				this.options.subAgentScannerService,
-				this.options.chatServiceAdapter,
-				options?.parentSessionId ?? session?.id ?? '',
-				options?.subAgentStateCallback ?? (() => {}),
-			));
+			if (scanResult.agents.length > 0) {
+				executors.push(new SubAgentToolExecutor(
+					this.options.subAgentScannerService,
+					this.options.chatServiceAdapter,
+					options?.parentSessionId ?? session?.id ?? '',
+					options?.subAgentStateCallback ?? (() => {}),
+				));
+			}
 		}
 
 		if (builtinExecutor) {
@@ -289,11 +344,28 @@ export class ChatToolRuntimeResolver {
 				}))
 			: [];
 		const mcpManager = this.options.runtimeDeps.getMcpClientManager();
+		const mcpTools = mcpManager
+			? (() => {
+				const serverNameById = new Map(
+					mcpManager.getEnabledServerSummaries().map((server) => [server.id, server.name]),
+				);
+				return mcpManager.getToolsForModelContext()
+					.then((tools) => tools.map((tool) =>
+						createMcpToolDefinition(tool, serverNameById.get(tool.serverId)),
+					));
+			})()
+			: Promise.resolve([]);
 		const subAgents = options?.includeSubAgents === false
 			? []
 			: (await this.options.subAgentScannerService.scan()).agents;
+		const subAgentTools = subAgents.length > 0
+			? [
+				createSubAgentDiscoveryTool(createDiscoverSubAgentsToolDefinition()),
+				createSubAgentDiscoveryTool(createDelegateSubAgentToolDefinition()),
+			]
+			: [];
 		return buildToolDiscoveryCatalog({
-			tools: builtinTools,
+			tools: [...builtinTools, ...(await mcpTools), ...subAgentTools],
 			serverEntries: mcpManager?.getEnabledServerSummaries() ?? [],
 			subAgents,
 		});

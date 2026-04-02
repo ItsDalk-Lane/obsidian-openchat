@@ -21,10 +21,16 @@ import type { FileContentOptions } from './file-content-service';
 import type { MessageContextOptimizer } from './message-context-optimizer';
 import type { MessageService } from './message-service';
 import type { ChatProviderMessageBuildOptions } from './chat-provider-message-facade';
+import {
+	buildSelectedTextSourceLabel,
+	buildSelectionContextPromptBlock,
+} from './chat-selection-context-prompt';
+import { buildToolSurfacePromptBlock } from './chat-tool-surface-prompt';
 import type {
 	ChatMessage,
 	ChatSession,
 	ChatSettings,
+	SelectedTextContext,
 	ChatState,
 } from '../types/chat';
 import {
@@ -112,7 +118,11 @@ export const buildProviderMessagesWithOptions = async (
 		session,
 		options?.systemPrompt,
 		options?.modelTag,
-		options?.requestTools
+		options?.requestTools,
+		{
+			providerDiscoveryPayload: options?.providerDiscoveryPayload,
+			providerExecutablePayload: options?.providerExecutablePayload,
+		},
 	);
 };
 export const buildProviderMessagesForAgent = async (
@@ -121,8 +131,20 @@ export const buildProviderMessagesForAgent = async (
 	session: ChatSession,
 	systemPrompt?: string,
 	modelTag?: string,
-	requestTools: ToolDefinition[] = []
+	requestTools: ToolDefinition[] = [],
+	toolPayloads?: {
+		providerDiscoveryPayload?: ChatProviderMessageBuildOptions['providerDiscoveryPayload'];
+		providerExecutablePayload?: ChatProviderMessageBuildOptions['providerExecutablePayload'];
+	},
 ): Promise<ProviderMessage[]> => {
+	const resolveSelectedTextContext = (
+		message?: ChatMessage,
+	): SelectedTextContext | undefined => {
+		const candidate = message?.metadata?.selectedTextContext;
+		return candidate && typeof candidate === 'object'
+			? candidate as SelectedTextContext
+			: undefined;
+	};
 	const contextNotes = [...(session.contextNotes ?? []), ...deps.state.contextNotes];
 	const { selectedFiles, selectedFolders } = buildResolvedSelectionContext(session);
 	const messageManagement = getChatMessageManagementSettings(
@@ -132,18 +154,26 @@ export const buildProviderMessagesForAgent = async (
 	const fileContentOptions = getChatDefaultFileContentOptions();
 	const explicitSystemPrompt = systemPrompt?.trim();
 	let effectiveSystemPrompt = explicitSystemPrompt;
+	const contextSourceMessage = getLatestContextSourceMessage(messages);
+	const selectedText = getStringMetadata(contextSourceMessage, 'selectedText');
+	const selectedTextContext = resolveSelectedTextContext(contextSourceMessage);
 
 	const activePlanGuidance = buildLivePlanGuidance(session.livePlan);
+	const selectionContextGuidance = buildSelectionContextPromptBlock({
+		selectedText,
+		selectedTextContext,
+	});
+	const toolSurfaceGuidance = buildToolSurfacePromptBlock(toolPayloads ?? {});
 	const skillsPromptBlock = await deps.resolveSkillsSystemPromptBlock(requestTools);
 	effectiveSystemPrompt = composeChatSystemPrompt({
 		configuredSystemPrompt: effectiveSystemPrompt,
 		livePlanGuidance: activePlanGuidance,
+		selectionContextGuidance,
+		toolSurfaceGuidance,
 		skillsPromptBlock,
 	});
 	const sourcePath = deps.getActiveFilePath() ?? '';
-
-	const contextSourceMessage = getLatestContextSourceMessage(messages);
-	const selectedText = getStringMetadata(contextSourceMessage, 'selectedText');
+	const selectedTextSource = buildSelectedTextSourceLabel(selectedTextContext);
 	const hasContextPayload = hasBuildableContextPayload(
 		contextNotes,
 		selectedFiles,
@@ -156,6 +186,8 @@ export const buildProviderMessagesForAgent = async (
 			selectedFolders,
 			contextNotes,
 			selectedText,
+			selectedTextContext,
+			selectedTextSource,
 			fileContentOptions,
 			sourcePath,
 			images: contextSourceMessage?.images ?? [],

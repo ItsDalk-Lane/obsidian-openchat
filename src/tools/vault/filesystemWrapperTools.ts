@@ -8,10 +8,13 @@ import {
 } from './filesystemToolSchemas';
 import { executeListDirectory } from './filesystemListDirSupport';
 import {
+	buildListDirectoryFlatArgs,
 	buildListDirectoryTreeArgs,
 	buildListVaultOverviewArgs,
+	listDirectoryFlatSchema,
 	listDirectoryTreeSchema,
 	listVaultOverviewSchema,
+	type ListDirectoryFlatArgs,
 	type ListDirectoryTreeArgs,
 	type ListVaultOverviewArgs,
 } from './filesystemWrapperSupport';
@@ -35,6 +38,21 @@ export function registerFilesystemWrapperTools(
 		async (input: ListDirectoryTreeArgs) =>
 			executeListDirectory(app, buildListDirectoryTreeArgs(input)),
 	);
+
+		registerBuiltinTool(
+			server,
+			registry,
+			'list_directory_flat',
+			{
+				title: '列出当前目录一层内容',
+				description: '浏览一个已知目录的一层内容。',
+				inputSchema: listDirectoryFlatSchema,
+				outputSchema: structuredOutputSchema,
+				annotations: readOnlyToolAnnotations,
+			},
+			async (input: ListDirectoryFlatArgs) =>
+				executeListDirectory(app, buildListDirectoryFlatArgs(input)),
+		);
 
 	registerBuiltinTool(
 		server,

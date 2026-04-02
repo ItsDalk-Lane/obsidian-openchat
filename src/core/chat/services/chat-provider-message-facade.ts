@@ -4,6 +4,10 @@ import type { ToolDefinition } from 'src/types/tool';
 import type { FileContentOptions } from './file-content-service';
 import type { ChatProviderMessageDeps } from './chat-provider-messages';
 import type {
+	ProviderToolDiscoveryPayload,
+	ProviderToolExecutablePayload,
+} from './chat-tool-selection-types';
+import type {
 	ChatMessage,
 	ChatSession,
 	ChatSettings,
@@ -16,6 +20,8 @@ export interface ChatProviderMessageBuildOptions {
 	systemPrompt?: string;
 	modelTag?: string;
 	requestTools?: ToolDefinition[];
+	providerDiscoveryPayload?: ProviderToolDiscoveryPayload;
+	providerExecutablePayload?: ProviderToolExecutablePayload;
 }
 
 export interface ChatProviderMessageFacade {
@@ -30,6 +36,10 @@ export interface ChatProviderMessageFacade {
 		systemPrompt?: string,
 		modelTag?: string,
 		requestTools?: ToolDefinition[],
+		toolPayloads?: {
+			providerDiscoveryPayload?: ProviderToolDiscoveryPayload;
+			providerExecutablePayload?: ProviderToolExecutablePayload;
+		},
 	): Promise<ProviderMessage[]>;
 	getMessageManagementSettings(): MessageManagementSettings;
 	getDefaultFileContentOptions(): FileContentOptions;
@@ -53,6 +63,10 @@ export interface ChatProviderMessageFacadeOperations {
 		systemPrompt?: string,
 		modelTag?: string,
 		requestTools?: ToolDefinition[],
+		toolPayloads?: {
+			providerDiscoveryPayload?: ProviderToolDiscoveryPayload;
+			providerExecutablePayload?: ProviderToolExecutablePayload;
+		},
 	): Promise<ProviderMessage[]>;
 	getMessageManagementSettings(
 		settings: ChatSettings,
@@ -81,6 +95,7 @@ export const createChatProviderMessageFacade = (
 		systemPrompt,
 		modelTag,
 		requestTools = [],
+		toolPayloads,
 	) =>
 		await operations.buildProviderMessagesForAgent(
 			getDeps(),
@@ -89,6 +104,7 @@ export const createChatProviderMessageFacade = (
 			systemPrompt,
 			modelTag,
 			requestTools,
+			toolPayloads,
 		),
 	getMessageManagementSettings: () => {
 		const deps = getDeps();

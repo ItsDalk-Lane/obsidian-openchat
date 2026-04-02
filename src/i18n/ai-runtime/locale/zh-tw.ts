@@ -303,6 +303,8 @@ export default {
 		'整檔寫入或覆蓋時使用；局部編輯請用 edit_file。',
 	'Use this for partial edits to known files; read with read_file first.':
 		'局部編輯已知檔案時使用；讀取內容前先用 read_file。',
+	'Use this for minimal partial edits to known files; keep edits narrowly scoped and read the target segment with read_file first when needed.':
+		'已知檔案的最小局部編輯請用它；讓 edits 儘量收斂到必要片段，定位不穩時先用 read_file 讀取目標範圍。',
 	'Failed to move action. Please try again.': '移動動作失敗，請再試一次。',
 	'Failed to keep child actions. Please try again.': '保留子動作失敗，請再試一次。',
 	'Failed to delete child actions. Please try again.': '刪除子動作失敗，請再試一次。',

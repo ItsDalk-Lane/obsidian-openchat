@@ -4,6 +4,7 @@ import type {
 	ChatAttachmentFileInput,
 	ChatAttachmentFolderInput,
 } from 'src/domains/chat/service-attachment-selection';
+import type { SelectedTextContext } from '../types/chat';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import { normalizeMessageManagementSettings } from '../types/chat';
@@ -106,6 +107,7 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 			mutableState.contextNotes = [];
 			mutableState.selectedImages = [];
 			mutableState.selectedText = undefined;
+			mutableState.selectedTextContext = undefined;
 			mutableState.inputValue = '';
 			mutableState.selectedPromptTemplate = undefined;
 			mutableState.parallelResponses = undefined;
@@ -155,15 +157,19 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 		state.selectedImages = state.selectedImages.filter((img) => img !== image);
 		internals.service.emitState();
 	},
-	setSelectedText(text: string): void {
-		internals.stateStore.getMutableState().selectedText = text;
+	setSelectedText(text: string, context?: SelectedTextContext): void {
+		const state = internals.stateStore.getMutableState();
+		state.selectedText = text;
+		state.selectedTextContext = context;
 		internals.service.emitState();
 	},
 	setNextTriggerSource(source) {
 		internals.pendingTriggerSource = source;
 	},
 	clearSelectedText(): void {
-		internals.stateStore.getMutableState().selectedText = undefined;
+		const state = internals.stateStore.getMutableState();
+		state.selectedText = undefined;
+		state.selectedTextContext = undefined;
 		internals.service.emitState();
 	},
 	consumePendingTriggerSource() {

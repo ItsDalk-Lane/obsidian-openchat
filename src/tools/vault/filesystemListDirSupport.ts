@@ -4,9 +4,9 @@ import type { ListDirectoryArgs } from './filesystemToolSchemas';
 import { parseListDirectoryArgs } from './filesystemToolParsers';
 import {
 	getFolderOrThrow,
-	resolveRegex,
 	getFileStat,
 } from './helpers';
+import { resolveRegex } from './regex';
 import {
 	asStructuredOrText,
 	formatSize,

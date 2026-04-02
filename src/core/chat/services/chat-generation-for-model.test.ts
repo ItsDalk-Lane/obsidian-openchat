@@ -284,6 +284,8 @@ test('generateAssistantResponseForModelImpl 会把 prepared tool turn 注入主�
 			});
 			const prepareCalls: Array<{ includeSubAgents?: boolean; parentSessionId?: string }> = [];
 			const buildMessageRequests: ToolDefinition[][] = [];
+			const buildDiscoveryPayloads: Array<PreparedToolTurn['providerDiscoveryPayload'] | undefined> = [];
+			const buildExecutablePayloads: Array<PreparedToolTurn['providerExecutablePayload'] | undefined> = [];
 			const callbackRecords: ToolExecutionRecord[] = [];
 			const session = createSession();
 
@@ -298,6 +300,8 @@ test('generateAssistantResponseForModelImpl 会把 prepared tool turn 注入主�
 					},
 					buildProviderMessagesWithOptions: async (_session, options) => {
 						buildMessageRequests.push([...(options?.requestTools ?? [])]);
+						buildDiscoveryPayloads.push(options?.providerDiscoveryPayload);
+						buildExecutablePayloads.push(options?.providerExecutablePayload);
 						return [{ role: 'user', content: 'hello' }];
 					},
 				});
@@ -327,6 +331,8 @@ test('generateAssistantResponseForModelImpl 会把 prepared tool turn 注入主�
 				assert.equal(message.toolCalls?.length, 1);
 				assert.equal(callbackRecords.length, 1);
 				assert.deepEqual(buildMessageRequests[0]?.map((tool) => tool.name), ['read_file', 'github_search']);
+				assert.equal(buildDiscoveryPayloads[0], preparedToolTurn.providerDiscoveryPayload);
+				assert.equal(buildExecutablePayloads[0], preparedToolTurn.providerExecutablePayload);
 				assert.equal(prepareCalls.length, 1);
 				assert.equal(prepareCalls[0]?.includeSubAgents, true);
 				assert.equal(prepareCalls[0]?.parentSessionId, session.id);
@@ -341,6 +347,7 @@ test('generateAssistantResponseForModelImpl 在 prepareToolTurn 失败时会回�
 	const provider = createProvider('OpenAI');
 	const notices: string[] = [];
 	const buildMessageRequests: ToolDefinition[][] = [];
+	const buildDiscoveryPayloads: Array<PreparedToolTurn['providerDiscoveryPayload'] | undefined> = [];
 	const session = createSession();
 
 	await withPatchedVendor('OpenAI', async ({ getProviderOptions }) => {
@@ -350,6 +357,7 @@ test('generateAssistantResponseForModelImpl 在 prepareToolTurn 失败时会回�
 			},
 			buildProviderMessagesWithOptions: async (_session, options) => {
 				buildMessageRequests.push([...(options?.requestTools ?? [])]);
+				buildDiscoveryPayloads.push(options?.providerDiscoveryPayload);
 				return [{ role: 'user', content: 'fallback' }];
 			},
 			showMcpNoticeOnce: (message) => {
@@ -361,6 +369,7 @@ test('generateAssistantResponseForModelImpl 在 prepareToolTurn 失败时会回�
 		assert.ok(providerOptions);
 		assert.equal(providerOptions.tools, undefined);
 		assert.deepEqual(buildMessageRequests[0], []);
+		assert.equal(buildDiscoveryPayloads[0], undefined);
 		assert.equal(message.content, 'OpenAI response');
 	});
 
@@ -381,6 +390,7 @@ test('generateAssistantResponseForModelImpl 在提供 override 时跳过 prepare
 	let prepareCalled = 0;
 	const overrideGetTools = async () => [overrideTool];
 	const buildMessageRequests: ToolDefinition[][] = [];
+	const buildDiscoveryPayloads: Array<PreparedToolTurn['providerDiscoveryPayload'] | undefined> = [];
 
 	await withPatchedVendor('Claude', async ({ getProviderOptions }) => {
 		const deps = createDeps(provider, {
@@ -390,6 +400,7 @@ test('generateAssistantResponseForModelImpl 在提供 override 时跳过 prepare
 			},
 			buildProviderMessagesWithOptions: async (_session, options) => {
 				buildMessageRequests.push([...(options?.requestTools ?? [])]);
+				buildDiscoveryPayloads.push(options?.providerDiscoveryPayload);
 				return [{ role: 'user', content: 'override' }];
 			},
 		});
@@ -413,6 +424,7 @@ test('generateAssistantResponseForModelImpl 在提供 override 时跳过 prepare
 		assert.equal(providerOptions.toolExecutor, toolExecutor);
 		assert.equal(providerOptions.maxToolCallLoops, 3);
 		assert.deepEqual(buildMessageRequests[0]?.map((tool) => tool.name), ['override_tool']);
+		assert.equal(buildDiscoveryPayloads[0], undefined);
 		assert.equal(message.content, 'Claude response');
 	});
 

@@ -1,5 +1,8 @@
-import { SKILL_TOOL_NAME } from 'src/tools/skill/skill-tools';
-import { SUB_AGENT_TOOL_PREFIX } from 'src/tools/sub-agents/types';
+import { INVOKE_SKILL_TOOL_NAME } from 'src/tools/skill/skill-tools';
+import {
+	DELEGATE_SUB_AGENT_TOOL_NAME,
+	SUB_AGENT_TOOL_PREFIX,
+} from 'src/tools/sub-agents/types';
 import type { DiscoveryEntry } from './chat-tool-selection-types';
 
 interface WorkflowIntentMatcher {
@@ -79,12 +82,12 @@ const WORKFLOW_INTENT_MATCHERS: readonly WorkflowIntentMatcher[] = [
 		anyOf: ['write_plan'],
 	},
 	{
-		toolName: SKILL_TOOL_NAME,
+		toolName: INVOKE_SKILL_TOOL_NAME,
 		requiresAll: [
 			['run', 'invoke', 'use', '调用', '使用', '运行', '执行'],
 			['skill', 'skills', '技能'],
 		],
-		anyOf: [SKILL_TOOL_NAME],
+		anyOf: [INVOKE_SKILL_TOOL_NAME],
 	},
 ];
 
@@ -113,6 +116,7 @@ export const isWorkflowDiscoveryEntry = (entry: DiscoveryEntry): boolean => {
 	return entry.visibility === 'workflow-only'
 		|| entry.source === 'workflow'
 		|| entry.source === 'escape-hatch'
+		|| entry.toolName === DELEGATE_SUB_AGENT_TOOL_NAME
 		|| entry.toolName.startsWith(SUB_AGENT_TOOL_PREFIX);
 };
 
@@ -133,7 +137,10 @@ export const matchesWorkflowIntent = (query: string, entry: DiscoveryEntry): boo
 		return false;
 	}
 
-	if (entry.toolName.startsWith(SUB_AGENT_TOOL_PREFIX)) {
+	if (
+		entry.toolName === DELEGATE_SUB_AGENT_TOOL_NAME
+		|| entry.toolName.startsWith(SUB_AGENT_TOOL_PREFIX)
+	) {
 		return includesAnyKeyword(normalizedQuery, SUB_AGENT_INTENT_TERMS)
 			|| getEntryTerms(entry).some((term) => normalizedQuery.includes(term));
 	}

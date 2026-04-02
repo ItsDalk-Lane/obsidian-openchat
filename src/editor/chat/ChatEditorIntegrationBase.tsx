@@ -254,6 +254,8 @@ export abstract class ChatEditorIntegrationBase {
 			fullText: fullText,
 			from: cursorPos,
 			to: cursorPos,
+			lineStart: view.state.doc.lineAt(cursorPos).number,
+			lineEnd: view.state.doc.lineAt(cursorPos).number,
 			coords: {
 				top: coords.top,
 				left: coords.left,

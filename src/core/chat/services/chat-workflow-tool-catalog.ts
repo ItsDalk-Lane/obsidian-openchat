@@ -9,17 +9,21 @@ export interface WorkflowToolCatalog {
 export const buildWorkflowToolCatalog = (
 	catalog: DiscoveryCatalog,
 ): WorkflowToolCatalog => {
-	const dedupedEntries = new Map<string, DiscoveryEntry>();
+	const byToolName = new Map<string, DiscoveryEntry>();
+	const entries: DiscoveryEntry[] = [];
 
 	for (const entry of [...catalog.workflowEntries, ...catalog.entries]) {
-		if (!isWorkflowDiscoveryEntry(entry) || dedupedEntries.has(entry.toolName)) {
+		if (!isWorkflowDiscoveryEntry(entry)) {
 			continue;
 		}
-		dedupedEntries.set(entry.toolName, entry);
+		entries.push(entry);
+		if (!byToolName.has(entry.toolName)) {
+			byToolName.set(entry.toolName, entry);
+		}
 	}
 
 	return {
-		entries: [...dedupedEntries.values()],
-		byToolName: dedupedEntries,
+		entries,
+		byToolName,
 	};
 };

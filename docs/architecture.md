@@ -350,10 +350,13 @@ chat 生成回复或为 compare/sub-agent 执行模型请求
    → core/chat/services/chatGeneration.ts 保留流式生成、工具注入与错误包装
    → core/chat/services/chat-service.ts 只负责 generation deps builder 与 facade 组装
 
-chat 构建 system prompt 或工具读取技能正文
-   → core/chat/services/chat-service.ts 组装技能提示词块
-   → tools/skill/skill-tools.ts 读取 domains/skills/service.ts 暴露的正文加载能力
-   → domains/skills/service.ts 输出安全转义的 skills 片段与技能正文
+chat 构建 system prompt、裁剪工具 surface 或读取技能正文
+   → core/chat/services/chat-tool-runtime-resolver.ts 先生成 discovery catalog、candidate scope 与 executable tool set
+   → core/chat/services/chat-tool-candidate-resolver.ts 只做 deterministic 候选收敛，不再对外部 MCP 做全量 fallback
+   → core/chat/services/chat-tool-surface-prompt.ts 把 discovery/executable payload 压缩成 provider 可读的短提示块
+   → core/chat/services/chat-service-deps-support.ts 只注入精简的 skills guidance，不再把完整 skills 列表塞进 system prompt
+   → tools/skill/skill-tools.ts 与 tools/sub-agents/subAgentTools.ts 暴露 discover + invoke/delegate 的两步 workflow surface
+   → 详细决策见 docs/decisions/2026-04-01-tool-surface-two-stage.md
 
 插件启动或 settings 刷新 MCP 配置
    → core/FeatureCoordinator 调用 domains/mcp/ui.ts 协调外部 MCP 运行时

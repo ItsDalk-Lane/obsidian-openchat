@@ -297,7 +297,6 @@ export function normalizeToolArgs(
 	rawArgs: Record<string, unknown>,
 ): { args: Record<string, unknown>; notes: string[] } {
 	const toolHint = getBuiltinToolHint(toolName)
-	const { required } = getSchemaMeta(schema)
 	const notes: string[] = []
 	const properties =
 		schema && typeof schema === 'object' && typeof schema.properties === 'object' && schema.properties !== null
@@ -353,62 +352,6 @@ export function normalizeToolArgs(
 			if (next !== value) {
 				normalized[key] = next
 				notes.push(`${key}: 已自动转换为 ${coercion}`)
-			}
-		}
-
-		if (typeof value !== 'string' || !value) continue
-
-		if (isUrlLikeKey(key) || (isRepoLikeKey(key) && /url|uri/i.test(key))) {
-			const next = toGithubUrl(value)
-			if (next !== value) {
-				normalized[key] = next
-				notes.push(`${key}: repo 标识已转为 URL`)
-			}
-			continue
-		}
-
-		if (isRepoLikeKey(key) && !isUrlLikeKey(key) && isGithubUrl(value)) {
-			const next = toGithubSlug(value)
-			if (next !== value) {
-				normalized[key] = next
-				notes.push(`${key}: GitHub URL 已转为 owner/repo`)
-			}
-		}
-	}
-
-	const missingRequired = required.filter((key) => {
-		const val = normalized[key]
-		return val === undefined || val === null || (typeof val === 'string' && !val.trim())
-	})
-
-	if (missingRequired.length === 1) {
-		const targetKey = missingRequired[0]
-		const aliases = Object.entries(normalized).filter(([key, val]) => {
-			if (typeof val !== 'string' || !val.trim()) return false
-			if (key === targetKey) return false
-
-			if (isUrlLikeKey(targetKey)) {
-				return isRepoLikeKey(key) || isUrlLikeKey(key)
-			}
-			if (isRepoLikeKey(targetKey)) {
-				return isRepoLikeKey(key) || isUrlLikeKey(key)
-			}
-			return false
-		})
-
-		if (aliases.length > 0) {
-			const aliasVal = aliases[0][1] as string
-			normalized[targetKey] = isUrlLikeKey(targetKey) ? toGithubUrl(aliasVal) : aliasVal
-			notes.push(`已将 ${aliases[0][0]} 映射为必填字段 ${targetKey}`)
-		} else {
-			const stringValues = Object.values(normalized).filter(
-				(v): v is string => typeof v === 'string' && !!v.trim(),
-			)
-			if (stringValues.length === 1) {
-				normalized[targetKey] = isUrlLikeKey(targetKey)
-					? toGithubUrl(stringValues[0])
-					: stringValues[0]
-				notes.push(`已将唯一字符串参数映射为必填字段 ${targetKey}`)
 			}
 		}
 	}

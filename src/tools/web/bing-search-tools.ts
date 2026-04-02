@@ -176,11 +176,11 @@ export function createBingSearchTools(): BuiltinTool[] {
 
 - 需要搜索最新网络信息时
 - 需要围绕某个主题查找候选网页时
-- 需要先搜再配合 \`fetch\` 抓取详细内容时
+- 需要先搜再配合 \`fetch_webpage\` 抓取详细内容时
 
 ## 何时不使用
 
-- **不要用于抓取已知 URL 的正文**：这种情况请直接使用 \`fetch\`
+- **不要用于抓取已知 URL 的正文**：这种情况请直接使用 \`fetch_webpage\`
 - **不要用于搜索本地 Vault 内容**：本地内容请使用文件系统工具
 
 ## 可用字段
@@ -196,7 +196,7 @@ export function createBingSearchTools(): BuiltinTool[] {
 ## 失败恢复
 
 - 如果结果不理想，调整 \`query\` 后重试
-- 如果只是想读取某个已知网页，不要继续重试 \`bing_search\`，应改用 \`fetch\`
+- 如果只是想读取某个已知网页，不要继续重试 \`bing_search\`，应改用 \`fetch_webpage\`
 - 如果是网络请求失败，可稍后重试
 
 ## 示例

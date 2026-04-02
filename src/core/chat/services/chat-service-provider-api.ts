@@ -7,6 +7,7 @@ import type { FileContentOptions } from './file-content-service';
 import type { GenerateAssistantOptions } from './chat-service-types';
 import type { ChatProviderMessageBuildOptions } from './chat-provider-message-facade';
 import type { ChatServiceInternals } from './chat-service-internals';
+import { DELEGATE_SUB_AGENT_TOOL_NAME } from 'src/tools/sub-agents/types';
 import {
 	detectChatImageGenerationIntent,
 	findInstalledSkillDefinition,
@@ -61,8 +62,8 @@ export const createChatServiceProviderApi = (internals: ChatServiceInternals) =>
 			const existingIndex = existingToolCalls.findIndex((record) => record.id === update.toolCallId);
 			const nextRecord: ToolCall = {
 				id: update.toolCallId,
-				name: `sub_agent_${update.state.name}`,
-				arguments: { task: update.task },
+				name: DELEGATE_SUB_AGENT_TOOL_NAME,
+				arguments: { agent: update.state.name, task: update.task },
 				result: internals.service.extractLatestSubAgentResult(update.state),
 				status: update.state.status === 'running'
 					? 'pending'

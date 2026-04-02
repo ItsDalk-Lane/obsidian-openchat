@@ -43,7 +43,11 @@ export interface ToolDiscoveryMetadata {
 
 export interface ToolRuntimeContextDefault {
 	readonly field: string
-	readonly source: 'active-file-path'
+	readonly source:
+		| 'active-file-path'
+		| 'selected-text-file-path'
+		| 'selected-text-start-line'
+		| 'selected-text-line-count'
 }
 
 export interface ToolRuntimePolicy {

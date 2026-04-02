@@ -11,8 +11,10 @@ import {
 	structuredOutputSchema,
 } from 'src/tools/vault/filesystemToolSchemas';
 import {
+	buildListDirectoryFlatArgs,
 	buildListDirectoryTreeArgs,
 	buildListVaultOverviewArgs,
+	listDirectoryFlatSchema,
 	listDirectoryTreeSchema,
 	listVaultOverviewSchema,
 } from 'src/tools/vault/filesystemWrapperSupport';
@@ -272,13 +274,22 @@ test('fetch wrapper 会缩小 schema 并与 legacy fetch 保持相同执行结�
 	);
 });
 
-test('vault wrapper 会缩小 schema，并让 list_directory 默认 surface 收窄为 flat 视图', () => {
+test('vault wrapper 会提供独立的 flat schema，并隐藏 legacy list_directory 默认 surface', () => {
 	const filesystemTools = [
 		createBuiltinStub('list_directory', listDirectorySchema),
+		createBuiltinStub('list_directory_flat', listDirectoryFlatSchema),
 		createBuiltinStub('list_directory_tree', listDirectoryTreeSchema),
 		createBuiltinStub('list_vault_overview', listVaultOverviewSchema),
 	];
 	const filesystemToolInfos = createBuiltinInfos(filesystemTools);
+	assert.deepEqual(getSchemaProperties('list_directory_flat', filesystemTools), [
+		'directory_path',
+		'include_sizes',
+		'limit',
+		'offset',
+		'regex',
+		'sort_by',
+	]);
 	assert.deepEqual(getSchemaProperties('list_directory_tree', filesystemTools), [
 		'directory_path',
 		'exclude_patterns',
@@ -298,23 +309,62 @@ test('vault wrapper 会缩小 schema，并让 list_directory 默认 surface 收�
 			{ surfaceFlags },
 		),
 	);
-	const properties = Object.keys(
+	assert.equal(compiledListDirectory.discovery?.discoveryVisibility, 'hidden');
+	assert.equal(compiledListDirectory.compatibility?.deprecationStatus, 'legacy');
+	const legacyProperties = Object.keys(
 		compiledListDirectory.inputSchema.properties as Record<string, unknown>,
 	).sort();
-	assert.deepEqual(properties, [
-		'directory_path',
-		'include_sizes',
-		'limit',
-		'offset',
-		'regex',
-		'sort_by',
-	]);
-	assert.equal(compiledListDirectory.runtimePolicy?.defaultArgs?.view, 'flat');
-	assert.ok(!properties.includes('view'));
-	assert.ok(!properties.includes('response_format'));
+	assert.ok(legacyProperties.includes('view'));
+	assert.ok(!legacyProperties.includes('response_format'));
+});
+
+test('legacy wrapper 工具会标记为兼容入口', () => {
+	const surfaceFlags = resolveToolSurfaceSettings({
+		toolSurface: {
+			timeWrappersV1: true,
+			vaultWrappersV1: true,
+			fetchWrappersV1: true,
+		},
+	});
+	const legacyTime = createBuiltinToolDefinition(
+		createBuiltinInfos(createTimeTools({ defaultTimezone: 'UTC' }))
+			.find((tool) => tool.name === 'get_time')!,
+		{ surfaceFlags },
+	);
+	const legacyFetch = createBuiltinToolDefinition(
+		createBuiltinInfos(createFetchTools({ runtime: {
+			fetchSingleUrl: async () => 'legacy',
+			fetchBatch: async () => [],
+		} }))
+			.find((tool) => tool.name === 'fetch')!,
+		{ surfaceFlags },
+	);
+	assert.equal(legacyTime.compatibility?.deprecationStatus, 'legacy');
+	assert.equal(legacyFetch.compatibility?.deprecationStatus, 'legacy');
+	assert.match(legacyTime.discovery?.oneLinePurpose ?? '', /get_current_time/);
+	assert.match(legacyFetch.discovery?.oneLinePurpose ?? '', /fetch_webpage/);
 });
 
 test('vault wrapper 会把窄 schema 映射为 legacy list_directory 参数', () => {
+	const flatArgs = listDirectoryFlatSchema.parse({
+		directory_path: 'projects',
+		include_sizes: true,
+		sort_by: 'size',
+		regex: '.*',
+		limit: 20,
+		offset: 5,
+	});
+	assert.deepEqual(buildListDirectoryFlatArgs(flatArgs), {
+		directory_path: 'projects',
+		view: 'flat',
+		include_sizes: true,
+		sort_by: 'size',
+		regex: '.*',
+		limit: 20,
+		offset: 5,
+		response_format: 'json',
+	});
+
 	const treeArgs = listDirectoryTreeSchema.parse({
 		directory_path: 'projects',
 		exclude_patterns: ['archive/**'],
@@ -352,6 +402,7 @@ test('ChatToolSelectionCoordinator 会在时间与网页请求下优先选择 wr
 	const surfaceFlags = resolveToolSurfaceSettings({ toolSurface });
 	const filesystemSurfaceTools = [
 		createBuiltinStub('list_directory', listDirectorySchema),
+		createBuiltinStub('list_directory_flat', listDirectoryFlatSchema),
 		createBuiltinStub('list_directory_tree', listDirectoryTreeSchema),
 		createBuiltinStub('list_vault_overview', listVaultOverviewSchema),
 	];
@@ -414,6 +465,14 @@ test('ChatToolSelectionCoordinator 会在时间与网页请求下优先选择 wr
 	});
 	assert.ok(treeTurn.candidateScope.candidateToolNames.includes('list_directory_tree'));
 	assert.ok(treeTurn.executableToolSet.tools.some((tool) => tool.name === 'list_directory_tree'));
+
+	const flatTurn = await coordinator.prepareTurn({
+		session: createSession('请列出 projects 目录当前一层的内容'),
+		includeSubAgents: false,
+	});
+	assert.ok(flatTurn.candidateScope.candidateToolNames.includes('list_directory_flat'));
+	assert.ok(!flatTurn.candidateScope.candidateToolNames.includes('list_directory'));
+	assert.ok(flatTurn.executableToolSet.tools.some((tool) => tool.name === 'list_directory_flat'));
 
 	const vaultTurn = await coordinator.prepareTurn({
 		session: createSession('请给我整个 vault 的文件路径总览，只看 md 文件'),

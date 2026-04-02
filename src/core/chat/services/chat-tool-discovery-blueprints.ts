@@ -1,7 +1,10 @@
 import {
-	SKILL_TOOL_NAME,
+	DISCOVER_SKILLS_TOOL_NAME,
+	INVOKE_SKILL_TOOL_NAME,
 } from 'src/tools/skill/skill-tools';
 import {
+	DELEGATE_SUB_AGENT_TOOL_NAME,
+	DISCOVER_SUB_AGENTS_TOOL_NAME,
 	SUB_AGENT_TOOL_PREFIX,
 } from 'src/tools/sub-agents/types';
 import {
@@ -38,7 +41,7 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		source: 'workflow',
 		visibility: 'workflow-only',
 		argumentComplexity: 'high',
-		riskLevel: 'mutating',
+		riskLevel: 'escape-hatch',
 		oneLinePurpose: '用受限脚本编排多个工具调用。',
 		capabilityTags: ['workflow', 'orchestrate', '编排', '脚本'],
 	},
@@ -66,9 +69,12 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		visibility: 'default',
 		argumentComplexity: 'high',
 		riskLevel: 'read-only',
-		oneLinePurpose: '获取当前时间、时区换算或时间范围。',
+		oneLinePurpose: '兼容型时间工具；默认优先使用 get_current_time、convert_time 或 calculate_time_range。',
 		capabilityTags: ['time', 'timezone', 'date', '时区', '时间', '日期'],
 		requiredArgsSummary: ['mode', 'timezone 或时区参数'],
+		compatibility: {
+			deprecationStatus: 'legacy',
+		},
 	},
 	get_current_time: {
 		familyId: 'builtin.time',
@@ -123,7 +129,12 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		runtimePolicy: {
 			defaultArgs: { response_format: 'json' },
 			hiddenSchemaFields: ['response_format'],
-			contextDefaults: [{ field: 'file_path', source: 'active-file-path' }],
+			contextDefaults: [
+				{ field: 'file_path', source: 'selected-text-file-path' },
+				{ field: 'file_path', source: 'active-file-path' },
+				{ field: 'start_line', source: 'selected-text-start-line' },
+				{ field: 'line_count', source: 'selected-text-line-count' },
+			],
 		},
 	},
 	read_media: {
@@ -136,7 +147,10 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		capabilityTags: ['image', 'audio', 'media', '图片', '音频', '媒体'],
 		requiredArgsSummary: ['file_path'],
 		runtimePolicy: {
-			contextDefaults: [{ field: 'file_path', source: 'active-file-path' }],
+			contextDefaults: [
+				{ field: 'file_path', source: 'selected-text-file-path' },
+				{ field: 'file_path', source: 'active-file-path' },
+			],
 		},
 	},
 	read_files: {
@@ -169,9 +183,17 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		visibility: 'default',
 		argumentComplexity: 'medium',
 		riskLevel: 'mutating',
-		oneLinePurpose: '对已知文件做局部编辑。',
+		oneLinePurpose: '对已知文件做最小局部编辑。',
+		whenToUse: ['只修改当前一段或少量已知片段', '希望保留文件其余内容不变'],
+		whenNotToUse: ['需要整文件重写时用 write_file', '片段定位不唯一时先用 read_file 读取目标范围'],
 		capabilityTags: ['edit', 'patch', 'modify', '局部修改', '编辑文件'],
 		requiredArgsSummary: ['file_path', 'edits'],
+		runtimePolicy: {
+			contextDefaults: [
+				{ field: 'file_path', source: 'selected-text-file-path' },
+				{ field: 'file_path', source: 'active-file-path' },
+			],
+		},
 	},
 	create_directory: {
 		familyId: 'builtin.vault.write',
@@ -189,7 +211,7 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		visibility: 'default',
 		argumentComplexity: 'high',
 		riskLevel: 'read-only',
-		oneLinePurpose: '浏览已知目录的内容。',
+		oneLinePurpose: '兼容型目录浏览工具；默认优先使用 list_directory_flat、list_directory_tree 或 list_vault_overview。',
 		whenNotToUse: ['不知道目录路径时先用 find_paths'],
 		capabilityTags: ['directory', 'folder', 'tree', 'list', '目录', '树形'],
 		requiredArgsSummary: ['directory_path', 'view'],
@@ -197,6 +219,20 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 			defaultArgs: { response_format: 'json' },
 			hiddenSchemaFields: ['response_format'],
 		},
+		compatibility: {
+			deprecationStatus: 'legacy',
+		},
+	},
+	list_directory_flat: {
+		familyId: 'builtin.vault.discovery',
+		source: 'builtin',
+		visibility: 'default',
+		argumentComplexity: 'medium',
+		riskLevel: 'read-only',
+		oneLinePurpose: '浏览已知目录的一层内容。',
+		whenNotToUse: ['需要树形递归时用 list_directory_tree', '需要全库总览时用 list_vault_overview'],
+		capabilityTags: ['directory', 'folder', 'flat list', '目录浏览', '当前目录'],
+		requiredArgsSummary: ['directory_path'],
 	},
 	list_directory_tree: {
 		familyId: 'builtin.vault.discovery',
@@ -205,7 +241,7 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		argumentComplexity: 'medium',
 		riskLevel: 'read-only',
 		oneLinePurpose: '以树形方式递归浏览已知目录。',
-		whenNotToUse: ['只看当前目录一层时用 list_directory', '需要全库概览时用 list_vault_overview'],
+		whenNotToUse: ['只看当前目录一层时用 list_directory_flat', '需要全库概览时用 list_vault_overview'],
 		capabilityTags: ['directory tree', 'tree', 'recursive directory', '树形目录', '递归目录'],
 		requiredArgsSummary: ['directory_path'],
 	},
@@ -216,7 +252,7 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		argumentComplexity: 'medium',
 		riskLevel: 'read-only',
 		oneLinePurpose: '获取整个 Vault 的轻量文件路径总览。',
-		whenNotToUse: ['只浏览单个目录时用 list_directory', '需要目录树时用 list_directory_tree'],
+		whenNotToUse: ['只浏览单个目录时用 list_directory_flat', '需要目录树时用 list_directory_tree'],
 		capabilityTags: ['vault overview', 'vault', 'workspace overview', '全库总览', 'Vault 总览'],
 		requiredArgsSummary: ['file_extensions'],
 	},
@@ -246,8 +282,8 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 	},
 	delete_path: {
 		familyId: 'builtin.vault.write',
-		source: 'builtin',
-		visibility: 'default',
+		source: 'workflow',
+		visibility: 'workflow-only',
 		argumentComplexity: 'medium',
 		riskLevel: 'destructive',
 		oneLinePurpose: '删除文件或目录。',
@@ -294,7 +330,10 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		runtimePolicy: {
 			defaultArgs: { response_format: 'json' },
 			hiddenSchemaFields: ['response_format'],
-			contextDefaults: [{ field: 'target_path', source: 'active-file-path' }],
+			contextDefaults: [
+				{ field: 'target_path', source: 'selected-text-file-path' },
+				{ field: 'target_path', source: 'active-file-path' },
+			],
 		},
 		compatibility: {
 			legacyCallNames: ['get_file_info'],
@@ -303,14 +342,17 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 	open_file: {
 		familyId: 'builtin.vault.read',
 		source: 'builtin',
-		visibility: 'default',
+		visibility: 'candidate-only',
 		argumentComplexity: 'low',
 		riskLevel: 'read-only',
 		oneLinePurpose: '在 Obsidian 中打开已知文件。',
 		capabilityTags: ['open', 'file', 'panel', '打开文件'],
 		requiredArgsSummary: ['file_path'],
 		runtimePolicy: {
-			contextDefaults: [{ field: 'file_path', source: 'active-file-path' }],
+			contextDefaults: [
+				{ field: 'file_path', source: 'selected-text-file-path' },
+				{ field: 'file_path', source: 'active-file-path' },
+			],
 		},
 	},
 	fetch: {
@@ -319,9 +361,12 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		visibility: 'default',
 		argumentComplexity: 'high',
 		riskLevel: 'read-only',
-		oneLinePurpose: '抓取已知网页内容。',
+		oneLinePurpose: '兼容型网页抓取工具；默认优先使用 fetch_webpage 或 fetch_webpages_batch。',
 		capabilityTags: ['fetch', 'url', 'website', 'webpage', '抓取网页', '网页内容'],
 		requiredArgsSummary: ['url 或 urls'],
+		compatibility: {
+			deprecationStatus: 'legacy',
+		},
 	},
 	fetch_webpage: {
 		familyId: 'builtin.web.fetch',
@@ -353,7 +398,17 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		capabilityTags: ['web search', 'search web', 'internet', '搜索网络', '联网搜索'],
 		requiredArgsSummary: ['query'],
 	},
-	[SKILL_TOOL_NAME]: {
+	[DISCOVER_SKILLS_TOOL_NAME]: {
+		familyId: 'builtin.skill.discovery',
+		source: 'builtin',
+		visibility: 'candidate-only',
+		argumentComplexity: 'low',
+		riskLevel: 'read-only',
+		oneLinePurpose: '列出当前可用的 Skill。',
+		capabilityTags: ['skill', 'skills', 'discover skills', '技能', '可用技能'],
+		requiredArgsSummary: ['query'],
+	},
+	[INVOKE_SKILL_TOOL_NAME]: {
 		familyId: 'workflow.skill',
 		source: 'workflow',
 		visibility: 'workflow-only',
@@ -361,6 +416,26 @@ export const BUILTIN_TOOL_BLUEPRINTS: Record<string, SurfaceBlueprint> = {
 		riskLevel: 'mutating',
 		oneLinePurpose: '加载并执行复杂 Skill 工作流。',
 		capabilityTags: ['skill', 'workflow', '技能'],
+	},
+	[DISCOVER_SUB_AGENTS_TOOL_NAME]: {
+		familyId: 'builtin.delegate.discovery',
+		source: 'custom',
+		visibility: 'candidate-only',
+		argumentComplexity: 'low',
+		riskLevel: 'read-only',
+		oneLinePurpose: '列出当前可用的 Sub-Agent。',
+		capabilityTags: ['sub-agent', 'delegate', 'discover agents', '子代理', '委托代理'],
+		requiredArgsSummary: ['query'],
+	},
+	[DELEGATE_SUB_AGENT_TOOL_NAME]: {
+		familyId: 'workflow.delegate',
+		source: 'workflow',
+		visibility: 'workflow-only',
+		argumentComplexity: 'high',
+		riskLevel: 'mutating',
+		oneLinePurpose: '把任务委托给指定的 Sub-Agent。',
+		capabilityTags: ['sub-agent', 'delegate', '委托', '子代理'],
+		requiredArgsSummary: ['agent', 'task'],
 	},
 };
 
@@ -371,15 +446,22 @@ export const createFallbackBlueprint = (
 		return {
 			familyId: 'workflow.delegate',
 			source: 'workflow',
-			visibility: 'workflow-only',
+			visibility: 'hidden',
 			argumentComplexity: 'high',
 			riskLevel: 'mutating',
 			oneLinePurpose: '把任务委托给子代理处理。',
 			capabilityTags: ['sub-agent', 'delegate', '委托', '子代理'],
+			compatibility: {
+				deprecationStatus: 'legacy',
+			},
 		};
 	}
 
 	if (tool.source === 'mcp') {
+		const nameTokens = tool.name
+			.toLowerCase()
+			.split(/[^a-z0-9]+/u)
+			.filter((token) => token.length > 1);
 		return {
 			familyId: `mcp.${tool.sourceId}`,
 			source: 'mcp',
@@ -387,7 +469,7 @@ export const createFallbackBlueprint = (
 			argumentComplexity: 'medium',
 			riskLevel: 'read-only',
 			oneLinePurpose: summarizeDescriptionForUiFallback(tool.description),
-			capabilityTags: [tool.sourceId.toLowerCase()],
+			capabilityTags: [tool.sourceId.toLowerCase(), ...nameTokens],
 		};
 	}
 

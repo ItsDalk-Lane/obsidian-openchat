@@ -102,7 +102,7 @@ export function createScriptTools(
 
 \`\`\`json
 {
-  "script": "const result = await call_tool('get_time', { timezone: 'Asia/Shanghai' }); return result.timezone;"
+	"script": "const result = await call_tool('get_current_time', { timezone: 'Asia/Shanghai' }); return result.timezone;"
 }
 \`\`\``,
 			inputSchema: executeScriptSchema,

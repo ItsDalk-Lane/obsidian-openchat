@@ -28,6 +28,8 @@ export interface SelectionInfo {
 	fullText?: string; // 完整文本（不包括 frontmatter），用于符号触发
 	from: number;
 	to: number;
+	lineStart?: number;
+	lineEnd?: number;
 	coords: {
 		top: number;
 		left: number;
@@ -218,12 +220,16 @@ export function createSelectionToolbarExtension(
 
 					// 获取当前活动文件
 					const activeFile = getActiveFile();
+					const startLine = this.view.state.doc.lineAt(currentSelection.from).number;
+					const endLine = this.view.state.doc.lineAt(currentSelection.to).number;
 
 					// 调用回调显示工具栏
 					const selectionInfo: SelectionInfo = {
 						text: selectedText,
 						from: currentSelection.from,
 						to: currentSelection.to,
+						lineStart: startLine,
+						lineEnd: endLine,
 						coords,
 						triggerSource: 'selection' // 通过选中文本触发
 					};

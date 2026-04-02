@@ -89,6 +89,7 @@ export const createChatServiceInternals = (
 		selectedFiles: [],
 		selectedFolders: [],
 		selectedText: undefined,
+		selectedTextContext: undefined,
 		shouldSaveHistory: true,
 		multiModelMode: 'single',
 		parallelResponses: undefined,
@@ -124,6 +125,7 @@ export const createChatServiceInternals = (
 	const toolSelectionCoordinator = new ChatToolSelectionCoordinator({
 		toolRuntimeResolver,
 		settingsAccessor,
+		getActiveFilePath: () => obsidianApi.getActiveFilePath(),
 	});
 	const sessionManager = new ChatSessionManager(
 		obsidianApi,

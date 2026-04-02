@@ -17,6 +17,7 @@ import type { ChatToolRuntimeResolver } from './chat-tool-runtime-resolver';
 interface ChatToolSelectionCoordinatorOptions {
 	readonly toolRuntimeResolver: ChatToolRuntimeResolver;
 	readonly settingsAccessor: ChatSettingsAccessor;
+	readonly getActiveFilePath?: () => string | null;
 }
 
 const buildPolicySet = (runtime: ResolvedToolRuntime): ToolCallPolicySet => {
@@ -100,9 +101,13 @@ export class ChatToolSelectionCoordinator implements ToolSelectionCoordinator {
 
 		const candidateScope = this.candidateScopeResolver.resolve({
 			query,
+			session: input.session,
 			catalog: discoveryCatalog,
 			workflowToolsDefaultHidden: toolSurfaceFlags.workflowToolsDefaultHidden,
 			workflowModeV1: toolSurfaceFlags.workflowModeV1,
+			routingContext: {
+				activeFilePath: this.options.getActiveFilePath?.() ?? null,
+			},
 		});
 
 		const runtime = candidateScope.mode === 'no-tool'

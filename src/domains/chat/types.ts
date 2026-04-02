@@ -42,6 +42,19 @@ export type SelectedItem = SelectedFile | SelectedFolder;
 
 export type SubAgentExecutionStatus = 'running' | 'completed' | 'failed' | 'cancelled';
 
+export interface SelectedTextRange {
+	from: number;
+	to: number;
+	startLine?: number;
+	endLine?: number;
+}
+
+export interface SelectedTextContext {
+	filePath?: string;
+	range?: SelectedTextRange;
+	triggerSource?: 'selection' | 'symbol';
+}
+
 export interface SubAgentExecutionState {
 	name: string;
 	status: SubAgentExecutionStatus;
@@ -54,6 +67,7 @@ export interface SubAgentExecutionState {
 export interface ChatMessageMetadata extends Record<string, unknown> {
 	pinned?: boolean;
 	selectedText?: string;
+	selectedTextContext?: SelectedTextContext;
 	parsedContent?: unknown;
 	transient?: boolean;
 	hiddenFromModel?: boolean;
@@ -209,6 +223,7 @@ export interface ChatState {
 	selectedFiles: SelectedFile[];
 	selectedFolders: SelectedFolder[];
 	selectedText?: string;
+	selectedTextContext?: SelectedTextContext;
 	error?: string;
 	selectedPromptTemplate?: {
 		path: string;

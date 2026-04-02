@@ -7,6 +7,13 @@ import { buildToolArgumentValidationErrorContext, buildToolValidationResult } fr
 
 export interface ToolArgumentCompletionContext {
 	readonly activeFilePath?: string | null;
+	readonly selectedTextFilePath?: string | null;
+	readonly selectedTextRange?: {
+		readonly from: number;
+		readonly to: number;
+		readonly startLine?: number;
+		readonly endLine?: number;
+	} | null;
 }
 
 export interface ToolArgumentCompletionResult {
@@ -47,6 +54,8 @@ const applyContextDefaults = (
 	notes: string[],
 ): Record<string, unknown> => {
 	const next = { ...args };
+	const selectedStartLine = context?.selectedTextRange?.startLine;
+	const selectedEndLine = context?.selectedTextRange?.endLine;
 	for (const item of tool.runtimePolicy?.contextDefaults ?? []) {
 		if (hasUsableValue(next[item.field])) {
 			continue;
@@ -54,6 +63,26 @@ const applyContextDefaults = (
 		if (item.source === 'active-file-path' && context?.activeFilePath) {
 			next[item.field] = context.activeFilePath;
 			notes.push(`已从当前活动文件补全 ${item.field}`);
+			continue;
+		}
+		if (item.source === 'selected-text-file-path' && context?.selectedTextFilePath) {
+			next[item.field] = context.selectedTextFilePath;
+			notes.push(`已从当前选区所在文件补全 ${item.field}`);
+			continue;
+		}
+		if (item.source === 'selected-text-start-line' && typeof selectedStartLine === 'number') {
+			next[item.field] = selectedStartLine;
+			notes.push(`已从当前选区起始行补全 ${item.field}`);
+			continue;
+		}
+		if (
+			item.source === 'selected-text-line-count'
+			&& typeof selectedStartLine === 'number'
+			&& typeof selectedEndLine === 'number'
+			&& selectedEndLine >= selectedStartLine
+		) {
+			next[item.field] = selectedEndLine - selectedStartLine + 1;
+			notes.push(`已从当前选区行数补全 ${item.field}`);
 		}
 	}
 	return next;

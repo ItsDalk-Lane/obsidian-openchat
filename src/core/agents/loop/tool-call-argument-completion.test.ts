@@ -56,6 +56,49 @@ test('completeToolArguments 会补全隐藏默认参数与活动文件路径', (
 	assert.ok(result.notes.some((note) => note.includes('response_format')));
 });
 
+test('completeToolArguments 会优先使用选区文件和选区行范围补全 read_file 参数', () => {
+	const validationSchema = {
+		type: 'object',
+		properties: {
+			file_path: { type: 'string' },
+			start_line: { type: 'integer' },
+			line_count: { type: 'integer' },
+		},
+		required: ['file_path'],
+	};
+	const tool = createToolDefinition({
+		inputSchema: validationSchema,
+		runtimePolicy: {
+			validationSchema,
+			contextDefaults: [
+				{ field: 'file_path', source: 'selected-text-file-path' },
+				{ field: 'file_path', source: 'active-file-path' },
+				{ field: 'start_line', source: 'selected-text-start-line' },
+				{ field: 'line_count', source: 'selected-text-line-count' },
+			],
+		},
+	});
+
+	const result = completeToolArguments(tool, {}, {
+		activeFilePath: 'notes/current.md',
+		selectedTextFilePath: 'docs/spec.md',
+		selectedTextRange: {
+			from: 40,
+			to: 80,
+			startLine: 5,
+			endLine: 9,
+		},
+	});
+
+	assert.deepEqual(result.errors, []);
+	assert.equal(result.args.file_path, 'docs/spec.md');
+	assert.equal(result.args.start_line, 5);
+	assert.equal(result.args.line_count, 5);
+	assert.ok(result.notes.some((note) => note.includes('选区所在文件')));
+	assert.ok(result.notes.some((note) => note.includes('选区起始行')));
+	assert.ok(result.notes.some((note) => note.includes('选区行数')));
+});
+
 test('completeToolArguments 会复用 builtin hint 做别名映射与类型转换', () => {
 	const schema = {
 		type: 'object',

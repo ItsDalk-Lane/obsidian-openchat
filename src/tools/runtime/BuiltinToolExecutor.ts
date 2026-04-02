@@ -17,6 +17,7 @@ import {
 	formatToolErrorContext,
 } from 'src/core/agents/loop/tool-call-validation';
 import { DebugLogger } from 'src/utils/DebugLogger';
+import type { ToolArgumentCompletionContext } from 'src/core/agents/loop/tool-call-argument-completion';
 
 export class BuiltinToolExecutor implements ToolExecutor {
 	private readonly callTool: (
@@ -24,6 +25,7 @@ export class BuiltinToolExecutor implements ToolExecutor {
 		args: Record<string, unknown>
 	) => Promise<unknown>;
 	private readonly enableRuntimeArgumentCompletion: boolean;
+	private readonly runtimeArgumentContext?: Omit<ToolArgumentCompletionContext, 'activeFilePath'>;
 
 	constructor(
 		private readonly registry: BuiltinToolRegistry,
@@ -34,11 +36,13 @@ export class BuiltinToolExecutor implements ToolExecutor {
 		) => Promise<unknown>,
 		options?: {
 			readonly enableRuntimeArgumentCompletion?: boolean;
+			readonly runtimeArgumentContext?: Omit<ToolArgumentCompletionContext, 'activeFilePath'>;
 		},
 	) {
 		this.callTool = callTool ?? (async (name, args) =>
 			await this.registry.call(name, args, this.context));
 		this.enableRuntimeArgumentCompletion = options?.enableRuntimeArgumentCompletion ?? true;
+		this.runtimeArgumentContext = options?.runtimeArgumentContext;
 	}
 
 	canHandle(call: ToolCallRequest, tools: ToolDefinition[]): boolean {
@@ -78,6 +82,7 @@ export class BuiltinToolExecutor implements ToolExecutor {
 		try {
 			const completion = completeToolArguments(tool, rawArgs, {
 				activeFilePath: this.context.app.workspace.getActiveFile()?.path ?? null,
+				...this.runtimeArgumentContext,
 			}, {
 				enableRuntimeCompletion: this.enableRuntimeArgumentCompletion,
 			});

@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import Module from 'node:module';
 import test from 'node:test';
+import { PromptBuilder } from 'src/core/services/PromptBuilder';
 import { DEFAULT_CHAT_SETTINGS } from 'src/domains/chat/config';
 import {
 	createChatProviderMessageFacade,
 } from './chat-provider-message-facade';
+import {
+	buildSelectedTextSourceLabel,
+	buildSelectionContextPromptBlock,
+} from './chat-selection-context-prompt';
 import { getChatMessageManagementSettings } from 'src/domains/chat/service-provider-message-support';
 import type { ChatProviderMessageDeps } from './chat-provider-messages';
 import type { ChatMessage, ChatSettings, ChatState, ChatSession } from '../types/chat';
@@ -204,3 +209,142 @@ test('buildProviderMessagesForAgent 忽略会话里遗留的模板系统提示�
 	assert.equal(capturedSystemPrompt, undefined)
 	assert.deepEqual(providerMessages, [{ role: 'user', content: 'hello' }])
 })
+
+test('buildSelectedTextSourceLabel 会把文件与行范围绑定到 selected_text 源标签', () => {
+	assert.equal(buildSelectedTextSourceLabel({
+		filePath: 'docs/spec.md',
+		range: { from: 10, to: 30, startLine: 12, endLine: 24 },
+	}), 'selected_text @ docs/spec.md#L12-L24');
+	assert.equal(buildSelectedTextSourceLabel({
+		filePath: 'docs/spec.md',
+	}), 'selected_text @ docs/spec.md');
+});
+
+test('PromptBuilder 会把 selected_text 源标签写入上下文 XML', async () => {
+	const promptBuilder = new PromptBuilder({
+		getActiveFilePath: () => null,
+	});
+	const contextMessage = await promptBuilder.buildChatContextMessage({
+		selectedFiles: [],
+		selectedFolders: [],
+		contextNotes: [],
+		selectedText: 'const value = 1;',
+		selectedTextContext: {
+			filePath: 'src/example.ts',
+			range: { from: 5, to: 20, startLine: 3, endLine: 3 },
+		},
+		selectedTextSource: 'selected_text @ src/example.ts#L3',
+		sourcePath: '',
+	});
+
+	assert.ok(contextMessage);
+	assert.match(contextMessage?.content ?? '', /<source>selected_text @ src\/example.ts#L3<\/source>/);
+	assert.match(contextMessage?.content ?? '', /const value = 1;/);
+});
+
+test('buildProviderMessagesForAgent 会把选区文件与范围注入 provider prompt 和 context source', async () => {
+	ensureWindowLocalStorage();
+	installObsidianStub();
+	const { buildProviderMessagesForAgent } = await import('./chat-provider-messages');
+	let capturedSystemPrompt: string | undefined;
+	let capturedSelectedTextSource: string | null | undefined;
+	const deps = createProviderMessageDeps(DEFAULT_CHAT_SETTINGS, DEFAULT_CHAT_SETTINGS);
+	deps.messageService = {
+		createMessage: (role, content, extras) => ({
+			id: 'message-ephemeral',
+			role,
+			content,
+			timestamp: 1,
+			images: [],
+			isError: false,
+			metadata: extras?.metadata ?? {},
+			toolCalls: [],
+		}),
+		buildContextProviderMessage: async (params) => {
+			capturedSelectedTextSource = params.selectedTextSource;
+			return {
+				role: 'user',
+				content: '<documents />',
+			};
+		},
+		toProviderMessages: async (messages: ChatMessage[], options) => {
+			if (options?.systemPrompt) {
+				capturedSystemPrompt = options.systemPrompt;
+			}
+			return messages.map((message) => ({
+				role: message.role === 'assistant' ? 'assistant' : 'user',
+				content: message.content,
+			}));
+		},
+	} as never;
+	deps.messageContextOptimizer = {
+		estimateChatTokens: () => 1,
+		optimize: async (messages: ChatMessage[]) => ({
+			messages,
+			historyTokenEstimate: 1,
+			contextCompaction: null,
+		}),
+	} as never;
+	deps.contextCompactionService = {
+		compactContextProviderMessage: async () => ({
+			message: null,
+			summary: '',
+			signature: '',
+			tokenEstimate: 0,
+		}),
+	} as never;
+
+	const userMessage: ChatMessage = {
+		id: 'message-2',
+		role: 'user',
+		content: '请修改这段实现',
+		timestamp: 1,
+		images: [],
+		isError: false,
+		metadata: {
+			selectedText: 'const value = 1;',
+			selectedTextContext: {
+				filePath: 'src/example.ts',
+				range: { from: 5, to: 20, startLine: 3, endLine: 6 },
+			},
+		},
+		toolCalls: [],
+	};
+	const session: ChatSession = {
+		id: 'session-2',
+		title: 'Chat',
+		modelId: 'model-a',
+		messages: [userMessage],
+		createdAt: 1,
+		updatedAt: 1,
+		livePlan: null,
+		contextCompaction: null,
+		requestTokenState: null,
+	};
+
+	await buildProviderMessagesForAgent(
+		deps,
+		[userMessage],
+		session,
+	);
+
+	assert.equal(capturedSelectedTextSource, 'selected_text @ src/example.ts#L3-L6');
+	assert.match(capturedSystemPrompt ?? '', /<selection-context>/);
+	assert.match(capturedSystemPrompt ?? '', /selected_text_file=src\/example.ts/);
+	assert.match(capturedSystemPrompt ?? '', /selected_text_lines=3-6/);
+	assert.match(capturedSystemPrompt ?? '', /edit_file_strategy=/);
+});
+
+test('buildSelectionContextPromptBlock 在缺少行范围时仍会保留文件锚点', () => {
+	const block = buildSelectionContextPromptBlock({
+		selectedText: 'const value = 1;',
+		selectedTextContext: {
+			filePath: 'src/example.ts',
+			range: { from: 5, to: 20 },
+		},
+	});
+
+	assert.match(block ?? '', /selected_text_file=src\/example.ts/);
+	assert.doesNotMatch(block ?? '', /selected_text_lines=/);
+	assert.match(block ?? '', /default_local_strategy=/);
+});

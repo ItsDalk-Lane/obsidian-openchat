@@ -66,6 +66,7 @@ export class MessageService {
 			sourcePath?: string;
 			maxHistoryRounds?: number;
 			prebuiltContextMessage?: ProviderMessage | null;
+			selectedTextSource?: string | null;
 		}
 	): Promise<ProviderMessage[]> {
 		const {
@@ -77,6 +78,7 @@ export class MessageService {
 			sourcePath,
 			maxHistoryRounds,
 			prebuiltContextMessage,
+			selectedTextSource,
 		} = options ?? {};
 
 		const promptBuilder = new PromptBuilder(this.app, this.fileContentService);
@@ -89,6 +91,7 @@ export class MessageService {
 			sourcePath,
 			maxHistoryRounds,
 			prebuiltContextMessage,
+			selectedTextSource,
 		});
 	}
 

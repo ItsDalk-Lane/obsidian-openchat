@@ -22,6 +22,7 @@ import { executeMcpToolCalls } from './mcpToolCallHandler'
 import type { OpenAIToolCall, ToolLoopMessage } from './mcpToolCallHandler'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import { isToolFailureContent } from './mcpToolCallHandlerInternals'
+import type { ToolArgumentCompletionContext } from 'src/core/agents/loop/tool-call-argument-completion'
 
 interface ToolFailureTrackerEntry {
 	count: number
@@ -38,14 +39,17 @@ type ToolFailureTracker = Map<string, ToolFailureTrackerEntry>
 export class McpToolExecutor implements ToolExecutor {
 	private failureTracker: ToolFailureTracker = new Map()
 	private readonly enableRuntimeArgumentCompletion: boolean
+	private readonly runtimeArgumentContext?: ToolArgumentCompletionContext
 
 	constructor(
 		private mcpCallTool: McpCallToolFnForProvider,
 		options?: {
 			readonly enableRuntimeArgumentCompletion?: boolean
+			readonly runtimeArgumentContext?: ToolArgumentCompletionContext
 		},
 	) {
 		this.enableRuntimeArgumentCompletion = options?.enableRuntimeArgumentCompletion ?? true
+		this.runtimeArgumentContext = options?.runtimeArgumentContext
 	}
 
 	canHandle(call: ToolCallRequest, tools: ToolDefinition[]): boolean {
@@ -83,7 +87,7 @@ export class McpToolExecutor implements ToolExecutor {
 				}
 			}
 
-			const completion = completeToolArguments(targetTool, parsedArgs, undefined, {
+			const completion = completeToolArguments(targetTool, parsedArgs, this.runtimeArgumentContext, {
 				enableRuntimeCompletion: true,
 			})
 			if (completion.notes.length > 0) {

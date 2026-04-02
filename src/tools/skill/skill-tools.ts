@@ -1,9 +1,10 @@
-import type { SkillToolInput } from 'src/domains/skills/types';
 import { loadSkillContent, formatSkillToolResult, type SkillScannerService } from 'src/domains/skills/service';
 import { z } from 'zod';
 import type { BuiltinTool } from '../runtime/types';
 
-export const SKILL_TOOL_NAME = 'Skill';
+export const DISCOVER_SKILLS_TOOL_NAME = 'discover_skills';
+export const INVOKE_SKILL_TOOL_NAME = 'invoke_skill';
+export const LEGACY_INVOKE_SKILL_TOOL_NAME = 'Skill';
 
 const readOnlyToolAnnotations = {
 	readOnlyHint: true,
@@ -23,11 +24,19 @@ const skillToolSchema = z.object({
 		.describe('Optional arguments or context for the skill.'),
 }).strict();
 
-export const SKILL_TOOL_DESCRIPTION = [
+const discoverSkillsToolSchema = z.object({
+	query: z
+		.string()
+		.optional()
+		.describe('Optional filter text used to narrow the returned skills list.'),
+}).strict();
+
+export const INVOKE_SKILL_TOOL_DESCRIPTION = [
 	'Execute a skill within the current conversation.',
 	'',
-	'When the user asks for a task that matches an available skill, this is a BLOCKING REQUIREMENT:',
-	'invoke this tool before generating any other response about the task.',
+	'When the user asks for a task that should follow a Skill workflow, load that Skill before answering.',
+	'',
+	'If you do not know which skills are available, call `discover_skills` first.',
 	'',
 	'When the user types a slash command such as `/commit` or `/pdf`, treat it as a skill invocation.',
 	'',
@@ -36,15 +45,21 @@ export const SKILL_TOOL_DESCRIPTION = [
 	'- `{"skill":"commit","args":"-m \\"Fix bug\\""}`',
 	'',
 	'Important:',
-	'- Available skills are listed in `<skills>` blocks in the system prompt.',
-	'- Never mention a skill without actually calling this tool.',
+	'- Never mention a skill workflow without actually calling this tool.',
 	'- Do not invoke a skill that is already running.',
 	'- Do not use this tool for built-in CLI commands such as `/help` or `/clear`.',
 	'- If you see a `<command-name>` tag in the current conversation turn, the skill has already been loaded. Follow its instructions directly instead of calling this tool again.',
 ].join('\n');
 
+export const DISCOVER_SKILLS_TOOL_DESCRIPTION = [
+	'List installed skills that can be invoked in the current conversation.',
+	'',
+	'Use this when you need to inspect which skills exist before choosing one.',
+	'If the user already gave a specific slash command or explicit skill name, call `invoke_skill` directly instead.',
+].join('\n');
+
 export const buildSkillToolDescription = (): string => {
-	return SKILL_TOOL_DESCRIPTION;
+	return INVOKE_SKILL_TOOL_DESCRIPTION;
 };
 
 const buildInvocationArgsBlock = (args?: string): string => {
@@ -73,14 +88,49 @@ const resolveSkillDefinition = async (
 
 export function createSkillTools(
 	scanner: SkillScannerService
-): BuiltinTool<SkillToolInput>[] {
+): BuiltinTool[] {
 	return [{
-		name: SKILL_TOOL_NAME,
-		title: SKILL_TOOL_NAME,
+		name: DISCOVER_SKILLS_TOOL_NAME,
+		title: DISCOVER_SKILLS_TOOL_NAME,
+		description: DISCOVER_SKILLS_TOOL_DESCRIPTION,
+		inputSchema: discoverSkillsToolSchema,
+		annotations: readOnlyToolAnnotations,
+		async execute(args) {
+			const query = args.query?.trim().toLowerCase();
+			try {
+				const result = await scanner.scan();
+				const skills = result.skills
+					.filter((skill) => {
+						if (!query) {
+							return true;
+						}
+						return skill.metadata.name.toLowerCase().includes(query)
+							|| skill.metadata.description.toLowerCase().includes(query);
+					})
+					.map((skill) => ({
+						name: skill.metadata.name,
+						description: skill.metadata.description,
+						path: scanner.normalizePath(skill.skillFilePath),
+					}));
+				return {
+					skills,
+					meta: {
+						query: query ?? null,
+						returned: skills.length,
+						total: result.skills.length,
+					},
+				};
+			} catch (error) {
+				return `Skill 工具调用失败：${error instanceof Error ? error.message : String(error)}`;
+			}
+		},
+	}, {
+		name: INVOKE_SKILL_TOOL_NAME,
+		title: INVOKE_SKILL_TOOL_NAME,
 		description: buildSkillToolDescription(),
 		inputSchema: skillToolSchema,
 		annotations: readOnlyToolAnnotations,
-		async execute(args, context) {
+		async execute(args) {
 			const skillName = args.skill.trim();
 			if (!skillName) {
 				return 'Skill 工具调用失败：缺少有效的 skill 参数。';
@@ -88,7 +138,7 @@ export function createSkillTools(
 			try {
 				const definition = await resolveSkillDefinition(scanner, skillName);
 				if (!definition) {
-					return `Skill 工具调用失败：未找到名为 "${skillName}" 的 Skill，请检查 system prompt 中的 <skills> 列表。`;
+					return `Skill 工具调用失败：未找到名为 "${skillName}" 的 Skill，请先调用 ${DISCOVER_SKILLS_TOOL_NAME}。`;
 				}
 				const loaded = await loadSkillContent(scanner, definition.skillFilePath);
 				const result = formatSkillToolResult(

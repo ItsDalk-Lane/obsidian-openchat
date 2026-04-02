@@ -208,7 +208,7 @@ export const fetchSingleUrl: FetchSingleUrlHandler = async (
 					'',
 					'',
 					`<notice>内容已截断。使用 start_index=${nextStart}`,
-					`调用 fetch 工具获取更多内容（剩余约 ${remaining} 字符）。</notice>`,
+					`调用 fetch_webpage 获取更多内容（剩余约 ${remaining} 字符）。</notice>`,
 				].join('\n');
 			}
 		}

@@ -11,6 +11,126 @@ import type {
 	ProviderToolSurfaceMode,
 } from './provider-tool-capability-matrix';
 
+export type ToolRoutingAction =
+	| 'locate'
+	| 'search-content'
+	| 'read'
+	| 'write'
+	| 'metadata'
+	| 'workspace'
+	| 'web-fetch'
+	| 'web-search'
+	| 'time'
+	| 'workflow'
+	| 'unknown';
+
+export type ToolRoutingTargetKind =
+	| 'file'
+	| 'directory'
+	| 'selection'
+	| 'vault'
+	| 'workspace'
+	| 'url'
+	| 'skill'
+	| 'sub-agent'
+	| 'unknown';
+
+export type ToolRoutingTargetExplicitness = 'explicit' | 'contextual' | 'unknown';
+export type ToolRoutingScope = 'single' | 'multi' | 'vault' | 'workspace' | 'external' | 'unknown';
+export type ToolRoutingWriteIntent = 'none' | 'safe' | 'destructive';
+export type ToolRoutingConfidence = 'high' | 'medium' | 'low';
+export type ToolRoutingSelectionKind = 'none' | 'text' | 'file' | 'folder' | 'mixed';
+export type ToolRoutingWorkflowStage =
+	| 'initial'
+	| 'post-discovery'
+	| 'post-read'
+	| 'post-write'
+	| 'post-workflow';
+
+export type ToolRoutingQueryIndexDataSource = 'file' | 'property' | 'tag' | 'task';
+
+export interface ToolRoutingSelectionRange {
+	readonly from: number;
+	readonly to: number;
+}
+
+export interface ToolRoutingRecentDiscovery {
+	readonly toolName: string;
+	readonly hasResults: boolean;
+	readonly resultCount?: number;
+	readonly targetKind: ToolRoutingTargetKind;
+	readonly dataSource?: ToolRoutingQueryIndexDataSource;
+	readonly queryText?: string;
+	readonly resultFields?: readonly string[];
+	readonly resultReferencePaths?: readonly string[];
+	readonly resultReferenceUrls?: readonly string[];
+}
+
+export interface ToolRoutingRuntimeContext {
+	readonly activeFilePath?: string | null;
+}
+
+export interface ToolRoutingEnvironmentContext {
+	readonly hasSelectedText: boolean;
+	readonly hasSelectedFiles: boolean;
+	readonly hasSelectedFolders: boolean;
+	readonly hasContextualTarget: boolean;
+	readonly hasActiveFile: boolean;
+	readonly activeFilePath?: string;
+	readonly selectedTextFilePath?: string;
+	readonly selectedTextRange?: ToolRoutingSelectionRange;
+	readonly selectionKind: ToolRoutingSelectionKind;
+	readonly recentDiscovery?: ToolRoutingRecentDiscovery;
+	readonly latestToolNames: string[];
+	readonly workflowStage: ToolRoutingWorkflowStage;
+}
+
+export interface TaskSignature {
+	readonly normalizedQuery: string;
+	readonly nextAction: ToolRoutingAction;
+	readonly targetKind: ToolRoutingTargetKind;
+	readonly targetExplicitness: ToolRoutingTargetExplicitness;
+	readonly scope: ToolRoutingScope;
+	readonly writeIntent: ToolRoutingWriteIntent;
+	readonly confidence: ToolRoutingConfidence;
+	readonly explicitToolName?: string;
+	readonly environment: ToolRoutingEnvironmentContext;
+	readonly reasons: string[];
+}
+
+export interface ToolScoreBreakdown {
+	readonly domainMatch: number;
+	readonly targetFit: number;
+	readonly contextFit: number;
+	readonly workflowPrior: number;
+	readonly literalRecall: number;
+	readonly riskAdjustment: number;
+	readonly total: number;
+}
+
+export interface ToolScoreCard {
+	readonly toolName: string;
+	readonly familyId: string;
+	readonly sourceId: string;
+	readonly domainId: string;
+	readonly score: number;
+	readonly breakdown: ToolScoreBreakdown;
+	readonly blockedReasons: string[];
+}
+
+export interface CapabilityDomainScore {
+	readonly domainId: string;
+	readonly score: number;
+	readonly toolNames: string[];
+	readonly reasons: string[];
+}
+
+export interface ToolRoutingTrace {
+	readonly taskSignature: TaskSignature;
+	readonly selectedDomains: CapabilityDomainScore[];
+	readonly scoreCards: ToolScoreCard[];
+}
+
 export interface DiscoveryEntry {
 	readonly stableId: string;
 	readonly toolName: string;
@@ -48,6 +168,9 @@ export interface CandidateScope {
 	readonly candidateServerIds: string[];
 	readonly reasons: string[];
 	readonly query: string;
+	readonly selectedDomainIds?: string[];
+	readonly fallbackMode?: 'none' | 'conservative' | 'no-tool';
+	readonly routingTrace?: ToolRoutingTrace;
 }
 
 export interface ExecutableToolSet {
@@ -101,9 +224,11 @@ export interface DiscoveryCatalogBuildOptions {
 
 export interface CandidateResolutionInput {
 	readonly query: string;
+	readonly session: ChatSession;
 	readonly catalog: DiscoveryCatalog;
 	readonly workflowToolsDefaultHidden: boolean;
 	readonly workflowModeV1: boolean;
+	readonly routingContext?: ToolRoutingRuntimeContext;
 }
 
 export interface ToolSelectionCoordinator {

@@ -122,6 +122,7 @@ export const prepareChatRequest = async (
 			taskUserInput: originalUserInput,
 			taskTemplate,
 			selectedText: deps.state.selectedText,
+			selectedTextContext: deps.state.selectedTextContext,
 			triggerSource,
 		},
 	});
@@ -137,6 +138,7 @@ export const prepareChatRequest = async (
 	deps.state.selectedImages = [];
 	deps.attachmentSelectionService.clearSelection(false);
 	deps.state.selectedText = undefined;
+	deps.state.selectedTextContext = undefined;
 	deps.state.selectedPromptTemplate = undefined;
 	deps.emitState();
 

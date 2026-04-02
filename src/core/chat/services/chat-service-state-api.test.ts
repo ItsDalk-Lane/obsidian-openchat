@@ -17,6 +17,7 @@ const createStateStore = () => new ChatStateStore({
 	selectedImages: [],
 	selectedFiles: [],
 	selectedFolders: [],
+	selectedTextContext: undefined,
 	shouldSaveHistory: true,
 	multiModelMode: 'single',
 	layoutMode: 'horizontal',
@@ -84,6 +85,40 @@ test('createNewSession 不再在 session 上写入模板系统提示词标记', 
 	const session = api.createNewSession('新的聊天');
 
 	assert.equal(session.modelId, 'model-a');
+})
+
+test('setSelectedText 和 clearSelectedText 会同步维护选区上下文', () => {
+	const stateStore = createStateStore();
+	let emitCount = 0;
+
+	const internals = {
+		stateStore,
+		service: {
+			emitState: () => {
+				emitCount += 1;
+			},
+		} as ChatServiceInternals['service'],
+	} as ChatServiceInternals;
+
+	const api = createChatServiceStateApi(internals);
+	api.setSelectedText('片段', {
+		filePath: 'docs/spec.md',
+		range: { from: 3, to: 9 },
+		triggerSource: 'selection',
+	});
+
+	assert.equal(stateStore.getMutableState().selectedText, '片段');
+	assert.deepEqual(stateStore.getMutableState().selectedTextContext, {
+		filePath: 'docs/spec.md',
+		range: { from: 3, to: 9 },
+		triggerSource: 'selection',
+	});
+
+	api.clearSelectedText();
+
+	assert.equal(stateStore.getMutableState().selectedText, undefined);
+	assert.equal(stateStore.getMutableState().selectedTextContext, undefined);
+	assert.equal(emitCount, 2);
 })
 
 	test('deleteManagedImportedSelectedFile 会清理受管导入附件文件', async () => {
