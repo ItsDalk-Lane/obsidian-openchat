@@ -1,5 +1,4 @@
 import type { App } from 'obsidian';
-import { executeListDirectory } from '../filesystemListDirSupport';
 import type { ListDirectoryArgs } from '../filesystemToolSchemas';
 import type { ListVaultOverviewArgs } from './schema';
 
@@ -21,7 +20,10 @@ export const buildListVaultOverviewArgs = (
 	response_format: 'json',
 });
 
-export const executeListVaultOverview = (
+export const executeListVaultOverview = async (
 	app: App,
 	input: ListVaultOverviewArgs,
-): unknown => executeListDirectory(app, buildListVaultOverviewArgs(input));
+): Promise<unknown> => {
+	const { executeListDirectory } = await import('../filesystemListDirSupport');
+	return executeListDirectory(app, buildListVaultOverviewArgs(input));
+};

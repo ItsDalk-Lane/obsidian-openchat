@@ -1,5 +1,4 @@
 import type { App, FileSystemAdapter } from 'obsidian';
-import { Platform } from 'obsidian';
 import {
 	DEFAULT_SHELL_MAX_BUFFER,
 	DEFAULT_SHELL_TIMEOUT_MS,
@@ -9,7 +8,6 @@ import type {
 	BuiltinToolExecutionContext,
 	BuiltinValidationResult,
 } from '../../runtime/types';
-import { normalizeVaultPath } from '../../vault/helpers';
 import type { RunShellArgs, RunShellResult } from './schema';
 
 type ShellRisk = 'read-only' | 'mutating' | 'destructive' | 'unknown';
@@ -35,12 +33,35 @@ const DESTRUCTIVE_COMMAND_PATTERNS = [
 	/>+/u,
 ] as const;
 
+const loadObsidianRuntime = (): {
+	Platform?: { isDesktopApp?: boolean; isDesktop?: boolean };
+	FileSystemAdapter?: typeof FileSystemAdapter;
+} => {
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-var-requires
+		return require('obsidian') as typeof import('obsidian');
+	} catch {
+		return {};
+	}
+};
+
 const isDesktopShellSupported = (): boolean => {
-	return Platform.isDesktopApp || Platform.isDesktop;
+	const { Platform } = loadObsidianRuntime();
+	if (Platform) {
+		return Boolean(Platform.isDesktopApp || Platform.isDesktop);
+	}
+	return typeof process !== 'undefined';
 };
 
 const collapseCommand = (command?: string): string => {
 	return String(command ?? '').replace(/\s+/gu, ' ').trim();
+};
+
+const normalizeVaultRelativePath = (input: string): string => {
+	return String(input)
+		.replace(/\\/gu, '/')
+		.replace(/\/+/gu, '/')
+		.replace(/^\/+/, '');
 };
 
 export const summarizeRunShell = (
@@ -71,7 +92,7 @@ const normalizeRunShellCwd = (cwd?: string): string | undefined => {
 	if (hasParentTraversal(raw)) {
 		throw new Error('cwd 不能包含 ..');
 	}
-	return normalizeVaultPath(raw);
+	return normalizeVaultRelativePath(raw);
 };
 
 const normalizeRunShellArgs = (args: RunShellArgs): RunShellArgs => {
@@ -168,7 +189,8 @@ export const checkRunShellPermissions = async (
 
 const resolveVaultBasePath = (app: App): string | null => {
 	const adapter = app.vault.adapter;
-	if (adapter instanceof (Object.getPrototypeOf(adapter).constructor as typeof FileSystemAdapter)) {
+	const { FileSystemAdapter: ObsidianFileSystemAdapter } = loadObsidianRuntime();
+	if (ObsidianFileSystemAdapter && adapter instanceof ObsidianFileSystemAdapter) {
 		return (adapter as FileSystemAdapter).getBasePath();
 	}
 	const maybeAdapter = adapter as unknown as { getBasePath?: () => string };

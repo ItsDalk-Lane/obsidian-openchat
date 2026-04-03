@@ -1,5 +1,4 @@
 import type { App } from 'obsidian';
-import { executeListDirectory } from '../filesystemListDirSupport';
 import type { ListDirectoryArgs } from '../filesystemToolSchemas';
 import type { ListDirectoryTreeArgs } from './schema';
 
@@ -21,7 +20,10 @@ export const buildListDirectoryTreeArgs = (
 	response_format: 'json',
 });
 
-export const executeListDirectoryTree = (
+export const executeListDirectoryTree = async (
 	app: App,
 	input: ListDirectoryTreeArgs,
-): unknown => executeListDirectory(app, buildListDirectoryTreeArgs(input));
+): Promise<unknown> => {
+	const { executeListDirectory } = await import('../filesystemListDirSupport');
+	return executeListDirectory(app, buildListDirectoryTreeArgs(input));
+};

@@ -161,6 +161,97 @@ test('Step 11 run_shell 会进入确认流，并保持桌面端 shell 执行兼�
 	assert.ok(result.stdout.trim().endsWith('/src'));
 });
 
+test('Step 11 run_script 内部 call_tool 会复用嵌套工具的确认权限流', async () => {
+	installObsidianStub();
+	const [
+		{ BuiltinToolExecutor },
+		{ BuiltinToolRegistry },
+		{ createRunScriptTool },
+		{ createRunShellTool },
+		{ createRunCommandTool },
+		{ ScriptRuntime },
+	] = await Promise.all([
+		import('../runtime/BuiltinToolExecutor'),
+		import('../runtime/tool-registry'),
+		import('./run-script/tool'),
+		import('./run-shell/tool'),
+		import('../obsidian/commands/run-command/tool'),
+		import('../runtime/script-runtime'),
+	]);
+
+	const confirmations: string[] = [];
+	const executedCommands: string[] = [];
+	const app = {
+		vault: {
+			adapter: {
+				getBasePath: () => process.cwd(),
+			},
+		},
+		commands: {
+			findCommand: (commandId: string) => ({
+				id: commandId,
+				name: commandId,
+			}),
+			executeCommandById: (commandId: string) => {
+				executedCommands.push(commandId);
+				return true;
+			},
+		},
+		workspace: {
+			getActiveFile: () => ({ path: 'notes/current.md' }),
+		},
+	} as never;
+	const registry = new BuiltinToolRegistry();
+	const baseContext = {
+		app,
+		callTool: async () => null,
+	} as never;
+	const runtime = new ScriptRuntime({
+		callTool: async (name, args, toolContext) =>
+			await registry.call(name, args, toolContext ?? baseContext),
+		momentFactory: () => 'moment',
+	});
+	registry.register(createRunScriptTool(runtime));
+	registry.register(createRunCommandTool(app));
+	registry.register(createRunShellTool(app));
+	const executor = new BuiltinToolExecutor(registry, baseContext);
+
+	const result = await executor.execute({
+		id: 'call-script',
+		name: 'run_script',
+		arguments: JSON.stringify({
+			script: [
+				'const command = await call_tool("run_command", { command_id: "editor:toggle-bold" });',
+				'const shell = await call_tool("run_shell", { command: "pwd", cwd: "src" });',
+				'return { command, shell };',
+			].join('\n'),
+		}),
+	}, [{
+		name: 'run_script',
+		description: '执行受限脚本',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				script: { type: 'string' },
+			},
+			required: ['script'],
+		},
+		source: 'builtin',
+		sourceId: 'builtin',
+	}], {
+		requestConfirmation: async (request) => {
+			confirmations.push(request.toolName);
+			return { decision: 'allow' };
+		},
+	});
+
+	assert.equal(result.status, 'completed');
+	assert.deepEqual(confirmations, ['run_command', 'run_shell']);
+	assert.deepEqual(executedCommands, ['editor:toggle-bold']);
+	assert.match(result.content, /"command_id": "editor:toggle-bold"/);
+	assert.match(result.content, /"cwd": ".*src"/);
+});
+
 test('Step 11 legacy 入口改为复用新的 script 工具目录', async () => {
 	const scriptToolsSource = await readScriptSource('./script-tools.ts');
 	const runScriptToolSource = await readScriptSource('./run-script/tool.ts');

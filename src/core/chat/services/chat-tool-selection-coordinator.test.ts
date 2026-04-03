@@ -61,12 +61,85 @@ function createSettingsAccessor(toolSurface?: ToolSurfaceSettings): ChatSettings
 }
 
 function createTool(name: string, description: string, inputSchema: Record<string, unknown>): ToolDefinition {
+	const requiredArgs = Array.isArray(inputSchema.required)
+		? inputSchema.required.filter((field): field is string => typeof field === 'string')
+		: [];
+	const toolSurface = name === 'read_file'
+		? {
+			family: 'builtin.vault.read',
+			visibility: 'default',
+			argumentComplexity: 'medium',
+			riskLevel: 'read-only',
+			oneLinePurpose: '读取单个已知文件。',
+			capabilityTags: ['read', 'file', 'content'],
+			requiredArgsSummary: requiredArgs,
+		}
+		: name === 'find_paths'
+			? {
+				family: 'builtin.vault.discovery',
+				visibility: 'default',
+				argumentComplexity: 'medium',
+				riskLevel: 'read-only',
+				oneLinePurpose: '查找路径。',
+				capabilityTags: ['find', 'path', 'locate'],
+				requiredArgsSummary: requiredArgs,
+			}
+			: name === 'search_content'
+				? {
+					family: 'builtin.vault.search',
+					visibility: 'default',
+					argumentComplexity: 'medium',
+					riskLevel: 'read-only',
+					oneLinePurpose: '搜索正文内容。',
+					capabilityTags: ['search', 'content', 'text'],
+					requiredArgsSummary: requiredArgs,
+				}
+				: name === 'run_shell'
+					? {
+						family: 'escape.shell',
+						visibility: 'workflow-only',
+						argumentComplexity: 'high',
+						riskLevel: 'escape-hatch',
+						oneLinePurpose: '执行本机 shell 命令。',
+						capabilityTags: ['shell', 'terminal', 'command'],
+						requiredArgsSummary: requiredArgs,
+					}
+					: name === 'run_script'
+						? {
+							family: 'workflow.script',
+							visibility: 'workflow-only',
+							argumentComplexity: 'high',
+							riskLevel: 'mutating',
+							oneLinePurpose: '执行受限脚本编排。',
+							capabilityTags: ['script', 'workflow', 'tool-calling'],
+							requiredArgsSummary: requiredArgs,
+						}
+						: name === 'discover_sub_agents'
+							? {
+								family: 'builtin.delegate.discovery',
+								visibility: 'default',
+								argumentComplexity: 'medium',
+								riskLevel: 'read-only',
+								oneLinePurpose: '列出可委托的子代理。',
+								capabilityTags: ['sub-agent', 'delegate', 'discover'],
+								requiredArgsSummary: requiredArgs,
+							}
+							: {
+								family: 'builtin.test.misc',
+								visibility: 'default',
+								argumentComplexity: 'medium',
+								riskLevel: 'read-only',
+								oneLinePurpose: description,
+								capabilityTags: [],
+								requiredArgsSummary: requiredArgs,
+							};
 	return compileExecutableToolDefinition(attachToolSurfaceMetadata({
 		name,
 		description,
 		inputSchema,
 		source: 'builtin',
 		sourceId: 'builtin',
+		surface: toolSurface,
 	}));
 }
 

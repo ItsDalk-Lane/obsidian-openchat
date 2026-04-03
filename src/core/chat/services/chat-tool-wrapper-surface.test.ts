@@ -7,6 +7,10 @@ import { BuiltinToolRegistry, type BuiltinToolInfo } from 'src/tools/runtime/too
 import type { BuiltinTool, ToolContext } from 'src/tools/runtime/types';
 import { createTimeTools } from 'src/tools/time/time-tools';
 import { createTimeWrapperTools } from 'src/tools/time/time-wrapper-tools';
+import { createListDirectoryTool } from 'src/tools/vault/list-directory/tool';
+import { createListDirectoryFlatTool } from 'src/tools/vault/list-directory-flat/tool';
+import { createListDirectoryTreeTool } from 'src/tools/vault/list-directory-tree/tool';
+import { createListVaultOverviewTool } from 'src/tools/vault/list-vault-overview/tool';
 import {
 	listDirectorySchema,
 	structuredOutputSchema,
@@ -277,10 +281,10 @@ test('fetch wrapper 会缩小 schema 并与 legacy fetch 保持相同执行结�
 
 test('vault wrapper 会提供独立的 flat schema，并隐藏 legacy list_directory 默认 surface', () => {
 	const filesystemTools = [
-		createBuiltinStub('list_directory', listDirectorySchema),
-		createBuiltinStub('list_directory_flat', listDirectoryFlatSchema),
-		createBuiltinStub('list_directory_tree', listDirectoryTreeSchema),
-		createBuiltinStub('list_vault_overview', listVaultOverviewSchema),
+		createListDirectoryTool({} as never),
+		createListDirectoryFlatTool({} as never),
+		createListDirectoryTreeTool({} as never),
+		createListVaultOverviewTool({} as never),
 	];
 	const filesystemToolInfos = createBuiltinInfos(filesystemTools);
 	assert.deepEqual(getSchemaProperties('list_directory_flat', filesystemTools), [
@@ -402,8 +406,13 @@ test('vault wrapper 会把窄 schema 映射为 legacy list_directory 参数', ()
 		include_sizes: true,
 		sort_by: 'size',
 		regex: '.*',
+		exclude_patterns: [],
 		limit: 20,
 		offset: 5,
+		max_depth: 5,
+		max_nodes: 200,
+		file_extensions: [],
+		vault_limit: 1_000,
 		response_format: 'json',
 	});
 
@@ -416,9 +425,16 @@ test('vault wrapper 会把窄 schema 映射为 legacy list_directory 参数', ()
 	assert.deepEqual(buildListDirectoryTreeArgs(treeArgs), {
 		directory_path: 'projects',
 		view: 'tree',
+		include_sizes: false,
+		sort_by: 'name',
+		regex: undefined,
 		exclude_patterns: ['archive/**'],
+		limit: 100,
+		offset: 0,
 		max_depth: 4,
 		max_nodes: 20,
+		file_extensions: [],
+		vault_limit: 1_000,
 		response_format: 'json',
 	});
 
@@ -429,6 +445,14 @@ test('vault wrapper 会把窄 schema 映射为 legacy list_directory 参数', ()
 	assert.deepEqual(buildListVaultOverviewArgs(overviewArgs), {
 		directory_path: '/',
 		view: 'vault',
+		include_sizes: false,
+		sort_by: 'name',
+		regex: undefined,
+		exclude_patterns: [],
+		limit: 100,
+		offset: 0,
+		max_depth: 5,
+		max_nodes: 200,
 		file_extensions: ['md'],
 		vault_limit: 10,
 		response_format: 'json',
@@ -443,10 +467,10 @@ test('ChatToolSelectionCoordinator 会在时间与网页请求下优先选择 wr
 	};
 	const surfaceFlags = resolveToolSurfaceSettings({ toolSurface });
 	const filesystemSurfaceTools = [
-		createBuiltinStub('list_directory', listDirectorySchema),
-		createBuiltinStub('list_directory_flat', listDirectoryFlatSchema),
-		createBuiltinStub('list_directory_tree', listDirectoryTreeSchema),
-		createBuiltinStub('list_vault_overview', listVaultOverviewSchema),
+		createListDirectoryTool({} as never),
+		createListDirectoryFlatTool({} as never),
+		createListDirectoryTreeTool({} as never),
+		createListVaultOverviewTool({} as never),
 	];
 	const filesystemSurfaceToolInfos = createBuiltinInfos(filesystemSurfaceTools);
 	const catalogTools = createSurfaceDefinitions([

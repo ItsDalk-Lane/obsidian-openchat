@@ -56,6 +56,7 @@ export const executeRunScript = async (
 ): Promise<unknown> => {
 	return await scriptRuntime.execute(args.script, {
 		abortSignal: context.abortSignal,
+		toolContext: context,
 		onToolCall: (event) => {
 			context.reportProgress?.({
 				message: buildToolCallMessage(event),

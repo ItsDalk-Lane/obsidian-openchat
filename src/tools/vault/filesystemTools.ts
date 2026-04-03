@@ -52,12 +52,10 @@ export async function createFilesystemBuiltinRuntime(
 			if (closed) {
 				throw new Error('Filesystem builtin runtime 已关闭');
 			}
-			try {
-				const result = await registry.call(name, args, context);
-				return serializeMcpToolResult(normalizeStructuredToolResult(result));
-			} catch (error) {
-				return formatToolError(error);
-			}
+			const result = await registry.execute(name, args, context);
+			return result.status === 'completed'
+				? result.serializedResult
+				: formatToolError(result.content);
 		},
 		listTools: async () => {
 			if (closed) {

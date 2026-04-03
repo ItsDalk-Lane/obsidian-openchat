@@ -1,5 +1,4 @@
 import type { App } from 'obsidian';
-import { executeListDirectory } from '../filesystemListDirSupport';
 import type { ListDirectoryArgs } from '../filesystemToolSchemas';
 import type { ListDirectoryFlatArgs } from './schema';
 
@@ -21,7 +20,10 @@ export const buildListDirectoryFlatArgs = (
 	response_format: 'json',
 });
 
-export const executeListDirectoryFlat = (
+export const executeListDirectoryFlat = async (
 	app: App,
 	input: ListDirectoryFlatArgs,
-): unknown => executeListDirectory(app, buildListDirectoryFlatArgs(input));
+): Promise<unknown> => {
+	const { executeListDirectory } = await import('../filesystemListDirSupport');
+	return executeListDirectory(app, buildListDirectoryFlatArgs(input));
+};

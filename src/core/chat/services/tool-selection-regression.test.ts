@@ -1,42 +1,43 @@
 import assert from 'node:assert/strict';
+import Module from 'node:module';
 import test from 'node:test';
-import { z } from 'zod';
 import { cloneAiRuntimeSettings } from 'src/domains/settings/config-ai-runtime';
+import type { SkillScannerService } from 'src/domains/skills/service';
+import type {
+	LoadedSkillContent,
+	SkillDefinition,
+	SkillScanResult,
+} from 'src/domains/skills/types';
 import type { ToolSurfaceSettings } from 'src/domains/settings/types-ai-runtime';
-import { BuiltinToolRegistry, type BuiltinToolInfo } from 'src/tools/runtime/tool-registry';
-import type { BuiltinTool } from 'src/tools/runtime/types';
+import { PlanState } from 'src/tools/runtime/plan-state';
+import { ScriptRuntime } from 'src/tools/runtime/script-runtime';
+import { BuiltinToolRegistry } from 'src/tools/runtime/tool-registry';
+import { createWritePlanTool } from 'src/tools/plan/write-plan/tool';
+import { createSkillTools } from 'src/tools/skill/skill-tools';
 import {
-	DISCOVER_SKILLS_TOOL_NAME,
-	INVOKE_SKILL_TOOL_NAME,
-} from 'src/tools/skill/skill-tools';
+	createDelegateSubAgentToolDefinition,
+	createDiscoverSubAgentsToolDefinition,
+} from 'src/tools/sub-agents/subAgentTools';
 import { createTimeTools } from 'src/tools/time/time-tools';
 import { createTimeWrapperTools } from 'src/tools/time/time-wrapper-tools';
 import { createFetchTools } from 'src/tools/web/fetch-tools';
 import { createFetchWrapperTools } from 'src/tools/web/fetch-wrapper-tools';
-import {
-	listDirectorySchema,
-	structuredOutputSchema,
-} from 'src/tools/vault/filesystemToolSchemas';
-import {
-	listDirectoryFlatSchema,
-	listDirectoryTreeSchema,
-	listVaultOverviewSchema,
-} from 'src/tools/vault/filesystemWrapperSupport';
 import type { ToolDefinition } from 'src/types/tool';
 import {
 	buildDiscoveryCatalog,
 	compileExecutableToolDefinition,
 	createBuiltinToolDefinition,
+	createSubAgentDiscoveryTool,
 } from './chat-tool-discovery-catalog';
 import { resolveToolSurfaceSettings } from './chat-tool-feature-flags';
 import { ChatToolSelectionCoordinator } from './chat-tool-selection-coordinator';
 import type { ChatSettingsAccessor } from './chat-service-types';
 import type { ChatToolRuntimeResolver } from './chat-tool-runtime-resolver';
-import type { ChatSession } from '../types/chat';
 import {
 	TOOL_SELECTION_REGRESSION_CASES,
 	type ToolSelectionRegressionCase,
 } from './__fixtures__/tool-selection-regression';
+import type { ChatSession } from '../types/chat';
 
 function createSession(content: string): ChatSession {
 	return {
@@ -65,6 +66,138 @@ function createSession(content: string): ChatSession {
 	};
 }
 
+const SKILL_DEFINITION: SkillDefinition = {
+	metadata: {
+		name: 'pdf',
+		description: 'Inspect PDF files and attachments.',
+	},
+	skillFilePath: 'System/AI Data/skills/pdf/SKILL.md',
+	basePath: 'System/AI Data/skills/pdf',
+};
+
+const installObsidianStub = (): void => {
+	const globalScope = globalThis as typeof globalThis & {
+		__obsidianRegressionStubInstalled?: boolean;
+	};
+	if (globalScope.__obsidianRegressionStubInstalled) {
+		return;
+	}
+	const moduleLoader = Module as typeof Module & {
+		_load: (request: string, parent: object | null, isMain: boolean) => unknown;
+	};
+	const originalLoad = moduleLoader._load;
+	moduleLoader._load = (request, parent, isMain) => {
+		if (request === 'obsidian') {
+			class FileSystemAdapter {
+				constructor(private readonly basePath = process.cwd()) {}
+
+				getBasePath(): string {
+					return this.basePath;
+				}
+			}
+
+			class TAbstractFile {}
+			class TFile extends TAbstractFile {}
+			class TFolder extends TAbstractFile {}
+
+			return {
+				App: class App {},
+				FileSystemAdapter,
+				Platform: {
+					isDesktopApp: true,
+					isDesktop: true,
+				},
+				TAbstractFile,
+				TFile,
+				TFolder,
+				normalizePath: (value: string) =>
+					value.replace(/\\/gu, '/').replace(/\/+/gu, '/'),
+				requestUrl: async () => ({
+					status: 200,
+					headers: {},
+					text: '',
+				}),
+			};
+		}
+		return originalLoad(request, parent, isMain);
+	};
+	globalScope.__obsidianRegressionStubInstalled = true;
+};
+
+const loadToolFactories = async () => {
+	installObsidianStub();
+	const [
+		{ createRunScriptTool },
+		{ createRunShellTool },
+		{ createFindPathsTool },
+		{ createListDirectoryFlatTool },
+		{ createListDirectoryTreeTool },
+		{ createListDirectoryTool },
+		{ createListVaultOverviewTool },
+		{ createQueryIndexTool },
+		{ createReadFileTool },
+		{ createSearchContentTool },
+		{ createBingSearchTools },
+	] = await Promise.all([
+		import('src/tools/script/run-script/tool'),
+		import('src/tools/script/run-shell/tool'),
+		import('src/tools/vault/find-paths/tool'),
+		import('src/tools/vault/list-directory-flat/tool'),
+		import('src/tools/vault/list-directory-tree/tool'),
+		import('src/tools/vault/list-directory/tool'),
+		import('src/tools/vault/list-vault-overview/tool'),
+		import('src/tools/vault/query-index/tool'),
+		import('src/tools/vault/read-file/tool'),
+		import('src/tools/vault/search-content/tool'),
+		import('src/tools/web/bing-search-tools'),
+	]);
+	return {
+		createRunScriptTool,
+		createRunShellTool,
+		createFindPathsTool,
+		createListDirectoryFlatTool,
+		createListDirectoryTreeTool,
+		createListDirectoryTool,
+		createListVaultOverviewTool,
+		createQueryIndexTool,
+		createReadFileTool,
+		createSearchContentTool,
+		createBingSearchTools,
+	};
+};
+
+function createSkillScanner(): SkillScannerService {
+	const scanResult: SkillScanResult = {
+		skills: [SKILL_DEFINITION],
+		errors: [],
+	};
+
+	return {
+		scan: async () => scanResult,
+		findByName: (name: string) =>
+			name === SKILL_DEFINITION.metadata.name ? SKILL_DEFINITION : undefined,
+		normalizePath: (path: string) => path,
+		loadSkillContent: async (): Promise<LoadedSkillContent> => ({
+			definition: SKILL_DEFINITION,
+			fullContent: SKILL_DEFINITION.metadata.description,
+			bodyContent: SKILL_DEFINITION.metadata.description,
+		}),
+	} as unknown as SkillScannerService;
+}
+
+function createAppStub() {
+	return {
+		vault: {
+			adapter: {
+				getBasePath: () => process.cwd(),
+			},
+		},
+		workspace: {
+			getActiveFile: () => null,
+		},
+	} as never;
+}
+
 function createSettingsAccessor(toolSurface?: ToolSurfaceSettings): ChatSettingsAccessor {
 	const aiRuntimeSettings = cloneAiRuntimeSettings();
 	aiRuntimeSettings.toolSurface = {
@@ -84,111 +217,76 @@ function createSettingsAccessor(toolSurface?: ToolSurfaceSettings): ChatSettings
 	};
 }
 
-function createBuiltinStub(
-	name: string,
-	inputSchema: BuiltinTool['inputSchema'],
-): BuiltinTool {
-	return {
-		name,
-		title: name,
-		description: name,
-		inputSchema,
-		outputSchema: structuredOutputSchema,
-		execute: async () => null,
-	};
-}
-
-function createBuiltinInfos(tools: BuiltinTool[]): BuiltinToolInfo[] {
-	const registry = new BuiltinToolRegistry();
-	registry.registerAll(tools);
-	return registry.listTools('builtin');
-}
-
-function createSurfaceDefinitions(toolSurface?: ToolSurfaceSettings): ToolDefinition[] {
-	const surfaceFlags = resolveToolSurfaceSettings({ toolSurface });
-	const builtinToolInfos = createBuiltinInfos([
-		createBuiltinStub('read_file', z.object({
-			file_path: z.string(),
-		})),
-		createBuiltinStub('find_paths', z.object({
-			query: z.string(),
-		})),
-		createBuiltinStub('search_content', z.object({
-			pattern: z.string(),
-		})),
-		createBuiltinStub('query_index', z.object({
-			data_source: z.string(),
-			query: z.string(),
-		})),
-		createBuiltinStub('bing_search', z.object({
-			query: z.string(),
-		})),
-		createBuiltinStub('run_shell', z.object({
-			command: z.string(),
-		})),
-		createBuiltinStub('run_script', z.object({
-			script: z.string(),
-		})),
-		createBuiltinStub('write_plan', z.object({
-			items: z.array(z.string()).optional(),
-		})),
-		createBuiltinStub(INVOKE_SKILL_TOOL_NAME, z.object({
-			skillName: z.string().optional(),
-			task: z.string().optional(),
-		})),
-		createBuiltinStub(DISCOVER_SKILLS_TOOL_NAME, z.object({
-			query: z.string().optional(),
-		})),
-		createBuiltinStub('discover_sub_agents', z.object({
-			query: z.string().optional(),
-		})),
-		createBuiltinStub('delegate_sub_agent', z.object({
-			agent: z.string().optional(),
-			task: z.string().optional(),
-		})),
-		createBuiltinStub('list_directory', listDirectorySchema),
-		createBuiltinStub('list_directory_flat', listDirectoryFlatSchema),
-		createBuiltinStub('list_directory_tree', listDirectoryTreeSchema),
-		createBuiltinStub('list_vault_overview', listVaultOverviewSchema),
-	]);
+async function createSurfaceDefinitions(toolSurface?: ToolSurfaceSettings): Promise<ToolDefinition[]> {
+	const {
+		createRunScriptTool,
+		createRunShellTool,
+		createFindPathsTool,
+		createListDirectoryFlatTool,
+		createListDirectoryTreeTool,
+		createListDirectoryTool,
+		createListVaultOverviewTool,
+		createQueryIndexTool,
+		createReadFileTool,
+		createSearchContentTool,
+		createBingSearchTools,
+	} = await loadToolFactories();
+	const app = createAppStub();
+	const scriptRuntime = new ScriptRuntime({
+		callTool: async () => null,
+		momentFactory: () => null,
+	});
 	const registry = new BuiltinToolRegistry();
 	registry.registerAll([
 		...createTimeTools({ defaultTimezone: 'UTC' }),
 		...createTimeWrapperTools({ defaultTimezone: 'UTC' }),
-		...createFetchTools({ runtime: {
-			fetchSingleUrl: async () => 'legacy',
-			fetchBatch: async () => [],
-		} }),
-		...createFetchWrapperTools({ runtime: {
-			fetchSingleUrl: async () => 'wrapper',
-			fetchBatch: async () => [],
-		} }),
+		...createFetchTools(),
+		...createFetchWrapperTools(),
+		createReadFileTool(app),
+		createFindPathsTool(app),
+		createSearchContentTool(app),
+		createQueryIndexTool(app),
+		...createBingSearchTools(),
+		createRunShellTool(app),
+		createRunScriptTool(scriptRuntime),
+		createWritePlanTool(new PlanState()),
+		...createSkillTools(createSkillScanner()),
+		createListDirectoryTool(app),
+		createListDirectoryFlatTool(app),
+		createListDirectoryTreeTool(app),
+		createListVaultOverviewTool(app),
 	]);
-	const coreTools = registry.listTools('builtin').map((tool) =>
+	const surfaceFlags = resolveToolSurfaceSettings({ toolSurface });
+	const builtinTools = registry.listTools('builtin').map((tool) =>
 		createBuiltinToolDefinition(tool, { surfaceFlags }),
 	);
-	const stubbedTools = builtinToolInfos.map((tool) =>
-		createBuiltinToolDefinition(tool, { surfaceFlags }),
-	);
-	return [...coreTools, ...stubbedTools].map((tool) => compileExecutableToolDefinition(tool));
+	const subAgentTools = [
+		createSubAgentDiscoveryTool(createDiscoverSubAgentsToolDefinition()),
+		createSubAgentDiscoveryTool(createDelegateSubAgentToolDefinition()),
+	];
+	return [...builtinTools, ...subAgentTools]
+		.map((tool) => compileExecutableToolDefinition(tool));
 }
 
 function createCoordinator(caseItem: ToolSelectionRegressionCase): ChatToolSelectionCoordinator {
-	const allTools = createSurfaceDefinitions(caseItem.toolSurface);
+	const allToolsPromise = createSurfaceDefinitions(caseItem.toolSurface);
 	const fakeResolver = {
 		async buildDiscoveryCatalog() {
+			const allTools = await allToolsPromise;
 			return buildDiscoveryCatalog({ tools: allTools, serverEntries: [] });
 		},
 		async resolveToolRuntime(options?: { explicitToolNames?: string[] }) {
-			const requestTools = allTools.filter((tool) =>
-				options?.explicitToolNames?.includes(tool.name),
-			);
+			const allTools = await allToolsPromise;
+			const requestTools = options?.explicitToolNames?.length
+				? allTools.filter((tool) => options.explicitToolNames?.includes(tool.name))
+				: allTools;
 			return {
 				requestTools,
 				getTools: async () => requestTools,
 			};
 		},
 	} as unknown as ChatToolRuntimeResolver;
+
 	return new ChatToolSelectionCoordinator({
 		toolRuntimeResolver: fakeResolver,
 		settingsAccessor: createSettingsAccessor(caseItem.toolSurface),

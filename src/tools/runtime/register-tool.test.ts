@@ -103,3 +103,74 @@ test('registerBuiltinTool 新 shape 会保留 surface/runtimePolicy 邻近元数
 		'{\n  "ok": true\n}',
 	);
 });
+
+test('BuiltinToolRegistry 会解析 alias 并保持对外 canonical 名称', async () => {
+	const { server } = createServerStub();
+	const registry = new BuiltinToolRegistry();
+
+	registerBuiltinTool(
+		server as never,
+		registry,
+		{
+			name: 'invoke_skill',
+			title: 'Invoke Skill',
+			description: 'invoke skill',
+			aliases: ['Skill'],
+			inputSchema: z.object({
+				skill: z.string(),
+			}),
+			execute: async (args: { skill: string }) => args.skill,
+		},
+	);
+
+	assert.equal(registry.getCanonicalName('Skill'), 'invoke_skill');
+	assert.ok(registry.get('Skill'));
+	assert.deepEqual(
+		registry.listTools('builtin').find((tool) => tool.name === 'invoke_skill')?.aliases,
+		['Skill'],
+	);
+
+	const result = await registry.call(
+		'Skill',
+		{ skill: 'pdf' },
+		{
+			app: {} as never,
+			callTool: async () => null,
+		},
+	);
+	assert.equal(result, 'pdf');
+});
+
+test('registerBuiltinTool 的 MCP handler 会复用完整权限流水线', async () => {
+	const { server, calls } = createServerStub();
+	const registry = new BuiltinToolRegistry();
+	let executed = false;
+
+	registerBuiltinTool(
+		server as never,
+		registry,
+		{
+			name: 'dangerous_tool',
+			title: 'Dangerous Tool',
+			description: 'dangerous tool',
+			inputSchema: z.object({
+				path: z.string().optional(),
+			}),
+			checkPermissions: () => ({
+				behavior: 'ask',
+				message: '危险操作需要确认',
+			}),
+			execute: async () => {
+				executed = true;
+				return { ok: true };
+			},
+		},
+	);
+
+	const result = await calls[0]!.handler({});
+	assert.equal(executed, false);
+	assert.match(
+		serializeMcpToolResult(result as Parameters<typeof serializeMcpToolResult>[0]),
+		/危险操作需要确认/,
+	);
+});

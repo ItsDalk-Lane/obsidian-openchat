@@ -8,6 +8,7 @@ import type {
 } from 'src/domains/skills/types';
 import type { SkillScannerService } from 'src/domains/skills/service';
 import type { ToolContext } from '../runtime/types';
+import { BuiltinToolRegistry } from '../runtime/tool-registry';
 import {
 	createSkillTools,
 	DISCOVER_SKILLS_TOOL_NAME,
@@ -83,6 +84,20 @@ function requireTool(scanner: SkillScannerService, toolName: string) {
 test('Skill 工具名称常量保持 canonical 与 legacy 对齐', () => {
 	assert.equal(INVOKE_SKILL_TOOL_NAME, 'invoke_skill');
 	assert.equal(LEGACY_INVOKE_SKILL_TOOL_NAME, 'Skill');
+});
+
+test('Skill alias 会进入 registry 元数据但不生成第二个 canonical 工具名', () => {
+	const registry = new BuiltinToolRegistry();
+	registry.registerAll(createSkillTools(createScanner([PDF_SKILL])));
+
+	assert.deepEqual(
+		registry.listToolNames(),
+		[DISCOVER_SKILLS_TOOL_NAME, INVOKE_SKILL_TOOL_NAME],
+	);
+	assert.deepEqual(
+		registry.listTools('builtin').find((tool) => tool.name === INVOKE_SKILL_TOOL_NAME)?.aliases,
+		[LEGACY_INVOKE_SKILL_TOOL_NAME],
+	);
 });
 
 test('discover_skills 会按 query 过滤并返回规范化路径', async () => {

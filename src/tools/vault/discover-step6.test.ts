@@ -80,6 +80,7 @@ test('legacy 注册入口已复用新的 discover 工具工厂，并保留 wrapp
 	assert.match(wrapperSource, /createListDirectoryFlatTool/);
 	assert.match(wrapperSource, /createListDirectoryTreeTool/);
 	assert.match(wrapperSource, /createListVaultOverviewTool/);
+	assert.match(listDirSource, /createListDirectoryTool/);
 	assert.match(
 		wrapperSource,
 		/registerBuiltinTool\(server, registry, createListDirectoryFlatTool\(app\)\)/,
@@ -87,5 +88,8 @@ test('legacy 注册入口已复用新的 discover 工具工厂，并保留 wrapp
 	assert.match(wrapperSupportSource, /from '\.\/list-directory-flat\/service'/);
 	assert.match(wrapperSupportSource, /from '\.\/list-directory-tree\/service'/);
 	assert.match(wrapperSupportSource, /from '\.\/list-vault-overview\/service'/);
-	assert.match(listDirSource, /'list_directory'/);
+	assert.match(
+		listDirSource,
+		/registerBuiltinTool\(server, registry, createListDirectoryTool\(app\)\)/,
+	);
 });

@@ -3,7 +3,6 @@ import type { McpToolAnnotations } from 'src/services/mcp/types';
 import { z } from 'zod';
 import { buildBuiltinTool, type BuiltinToolInput } from './build-tool';
 import { BuiltinToolRegistry } from './tool-registry';
-import { normalizeBuiltinToolExecutionResult } from './tool-result';
 import type {
 	BuiltinTool,
 	BuiltinToolExecutionContext,
@@ -108,8 +107,19 @@ export function registerBuiltinTool<TArgs extends Record<string, unknown>, TResu
 		async (args: Record<string, unknown>) => {
 			try {
 				const context = createMcpRegistrationContext();
-				const result = await tool.execute(args as TArgs, context);
-				return normalizeBuiltinToolExecutionResult(tool, result, context);
+				const result = await registry.execute(tool.name, args, context);
+				if (result.status === 'completed') {
+					return result.normalizedResult;
+				}
+				return {
+					isError: true,
+					content: [
+						{
+							type: 'text' as const,
+							text: result.content,
+						},
+					],
+				};
 			} catch (error) {
 				return {
 					isError: true,

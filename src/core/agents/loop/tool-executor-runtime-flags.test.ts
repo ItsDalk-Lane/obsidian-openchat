@@ -420,6 +420,57 @@ test('BuiltinToolExecutor 会在 outputSchema 不匹配时返回 output-validati
 	assert.match(result.content, /工具输出校验失败/);
 });
 
+test('BuiltinToolExecutor 会解析 alias 并保持 canonical 结果名', async () => {
+	const registry = createBuiltinRegistry();
+	registry.register(buildBuiltinTool({
+		name: 'invoke_skill',
+		aliases: ['Skill'],
+		description: '调用 Skill',
+		inputSchema: z.object({
+			skill: z.string(),
+		}),
+		execute: async (args: { skill: string }) => ({
+			skill: args.skill,
+		}),
+	}));
+	const executor = new BuiltinToolExecutor(registry, {
+		app: {
+			workspace: {
+				getActiveFile: () => ({ path: 'notes/current.md' }),
+			},
+		},
+		callTool: async () => null,
+	} as never);
+
+	const result = await executor.execute({
+		id: 'call-8',
+		name: 'Skill',
+		arguments: JSON.stringify({
+			skill: 'pdf',
+		}),
+	}, [{
+		name: 'invoke_skill',
+		description: '调用 Skill',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				skill: { type: 'string' },
+			},
+			required: ['skill'],
+		},
+		source: 'builtin',
+		sourceId: 'builtin',
+		compatibility: {
+			version: 1,
+			legacyCallNames: ['invoke_skill', 'Skill'],
+		},
+	}]);
+
+	assert.equal(result.status, 'completed');
+	assert.equal(result.name, 'invoke_skill');
+	assert.match(result.content, /"skill": "pdf"/);
+});
+
 test('McpToolExecutor 会在 runtimeArgCompletionV2 开启时注入默认参数', async () => {
 	const tool = createMcpTool();
 	const receivedArgs: Record<string, unknown>[] = [];

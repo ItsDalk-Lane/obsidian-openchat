@@ -19,11 +19,10 @@ import {
 } from './plan-state';
 import { ScriptRuntime } from './script-runtime';
 import { BuiltinToolRegistry, type BuiltinToolInfo } from './tool-registry';
-import {
-	normalizeStructuredToolResult,
-	serializeMcpToolResult,
-} from './tool-result';
-import type { ToolContext } from './types';
+import type {
+	BuiltinToolExecutionContext,
+	ToolContext,
+} from './types';
 import { createCanvasTools } from '../canvas/canvas-tools';
 import { createLinkTools } from '../link/link-tools';
 import { createGraphTools } from '../graph/graph-tools';
@@ -85,16 +84,35 @@ export async function createBuiltinToolsRuntime(
 	const planState = new PlanState();
 
 	// eslint-disable-next-line prefer-const -- context 与 scriptRuntime 存在循环依赖
-	let context!: ToolContext;
+	let context!: BuiltinToolExecutionContext<unknown>;
+	const executeBuiltinCall = async (
+		name: string,
+		args: Record<string, unknown>,
+		callContext: BuiltinToolExecutionContext<unknown>,
+	) => await registry.execute(name, args, callContext, {
+		abortSignal: callContext.abortSignal,
+	});
+	const callBuiltinTool = async (
+		name: string,
+		args: Record<string, unknown>,
+		callContext: BuiltinToolExecutionContext<unknown>,
+	): Promise<unknown> => {
+		const result = await executeBuiltinCall(name, args, callContext);
+		if (result.status === 'failed') {
+			throw new Error(result.content);
+		}
+		return result.publicResult;
+	};
 	const scriptRuntime = new ScriptRuntime({
-		callTool: async (name, args) => await registry.call(name, args, context),
+		callTool: async (name, args, callContext) =>
+			await callBuiltinTool(name, args, callContext ?? context),
 		momentFactory: (...args: unknown[]) =>
 			(moment as unknown as (...innerArgs: unknown[]) => unknown)(...args),
 	});
 
 	context = {
 		app: options.app,
-		callTool: async (name, args) => await registry.call(name, args, context),
+		callTool: async (name, args) => await callBuiltinTool(name, args, context),
 	};
 
 	if (settings.builtinCoreToolsEnabled !== false) {
@@ -151,8 +169,10 @@ export async function createBuiltinToolsRuntime(
 		name: string,
 		args: Record<string, unknown>
 	): Promise<string> => {
-		const result = await registry.call(name, args, context);
-		return serializeMcpToolResult(normalizeStructuredToolResult(result));
+		const result = await executeBuiltinCall(name, args, context);
+		return result.status === 'completed'
+			? result.serializedResult
+			: result.content;
 	};
 
 	const close = async (): Promise<void> => {

@@ -1,4 +1,5 @@
 import { DEFAULT_SCRIPT_TIMEOUT_MS } from './constants';
+import type { BuiltinToolExecutionContext } from './types';
 
 type AsyncFunctionType = new (
 	...args: string[]
@@ -27,7 +28,11 @@ const blockedPatterns: RegExp[] = [
 ];
 
 export interface ScriptRuntimeDependencies {
-	callTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
+	callTool: (
+		name: string,
+		args: Record<string, unknown>,
+		context?: BuiltinToolExecutionContext<unknown>,
+	) => Promise<unknown>;
 	momentFactory: (...args: unknown[]) => unknown;
 }
 
@@ -40,6 +45,7 @@ export interface ScriptToolCallEvent {
 export interface ScriptExecutionOptions {
 	readonly timeoutMs?: number;
 	readonly abortSignal?: AbortSignal;
+	readonly toolContext?: BuiltinToolExecutionContext<unknown>;
 	readonly onToolCall?: (event: ScriptToolCallEvent) => void;
 }
 
@@ -158,7 +164,11 @@ export class ScriptRuntime {
 					args: args ?? {},
 					callIndex: toolCallIndex,
 				});
-				return await this.dependencies.callTool(toolName, args ?? {});
+				return await this.dependencies.callTool(
+					toolName,
+					args ?? {},
+					executionOptions.toolContext,
+				);
 			};
 
 			const moment = (...args: unknown[]): unknown => {

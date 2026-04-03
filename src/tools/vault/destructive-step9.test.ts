@@ -42,12 +42,15 @@ test('Step 9 tool 源码声明 destructive 确认流与并发风险', async () =
 
 test('Step 9 legacy 入口与描述文件改为复用新破坏性工具目录', async () => {
 	const handlerSource = await readVaultSource('./filesystemSearchHandlers.ts');
+	const readWriteHandlerSource = await readVaultSource('./filesystemReadWriteHandlers.ts');
 	const descriptionsSource = await readVaultSource('./filesystemToolDescriptions.ts');
 	const moveDescriptionSource = await readVaultSource('./move-path/description.ts');
 	const deleteDescriptionSource = await readVaultSource('./delete-path/description.ts');
 
-	assert.match(handlerSource, /createMovePathTool\(app\)/);
-	assert.match(handlerSource, /createDeletePathTool\(app\)/);
+	assert.doesNotMatch(handlerSource, /createMovePathTool\(app\)/);
+	assert.doesNotMatch(handlerSource, /createDeletePathTool\(app\)/);
+	assert.match(readWriteHandlerSource, /createMovePathTool\(app\)/);
+	assert.match(readWriteHandlerSource, /createDeletePathTool\(app\)/);
 	assert.match(descriptionsSource, /move-path\/description/);
 	assert.match(descriptionsSource, /delete-path\/description/);
 	assert.match(moveDescriptionSource, /目标路径仍不稳定时/);
