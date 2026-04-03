@@ -1,4 +1,5 @@
 import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime';
+import type { SkillReturnPacket } from 'src/domains/skills/session-state';
 import type { PreparedChatRequest } from './chat-service-types';
 import type { ChatMessageOperationDeps } from './chat-message-operations';
 import type { ChatMessageMutationDeps } from './chat-message-mutations';
@@ -9,6 +10,7 @@ export interface ChatMessageOperationFacade {
 		options?: { skipImageSupportValidation?: boolean },
 	): Promise<PreparedChatRequest | null>;
 	sendMessage(content?: string): Promise<void>;
+	saveSkillExecutionResult(packet: SkillReturnPacket): Promise<void>;
 }
 
 export interface ChatMessageMutationFacade {
@@ -30,6 +32,10 @@ export interface ChatMessageOperationFacadeOperations {
 	sendMessage(
 		deps: ChatMessageOperationDeps,
 		content?: string,
+	): Promise<void>;
+	saveSkillExecutionResult(
+		deps: ChatMessageOperationDeps,
+		packet: SkillReturnPacket,
 	): Promise<void>;
 }
 
@@ -76,6 +82,8 @@ export const createChatMessageOperationFacade = (
 	prepareChatRequest: async (content, options) =>
 		await operations.prepareChatRequest(getDeps(), content, options),
 	sendMessage: async (content) => await operations.sendMessage(getDeps(), content),
+	saveSkillExecutionResult: async (packet) =>
+		await operations.saveSkillExecutionResult(getDeps(), packet),
 });
 
 export const createChatMessageMutationFacade = (

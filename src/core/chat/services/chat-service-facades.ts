@@ -38,6 +38,7 @@ import {
 	resolveChatContextBudget as resolveChatContextBudgetHelper,
 } from './chat-provider-messages';
 import {
+	saveSkillExecutionResult as saveSkillExecutionResultHelper,
 	prepareChatRequest as prepareChatRequestHelper,
 	sendMessage as sendMessageHelper,
 } from './chat-message-operations';
@@ -61,6 +62,7 @@ import {
 	rewriteSessionMessages as rewriteSessionMessagesHelper,
 	syncSessionMultiModelState as syncSessionMultiModelStateHelper,
 } from './chat-settings-persistence';
+import { createChatSkillExecutionService } from './chat-skill-execution';
 import {
 	getChatPersistenceDeps,
 	buildGenerationDeps,
@@ -91,6 +93,7 @@ export const getMessageOperationFacade = (
 			{
 				prepareChatRequest: prepareChatRequestHelper,
 				sendMessage: sendMessageHelper,
+				saveSkillExecutionResult: saveSkillExecutionResultHelper,
 			},
 		);
 	}
@@ -168,10 +171,10 @@ export const ensureCommandFacade = (internals: ChatServiceInternals): ChatComman
 			{
 				getExecuteSkillCommandParams: () => ({
 					obsidianApi: internals.obsidianApi,
-					state: internals.stateStore.getMutableState(),
-					emitState: () => internals.service.emitState(),
-					loadInstalledSkills: async () => await internals.service.loadInstalledSkills(),
-					sendMessage: async (content?: string) => await internals.service.sendMessage(content),
+					executeSkillExecution: async (request) =>
+						await internals.service.executeSkillExecution(request),
+					saveSkillExecutionResult: async (packet) =>
+						await getMessageOperationFacade(internals).saveSkillExecutionResult(packet),
 				}),
 				getExecuteSubAgentCommandParams: () => ({
 					state: internals.stateStore.getMutableState(),
@@ -199,4 +202,11 @@ export const ensureCommandFacade = (internals: ChatServiceInternals): ChatComman
 		);
 	}
 	return internals.commandFacade;
+};
+
+export const getSkillExecutionService = (internals: ChatServiceInternals) => {
+	if (!internals.skillExecutionService) {
+		internals.skillExecutionService = createChatSkillExecutionService(internals);
+	}
+	return internals.skillExecutionService;
 };

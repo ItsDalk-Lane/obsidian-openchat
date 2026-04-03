@@ -1,15 +1,16 @@
-## 2026-04-03 Skill 系统重构实施计划
+# 2026-04-03 Skill 系统重构实施计划
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
-| 0. 架构蓝图与 Codex 执行文件落库 | completed | 已新增 skill 重构 blueprint、roadmap、playbook，后续实现按单 Step 对话推进 |
-| 1. Skill manifest 与解析兼容升级 | pending | 目标是引入新 frontmatter 结构与默认值，但保持旧 `SKILL.md` 兼容 |
-| 2. Source / Registry 主干落地 | pending | 目标是只保留本地来源实现，但抽象出可扩展来源接口与统一快照 |
-| 3. 本地 Skill 管理能力落地 | pending | 目标是支持创建、更新、删除、启用/禁用，并作为设置页操作基础 |
-| 4. 设置页 Skill 管理 UI 落地 | pending | 目标是在保留简洁列表的前提下接入编辑、删除、启停、创建表单 |
-| 5. Skill 会话态与执行器落地 | pending | 目标是实现 `isolated_resume` 主任务恢复模型与统一执行主链 |
-| 6. slash command / invoke_skill 收敛 | pending | 目标是让两条入口共用同一 SkillExecutionService |
-| 7. relevant resolver 与最终收口 | pending | 目标是收敛相关 Skill 注入、测试、文档与手工验证清单 |
+| 0. 架构蓝图与 Codex 执行文件落库 | completed | 已新增 blueprint、roadmap、playbook |
+| 1. Skill manifest 与解析兼容升级 | completed | 已完成 Step 01 类型扩展与兼容解析 |
+| 2. Source / Registry 主干落地 | completed | 已完成 Step 02-03，source 与 registry 已落地 |
+| 3. 本地 Skill 管理能力落地 | completed | 已完成 Step 04，本地 CRUD 与启停写回已具备 |
+| 3.5 服务桥接与监听收敛 | completed | 已完成 Step 05，旧 scanner 与 runtime 监听链已接入新主干 |
+| 4. 设置页 Skill 管理 UI 落地 | completed | 已完成 Step 06-08，列表动作、编辑模态与创建表单已落地 |
+| 5. Skill 会话态与执行器落地 | completed | 已完成 Step 09-10，会话状态基础与统一执行器已落地 |
+| 6. slash command / invoke_skill 收敛 | completed | Step 11-12 已完成，共用执行主干 |
+| 7. relevant resolver 与最终收口 | completed | 已完成 Step 13-14，Skill 收口已完成 |
 
 ## 2026-04-03 内置工具功能优化状态摘要
 
@@ -54,7 +55,51 @@
 
 ## 当前优先下一步
 
-- Skill 系统重构后续应按
-  `docs/designs/2026-04-03-skill-system-codex-roadmap.md`
-  的 Step 01 开始执行。
+- Skill 系统重构路线图已在 Step 14 收尾完成。
+- 如需继续推进，不应继续在当前 roadmap 内追加 Step；应先新建下一轮路线图，
+  再进入新的 Step 01。
 - 内置工具方向的后续工作只剩真实 Obsidian 手工 smoke test 与发布准备。
+
+## 2026-04-03 Skill 系统重构收口摘要
+
+- 已落地模块：
+  - `src/domains/skills`：manifest 兼容解析、source / registry、CRUD、runtime filtering、execution、session-state
+  - `src/components/skills` 与 `src/components/chat-components`：
+    设置页列表动作、编辑模态、创建表单、slash 可执行 Skill 列表
+  - `src/core/chat/services` 与 `src/tools/skill`：
+    `/skill`、`invoke_skill`、discover/relevance prompt 注入、
+    Skill 返回包写回
+- 本轮修复收口：
+  - 运行时默认忽略 disabled skill，设置页仍显示全部 Skill
+  - `inline + allowed_tools` 已定为非法组合，并同步到 UI、执行器、spec、tests
+  - Skill 相关 `tsc` 回归已清零；最新 `tsc` 日志只剩仓库无关基线错误
+  - `lint:taste` 指定问题已清零：`saveSkillExecutionResult` 命名与非 barrel export 均已落地
+- 验证口径：
+  - `npx tsc --noEmit` 已执行；Skill 相关文件不再出现在最新日志中，
+    但全仓仍有无关基线错误
+  - 已执行命令：
+
+    ```bash
+    npm run lint:taste -- src/domains/skills src/components/skills \
+      src/core/chat/services/chat-skill-execution.ts \
+      src/core/chat/services/chat-commands.ts src/tools/skill
+    npx tsx --test src/domains/skills/skills.test.ts \
+      src/domains/skills/execution.test.ts \
+      src/domains/skills/session-state.test.ts \
+      src/core/chat/services/chat-skill-execution.test.ts \
+      src/core/chat/services/chat-message-operations.test.ts \
+      src/core/chat/services/chat-service-history-api.test.ts \
+      src/components/chat-components/chatSettingsIntegrationTabs.test.tsx \
+      src/components/skills/SkillEditorModal.test.tsx \
+      src/components/skills/CreateSkillForm.test.tsx \
+      src/tools/skill/skill-tools.test.ts
+    npm run build
+    ```
+
+- 残余风险：
+  - 全仓 `tsc` 仍有与 Skill 无关的基线错误，需要独立治理
+  - 真实 Obsidian smoke checklist 仍需人工执行，本轮未伪造结果
+  - `inline` 仍不支持 `allowed_tools` 白名单，这是本轮刻意保留的兼容边界
+- 推荐下一步：
+  - 不再在当前 roadmap 内继续补 Step；若继续推进 Skill，先新建下一轮 roadmap
+  - 并在新一轮中优先选择“清理无关全局 TypeScript 基线”或“执行真实 Obsidian smoke”之一

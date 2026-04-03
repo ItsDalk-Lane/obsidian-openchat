@@ -1,9 +1,18 @@
 import { localInstance } from 'src/i18n/locals';
 import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime';
+import {
+	beginSkillSession,
+	restoreMainTaskState,
+	writeSkillReturnPacket,
+} from 'src/domains/skills/session-state';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { McpSettings } from 'src/types/mcp';
 import type { ChatSession } from '../types/chat';
-import type { SavedChatSessionState } from './chat-service-types';
+import type {
+	FreezeSkillMainTaskInput,
+	SavedChatSessionState,
+	WriteActiveSkillReturnPacketInput,
+} from './chat-service-types';
 import type { LayoutMode, MultiModelMode } from '../types/multiModel';
 import type { ChatServiceInternals } from './chat-service-internals';
 import { cloneValue as cloneValueHelper } from './chat-settings-persistence';
@@ -29,6 +38,9 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 			selectedFolders: selection.selectedFolders,
 			selectedText: state.selectedText,
 			selectedTextContext: state.selectedTextContext,
+			skillSessionState: state.skillSessionState
+				? JSON.parse(JSON.stringify(state.skillSessionState))
+				: null,
 		};
 	},
 	restoreSessionState(savedState: SavedChatSessionState): void {
@@ -40,6 +52,9 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 		}
 		state.selectedText = savedState.selectedText;
 		state.selectedTextContext = savedState.selectedTextContext;
+		state.skillSessionState = savedState.skillSessionState
+			? JSON.parse(JSON.stringify(savedState.skillSessionState))
+			: null;
 		internals.attachmentSelectionService.restoreSelection(
 			{ selectedFiles: savedState.selectedFiles, selectedFolders: savedState.selectedFolders },
 			false,
@@ -92,6 +107,7 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 		state.selectedPromptTemplate = undefined;
 		state.selectedText = undefined;
 		state.selectedTextContext = undefined;
+		state.skillSessionState = null;
 		internals.service.emitState();
 		internals.service.queueSessionPlanSync(session);
 	},
@@ -113,6 +129,17 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 	getInstalledSkillsSnapshot() { return internals.runtimeDeps.getInstalledSkillsSnapshot(); },
 	getInstalledSubAgentsSnapshot() { return internals.subAgentScannerService.getCachedResult(); },
 	async loadInstalledSkills() { return await internals.runtimeDeps.scanSkills(); },
+	async loadRunnableSkills() {
+		await internals.runtimeDeps.ensureSkillsInitialized();
+		const scanner = internals.runtimeDeps.getSkillScannerService();
+		if (scanner) {
+			return await scanner.scanRuntimeSkills();
+		}
+		return await internals.runtimeDeps.scanSkills().then((result) => ({
+			...result,
+			skills: result.skills.filter((skill) => skill.metadata.enabled !== false),
+		}));
+	},
 	async refreshInstalledSkills() { return await internals.runtimeDeps.refreshSkills(); },
 	async loadInstalledSubAgents() { return await internals.subAgentScannerService.scan(); },
 	async refreshInstalledSubAgents() { return await internals.subAgentWatcherService.refresh(); },
@@ -147,6 +174,31 @@ export const createChatServiceHistoryApi = (internals: ChatServiceInternals) => 
 		session.contextCompaction = null;
 		session.requestTokenState = null;
 		void internals.service.persistSessionContextCompactionFrontmatter(session);
+	},
+	freezeSkillMainTask(input: FreezeSkillMainTaskInput) {
+		const state = internals.stateStore.getMutableState();
+		const skillSessionState = beginSkillSession(state, input);
+		state.skillSessionState = skillSessionState;
+		internals.service.emitState();
+		return JSON.parse(JSON.stringify(skillSessionState.activeInvocation));
+	},
+	writeActiveSkillReturnPacket(input: WriteActiveSkillReturnPacketInput) {
+		const state = internals.stateStore.getMutableState();
+		const skillSessionState = writeSkillReturnPacket(state.skillSessionState, input);
+		state.skillSessionState = skillSessionState;
+		internals.service.emitState();
+		return JSON.parse(JSON.stringify(skillSessionState.activeInvocation));
+	},
+	restoreSkillMainTask() {
+		const state = internals.stateStore.getMutableState();
+		const hadActiveInvocation = Boolean(state.skillSessionState?.activeInvocation);
+		const returnPacket = restoreMainTaskState(state, state.skillSessionState);
+		if (!hadActiveInvocation) {
+			return null;
+		}
+		internals.service.emitState();
+		internals.service.queueSessionPlanSync(state.activeSession);
+		return returnPacket;
 	},
 	async executeSkillCommand(skillName: string): Promise<void> { await ensureCommandFacade(internals).executeSkillCommand(skillName); },
 	async executeSubAgentCommand(agentName: string, task?: string): Promise<void> { await ensureCommandFacade(internals).executeSubAgentCommand(agentName, task); },

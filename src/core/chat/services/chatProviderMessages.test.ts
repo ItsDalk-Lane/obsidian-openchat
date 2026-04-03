@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
 import Module from 'node:module';
 import test from 'node:test';
-import { PromptBuilder } from 'src/core/services/PromptBuilder';
+import {
+	PromptBuilder,
+	type PromptBuilderContextMessageParams,
+} from 'src/core/services/PromptBuilder';
 import { DEFAULT_CHAT_SETTINGS } from 'src/domains/chat/config';
+import {
+	DISCOVER_SKILLS_TOOL_NAME,
+	INVOKE_SKILL_TOOL_NAME,
+} from 'src/tools/skill/skill-tools';
 import {
 	createChatProviderMessageFacade,
 } from './chat-provider-message-facade';
@@ -16,15 +23,43 @@ import type { ChatMessage, ChatSettings, ChatState, ChatSession } from '../types
 
 const ensureWindowLocalStorage = (): void => {
 	const globalScope = globalThis as typeof globalThis & {
-		window?: { localStorage?: { getItem: (key: string) => string | null } }
+		window?: Window & typeof globalThis
+	}
+	const localStorage: Storage = {
+		length: 0,
+		clear: () => {},
+		getItem: () => 'en',
+		key: () => null,
+		removeItem: () => {},
+		setItem: () => {},
 	}
 	globalScope.window = {
-		...(globalScope.window ?? {}),
-		localStorage: {
-			getItem: () => 'en',
-		},
-	}
+		...(globalScope.window ?? ({} as Window & typeof globalThis)),
+		localStorage,
+	} as Window & typeof globalThis
 };
+
+type MessageStubExtras = {
+	images?: string[];
+	isError?: boolean;
+	metadata?: Record<string, unknown>;
+	toolCalls?: unknown[];
+};
+
+const createEphemeralMessage = (
+	role: ChatMessage['role'],
+	content: string,
+	extras?: MessageStubExtras,
+): ChatMessage => ({
+	id: 'message-ephemeral',
+	role,
+	content,
+	timestamp: 1,
+	images: extras?.images ?? [],
+	isError: extras?.isError ?? false,
+	metadata: extras?.metadata ?? {},
+	toolCalls: (extras?.toolCalls ?? []) as never[],
+});
 
 const installObsidianStub = (): void => {
 	const globalScope = globalThis as typeof globalThis & {
@@ -142,19 +177,15 @@ test('buildProviderMessagesForAgent 忽略会话里遗留的模板系统提示�
 	let capturedSystemPrompt: string | undefined;
 	const deps = createProviderMessageDeps(DEFAULT_CHAT_SETTINGS, DEFAULT_CHAT_SETTINGS);
 	deps.messageService = {
-		createMessage: (role, content, extras) => ({
-			id: 'message-ephemeral',
-			role,
-			content,
-			timestamp: 1,
-			images: [],
-			isError: false,
-			metadata: extras?.metadata ?? {},
-			toolCalls: [],
-		}),
+		createMessage: createEphemeralMessage,
 		buildContextProviderMessage: async () => null,
-		toProviderMessages: async (messages: ChatMessage[], options) => {
-			capturedSystemPrompt = options?.systemPrompt;
+		toProviderMessages: async (
+			messages: ChatMessage[],
+			options?: { systemPrompt?: string },
+		) => {
+			if (options?.systemPrompt) {
+				capturedSystemPrompt = options.systemPrompt;
+			}
 			return messages.map((message) => ({
 				role: message.role === 'assistant' ? 'assistant' : 'user',
 				content: message.content,
@@ -229,10 +260,6 @@ test('PromptBuilder 会把 selected_text 源标签写入上下文 XML', async ()
 		selectedFolders: [],
 		contextNotes: [],
 		selectedText: 'const value = 1;',
-		selectedTextContext: {
-			filePath: 'src/example.ts',
-			range: { from: 5, to: 20, startLine: 3, endLine: 3 },
-		},
 		selectedTextSource: 'selected_text @ src/example.ts#L3',
 		sourcePath: '',
 	});
@@ -250,24 +277,18 @@ test('buildProviderMessagesForAgent 会把选区文件与范围注入 provider p
 	let capturedSelectedTextSource: string | null | undefined;
 	const deps = createProviderMessageDeps(DEFAULT_CHAT_SETTINGS, DEFAULT_CHAT_SETTINGS);
 	deps.messageService = {
-		createMessage: (role, content, extras) => ({
-			id: 'message-ephemeral',
-			role,
-			content,
-			timestamp: 1,
-			images: [],
-			isError: false,
-			metadata: extras?.metadata ?? {},
-			toolCalls: [],
-		}),
-		buildContextProviderMessage: async (params) => {
+		createMessage: createEphemeralMessage,
+		buildContextProviderMessage: async (params: PromptBuilderContextMessageParams) => {
 			capturedSelectedTextSource = params.selectedTextSource;
 			return {
 				role: 'user',
 				content: '<documents />',
 			};
 		},
-		toProviderMessages: async (messages: ChatMessage[], options) => {
+		toProviderMessages: async (
+			messages: ChatMessage[],
+			options?: { systemPrompt?: string },
+		) => {
 			if (options?.systemPrompt) {
 				capturedSystemPrompt = options.systemPrompt;
 			}
@@ -333,6 +354,234 @@ test('buildProviderMessagesForAgent 会把选区文件与范围注入 provider p
 	assert.match(capturedSystemPrompt ?? '', /selected_text_file=src\/example.ts/);
 	assert.match(capturedSystemPrompt ?? '', /selected_text_lines=3-6/);
 	assert.match(capturedSystemPrompt ?? '', /edit_file_strategy=/);
+});
+
+test('buildProviderMessagesWithOptions 只向 skills resolver 传入当前请求的相关上下文', async () => {
+	ensureWindowLocalStorage();
+	installObsidianStub();
+	const { buildProviderMessagesWithOptions } = await import('./chat-provider-messages');
+	let capturedSystemPrompt: string | undefined;
+	let capturedSkillsInput:
+		| { requestTools: { name: string }[]; relevanceQuery?: string; limit?: number }
+		| undefined;
+	const deps = createProviderMessageDeps(DEFAULT_CHAT_SETTINGS, DEFAULT_CHAT_SETTINGS);
+	deps.messageService = {
+		createMessage: createEphemeralMessage,
+		buildContextProviderMessage: async () => null,
+		toProviderMessages: async (
+			messages: ChatMessage[],
+			options?: { systemPrompt?: string },
+		) => {
+			capturedSystemPrompt = options?.systemPrompt;
+			return messages.map((message) => ({
+				role: message.role === 'assistant' ? 'assistant' : 'user',
+				content: message.content,
+			}));
+		},
+	} as never;
+	deps.messageContextOptimizer = {
+		estimateChatTokens: () => 1,
+		optimize: async (messages: ChatMessage[]) => ({
+			messages,
+			historyTokenEstimate: 1,
+			contextCompaction: null,
+		}),
+	} as never;
+	deps.contextCompactionService = {
+		compactContextProviderMessage: async () => ({
+			message: null,
+			summary: '',
+			signature: '',
+			tokenEstimate: 0,
+		}),
+	} as never;
+	deps.resolveSkillsSystemPromptBlock = async (input) => {
+		capturedSkillsInput = {
+			requestTools: input.requestTools.map((tool) => ({ name: tool.name })),
+			relevanceQuery: input.relevanceQuery,
+			limit: input.limit,
+		};
+		return '<skills>\n  <skill><name>pdf</name></skill>\n</skills>';
+	};
+
+	const userMessage: ChatMessage = {
+		id: 'message-3',
+		role: 'user',
+		content: '请把季度报告整理为 PDF。',
+		timestamp: 1,
+		images: [],
+		isError: false,
+		metadata: {
+			selectedText: 'Quarterly report draft',
+			selectedTextContext: {
+				filePath: 'docs/report.md',
+				range: { from: 1, to: 24, startLine: 1, endLine: 3 },
+			},
+		},
+		toolCalls: [],
+	};
+	const session: ChatSession = {
+		id: 'session-3',
+		title: 'Chat',
+		modelId: 'model-a',
+		messages: [userMessage],
+		createdAt: 1,
+		updatedAt: 1,
+		livePlan: null,
+		contextCompaction: null,
+		requestTokenState: null,
+	};
+
+	await buildProviderMessagesWithOptions(deps, session, {
+		taskDescription: '生成 PDF 版本并保持结构清晰',
+		requestTools: [{ name: DISCOVER_SKILLS_TOOL_NAME } as never],
+	});
+
+	assert.deepEqual(capturedSkillsInput?.requestTools, [{ name: DISCOVER_SKILLS_TOOL_NAME }]);
+	assert.match(capturedSkillsInput?.relevanceQuery ?? '', /当前任务：生成 PDF 版本并保持结构清晰/);
+	assert.ok((capturedSkillsInput?.relevanceQuery?.length ?? 0) > 0);
+});
+
+test('buildProviderMessagesWithOptions 在没有 skill 工具时不会注入 skills block', async () => {
+	ensureWindowLocalStorage();
+	installObsidianStub();
+	const { buildProviderMessagesWithOptions } = await import('./chat-provider-messages');
+	let capturedSystemPrompt: string | undefined;
+	const deps = createProviderMessageDeps(DEFAULT_CHAT_SETTINGS, DEFAULT_CHAT_SETTINGS);
+	deps.messageService = {
+		createMessage: createEphemeralMessage,
+		buildContextProviderMessage: async () => null,
+		toProviderMessages: async (
+			messages: ChatMessage[],
+			options?: { systemPrompt?: string },
+		) => {
+			capturedSystemPrompt = options?.systemPrompt;
+			return messages.map((message) => ({
+				role: message.role === 'assistant' ? 'assistant' : 'user',
+				content: message.content,
+			}));
+		},
+	} as never;
+	deps.messageContextOptimizer = {
+		estimateChatTokens: () => 1,
+		optimize: async (messages: ChatMessage[]) => ({
+			messages,
+			historyTokenEstimate: 1,
+			contextCompaction: null,
+		}),
+	} as never;
+	deps.contextCompactionService = {
+		compactContextProviderMessage: async () => ({
+			message: null,
+			summary: '',
+			signature: '',
+			tokenEstimate: 0,
+		}),
+	} as never;
+	deps.resolveSkillsSystemPromptBlock = async () => undefined;
+
+	const userMessage: ChatMessage = {
+		id: 'message-4',
+		role: 'user',
+		content: '请修改这段实现',
+		timestamp: 1,
+		images: [],
+		isError: false,
+		metadata: {},
+		toolCalls: [],
+	};
+	const session: ChatSession = {
+		id: 'session-4',
+		title: 'Chat',
+		modelId: 'model-a',
+		messages: [userMessage],
+		createdAt: 1,
+		updatedAt: 1,
+		livePlan: null,
+		contextCompaction: null,
+		requestTokenState: null,
+	};
+
+	await buildProviderMessagesWithOptions(deps, session, {
+		requestTools: [],
+	});
+
+	assert.doesNotMatch(capturedSystemPrompt ?? '', /<skills>/);
+});
+
+test('buildProviderMessagesWithOptions 在只有 invoke_skill 时也会注入 skills block', async () => {
+	ensureWindowLocalStorage();
+	installObsidianStub();
+	const { buildProviderMessagesWithOptions } = await import('./chat-provider-messages');
+	let capturedSkillsInput:
+		| { requestTools: { name: string }[]; relevanceQuery?: string; limit?: number }
+		| undefined;
+	const deps = createProviderMessageDeps(DEFAULT_CHAT_SETTINGS, DEFAULT_CHAT_SETTINGS);
+	deps.messageService = {
+		createMessage: createEphemeralMessage,
+		buildContextProviderMessage: async () => null,
+		toProviderMessages: async (messages: ChatMessage[]) => {
+			return messages.map((message) => ({
+				role: message.role === 'assistant' ? 'assistant' : 'user',
+				content: message.content,
+			}));
+		},
+	} as never;
+	deps.messageContextOptimizer = {
+		estimateChatTokens: () => 1,
+		optimize: async (messages: ChatMessage[]) => ({
+			messages,
+			historyTokenEstimate: 1,
+			contextCompaction: null,
+		}),
+	} as never;
+	deps.contextCompactionService = {
+		compactContextProviderMessage: async () => ({
+			message: null,
+			summary: '',
+			signature: '',
+			tokenEstimate: 0,
+		}),
+	} as never;
+	deps.resolveSkillsSystemPromptBlock = async (input) => {
+		capturedSkillsInput = {
+			requestTools: input.requestTools.map((tool) => ({ name: tool.name })),
+			relevanceQuery: input.relevanceQuery,
+			limit: input.limit,
+		};
+		return '<skills>\n  <skill><name>pdf</name></skill>\n</skills>';
+	};
+
+	const userMessage: ChatMessage = {
+		id: 'message-5',
+		role: 'user',
+		content: '直接帮我执行 pdf skill。',
+		timestamp: 1,
+		images: [],
+		isError: false,
+		metadata: {},
+		toolCalls: [],
+	};
+	const session: ChatSession = {
+		id: 'session-5',
+		title: 'Chat',
+		modelId: 'model-a',
+		messages: [userMessage],
+		createdAt: 1,
+		updatedAt: 1,
+		livePlan: null,
+		contextCompaction: null,
+		requestTokenState: null,
+	};
+
+	await buildProviderMessagesWithOptions(deps, session, {
+		taskDescription: '执行 pdf skill 并返回结果',
+		requestTools: [{ name: INVOKE_SKILL_TOOL_NAME } as never],
+	});
+
+	assert.deepEqual(capturedSkillsInput?.requestTools, [{ name: INVOKE_SKILL_TOOL_NAME }]);
+	assert.match(capturedSkillsInput?.relevanceQuery ?? '', /执行 pdf skill 并返回结果/);
+	assert.ok((capturedSkillsInput?.relevanceQuery?.length ?? 0) > 0);
 });
 
 test('buildSelectionContextPromptBlock 在缺少行范围时仍会保留文件锚点', () => {

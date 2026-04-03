@@ -27,16 +27,19 @@ const createOperationDeps = (
 	isCurrentModelSupportImageGeneration: () => false,
 	ensurePlanSyncReady: async () => {},
 	generateAssistantResponse: async () => {},
+	saveActiveSession: async () => {},
+	queueSessionPlanSync: () => {},
 });
 
 const createMutationDeps = (
 	multiModelService: MultiModelChatService | null,
 ): ChatMessageMutationDeps => ({
-	app: null as never,
 	state: null as never,
 	sessionManager: null as never,
 	multiModelService,
 	emitState: () => {},
+	notify: () => {},
+	insertTextIntoMarkdownEditor: () => ({ inserted: false }),
 	invalidateSessionContextCompaction: () => {},
 	queueSessionPlanSync: () => {},
 	generateAssistantResponse: async () => {},
@@ -60,6 +63,9 @@ test('createChatMessageOperationFacade 每次调用都读取最新 multiModelSer
 				return null;
 			},
 			sendMessage: async (deps) => {
+				capturedService = deps.multiModelService;
+			},
+			saveSkillExecutionResult: async (deps) => {
 				capturedService = deps.multiModelService;
 			},
 		},

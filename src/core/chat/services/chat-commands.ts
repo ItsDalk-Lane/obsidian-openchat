@@ -2,18 +2,17 @@ import { availableVendors } from 'src/domains/settings/config-ai-runtime-vendors
 import { localInstance } from 'src/i18n/locals'
 import { DebugLogger } from 'src/utils/DebugLogger'
 import type { SubAgentScanResult } from 'src/tools/sub-agents/types'
-import type { SkillScanResult } from 'src/domains/skills/types'
+import type { SkillExecutionRequest } from 'src/domains/skills/execution'
+import type { SkillReturnPacket } from 'src/domains/skills/session-state'
 import type { ChatSession, ChatState } from '../types/chat'
 import type { PreparedChatRequest } from './chat-service-types'
 import type { ProviderSettings } from 'src/types/provider'
 import type { ObsidianApiProvider } from 'src/providers/providers.types'
 
 export interface ExecuteSkillCommandParams {
-	obsidianApi: Pick<ObsidianApiProvider, 'getVaultEntry' | 'notify' | 'readVaultFile'>
-	state: ChatState
-	emitState: () => void
-	loadInstalledSkills: () => Promise<SkillScanResult>
-	sendMessage: (content?: string) => Promise<void>
+	obsidianApi: Pick<ObsidianApiProvider, 'notify'>
+	executeSkillExecution: (request: SkillExecutionRequest) => Promise<SkillReturnPacket>
+	saveSkillExecutionResult: (packet: SkillReturnPacket) => Promise<void>
 }
 
 export interface ExecuteSubAgentCommandParams {
@@ -39,54 +38,45 @@ export interface ExecuteSubAgentCommandParams {
 	) => Promise<unknown>
 	emitState: () => void
 }
+
+const notifySkillExecutionFailure = (
+	params: ExecuteSkillCommandParams,
+	packet: SkillReturnPacket,
+): void => {
+	if (packet.content.includes('未找到名为')) {
+		params.obsidianApi.notify(
+			localInstance.chat_skill_not_found_prefix.replace('{name}', packet.skillName),
+		)
+		return
+	}
+	if (packet.content === `Skill "${packet.skillName}" 没有可用的内容。`) {
+		params.obsidianApi.notify(
+			localInstance.chat_skill_content_empty_prefix.replace('{name}', packet.skillName),
+		)
+		return
+	}
+	params.obsidianApi.notify(
+		localInstance.chat_skill_execute_failed_prefix.replace('{reason}', packet.content),
+	)
+}
+
 export const executeSkillCommand = async (
 	params: ExecuteSkillCommandParams,
 	skillName: string
 ): Promise<void> => {
-	const skillsResult = await params.loadInstalledSkills()
-	const skill = skillsResult.skills.find((item) => item.metadata.name === skillName)
-
-	if (!skill) {
-		params.obsidianApi.notify(
-			localInstance.chat_skill_not_found_prefix.replace('{name}', skillName)
-		)
-		return
-	}
-
 	try {
-		const file = params.obsidianApi.getVaultEntry(skill.skillFilePath)
-		if (!file) {
-			params.obsidianApi.notify(
-				localInstance.chat_skill_file_missing_prefix.replace('{path}', skill.skillFilePath)
-			)
+		const packet = await params.executeSkillExecution({
+			skillName,
+			trigger: 'slash_command',
+		})
+		if (packet.status === 'failed') {
+			notifySkillExecutionFailure(params, packet)
 			return
 		}
-		if (file.kind !== 'file') {
-			params.obsidianApi.notify(
-				localInstance.chat_skill_path_invalid_prefix.replace('{path}', skill.skillFilePath)
-			)
+		if (packet.metadata?.executionMode === 'inline') {
 			return
 		}
-
-		const fullContent = await params.obsidianApi.readVaultFile(skill.skillFilePath)
-		const bodyContent = fullContent
-			.replace(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\s*\r?\n)?/, '')
-			.trim()
-		if (!bodyContent) {
-			params.obsidianApi.notify(
-				localInstance.chat_skill_content_empty_prefix.replace('{name}', skillName)
-			)
-			return
-		}
-
-		params.state.selectedPromptTemplate = {
-			name: skill.metadata.name,
-			path: skill.skillFilePath,
-			content: bodyContent
-		}
-		params.state.inputValue = ''
-		params.emitState()
-		await params.sendMessage('')
+		await params.saveSkillExecutionResult(packet)
 	} catch (error) {
 		const reason = error instanceof Error ? error.message : String(error)
 		params.obsidianApi.notify(

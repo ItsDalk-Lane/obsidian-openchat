@@ -185,6 +185,21 @@ function createSkillScanner(): SkillScannerService {
 	} as unknown as SkillScannerService;
 }
 
+const executeSkillExecution = async () => ({
+	invocationId: 'invoke-1',
+	skillId: SKILL_DEFINITION.skillFilePath,
+	skillName: SKILL_DEFINITION.metadata.name,
+	status: 'completed' as const,
+	content: 'skill-result',
+	sessionId: 'chat-main',
+	messageCount: 2,
+	producedAt: 1,
+	metadata: {
+		executionMode: 'isolated_resume',
+		trigger: 'invoke_skill',
+	},
+});
+
 function createAppStub() {
 	return {
 		vault: {
@@ -250,7 +265,7 @@ async function createSurfaceDefinitions(toolSurface?: ToolSurfaceSettings): Prom
 		createRunShellTool(app),
 		createRunScriptTool(scriptRuntime),
 		createWritePlanTool(new PlanState()),
-		...createSkillTools(createSkillScanner()),
+		...createSkillTools(createSkillScanner(), executeSkillExecution),
 		createListDirectoryTool(app),
 		createListDirectoryFlatTool(app),
 		createListDirectoryTreeTool(app),

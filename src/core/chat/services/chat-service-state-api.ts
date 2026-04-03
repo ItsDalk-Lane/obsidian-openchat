@@ -111,6 +111,7 @@ export const createChatServiceStateApi = (internals: ChatServiceInternals) => ({
 			mutableState.inputValue = '';
 			mutableState.selectedPromptTemplate = undefined;
 			mutableState.parallelResponses = undefined;
+			mutableState.skillSessionState = null;
 		});
 		internals.attachmentSelectionService.clearSelection(false);
 		internals.pendingTriggerSource = 'chat_input';

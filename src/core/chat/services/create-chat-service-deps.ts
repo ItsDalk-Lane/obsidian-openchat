@@ -55,11 +55,12 @@ export const createChatHostDeps = (
 			fileContentService,
 		),
 	resolveVaultBasePath: () => resolveVaultBasePath(host),
-	createBuiltinToolsRuntime: async (settings, skillScanner) => {
+	createBuiltinToolsRuntime: async (settings, skillScanner, executeSkillExecution) => {
 		return await createBuiltinToolsRuntime({
 			app: host.app,
 			settings,
 			skillScanner,
+			executeSkillExecution,
 			mcpManager: runtimeDeps.getMcpClientManager(),
 		});
 	},

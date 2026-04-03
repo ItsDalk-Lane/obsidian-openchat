@@ -176,3 +176,34 @@
 - 继续把 Skill 正文直接塞回主消息流
 
 一旦出现，应该停下来，回到当前 Step 的边界重新收敛。
+
+## 10. Step 14 收口基线
+
+### 10.1 自动验证基线
+
+- 优先跑整轮基线：`npm run test`
+- 如果仓库存在与本轮无关的基线噪音，至少补齐当前 Skill 重构直接相关测试，
+  并在 `progress.md` 中明确说明替代口径
+- 收口轮次应补跑 `npm run lint` 与 `npm run build`，确保类型、架构约束与产物同步通过
+
+### 10.2 真实 Obsidian 手工 smoke checklist
+
+1. 在设置页打开 Skill 管理列表，确认列表仍只展示名称与简短描述，未退化成详情堆叠
+2. 创建一个只含 `name` / `description` 的 legacy `SKILL.md`，确认仍能被扫描、显示并执行
+3. 在设置页对一个 Skill 依次执行编辑、启用/禁用、删除，确认列表与文件写回同步
+4. 在聊天输入里执行 `/skill <name>`，分别验证 `inline` 与
+  `isolated_resume` 路径仍能返回结果，且 `isolated_resume` 会回到主任务
+5. 在工具调用场景中先走 `discover_skills`，再走 `invoke_skill`，确认两阶段 canonical workflow 正常可用
+6. 用 legacy 工具名 `Skill` 触发同一个 Skill，确认兼容入口仍然可执行
+7. 在包含 Skill 工具的请求里检查调试日志或 provider prompt，确认只注入相关 Skill 摘要，而不是全量 `SKILL.md` 正文
+
+### 10.3 兼容桥接文档索引
+
+- `docs/releases/2026-04-01-tool-surface.md`：说明 canonical `discover_skills` / `invoke_skill`
+  workflow，以及 legacy `Skill` 仅保留兼容语义
+- `docs/decisions/2026-04-01-tool-surface-two-stage.md`：固定两阶段 surface 的架构决策，说明
+  provider prompt 不再依赖全量 skills 列表
+- `docs/designs/2026-04-03-skill-system-architecture-blueprint.md`：
+  固定 slash command 与
+  `invoke_skill` 共享执行主链、迁移期保持兼容的架构不变量
+- `task_plan.md` / `progress.md`：逐步记录 Step 11-14 的兼容策略、验证口径与收口结果

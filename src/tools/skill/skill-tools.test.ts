@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { App } from 'obsidian';
+import type { SkillReturnPacket } from 'src/domains/skills/session-state';
 import type {
 	LoadedSkillContent,
 	SkillDefinition,
@@ -39,6 +40,16 @@ const COMMIT_SKILL: SkillDefinition = {
 	basePath: 'System/AI Data/skills/commit',
 };
 
+const DISABLED_SKILL: SkillDefinition = {
+	metadata: {
+		name: 'disabled',
+		description: 'Disabled skill should not be exposed at runtime.',
+		enabled: false,
+	},
+	skillFilePath: 'System/AI Data/skills/disabled/SKILL.md',
+	basePath: 'System/AI Data/skills/disabled',
+};
+
 function createScanner(skills: readonly SkillDefinition[]): SkillScannerService {
 	const byName = new Map(skills.map((skill) => [skill.metadata.name, skill]));
 	const byPath = new Map(skills.map((skill) => [skill.skillFilePath, skill]));
@@ -46,13 +57,27 @@ function createScanner(skills: readonly SkillDefinition[]): SkillScannerService 
 		skills: [...skills],
 		errors: [],
 	};
+	const runtimeResult: SkillScanResult = {
+		...scanResult,
+		skills: scanResult.skills.filter((skill) => skill.metadata.enabled !== false),
+	};
 
 	const scanner = {
 		async scan(): Promise<SkillScanResult> {
 			return scanResult;
 		},
-		findByName(name: string): SkillDefinition | undefined {
-			return byName.get(name.trim());
+		async scanRuntimeSkills(): Promise<SkillScanResult> {
+			return runtimeResult;
+		},
+		findByName(name: string, options?: { includeDisabled?: boolean }): SkillDefinition | undefined {
+			const matched = byName.get(name.trim());
+			if (!matched) {
+				return undefined;
+			}
+			if (options?.includeDisabled) {
+				return matched;
+			}
+			return matched.metadata.enabled === false ? undefined : matched;
 		},
 		normalizePath(path: string): string {
 			return path.replace(/\\/gu, '/');
@@ -73,8 +98,38 @@ function createScanner(skills: readonly SkillDefinition[]): SkillScannerService 
 	return scanner as SkillScannerService;
 }
 
-function requireTool(scanner: SkillScannerService, toolName: string) {
-	const tool = createSkillTools(scanner).find((entry) => entry.name === toolName);
+const createPacket = (
+	skillName: string,
+	overrides: Partial<SkillReturnPacket> = {},
+): SkillReturnPacket => ({
+	invocationId: 'invoke-1',
+	skillId: `System/AI Data/skills/${skillName}/SKILL.md`,
+	skillName,
+	status: 'completed',
+	content: 'skill-result',
+	sessionId: 'chat-main',
+	messageCount: 2,
+	producedAt: 1,
+	metadata: { executionMode: 'isolated_resume', trigger: 'invoke_skill' },
+	...overrides,
+});
+
+const createExecuteSkillExecution = (
+	handler?: (request: { skillName: string; args?: string; trigger?: string }) => SkillReturnPacket,
+) => {
+	return async (request: { skillName: string; args?: string; trigger?: string }) => {
+		return handler?.(request) ?? createPacket(request.skillName);
+	};
+};
+
+function requireTool(
+	scanner: SkillScannerService,
+	toolName: string,
+	executeSkillExecution = createExecuteSkillExecution(),
+) {
+	const tool = createSkillTools(scanner, executeSkillExecution).find(
+		(entry) => entry.name === toolName,
+	);
 	if (!tool) {
 		throw new Error(`未找到工具: ${toolName}`);
 	}
@@ -88,7 +143,10 @@ test('Skill 工具名称常量保持 canonical 与 legacy 对齐', () => {
 
 test('Skill alias 会进入 registry 元数据但不生成第二个 canonical 工具名', () => {
 	const registry = new BuiltinToolRegistry();
-	registry.registerAll(createSkillTools(createScanner([PDF_SKILL])));
+	registry.registerAll(createSkillTools(
+		createScanner([PDF_SKILL]),
+		createExecuteSkillExecution(),
+	));
 
 	assert.deepEqual(
 		registry.listToolNames(),
@@ -101,7 +159,7 @@ test('Skill alias 会进入 registry 元数据但不生成第二个 canonical �
 });
 
 test('discover_skills 会按 query 过滤并返回规范化路径', async () => {
-	const scanner = createScanner([PDF_SKILL, COMMIT_SKILL]);
+	const scanner = createScanner([PDF_SKILL, COMMIT_SKILL, DISABLED_SKILL]);
 	const tool = requireTool(scanner, DISCOVER_SKILLS_TOOL_NAME);
 	const result = await tool.execute({ query: 'pdf' }, TOOL_CONTEXT) as {
 		skills: Array<{ name: string; description: string; path: string }>;
@@ -122,28 +180,138 @@ test('discover_skills 会按 query 过滤并返回规范化路径', async () => 
 	});
 });
 
-test('invoke_skill 会加载 skill 正文并附加调用上下文标记', async () => {
+test('discover_skills 不会返回已禁用的 Skill', async () => {
+	const scanner = createScanner([PDF_SKILL, DISABLED_SKILL]);
+	const tool = requireTool(scanner, DISCOVER_SKILLS_TOOL_NAME);
+	const result = await tool.execute({}, TOOL_CONTEXT) as {
+		skills: Array<{ name: string }>;
+		meta: { query: string | null; returned: number; total: number };
+	};
+
+	assert.deepEqual(result.skills.map((skill) => skill.name), ['pdf']);
+	assert.deepEqual(result.meta, { query: null, returned: 1, total: 1 });
+});
+
+test('invoke_skill 会通过统一执行器返回结构化 Skill 返回包', async () => {
 	const scanner = createScanner([PDF_SKILL]);
-	const tool = requireTool(scanner, INVOKE_SKILL_TOOL_NAME);
+	const requests: Array<{ skillName: string; args?: string; trigger?: string }> = [];
+	const tool = requireTool(
+		scanner,
+		INVOKE_SKILL_TOOL_NAME,
+		createExecuteSkillExecution((request) => {
+			requests.push(request);
+			return createPacket('pdf', {
+				content: 'isolated-result',
+				metadata: { executionMode: 'isolated_resume', trigger: 'invoke_skill' },
+			});
+		}),
+	);
 	const result = await tool.execute({
 		skill: 'pdf',
 		args: '--pages 1-2',
-	}, TOOL_CONTEXT) as string;
+	}, TOOL_CONTEXT) as {
+		status: string;
+		message: string;
+		nextAction: string | null;
+		executionMode: string | null;
+		packet: SkillReturnPacket;
+	};
 
-	assert.equal(typeof result, 'string');
-	assert.match(result, /Base Path: System\/AI Data\/skills\/pdf\//);
-	assert.match(result, /Inspect PDF files and attachments\./);
-	assert.match(result, /<invocation-args>\n--pages 1-2\n<\/invocation-args>/);
-	assert.match(result, /<command-name>pdf<\/command-name>/);
+	assert.deepEqual(requests, [{
+		skillName: 'pdf',
+		args: '--pages 1-2',
+		trigger: 'invoke_skill',
+	}]);
+	assert.equal(result.status, 'completed');
+	assert.equal(result.executionMode, 'isolated_resume');
+	assert.equal(result.packet.skillName, 'pdf');
+	assert.equal(result.packet.content, 'isolated-result');
+	assert.equal(result.nextAction, null);
+	assert.equal(result.message, 'Skill "pdf" 执行完成。');
 });
 
 test('invoke_skill 在技能不存在时会提示先调用 discover_skills', async () => {
 	const scanner = createScanner([PDF_SKILL]);
-	const tool = requireTool(scanner, INVOKE_SKILL_TOOL_NAME);
-	const result = await tool.execute({ skill: 'missing' }, TOOL_CONTEXT) as string;
-
-	assert.equal(
-		result,
-		'Skill 工具调用失败：未找到名为 "missing" 的 Skill，请先调用 discover_skills。',
+	const tool = requireTool(
+		scanner,
+		INVOKE_SKILL_TOOL_NAME,
+		createExecuteSkillExecution((request) => createPacket(request.skillName, {
+			status: 'failed',
+			content: `未找到名为 "${request.skillName}" 的 Skill。`,
+			sessionId: null,
+			messageCount: 0,
+		})),
 	);
+	const result = await tool.execute({ skill: 'missing' }, TOOL_CONTEXT) as {
+		message: string;
+		nextAction: string | null;
+		packet: SkillReturnPacket;
+	};
+
+	assert.equal(result.packet.status, 'failed');
+	assert.match(result.message, /discover_skills/);
+	assert.equal(result.nextAction, '请先调用 discover_skills。');
+});
+
+test('invoke_skill 在 Skill 已禁用时返回稳定失败结果', async () => {
+	const scanner = createScanner([PDF_SKILL, DISABLED_SKILL]);
+	const tool = requireTool(
+		scanner,
+		INVOKE_SKILL_TOOL_NAME,
+		createExecuteSkillExecution((request) => createPacket(request.skillName, {
+			status: 'failed',
+			content: `Skill "${request.skillName}" 当前已禁用，无法执行。`,
+			sessionId: null,
+			messageCount: 0,
+		})),
+	);
+	const result = await tool.execute({ skill: 'disabled' }, TOOL_CONTEXT) as {
+		message: string;
+		nextAction: string | null;
+		packet: SkillReturnPacket;
+	};
+
+	assert.equal(result.packet.status, 'failed');
+	assert.match(result.message, /已禁用/);
+	assert.equal(result.nextAction, null);
+});
+
+test('invoke_skill legacy alias 会通过 registry 返回结构化结果', async () => {
+	const registry = new BuiltinToolRegistry();
+	const requests: Array<{ skillName: string; trigger?: string }> = [];
+	registry.registerAll(createSkillTools(
+		createScanner([PDF_SKILL]),
+		createExecuteSkillExecution((request) => {
+			requests.push({ skillName: request.skillName, trigger: request.trigger });
+			return createPacket('pdf');
+		}),
+	));
+
+	const result = await registry.call('Skill', { skill: 'pdf' }, TOOL_CONTEXT) as {
+		packet: SkillReturnPacket;
+		status: string;
+	};
+
+	assert.deepEqual(requests, [{ skillName: 'pdf', trigger: 'invoke_skill' }]);
+	assert.equal(result.status, 'completed');
+	assert.equal(result.packet.skillName, 'pdf');
+});
+
+test('invoke_skill 在执行器抛出异常时返回单次格式化的 failed packet', async () => {
+	const scanner = createScanner([PDF_SKILL]);
+	const tool = requireTool(
+		scanner,
+		INVOKE_SKILL_TOOL_NAME,
+		async () => {
+			throw new Error('runtime exploded');
+		},
+	);
+	const result = await tool.execute({ skill: 'pdf' }, TOOL_CONTEXT) as {
+		message: string;
+		packet: SkillReturnPacket;
+	};
+
+	assert.equal(result.message, 'Skill 工具调用失败：runtime exploded');
+	assert.equal(result.packet.skillId, '__unknown__');
+	assert.equal(result.packet.status, 'failed');
 });

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import Module from 'node:module'
 import test from 'node:test'
+import type { SkillReturnPacket } from 'src/domains/skills/session-state'
 import {
 	createChatCommandFacade,
 } from './chat-command-facade'
@@ -11,14 +12,20 @@ import type {
 
 const ensureWindowLocalStorage = (): void => {
 	const globalScope = globalThis as typeof globalThis & {
-		window?: { localStorage?: { getItem: (key: string) => string | null } }
+		window?: Window & typeof globalThis
+	}
+	const localStorage: Storage = {
+		length: 0,
+		clear: () => {},
+		getItem: () => 'en',
+		key: () => null,
+		removeItem: () => {},
+		setItem: () => {},
 	}
 	globalScope.window = {
-		...(globalScope.window ?? {}),
-		localStorage: {
-			getItem: () => 'en',
-		},
-	}
+		...(globalScope.window ?? ({} as Window & typeof globalThis)),
+		localStorage,
+	} as Window & typeof globalThis
 }
 
 const installObsidianStub = (): void => {
@@ -42,11 +49,19 @@ const installObsidianStub = (): void => {
 }
 
 const createSkillParams = (inputValue: string): ExecuteSkillCommandParams => ({
-	obsidianApi: null as never,
-	state: { inputValue } as never,
-	emitState: () => {},
-	loadInstalledSkills: async () => null as never,
-	sendMessage: async () => {},
+	obsidianApi: { notify: () => {} },
+	executeSkillExecution: async () => ({
+		invocationId: 'invoke-1',
+		skillId: 'skills/skill-a/SKILL.md',
+		skillName: inputValue,
+		status: 'completed',
+		content: 'skill-result',
+		sessionId: 'chat-main',
+		messageCount: 2,
+		producedAt: 1,
+		metadata: { executionMode: 'inline' },
+	}),
+	saveSkillExecutionResult: async () => {},
 })
 
 const createSubAgentParams = (
@@ -73,7 +88,7 @@ test('createChatCommandFacade 每次调用都读取最新 deps', async () => {
 	let selectedModelId: string | null = 'model-a'
 	let skillGetterCalls = 0
 	let subAgentGetterCalls = 0
-	let capturedInputValue: string | undefined
+	let capturedSkillName: string | undefined
 	let capturedProviderCount: number | undefined
 	let capturedSelectedModelId: string | null | undefined
 
@@ -89,8 +104,9 @@ test('createChatCommandFacade 每次调用都读取最新 deps', async () => {
 			},
 		},
 		{
-			executeSkillCommand: async (params) => {
-				capturedInputValue = params.state.inputValue
+			executeSkillCommand: async (params, skillName) => {
+				capturedSkillName = skillName
+				await params.executeSkillExecution({ skillName, trigger: 'slash_command' })
 			},
 			executeSubAgentCommand: async (params) => {
 				capturedProviderCount = params.providers.length
@@ -100,7 +116,7 @@ test('createChatCommandFacade 每次调用都读取最新 deps', async () => {
 	)
 
 	await facade.executeSkillCommand('skill-a')
-	assert.equal(capturedInputValue, 'skill-a')
+	assert.equal(capturedSkillName, 'skill-a')
 
 	inputValue = 'skill-b'
 	providerCount = 3
@@ -108,50 +124,82 @@ test('createChatCommandFacade 每次调用都读取最新 deps', async () => {
 	await facade.executeSkillCommand('skill-b')
 	await facade.executeSubAgentCommand('agent-b')
 
-	assert.equal(capturedInputValue, 'skill-b')
+	assert.equal(capturedSkillName, 'skill-b')
 	assert.equal(capturedProviderCount, 3)
 	assert.equal(capturedSelectedModelId, 'model-b')
 	assert.equal(skillGetterCalls, 2)
 	assert.equal(subAgentGetterCalls, 1)
 })
 
-test('executeSkillCommand 选择模板后不再切换模板系统提示词标记', async () => {
+test('executeSkillCommand slash 会通过统一执行器执行 inline Skill', async () => {
 	ensureWindowLocalStorage()
 	installObsidianStub()
 	const { executeSkillCommand } = await import('./chat-commands')
-	const sentMessages: string[] = []
-	const state = {
-		inputValue: 'old input',
-	} as ExecuteSkillCommandParams['state']
+	const requests: Array<{ skillName: string; trigger?: string }> = []
+	let appliedPacket = false
 
 	await executeSkillCommand(
 		{
 			obsidianApi: {
-				getVaultEntry: () => ({
-					kind: 'file',
-					path: 'AI Prompts/skill-a.md',
-					name: 'skill-a.md',
-				}),
 				notify: () => {},
-				readVaultFile: async () => '请审查下面的实现',
 			},
-			state,
-			emitState: () => {},
-			loadInstalledSkills: async () => ({
-				skills: [{
-					metadata: { name: 'skill-a' },
-					skillFilePath: 'AI Prompts/skill-a.md',
-				}],
-			}) as never,
-			sendMessage: async (content) => {
-				sentMessages.push(content ?? '')
+			executeSkillExecution: async (request) => {
+				requests.push({
+					skillName: request.skillName,
+					trigger: request.trigger,
+				})
+				return {
+					invocationId: 'invoke-1',
+					skillId: 'skills/skill-a/SKILL.md',
+					skillName: 'skill-a',
+					status: 'completed',
+					content: 'inline-result',
+					sessionId: 'chat-main',
+					messageCount: 2,
+					producedAt: 1,
+					metadata: { executionMode: 'inline' },
+				}
+			},
+			saveSkillExecutionResult: async () => {
+				appliedPacket = true
 			},
 		},
 		'skill-a',
 	)
 
-	assert.equal(state.selectedPromptTemplate?.name, 'skill-a')
-	assert.equal(state.selectedPromptTemplate?.content, '请审查下面的实现')
-	assert.equal(state.inputValue, '')
-	assert.deepEqual(sentMessages, [''])
+	assert.deepEqual(requests, [{ skillName: 'skill-a', trigger: 'slash_command' }])
+	assert.equal(appliedPacket, false)
+})
+
+test('executeSkillCommand slash 会把非 inline Skill 返回包写回主任务', async () => {
+	ensureWindowLocalStorage()
+	installObsidianStub()
+	const { executeSkillCommand } = await import('./chat-commands')
+	const appliedPackets: SkillReturnPacket[] = []
+
+	await executeSkillCommand(
+		{
+			obsidianApi: {
+				notify: () => {},
+			},
+			executeSkillExecution: async () => ({
+				invocationId: 'invoke-2',
+				skillId: 'skills/skill-b/SKILL.md',
+				skillName: 'skill-b',
+				status: 'completed',
+				content: 'isolated-result',
+				sessionId: 'chat-skill',
+				messageCount: 2,
+				producedAt: 2,
+				metadata: { executionMode: 'isolated_resume' },
+			}),
+			saveSkillExecutionResult: async (packet) => {
+				appliedPackets.push(packet)
+			},
+		},
+		'skill-b',
+	)
+
+	assert.equal(appliedPackets.length, 1)
+	assert.equal(appliedPackets[0]?.content, 'isolated-result')
 })

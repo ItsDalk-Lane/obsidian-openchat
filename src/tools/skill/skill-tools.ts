@@ -14,6 +14,7 @@ import {
 	INVOKE_SKILL_TOOL_NAME,
 	LEGACY_INVOKE_SKILL_TOOL_NAME,
 } from './invoke-skill/tool';
+import type { ExecuteSkillExecution } from './invoke-skill/service';
 
 export {
 	buildSkillToolDescription,
@@ -26,9 +27,10 @@ export {
 
 export function createSkillTools(
 	scanner: SkillScannerService,
+	executeSkillExecution: ExecuteSkillExecution,
 ): BuiltinTool[] {
 	return [
 		createDiscoverSkillsTool(scanner),
-		createInvokeSkillTool(scanner),
+		createInvokeSkillTool(executeSkillExecution),
 	];
 }

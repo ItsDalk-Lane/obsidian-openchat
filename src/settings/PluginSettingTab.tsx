@@ -86,7 +86,14 @@ const McpServersTabContent = () => {
 }
 
 const SkillsTabContent = () => {
-	const { skillScanResult, refreshInstalledSkills } = useChatSettingsContext()
+	const {
+		skillScanResult,
+		refreshInstalledSkills,
+		handleCreateInstalledSkill,
+		handleEditInstalledSkill,
+		handleToggleInstalledSkill,
+		handleDeleteInstalledSkill,
+	} = useChatSettingsContext()
 
 	// 每次进入这个界面时自动扫描一次
 	useEffect(() => {
@@ -97,6 +104,10 @@ const SkillsTabContent = () => {
 		<SkillsSettingsTab
 			skillScanResult={skillScanResult}
 			refreshInstalledSkills={refreshInstalledSkills}
+			handleCreateInstalledSkill={handleCreateInstalledSkill}
+			handleEditInstalledSkill={handleEditInstalledSkill}
+			handleToggleInstalledSkill={handleToggleInstalledSkill}
+			handleDeleteInstalledSkill={handleDeleteInstalledSkill}
 		/>
 	)
 }

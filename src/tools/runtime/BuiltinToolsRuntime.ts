@@ -1,4 +1,6 @@
 import { moment, type App } from 'obsidian';
+import type { SkillExecutionRequest } from 'src/domains/skills/execution';
+import type { SkillReturnPacket } from 'src/domains/skills/session-state';
 import type { McpRuntimeManager } from 'src/domains/mcp/types';
 import type { SkillScannerService } from 'src/domains/skills/service';
 import {
@@ -31,9 +33,8 @@ import { createMcpResourceTools } from '../mcp/resources/mcp-resource-tools';
 import { createPlanTools } from '../plan/plan-tools';
 import { createObsidianCommandTools } from '../obsidian/commands/obsidian-tools';
 import { createScriptTools } from '../script/script-tools';
-import {
-	createSkillTools,
-} from '../skill/skill-tools';
+import { createDiscoverSkillsTool } from '../skill/discover-skills/tool';
+import { createInvokeSkillTool } from '../skill/invoke-skill/tool';
 import { createTimeTools } from '../time/time-tools';
 import { createTimeWrapperTools } from '../time/time-wrapper-tools';
 import { createBingSearchTools } from '../web/bing-search-tools';
@@ -73,6 +74,7 @@ interface CreateBuiltinToolsRuntimeOptions {
 	app: App;
 	settings?: BuiltinToolsRuntimeSettings;
 	skillScanner?: SkillScannerService | null;
+	executeSkillExecution?: ((request: SkillExecutionRequest) => Promise<SkillReturnPacket>) | null;
 	mcpManager?: McpRuntimeManager | null;
 }
 
@@ -158,7 +160,11 @@ export async function createBuiltinToolsRuntime(
 	}
 
 	if (options.skillScanner) {
-		registry.registerAll(createSkillTools(options.skillScanner));
+		registry.register(createDiscoverSkillsTool(options.skillScanner));
+	}
+
+	if (options.skillScanner && options.executeSkillExecution) {
+		registry.register(createInvokeSkillTool(options.executeSkillExecution));
 	}
 
 	const listTools = async (): Promise<BuiltinToolInfo[]> => {

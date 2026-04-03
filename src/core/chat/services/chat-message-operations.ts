@@ -1,6 +1,7 @@
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type { ProviderSettings } from 'src/types/provider';
+import type { SkillReturnPacket } from 'src/domains/skills/session-state';
 import type { ChatAttachmentSelectionService } from './chat-attachment-selection-service';
 import type { ChatImageResolver } from './chat-image-resolver';
 import type { ChatSessionManager } from './chat-session-manager';
@@ -26,6 +27,70 @@ export interface ChatMessageOperationDeps {
 	isCurrentModelSupportImageGeneration: () => boolean;
 	ensurePlanSyncReady: () => Promise<void>;
 	generateAssistantResponse: (session: ChatSession) => Promise<void>;
+	saveActiveSession: () => Promise<void>;
+	queueSessionPlanSync: (session: ChatSession | null) => void;
+}
+
+const buildSkillPacketMetadata = (packet: SkillReturnPacket): Record<string, unknown> => ({
+	skillExecution: {
+		invocationId: packet.invocationId,
+		skillId: packet.skillId,
+		skillName: packet.skillName,
+		status: packet.status,
+		sessionId: packet.sessionId,
+		messageCount: packet.messageCount,
+		producedAt: packet.producedAt,
+		metadata: packet.metadata,
+	},
+})
+
+const hasAppliedSkillPacket = (
+	session: ChatSession,
+	packet: SkillReturnPacket,
+): boolean => {
+	return session.messages.some((message) => {
+		const skillExecution = message.metadata?.skillExecution
+		if (!skillExecution || typeof skillExecution !== 'object') {
+			return false
+		}
+		return (skillExecution as { invocationId?: unknown }).invocationId === packet.invocationId
+	})
+}
+
+export const saveSkillExecutionResult = async (
+	deps: ChatMessageOperationDeps,
+	packet: SkillReturnPacket,
+): Promise<void> => {
+	const content = packet.content.trim()
+	if (!content) {
+		return
+	}
+
+	const hadActiveSession = deps.state.activeSession !== null
+	const session = deps.state.activeSession ?? deps.createNewSession()
+	if (hasAppliedSkillPacket(session, packet)) {
+		return
+	}
+	const assistantMessage = deps.messageService.createMessage('assistant', content, {
+		metadata: buildSkillPacketMetadata(packet),
+	})
+	session.messages.push(assistantMessage)
+	session.updatedAt = Date.now()
+	deps.emitState()
+	if (hadActiveSession) {
+		deps.queueSessionPlanSync(session)
+	}
+
+	if (!deps.state.shouldSaveHistory) {
+		return
+	}
+
+	try {
+		await deps.saveActiveSession()
+	} catch (error) {
+		DebugLogger.error('[ChatService] 保存 Skill 返回结果失败', error)
+		deps.notify(localInstance.chat_session_file_create_failed_but_sent)
+	}
 }
 
 export const prepareChatRequest = async (

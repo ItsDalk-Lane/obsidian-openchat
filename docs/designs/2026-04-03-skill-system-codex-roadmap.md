@@ -306,6 +306,11 @@
 - 验收标准：
   - 代码、文档、验证记录一致。
   - 下一次进入真实增强功能时有稳定基线。
+- 本步建议输出物：
+  - 一组覆盖 slash command、`invoke_skill`、relevant prompt 注入的收口回归
+  - 一份真实 Obsidian 手工 smoke checklist
+  - 一份兼容桥接文档索引，明确旧 `Skill`、`discover_skills` / `invoke_skill`
+    与 `/skill` 的说明分别落在哪些文档
 - 建议验证：
   - `npm run test`
   - 必要的 lint / build

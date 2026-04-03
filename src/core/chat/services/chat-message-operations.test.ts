@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type { SkillReturnPacket } from 'src/domains/skills/session-state';
 import type { ChatSession, ChatState } from '../types/chat';
 import {
+	saveSkillExecutionResult,
 	prepareChatRequest,
 	type ChatMessageOperationDeps,
 } from './chat-message-operations';
@@ -49,7 +51,16 @@ const createDeps = (
 		clearSelection: () => {},
 	} as never,
 	messageService: {
-		createMessage: (role, content, extras) => ({
+		createMessage: (
+			role: ChatSession['messages'][number]['role'],
+			content: string,
+			extras?: {
+				images?: string[];
+				isError?: boolean;
+				metadata?: Record<string, unknown>;
+				toolCalls?: unknown[];
+			},
+		) => ({
 			id: 'message-1',
 			role,
 			content: content.trim(),
@@ -57,7 +68,7 @@ const createDeps = (
 			images: extras?.images ?? [],
 			isError: extras?.isError ?? false,
 			metadata: extras?.metadata ?? {},
-			toolCalls: extras?.toolCalls ?? [],
+			toolCalls: (extras?.toolCalls ?? []) as never[],
 		}),
 	} as never,
 	sessionManager: null as never,
@@ -72,7 +83,22 @@ const createDeps = (
 	isCurrentModelSupportImageGeneration: () => false,
 	ensurePlanSyncReady: async () => {},
 	generateAssistantResponse: async () => {},
+	saveActiveSession: async () => {},
+	queueSessionPlanSync: () => {},
 });
+
+const createPacket = (overrides: Partial<SkillReturnPacket> = {}): SkillReturnPacket => ({
+	invocationId: 'invoke-1',
+	skillId: 'skills/code-audit/SKILL.md',
+	skillName: 'code-audit',
+	status: 'completed',
+	content: 'isolated-result',
+	sessionId: 'skill-session-1',
+	messageCount: 2,
+	producedAt: 10,
+	metadata: { executionMode: 'isolated_resume' },
+	...overrides,
+})
 
 test('prepareChatRequest 将选中模板作为用户消息的一部分发送', async () => {
 	const session = createSession();
@@ -140,4 +166,81 @@ test('prepareChatRequest 会把选区范围和文件路径写入用户消息 met
 		triggerSource: 'selection',
 	})
 	assert.equal(state.selectedTextContext, undefined)
+})
+
+test('saveSkillExecutionResult 会把 Skill 返回包追加到当前主会话', async () => {
+	const session = createSession();
+	const queuedSessions: Array<string | null> = [];
+	let saveCalls = 0;
+	const state = createState({
+		activeSession: session,
+		shouldSaveHistory: true,
+	});
+
+	await saveSkillExecutionResult(
+		{
+			...createDeps(state, session),
+			saveActiveSession: async () => {
+				saveCalls += 1
+			},
+			queueSessionPlanSync: (nextSession) => {
+				queuedSessions.push(nextSession?.id ?? null)
+			},
+		},
+		createPacket(),
+	)
+
+	const skillExecution = session.messages[0]?.metadata?.skillExecution as
+		| { skillName?: string }
+		| undefined
+	assert.equal(session.messages.length, 1)
+	assert.equal(session.messages[0]?.role, 'assistant')
+	assert.equal(session.messages[0]?.content, 'isolated-result')
+	assert.equal(skillExecution?.skillName, 'code-audit')
+	assert.equal(saveCalls, 1)
+	assert.deepEqual(queuedSessions, ['session-1'])
+})
+
+test('saveSkillExecutionResult 在没有活动会话时会创建新主会话', async () => {
+	const session = createSession();
+	let createdSessions = 0;
+	const state = createState({
+		activeSession: null,
+		shouldSaveHistory: false,
+	});
+
+	await saveSkillExecutionResult(
+		{
+			...createDeps(state, session),
+			createNewSession: () => {
+				createdSessions += 1
+				state.activeSession = session
+				return session
+			},
+		},
+		createPacket(),
+	)
+
+	assert.equal(createdSessions, 1)
+	assert.equal(state.activeSession, session)
+	assert.equal(session.messages[0]?.content, 'isolated-result')
+})
+
+test('saveSkillExecutionResult 对同一返回包重复应用时不会重复追加消息', async () => {
+	const session = createSession();
+	const state = createState({
+		activeSession: session,
+		shouldSaveHistory: false,
+	});
+	const deps = createDeps(state, session)
+	const packet = createPacket()
+
+	await saveSkillExecutionResult(deps, packet)
+	await saveSkillExecutionResult(deps, packet)
+
+	const skillExecution = session.messages[0]?.metadata?.skillExecution as
+		| { invocationId?: string }
+		| undefined
+	assert.equal(session.messages.length, 1)
+	assert.equal(skillExecution?.invocationId, 'invoke-1')
 })

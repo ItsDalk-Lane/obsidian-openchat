@@ -59,12 +59,66 @@ export interface ChatProviderMessageDeps {
 	resolveProviderByTag: (tag?: string) => ProviderSettings | null;
 	findProviderByTagExact: (tag?: string) => ProviderSettings | null;
 	resolveSkillsSystemPromptBlock: (
-		requestTools: ToolDefinition[]
+		input: {
+			requestTools: ToolDefinition[];
+			relevanceQuery?: string;
+			limit?: number;
+		}
 	) => Promise<string | undefined>;
 	persistSessionContextCompactionFrontmatter: (
 		session: ChatSession
 	) => Promise<void>;
 }
+
+const MAX_SKILL_RELEVANCE_SEGMENT_LENGTH = 400;
+
+const trimSkillRelevanceSegment = (value?: string | null): string | undefined => {
+	const trimmed = value?.trim();
+	if (!trimmed) {
+		return undefined;
+	}
+	return trimmed.slice(0, MAX_SKILL_RELEVANCE_SEGMENT_LENGTH);
+};
+
+const findLatestRelevantUserContent = (
+	messages: ChatMessage[],
+	includeEphemeralContext: boolean,
+): string | undefined => {
+	for (let index = messages.length - 1; index >= 0; index -= 1) {
+		const message = messages[index];
+		if (message.role !== 'user' || message.metadata?.hiddenFromModel) {
+			continue;
+		}
+		const isEphemeralContext = Boolean(message.metadata?.isEphemeralContext);
+		if (isEphemeralContext !== includeEphemeralContext) {
+			continue;
+		}
+		const content = trimSkillRelevanceSegment(message.content);
+		if (content) {
+			return content;
+		}
+	}
+	return undefined;
+};
+
+const buildSkillsRelevanceQuery = (
+	messages: ChatMessage[],
+	sessionMessages: ChatMessage[],
+	selectedText?: string | null,
+): string | undefined => {
+	const parts = [
+		findLatestRelevantUserContent(messages, false)
+			?? findLatestRelevantUserContent(sessionMessages, false),
+		findLatestRelevantUserContent(messages, true),
+		trimSkillRelevanceSegment(selectedText)
+			? `selected_text:\n${trimSkillRelevanceSegment(selectedText)}`
+			: undefined,
+	].filter((part): part is string => Boolean(part));
+	if (parts.length === 0) {
+		return undefined;
+	}
+	return parts.join('\n\n');
+};
 
 export const getChatMessageManagementSettings = (
 	settings: ChatSettings,
@@ -138,7 +192,7 @@ export const buildProviderMessagesForAgent = async (
 	},
 ): Promise<ProviderMessage[]> => {
 	const resolveSelectedTextContext = (
-		message?: ChatMessage,
+		message?: ChatMessage | null,
 	): SelectedTextContext | undefined => {
 		const candidate = message?.metadata?.selectedTextContext;
 		return candidate && typeof candidate === 'object'
@@ -155,7 +209,9 @@ export const buildProviderMessagesForAgent = async (
 	const explicitSystemPrompt = systemPrompt?.trim();
 	let effectiveSystemPrompt = explicitSystemPrompt;
 	const contextSourceMessage = getLatestContextSourceMessage(messages);
-	const selectedText = getStringMetadata(contextSourceMessage, 'selectedText');
+	const selectedText = contextSourceMessage
+		? getStringMetadata(contextSourceMessage, 'selectedText') ?? null
+		: null;
 	const selectedTextContext = resolveSelectedTextContext(contextSourceMessage);
 
 	const activePlanGuidance = buildLivePlanGuidance(session.livePlan);
@@ -164,7 +220,10 @@ export const buildProviderMessagesForAgent = async (
 		selectedTextContext,
 	});
 	const toolSurfaceGuidance = buildToolSurfacePromptBlock(toolPayloads ?? {});
-	const skillsPromptBlock = await deps.resolveSkillsSystemPromptBlock(requestTools);
+	const skillsPromptBlock = await deps.resolveSkillsSystemPromptBlock({
+		requestTools,
+		relevanceQuery: buildSkillsRelevanceQuery(messages, session.messages, selectedText),
+	});
 	effectiveSystemPrompt = composeChatSystemPrompt({
 		configuredSystemPrompt: effectiveSystemPrompt,
 		livePlanGuidance: activePlanGuidance,
@@ -186,7 +245,6 @@ export const buildProviderMessagesForAgent = async (
 			selectedFolders,
 			contextNotes,
 			selectedText,
-			selectedTextContext,
 			selectedTextSource,
 			fileContentOptions,
 			sourcePath,

@@ -44,7 +44,7 @@ test('updateSettings 在 autosaveChat 变更时同步 shouldSaveHistory', () => 
 			emitState: () => {
 				emitCount += 1;
 			},
-		} as ChatServiceInternals['service'],
+		} as unknown as ChatServiceInternals['service'],
 	} as ChatServiceInternals;
 
 	const api = createChatServiceStateApi(internals);
@@ -78,7 +78,7 @@ test('createNewSession 不再在 session 上写入模板系统提示词标记', 
 			stopGeneration: () => {},
 			emitState: () => {},
 			queueSessionPlanSync: () => {},
-		} as ChatServiceInternals['service'],
+		} as unknown as ChatServiceInternals['service'],
 	} as ChatServiceInternals;
 
 	const api = createChatServiceStateApi(internals);
@@ -121,7 +121,7 @@ test('setSelectedText 和 clearSelectedText 会同步维护选区上下文', () 
 	assert.equal(emitCount, 2);
 })
 
-	test('deleteManagedImportedSelectedFile 会清理受管导入附件文件', async () => {
+test('deleteManagedImportedSelectedFile 会清理受管导入附件文件', async () => {
 	const stateStore = createStateStore();
 	stateStore.getMutableState().selectedFiles = [{
 		id: 'System/AI Data/chat-history/files/imported.md',
@@ -140,14 +140,14 @@ test('setSelectedText 和 clearSelectedText 会同步维护选区上下文', () 
 				stateStore.getMutableState().selectedFiles = stateStore.getMutableState().selectedFiles
 					.filter((file) => file.id !== fileId);
 			},
-		} as ChatServiceInternals['attachmentSelectionService'],
+		} as unknown as ChatServiceInternals['attachmentSelectionService'],
 		obsidianApi: {
 			pathExists: async () => true,
 			deleteVaultPath: async (path: string) => {
 				deletedPaths.push(path);
 			},
 			notify: () => {},
-		} as ChatServiceInternals['obsidianApi'],
+		} as unknown as ChatServiceInternals['obsidianApi'],
 	} as ChatServiceInternals;
 
 	const api = createChatServiceStateApi(internals);
@@ -176,14 +176,14 @@ test('removeSelectedFile 仅更新选择状态而不删除文件', async () => {
 				stateStore.getMutableState().selectedFiles = stateStore.getMutableState().selectedFiles
 					.filter((file) => file.id !== fileId);
 			},
-		} as ChatServiceInternals['attachmentSelectionService'],
+		} as unknown as ChatServiceInternals['attachmentSelectionService'],
 		obsidianApi: {
 			pathExists: async () => true,
 			deleteVaultPath: async (path: string) => {
 				deletedPaths.push(path);
 			},
 			notify: () => {},
-		} as ChatServiceInternals['obsidianApi'],
+		} as unknown as ChatServiceInternals['obsidianApi'],
 	} as ChatServiceInternals;
 
 	const api = createChatServiceStateApi(internals);
@@ -194,7 +194,7 @@ test('removeSelectedFile 仅更新选择状态而不删除文件', async () => {
 	assert.equal(stateStore.getMutableState().selectedFiles.length, 0);
 });
 
-	test('deleteManagedImportedSelectedFile 不删除普通 Vault 附件文件', async () => {
+test('deleteManagedImportedSelectedFile 不删除普通 Vault 附件文件', async () => {
 	const stateStore = createStateStore();
 	stateStore.getMutableState().selectedFiles = [{
 		id: 'docs/spec.md',
@@ -209,14 +209,14 @@ test('removeSelectedFile 仅更新选择状态而不删除文件', async () => {
 		stateStore,
 		attachmentSelectionService: {
 			removeSelectedFile: () => {},
-		} as ChatServiceInternals['attachmentSelectionService'],
+		} as unknown as ChatServiceInternals['attachmentSelectionService'],
 		obsidianApi: {
 			pathExists: async () => true,
 			deleteVaultPath: async (path: string) => {
 				deletedPaths.push(path);
 			},
 			notify: () => {},
-		} as ChatServiceInternals['obsidianApi'],
+		} as unknown as ChatServiceInternals['obsidianApi'],
 	} as ChatServiceInternals;
 
 	const api = createChatServiceStateApi(internals);

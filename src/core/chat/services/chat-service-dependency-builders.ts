@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolExecutionRecord } from 'src/types/tool';
+import type { ToolExecutionRecord, ToolUserInputRequest } from 'src/types/tool';
 import type { ChatMessage, ChatSession, ChatSettings } from '../types/chat';
 import type { FileContentOptions } from './file-content-service';
 import type {
@@ -31,7 +31,7 @@ export const buildGenerationDeps = (internals: ChatServiceInternals) => ({
 		await internals.obsidianApi.getAvailableAttachmentPath(filename),
 	writeVaultBinary: async (filePath: string, content: ArrayBuffer) =>
 		await internals.obsidianApi.writeVaultBinary(filePath, content),
-	requestToolUserInput: async (request) =>
+	requestToolUserInput: async (request: ToolUserInputRequest) =>
 		await internals.requestToolUserInput(request),
 	getDefaultProviderTag: () => getDefaultProviderTag(internals),
 	findProviderByTagExact: (tag?: string) => findProviderByTagExact(internals, tag),
@@ -42,7 +42,9 @@ export const buildGenerationDeps = (internals: ChatServiceInternals) => ({
 		session: ChatSession,
 		shouldAttachToSession: boolean,
 	) => internals.service.createSubAgentStateUpdater(assistantMessage, session, shouldAttachToSession),
-	prepareToolTurn: async (input) =>
+	prepareToolTurn: async (
+		input: Parameters<typeof internals.toolSelectionCoordinator.prepareTurn>[0],
+	) =>
 		await internals.toolSelectionCoordinator.prepareTurn(input),
 	resolveToolRuntime: (options?: Parameters<typeof internals.service.resolveToolRuntime>[0]) =>
 		internals.service.resolveToolRuntime(options),
@@ -87,6 +89,11 @@ export const buildMessageOperationDeps = (internals: ChatServiceInternals) => ({
 	generateAssistantResponse: async (session: ChatSession) => {
 		await internals.service.generateAssistantResponse(session);
 	},
+	saveActiveSession: async () => {
+		await internals.service.saveActiveSession();
+	},
+	queueSessionPlanSync: (session: ChatSession | null) =>
+		internals.service.queueSessionPlanSync(session),
 });
 
 export const buildMessageMutationDeps = (internals: ChatServiceInternals) => ({
@@ -119,8 +126,10 @@ export const getProviderMessageDeps = (internals: ChatServiceInternals) => ({
 	getDefaultProviderTag: () => getDefaultProviderTag(internals),
 	resolveProviderByTag: (tag?: string) => resolveProviderByTag(internals, tag),
 	findProviderByTagExact: (tag?: string) => findProviderByTagExact(internals, tag),
-	resolveSkillsSystemPromptBlock: async (requestTools: ToolDefinition[]) =>
-		await resolveSkillsSystemPromptBlock(internals, requestTools),
+	resolveSkillsSystemPromptBlock: async (
+		input: Parameters<typeof resolveSkillsSystemPromptBlock>[1],
+	) =>
+		await resolveSkillsSystemPromptBlock(internals, input),
 	persistSessionContextCompactionFrontmatter: async (session: ChatSession) =>
 		await internals.service.persistSessionContextCompactionFrontmatter(session),
 });

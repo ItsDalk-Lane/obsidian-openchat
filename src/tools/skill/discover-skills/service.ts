@@ -22,7 +22,7 @@ export const executeDiscoverSkills = async (
 ): Promise<DiscoverSkillsResult | string> => {
 	const query = args.query?.trim().toLowerCase();
 	try {
-		const result = await scanner.scan();
+		const result = await scanner.scanRuntimeSkills();
 		const skills = result.skills
 			.filter((skill) => {
 				if (!query) {

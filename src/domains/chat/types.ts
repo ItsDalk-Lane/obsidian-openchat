@@ -9,6 +9,7 @@
 
 import type { LayoutMode, MultiModelMode, ParallelResponseGroup } from './types-multi-model';
 import type { ToolCall } from './types-tools';
+import type { SkillSessionState } from 'src/domains/skills/session-state';
 
 export type ChatRole = 'user' | 'assistant' | 'system' | 'tool';
 
@@ -234,6 +235,7 @@ export interface ChatState {
 	multiModelMode: MultiModelMode;
 	parallelResponses?: ParallelResponseGroup;
 	layoutMode: LayoutMode;
+	skillSessionState?: SkillSessionState | null;
 }
 
 export type {

@@ -37,6 +37,7 @@ import type { ChatPersistenceFacade } from './chat-persistence-facade';
 import type { ChatCommandFacade } from './chat-command-facade';
 import type { OllamaCapabilityCacheEntry } from './chat-provider-helpers';
 import type { ChatService } from './chat-service';
+import type { SkillExecutionService } from 'src/domains/skills/execution';
 
 export interface ChatServiceInternals {
 	service: ChatService;
@@ -72,6 +73,7 @@ export interface ChatServiceInternals {
 	providerMessageFacade: ChatProviderMessageFacade | null;
 	persistenceFacade: ChatPersistenceFacade | null;
 	commandFacade: ChatCommandFacade | null;
+	skillExecutionService: SkillExecutionService | null;
 }
 
 export const createChatServiceInternals = (
@@ -96,6 +98,7 @@ export const createChatServiceInternals = (
 		multiModelMode: 'single',
 		parallelResponses: undefined,
 		layoutMode: 'horizontal',
+		skillSessionState: null,
 	});
 	const settingsAccessor = deps.host.settingsAccessor;
 	const obsidianApi = deps.host.obsidianApi;
@@ -123,6 +126,7 @@ export const createChatServiceInternals = (
 		getMaxToolCallLoops: () => service.getMaxToolCallLoops(),
 		showMcpNoticeOnce: (message) => service.showMcpNoticeOnce(message),
 		chatServiceAdapter: service,
+		executeSkillExecution: async (request) => await service.executeSkillExecution(request),
 	});
 	const toolSelectionCoordinator = new ChatToolSelectionCoordinator({
 		toolRuntimeResolver,
@@ -192,6 +196,7 @@ export const createChatServiceInternals = (
 		providerMessageFacade: null,
 		persistenceFacade: null,
 		commandFacade: null,
+		skillExecutionService: null,
 	};
 	void subAgentWatcherService.start().catch((error) => {
 		DebugLogger.warn('[ChatService] 初始化 Sub Agent 监听失败', error);

@@ -1,5 +1,8 @@
 import type { ProviderSettings } from 'src/types/provider';
-import type { ToolDefinition } from 'src/types/tool';
+import type { ToolDefinition, ToolExecutionRecord } from 'src/types/tool';
+import type {
+	SkillExecutionRequest,
+} from 'src/domains/skills/execution';
 import type { ToolCall } from '../types/tools';
 import type { ChatMessage, ChatSession, MessageManagementSettings } from '../types/chat';
 import type { ResolvedContextBudget } from 'src/core/chat/utils/context-budget';
@@ -8,6 +11,7 @@ import type { GenerateAssistantOptions } from './chat-service-types';
 import type { ChatProviderMessageBuildOptions } from './chat-provider-message-facade';
 import type { ChatServiceInternals } from './chat-service-internals';
 import { DELEGATE_SUB_AGENT_TOOL_NAME } from 'src/tools/sub-agents/types';
+import type { SubAgentStateUpdate } from 'src/tools/sub-agents/types';
 import {
 	detectChatImageGenerationIntent,
 	findInstalledSkillDefinition,
@@ -29,6 +33,7 @@ import {
 } from './chat-service-deps-support';
 import {
 	getGenerationFacade,
+	getSkillExecutionService,
 	getProviderMessageFacade,
 } from './chat-service-facades';
 
@@ -53,7 +58,7 @@ export const createChatServiceProviderApi = (internals: ChatServiceInternals) =>
 		session: ChatSession,
 		shouldAttachToSession: boolean,
 	) {
-		return (update: Parameters<typeof internals.service.createSubAgentStateUpdater>[0]) => {
+		return (update: SubAgentStateUpdate) => {
 			const metadata = { ...(assistantMessage.metadata ?? {}) };
 			const subAgentStates = { ...(metadata.subAgentStates ?? {}) };
 			subAgentStates[update.toolCallId] = update.state;
@@ -87,11 +92,15 @@ export const createChatServiceProviderApi = (internals: ChatServiceInternals) =>
 	findInstalledSkillDefinition(skillName: string) {
 		return findInstalledSkillDefinition(internals, skillName);
 	},
-	normalizeToolExecutionRecord(record) {
+	normalizeToolExecutionRecord(record: ToolExecutionRecord) {
 		return normalizeToolExecutionRecord(internals, record);
 	},
-	async resolveSkillsSystemPromptBlock(requestTools: ToolDefinition[]) {
-		return await resolveSkillsSystemPromptBlock(internals, requestTools);
+	async resolveSkillsSystemPromptBlock(input: {
+		requestTools: ToolDefinition[];
+		relevanceQuery?: string;
+		limit?: number;
+	}) {
+		return await resolveSkillsSystemPromptBlock(internals, input);
 	},
 	extractLatestSubAgentResult(state: { status: string; internalMessages: ChatMessage[] }) {
 		if (state.status === 'running') {
@@ -151,6 +160,12 @@ export const createChatServiceProviderApi = (internals: ChatServiceInternals) =>
 	},
 	getProviderMessageFacade() {
 		return getProviderMessageFacade(internals);
+	},
+	getSkillExecutionService() {
+		return getSkillExecutionService(internals);
+	},
+	async executeSkillExecution(request: SkillExecutionRequest) {
+		return await getSkillExecutionService(internals).execute(request);
 	},
 	async generateAssistantResponse(session: ChatSession): Promise<void> {
 		await getGenerationFacade(internals).generateAssistantResponse(session);

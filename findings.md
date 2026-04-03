@@ -1,6 +1,26 @@
 # 审计发现记录
 
-## 2026-04-03 Skill 系统重构设计发现
+## 2026-04-03 Skill 系统重构收口发现
+
+- Skill 收口阶段的关键不是继续扩功能，而是把 Step 01-14 已落地的兼容语义固定成稳定边界：
+  legacy `SKILL.md` 兼容、disabled skill 运行时过滤、`/skill` 与 `invoke_skill` 共用执行主干、
+  canonical `discover_skills` / `invoke_skill` 与 legacy `Skill` alias 并存。
+- 本轮最值得锁定的收口点有两个：
+  - runtime 与 settings 必须分离语义，设置页保留全量，运行时默认只看 enabled skill；
+  - `inline + allowed_tools` 不能继续半实现，必须统一改成显式非法组合。
+- Step 01-14 的 landed modules 已经稳定落在三条主线上：
+  - `src/domains/skills`：manifest、source / registry、CRUD、execution、session-state
+  - `src/components/skills` / `src/components/chat-components`：
+    Skill 管理 UI 与 slash 可执行列表
+  - `src/core/chat/services` / `src/tools/skill`：slash command、
+    invoke tool、relevant resolver、返回包写回
+- 本轮新增的类型修复说明：Skill 相关文件与其直接测试夹具原本仍有一批 `tsc` 回归；
+  现已清零，最新全仓 `tsc` 只剩无关基线问题。
+- 残余风险仍有两类：
+  - 全仓 `tsc` 无关基线错误尚未独立治理
+  - 真实 Obsidian smoke checklist 仍需人工执行，当前不能把自动测试当成替代品
+- 建议下一步：不要继续往当前 Skill roadmap 追加 Step；若还要推进，先新建下一轮 roadmap，
+  再明确是优先清理全局基线，还是优先执行真实 Obsidian smoke。
 
 - Skill 重构当前最重要的是先固定目标架构，而不是先做 UI。
 - 适合继续沿用 `task_plan.md`、`findings.md`、`progress.md` 的文件式推进方式。

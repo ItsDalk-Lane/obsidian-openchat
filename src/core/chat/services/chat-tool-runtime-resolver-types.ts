@@ -10,6 +10,8 @@ import type { ChatRuntimeDeps } from '../runtime/chat-runtime-deps';
 import type { ChatSession } from '../types/chat';
 import type { ChatPlanSyncService } from './chat-plan-sync-service';
 import type { ChatHostDeps, ChatSettingsAccessor } from './chat-service-types';
+import type { SkillExecutionRequest } from 'src/domains/skills/execution';
+import type { SkillReturnPacket } from 'src/domains/skills/session-state';
 
 export interface ResolveToolRuntimeOptions {
 	includeSubAgents?: boolean;
@@ -30,6 +32,9 @@ export interface ChatToolRuntimeResolverOptions {
 	getMaxToolCallLoops: () => number | undefined;
 	showMcpNoticeOnce: (message: string) => void;
 	chatServiceAdapter: SubAgentChatServiceAdapter;
+	executeSkillExecution: (
+		request: SkillExecutionRequest,
+	) => Promise<SkillReturnPacket>;
 }
 
 export type BuiltinToolList = Awaited<ReturnType<BuiltinToolsRuntime['listTools']>>;

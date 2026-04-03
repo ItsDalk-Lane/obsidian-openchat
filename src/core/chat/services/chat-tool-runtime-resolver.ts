@@ -156,6 +156,7 @@ export class ChatToolRuntimeResolver {
 			const runtime = await this.options.createBuiltinToolsRuntime(
 				this.getBuiltinToolSettings(),
 				this.options.runtimeDeps.getSkillScannerService(),
+				this.options.executeSkillExecution,
 			);
 			this.builtinToolsRuntime = runtime;
 			this.builtinRuntimeSessionId = targetSessionId;

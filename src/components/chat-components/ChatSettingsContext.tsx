@@ -17,7 +17,7 @@ import {
 import type { ChatSettings } from 'src/domains/chat/types'
 import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime'
 import { localInstance } from 'src/i18n/locals'
-import type { SkillScanResult } from 'src/domains/skills/types'
+import type { SkillDefinition, SkillScanResult } from 'src/domains/skills/types'
 import type { SubAgentScanResult } from 'src/tools/sub-agents/types'
 import { BUILTIN_SERVER_ID } from 'src/tools/runtime/constants'
 import { McpConfigImporter } from 'src/services/mcp/McpConfigImporter'
@@ -32,6 +32,7 @@ import { McpImportModal, McpServerEditModal } from 'src/services/mcp/McpConfigMo
 import { formatProviderOptionLabel } from './chatSettingsHelpers'
 import type { ChatService } from 'src/core/chat/services/chat-service'
 import type { ExternalMcpEntry, ProviderOption } from './chatSettingsTypes'
+import { useSkillSettingsController } from 'src/components/skills/useSkillSettingsController'
 
 const cloneValue = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 
@@ -60,6 +61,10 @@ export interface ChatSettingsContextValue {
 	handleEnableAllBuiltinTools: () => Promise<void>
 	handleToggleExternalMcpServer: (entry: ExternalMcpEntry, enabled: boolean) => Promise<void>
 	handleDeleteExternalMcpServer: (serverId: string) => Promise<void>
+	handleCreateInstalledSkill: () => void
+	handleEditInstalledSkill: (skill: SkillDefinition) => Promise<void>
+	handleToggleInstalledSkill: (skill: SkillDefinition, enabled: boolean) => Promise<void>
+	handleDeleteInstalledSkill: (skill: SkillDefinition) => Promise<void>
 	refreshInstalledSkills: () => Promise<void>
 	refreshInstalledSubAgents: () => Promise<void>
 	copyToolName: (toolName: string) => Promise<void>
@@ -102,6 +107,25 @@ export const ChatSettingsProvider = ({ app, service, children }: ChatSettingsPro
 		() => new Map()
 	)
 	const obsidianApi = service.getObsidianApiProvider()
+
+	const getInstalledSkillScanner = useCallback(() => (
+		service.internals.runtimeDeps.getSkillScannerService() ?? undefined
+	), [service])
+	const {
+		handleCreateInstalledSkill,
+		handleEditInstalledSkill,
+		handleToggleInstalledSkill,
+		handleDeleteInstalledSkill,
+		refreshInstalledSkills,
+		createSkillFormModal,
+		skillEditorModal,
+	} = useSkillSettingsController({
+		service,
+		obsidianApi,
+		skillScanResult,
+		setSkillScanResult,
+		getInstalledSkillScanner,
+	})
 
 	const providers = aiRuntimeSettings.providers ?? service.getProviders()
 	const providerOptions = useMemo<ProviderOption[]>(
@@ -371,11 +395,6 @@ export const ChatSettingsProvider = ({ app, service, children }: ChatSettingsPro
 		[mcpSettings, persistMcpSettings]
 	)
 
-	const refreshInstalledSkills = useCallback(
-		async () => setSkillScanResult(await service.refreshInstalledSkills()),
-		[service]
-	)
-
 	const refreshInstalledSubAgents = useCallback(
 		async () => setSubAgentScanResult(await service.refreshInstalledSubAgents()),
 		[service]
@@ -426,6 +445,10 @@ export const ChatSettingsProvider = ({ app, service, children }: ChatSettingsPro
 			handleEnableAllBuiltinTools,
 			handleToggleExternalMcpServer,
 			handleDeleteExternalMcpServer,
+			handleCreateInstalledSkill,
+			handleEditInstalledSkill,
+			handleToggleInstalledSkill,
+			handleDeleteInstalledSkill,
 			refreshInstalledSkills,
 			refreshInstalledSubAgents,
 			copyToolName,
@@ -451,11 +474,21 @@ export const ChatSettingsProvider = ({ app, service, children }: ChatSettingsPro
 			handleEnableAllBuiltinTools,
 			handleToggleExternalMcpServer,
 			handleDeleteExternalMcpServer,
+			handleCreateInstalledSkill,
+			handleEditInstalledSkill,
+			handleToggleInstalledSkill,
+			handleDeleteInstalledSkill,
 			refreshInstalledSkills,
 			refreshInstalledSubAgents,
 			copyToolName,
 		]
 	)
 
-	return <ChatSettingsContext.Provider value={value}>{children}</ChatSettingsContext.Provider>
+	return (
+		<ChatSettingsContext.Provider value={value}>
+			{children}
+			{createSkillFormModal}
+			{skillEditorModal}
+		</ChatSettingsContext.Provider>
+	)
 }

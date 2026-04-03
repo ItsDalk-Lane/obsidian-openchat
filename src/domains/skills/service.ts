@@ -1,35 +1,46 @@
 /**
  * @module skills/service
- * @description 承载 skills 域的扫描、内容加载与 system prompt 组装逻辑。
+ * @description 承载 skills 域的兼容 scanner facade、内容加载与 system prompt 组装逻辑。
  *
  * @dependencies src/domains/skills/types, src/domains/skills/config, src/providers/providers.types
  * @side-effects 读取 Vault、确保 AI 数据目录存在
  * @invariants 不直接导入 obsidian，不反向依赖 settings/core/commands。
  */
 
-import {
-	buildSkillsRootPath,
-	FRONTMATTER_REGEX,
-	MAX_SKILL_DESCRIPTION_LENGTH,
-	SKILL_FILE_NAME,
-	SKILL_NAME_PATTERN,
-} from './config';
+import { LocalVaultSkillSource } from './source';
+import { SkillRegistry } from './registry';
 import type {
+	CreateSkillInput,
 	LoadedSkillContent,
+	SkillChangeListener,
 	SkillDefinition,
+	SkillId,
+	SkillQueryOptions,
 	SkillsDomainLogger,
-	SkillMetadata,
-	SkillScanError,
 	SkillScanResult,
+	SkillSource,
+	UpdateSkillInput,
 } from './types';
-import type { VaultPathPort, VaultReadPort, YamlPort } from 'src/providers/providers.types';
+import type { SkillSourceHostPort } from './source';
 
 /** SkillScannerService 所需的最小宿主能力 */
-export type SkillScannerHostPort = VaultPathPort & VaultReadPort & YamlPort;
+export type SkillScannerHostPort = SkillSourceHostPort;
+
+const isRuntimeEnabledSkill = (skill: SkillDefinition): boolean => skill.metadata.enabled !== false;
+
+export function filterRuntimeEnabledSkills(
+	result: SkillScanResult,
+): SkillScanResult {
+	return {
+		...result,
+		skills: result.skills.filter((skill) => isRuntimeEnabledSkill(skill)),
+	};
+}
 
 interface SkillScannerServiceOptions {
 	getAiDataFolder: () => string;
 	logger?: SkillsDomainLogger;
+	source?: SkillSource;
 }
 
 /**
@@ -38,193 +49,155 @@ interface SkillScannerServiceOptions {
  * @throws 仅在 provider 读取失败时由调用方观察到错误
  */
 export class SkillScannerService {
-	private cache: SkillScanResult | null = null;
-	private scanPromise: Promise<SkillScanResult> | null = null;
-	private readonly skillsByName = new Map<string, SkillDefinition>();
-	private readonly skillsByPath = new Map<string, SkillDefinition>();
+	private readonly source: SkillSource;
+	private readonly registry: SkillRegistry;
+	private readonly listeners = new Set<SkillChangeListener>();
 
 	constructor(
 		private readonly obsidianApi: SkillScannerHostPort,
 		private readonly options: SkillScannerServiceOptions,
-	) {}
+	) {
+		this.source = options.source ?? new LocalVaultSkillSource(this.obsidianApi, {
+			getAiDataFolder: options.getAiDataFolder,
+			logger: options.logger,
+		});
+		this.registry = new SkillRegistry(this.source);
+	}
 
 	/** @precondition getAiDataFolder 可返回当前 AI 数据目录 @postcondition 返回归一化后的 skills 根目录路径 @throws 从不抛出 @example scanner.getSkillsRootPath() */
 	getSkillsRootPath(): string {
-		return this.obsidianApi.normalizePath(buildSkillsRootPath(this.options.getAiDataFolder()));
+		return this.source.getSkillsRootPath();
 	}
 
 	/** @precondition 无 @postcondition 返回最近一次扫描缓存，没有缓存则返回 null @throws 从不抛出 @example scanner.getCachedResult() */
 	getCachedResult(): SkillScanResult | null {
-		return this.cache;
+		return this.registry.getSnapshot();
 	}
 
 	/** @precondition Vault provider 可正常列目录与读文件 @postcondition 返回缓存后的扫描结果 @throws 当 provider 级基础设施失败且未被内部降级时抛出 @example await scanner.scan() */
 	async scan(): Promise<SkillScanResult> {
-		if (this.cache) {
-			return this.cache;
+		const hadSnapshot = this.registry.getSnapshot() !== null;
+		const result = await this.registry.scan();
+		if (!hadSnapshot) {
+			this.emitChange(result);
 		}
-		if (!this.scanPromise) {
-			this.scanPromise = this.doScan().finally(() => {
-				this.scanPromise = null;
-			});
-		}
-		return await this.scanPromise;
+		return result;
 	}
 
-	/** @precondition name 为技能名或用户输入片段 @postcondition 返回缓存中的同名技能定义 @throws 从不抛出 @example scanner.findByName('alpha') */
-	findByName(name: string): SkillDefinition | undefined {
-		return this.skillsByName.get(name.trim());
+	/** @precondition Vault provider 可正常列目录与读文件 @postcondition 强制刷新并返回新的扫描结果 @throws 当 provider 级基础设施失败且未被内部降级时抛出 @example await scanner.refresh() */
+	async refresh(): Promise<SkillScanResult> {
+		const result = await this.registry.refresh();
+		this.emitChange(result);
+		return result;
+	}
+
+	async createSkill(input: CreateSkillInput): Promise<SkillDefinition> {
+		const created = await this.source.createSkill(input);
+		return await this.refreshAndFindSkill(created.skillFilePath, created);
+	}
+
+	async updateSkill(input: UpdateSkillInput): Promise<SkillDefinition> {
+		const updated = await this.source.updateSkill(input);
+		return await this.refreshAndFindSkill(updated.skillFilePath, updated);
+	}
+
+	async removeSkill(skillId: SkillId): Promise<void> {
+		await this.source.removeSkill(skillId);
+		await this.refresh();
+	}
+
+	async setSkillEnabled(skillId: SkillId, enabled: boolean): Promise<SkillDefinition> {
+		const updated = await this.source.setSkillEnabled(skillId, enabled);
+		return await this.refreshAndFindSkill(updated.skillFilePath, updated);
+	}
+
+	async scanRuntimeSkills(): Promise<SkillScanResult> {
+		return filterRuntimeEnabledSkills(await this.scan());
+	}
+
+	/** @precondition name 为技能名或用户输入片段 @postcondition 默认只返回运行时可执行的同名技能定义 @throws 从不抛出 @example scanner.findByName('alpha') */
+	findByName(name: string, options?: SkillQueryOptions): SkillDefinition | undefined {
+		return this.registry.findByName(name, options);
+	}
+
+	async resolveRelevantSkills(
+		query: string,
+		limit = 3,
+		options?: SkillQueryOptions,
+	): Promise<SkillDefinition[]> {
+		const trimmedQuery = query.trim();
+		if (!trimmedQuery) {
+			return [];
+		}
+		if (!this.registry.getSnapshot()) {
+			await this.scan();
+		}
+		return this.registry.resolveRelevantSkills(trimmedQuery, limit, options);
 	}
 
 	/** @precondition path 为技能文件或目录路径 @postcondition 返回路径命中的技能定义或 null @throws 从不抛出 @example scanner.findByPath('System/AI Data/skills/demo/SKILL.md') */
 	findByPath(path: string): SkillDefinition | null {
-		return this.skillsByPath.get(this.obsidianApi.normalizePath(path)) ?? null;
+		return this.registry.findById(this.source.normalizePath(path)) ?? null;
 	}
 
 	/** @precondition path 为任意 vault 路径 @postcondition 返回 provider 归一化后的路径 @throws 从不抛出 @example scanner.normalizePath('a\\b') */
 	normalizePath(path: string): string {
-		return this.obsidianApi.normalizePath(path);
+		return this.source.normalizePath(path);
+	}
+
+	/** @precondition listener 为幂等或可重复调用的订阅函数 @postcondition 返回可注销该订阅的函数 @throws 从不抛出 @example const off = scanner.onChange(listener) */
+	onChange(listener: SkillChangeListener): () => void {
+		this.listeners.add(listener);
+		const cached = this.registry.getSnapshot();
+		if (cached) {
+			listener(cached);
+		}
+		return () => {
+			this.listeners.delete(listener);
+		};
 	}
 
 	/** @precondition 无 @postcondition 清空缓存与索引，下一次 scan 会重新读取 Vault @throws 从不抛出 @example scanner.clearCache() */
 	clearCache(): void {
-		this.cache = null;
-		this.skillsByName.clear();
-		this.skillsByPath.clear();
+		this.registry.clearCache();
 	}
 
 	/** @precondition path 指向某个已注册 Skill 的 SKILL.md @postcondition 返回完整文件内容与剥离 frontmatter 后的正文 @throws 当技能未注册或文件不可读时抛出 @example await scanner.loadSkillContent(path) */
 	async loadSkillContent(path: string): Promise<LoadedSkillContent> {
-		const normalizedPath = this.obsidianApi.normalizePath(path);
-		let definition = this.findByPath(normalizedPath);
+		const normalizedPath = this.source.normalizePath(path);
+		let definition = this.registry.findById(normalizedPath);
 		if (!definition) {
 			await this.scan();
-			definition = this.findByPath(normalizedPath);
+			definition = this.registry.findById(normalizedPath);
 		}
 		if (!definition) {
 			throw new Error(`未找到已注册的 Skill: ${normalizedPath}`);
 		}
-		const fullContent = await this.obsidianApi.readVaultFile(normalizedPath);
+		const loaded = await this.source.loadSkillContent(normalizedPath);
 		return {
+			...loaded,
 			definition,
-			fullContent,
-			bodyContent: stripSkillFrontmatter(fullContent),
 		};
 	}
 
-	private async doScan(): Promise<SkillScanResult> {
-		const aiDataFolder = this.options.getAiDataFolder();
-		await this.obsidianApi.ensureAiDataFolders(aiDataFolder);
-		const skillsRootPath = this.getSkillsRootPath();
-		const skills: SkillDefinition[] = [];
-		const errors: SkillScanError[] = [];
-		const indexByName = new Map<string, number>();
-
-		for (const folderEntry of this.obsidianApi.listFolderEntries(skillsRootPath)) {
-			if (folderEntry.kind !== 'folder') {
-				continue;
-			}
-			const skillFile = this.obsidianApi
-				.listFolderEntries(folderEntry.path)
-				.find((entry) => entry.kind === 'file' && entry.name === SKILL_FILE_NAME);
-			if (!skillFile) {
-				continue;
-			}
-			try {
-				const metadata = await this.readSkillMetadata(skillFile.path);
-				const definition: SkillDefinition = {
-					metadata,
-					skillFilePath: skillFile.path,
-					basePath: folderEntry.path,
-				};
-				const existingIndex = indexByName.get(metadata.name);
-				if (existingIndex !== undefined) {
-					errors.push({
-						path: skillFile.path,
-						reason: `Skill 名称重复，已覆盖先前定义: ${metadata.name}`,
-						severity: 'warning',
-					});
-					skills[existingIndex] = definition;
-					continue;
-				}
-				indexByName.set(metadata.name, skills.length);
-				skills.push(definition);
-			} catch (error) {
-				const reason = error instanceof Error ? error.message : String(error);
-				errors.push({
-					path: skillFile.path,
-					reason,
-					severity: 'error',
-				});
-				this.options.logger?.warn('[SkillsDomain] Skill 解析失败', {
-					path: skillFile.path,
-					reason,
-				});
-			}
-		}
-
-		skills.sort((left, right) => left.metadata.name.localeCompare(right.metadata.name));
-		const result: SkillScanResult = { skills, errors };
-		this.cacheResult(result);
-		return result;
+	/** @precondition path 为任意 Vault 变更路径 @postcondition 返回该路径是否属于受当前 source 管理的 SKILL.md @throws 从不抛出 @example scanner.isSkillFilePath('System/AI Data/skills/demo/SKILL.md') */
+	isSkillFilePath(path: string): boolean {
+		return this.source.isSkillFilePath(path);
 	}
 
-	private cacheResult(result: SkillScanResult): void {
-		this.cache = result;
-		this.skillsByName.clear();
-		this.skillsByPath.clear();
-		for (const skill of result.skills) {
-			this.skillsByName.set(skill.metadata.name, skill);
-			this.skillsByPath.set(this.obsidianApi.normalizePath(skill.skillFilePath), skill);
+	private async refreshAndFindSkill(
+		skillId: SkillId,
+		fallback: SkillDefinition,
+	): Promise<SkillDefinition> {
+		await this.refresh();
+		return this.registry.findById(skillId) ?? fallback;
+	}
+
+	private emitChange(result: SkillScanResult): void {
+		for (const listener of this.listeners) {
+			listener(result);
 		}
 	}
-
-	private async readSkillMetadata(filePath: string): Promise<SkillMetadata> {
-		return parseSkillMetadata(await this.obsidianApi.readVaultFile(filePath), this.obsidianApi);
-	}
-}
-
-/** @precondition content 为 SKILL.md 原始内容 @postcondition 返回经校验后的 frontmatter 元数据 @throws 当前置 YAML 缺失、非法或字段不合规时抛出 @example parseSkillMetadata('---\nname: demo\ndescription: desc\n---', obsidianApi) */
-export function parseSkillMetadata(content: string, obsidianApi: YamlPort): SkillMetadata {
-	const match = content.match(FRONTMATTER_REGEX);
-	if (!match) {
-		throw new Error('SKILL.md 缺少有效的 YAML frontmatter');
-	}
-	let parsed: Record<string, unknown>;
-	try {
-		const yaml = obsidianApi.parseYaml(match[1]);
-		if (!yaml || typeof yaml !== 'object' || Array.isArray(yaml)) {
-			throw new Error('frontmatter 必须是对象');
-		}
-		parsed = yaml as Record<string, unknown>;
-	} catch (error) {
-		throw new Error(`frontmatter 解析失败: ${error instanceof Error ? error.message : String(error)}`);
-	}
-	const name = requireTrimmedString(parsed.name, 'name');
-	if (!SKILL_NAME_PATTERN.test(name)) {
-		throw new Error('frontmatter.name 不符合命名规范');
-	}
-	const description = requireTrimmedString(parsed.description, 'description');
-	if (description.length > MAX_SKILL_DESCRIPTION_LENGTH) {
-		throw new Error('frontmatter.description 超过 1024 字符限制');
-	}
-	const metadata: SkillMetadata = { name, description };
-	if (typeof parsed.license === 'string' && parsed.license.trim()) {
-		metadata.license = parsed.license.trim();
-	}
-	if (isCompatibilityValue(parsed.compatibility)) {
-		metadata.compatibility = parsed.compatibility;
-	}
-	if (parsed.metadata && typeof parsed.metadata === 'object' && !Array.isArray(parsed.metadata)) {
-		metadata.metadata = parsed.metadata as Record<string, unknown>;
-	}
-	return metadata;
-}
-
-/** @precondition content 为 SKILL.md 原始内容 @postcondition 返回剥离 frontmatter 后的正文 @throws 从不抛出 @example stripSkillFrontmatter('---\nname: demo\ndescription: desc\n---\nbody') */
-export function stripSkillFrontmatter(content: string): string {
-	const match = content.match(FRONTMATTER_REGEX);
-	return match ? content.slice(match[0].length) : content;
 }
 
 /** @precondition basePath 与 bodyContent 来自同一技能定义 @postcondition 返回工具调用所需的规范化输出文本 @throws 从不抛出 @example formatSkillToolResult('folder\\skill', 'body', (path) => path) */
@@ -248,32 +221,18 @@ export function buildSkillsSystemPromptBlock(skills: readonly SkillDefinition[])
 		.replace(/'/gu, '&apos;');
 	return [
 		'<skills>',
-		'Priority: Match user requests to the best available skill before using other commands. | Skills listed before commands',
-		'Invoke via: skill(name="item-name") — omit leading slash for commands.',
+		'Use discover_skills to inspect available skills when the exact skill name is unknown.',
+		'Use invoke_skill only after you know the target skill name or when the user gives a slash command such as /commit or /pdf.',
 		...skills.flatMap((skill) => [
 			'  <skill>',
 			`    <name>${escapeXml(skill.metadata.name)}</name>`,
 			`    <description>${escapeXml(skill.metadata.description)}</description>`,
+			...(skill.metadata.when_to_use
+				? [`    <when_to_use>${escapeXml(skill.metadata.when_to_use)}</when_to_use>`]
+				: []),
 			'    <scope>user</scope>',
 			'  </skill>',
 		]),
 		'</skills>',
 	].join('\n');
-}
-
-function requireTrimmedString(value: unknown, fieldName: string): string {
-	if (typeof value !== 'string' || !value.trim()) {
-		throw new Error(`frontmatter.${fieldName} 为必填项`);
-	}
-	return value.trim();
-}
-
-function isCompatibilityValue(value: unknown): value is SkillMetadata['compatibility'] {
-	if (typeof value === 'string') {
-		return true;
-	}
-	if (Array.isArray(value)) {
-		return value.every((entry) => typeof entry === 'string');
-	}
-	return !!value && typeof value === 'object';
 }

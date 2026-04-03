@@ -4,6 +4,7 @@ import type { AiRuntimeSettings } from 'src/domains/settings/types-ai-runtime';
 import type { PluginSettings } from 'src/domains/settings/types';
 import type { BuiltinToolsRuntime, BuiltinToolsRuntimeSettings } from 'src/tools/runtime/BuiltinToolsRuntime';
 import type { SkillScannerService } from 'src/domains/skills/service';
+import type { SkillExecutionRequest } from 'src/domains/skills/execution';
 import type { ObsidianApiProvider } from 'src/providers/providers.types';
 import type { ChatRuntimeDeps } from '../runtime/chat-runtime-deps';
 import type {
@@ -26,6 +27,13 @@ import type { MessageService } from './message-service';
 import type { ResolvedToolRuntime, SubAgentStateCallback } from 'src/tools/sub-agents/types';
 import type { SubAgentScannerService } from 'src/tools/sub-agents/SubAgentScannerService';
 import type { SubAgentWatcherService } from 'src/tools/sub-agents/SubAgentWatcherService';
+import type {
+	BeginSkillInvocationInput,
+	SkillInvocationFrame,
+	SkillReturnPacket,
+	SkillSessionState,
+	WriteSkillReturnPacketInput,
+} from 'src/domains/skills/session-state';
 import type {
 	ProviderToolDiscoveryPayload,
 	ProviderToolExecutablePayload,
@@ -68,7 +76,18 @@ export interface SavedChatSessionState extends AttachmentSelectionSnapshot {
 	activeSession: ChatSession | null;
 	selectedText?: string;
 	selectedTextContext?: SelectedTextContext;
+	skillSessionState?: SkillSessionState | null;
 }
+
+export type FreezeSkillMainTaskInput = BeginSkillInvocationInput;
+
+export type FreezeSkillMainTaskResult = SkillInvocationFrame;
+
+export type WriteActiveSkillReturnPacketInput = WriteSkillReturnPacketInput;
+
+export type WriteActiveSkillReturnPacketResult = SkillInvocationFrame;
+
+export type RestoreSkillMainTaskResult = SkillReturnPacket | null;
 
 export interface ChatSettingsAccessor {
 	getManifestId(): string;
@@ -126,6 +145,7 @@ export interface ChatHostDeps {
 	createBuiltinToolsRuntime(
 		settings: BuiltinToolsRuntimeSettings | undefined,
 		skillScanner: SkillScannerService | null,
+		executeSkillExecution: ((request: SkillExecutionRequest) => Promise<SkillReturnPacket>) | null,
 	): Promise<BuiltinToolsRuntime>;
 	createSubAgentScannerService(): SubAgentScannerService;
 	createSubAgentWatcherService(scanner: SubAgentScannerService): SubAgentWatcherService;

@@ -7,10 +7,18 @@
  * @invariants 不直接导入 obsidian，不向外暴露 App 实例。
  */
 
-import { SKILL_FILE_NAME, SKILL_RELOAD_DEBOUNCE_MS } from './config';
+import { SKILL_RELOAD_DEBOUNCE_MS } from './config';
 import { SkillScannerService } from './service';
 import type { SkillScannerHostPort } from './service';
-import type { SkillChangeListener, SkillsDomainLogger, SkillScanResult } from './types';
+import type {
+	CreateSkillInput,
+	SkillChangeListener,
+	SkillDefinition,
+	SkillId,
+	SkillsDomainLogger,
+	SkillScanResult,
+	UpdateSkillInput,
+} from './types';
 import type { VaultWatchPort } from 'src/providers/providers.types';
 
 /** SkillsRuntimeCoordinator 所需的最小宿主能力 */
@@ -29,20 +37,28 @@ interface SkillsRuntimeCoordinatorOptions {
 export class SkillsRuntimeCoordinator {
 	private readonly skillScannerService: SkillScannerService;
 	private readonly listeners = new Set<SkillChangeListener>();
+	private readonly stopScannerSubscription: () => void;
 	private initializePromise: Promise<void> | null = null;
 	private stopVaultWatch: (() => void) | null = null;
 	private reloadTimer: ReturnType<typeof setTimeout> | null = null;
 	private started = false;
+	private initialized = false;
 
 	constructor(
 		private readonly obsidianApi: SkillsRuntimeHostPort,
 		private readonly options: SkillsRuntimeCoordinatorOptions,
 	) {
 		this.skillScannerService = new SkillScannerService(this.obsidianApi, this.options);
+		this.stopScannerSubscription = this.skillScannerService.onChange((result) => {
+			this.emitChange(result);
+		});
 	}
 
 	/** @precondition provider 可注册 Vault 监听 @postcondition skills 域完成首次刷新与监听注册 @throws 当首次扫描失败时抛出 @example await runtime.initialize() */
 	async initialize(): Promise<void> {
+		if (this.initialized) {
+			return;
+		}
 		if (!this.initializePromise) {
 			this.initializePromise = this.doInitialize().finally(() => {
 				this.initializePromise = null;
@@ -73,6 +89,26 @@ export class SkillsRuntimeCoordinator {
 		return await this.refreshNow();
 	}
 
+	async createSkill(input: CreateSkillInput): Promise<SkillDefinition> {
+		await this.initialize();
+		return await this.skillScannerService.createSkill(input);
+	}
+
+	async updateSkill(input: UpdateSkillInput): Promise<SkillDefinition> {
+		await this.initialize();
+		return await this.skillScannerService.updateSkill(input);
+	}
+
+	async removeSkill(skillId: SkillId): Promise<void> {
+		await this.initialize();
+		await this.skillScannerService.removeSkill(skillId);
+	}
+
+	async setSkillEnabled(skillId: SkillId, enabled: boolean): Promise<SkillDefinition> {
+		await this.initialize();
+		return await this.skillScannerService.setSkillEnabled(skillId, enabled);
+	}
+
 	/** @precondition listener 为幂等或可重复调用的订阅函数 @postcondition 返回可注销该订阅的函数 @throws 从不抛出 @example const off = runtime.onSkillsChange(listener) */
 	onSkillsChange(listener: SkillChangeListener): () => void {
 		this.listeners.add(listener);
@@ -87,6 +123,7 @@ export class SkillsRuntimeCoordinator {
 
 	/** @precondition 无 @postcondition 监听器、定时器与缓存全部清理完毕 @throws 从不抛出 @example runtime.dispose() */
 	dispose(): void {
+		this.stopScannerSubscription();
 		this.stopVaultWatch?.();
 		this.stopVaultWatch = null;
 		if (this.reloadTimer !== null) {
@@ -96,39 +133,27 @@ export class SkillsRuntimeCoordinator {
 		this.listeners.clear();
 		this.skillScannerService.clearCache();
 		this.started = false;
+		this.initialized = false;
 	}
 
 	private async doInitialize(): Promise<void> {
 		if (!this.started) {
 			this.started = true;
 			this.stopVaultWatch = this.obsidianApi.onVaultChange((event) => {
-				if (this.isSkillFilePath(event.path) || (event.oldPath && this.isSkillFilePath(event.oldPath))) {
+				if (
+					this.skillScannerService.isSkillFilePath(event.path)
+					|| (event.oldPath && this.skillScannerService.isSkillFilePath(event.oldPath))
+				) {
 					this.scheduleReload();
 				}
 			});
 		}
 		await this.refreshNow();
+		this.initialized = true;
 	}
 
 	private async refreshNow(): Promise<SkillScanResult> {
-		this.skillScannerService.clearCache();
-		const result = await this.skillScannerService.scan();
-		for (const listener of this.listeners) {
-			listener(result);
-		}
-		return result;
-	}
-
-	private isSkillFilePath(path: string): boolean {
-		const normalizedPath = this.obsidianApi.normalizePath(path);
-		const skillsRootPath = this.obsidianApi.normalizePath(this.skillScannerService.getSkillsRootPath());
-		if (!normalizedPath || !skillsRootPath) {
-			return false;
-		}
-		if (normalizedPath !== skillsRootPath && !normalizedPath.startsWith(`${skillsRootPath}/`)) {
-			return false;
-		}
-		return normalizedPath.endsWith(`/${SKILL_FILE_NAME}`);
+		return await this.skillScannerService.refresh();
 	}
 
 	private scheduleReload(): void {
@@ -141,5 +166,11 @@ export class SkillsRuntimeCoordinator {
 				this.options.logger?.warn('[SkillsDomain] 刷新 Skill 列表失败', error);
 			});
 		}, SKILL_RELOAD_DEBOUNCE_MS);
+	}
+
+	private emitChange(result: SkillScanResult): void {
+		for (const listener of this.listeners) {
+			listener(result);
+		}
 	}
 }

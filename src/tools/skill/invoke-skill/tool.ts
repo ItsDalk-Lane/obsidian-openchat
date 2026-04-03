@@ -1,4 +1,3 @@
-import type { SkillScannerService } from 'src/domains/skills/service';
 import { z } from 'zod';
 import type { BuiltinTool } from '../../runtime/types';
 import { buildBuiltinTool } from '../../runtime/build-tool';
@@ -6,7 +5,9 @@ import { buildSkillToolDescription } from '../_shared/description';
 import { skillReadOnlyAnnotations } from '../_shared/service';
 import {
 	describeInvokeSkillActivity,
+	type ExecuteSkillExecution,
 	executeInvokeSkill,
+	type InvokeSkillResult,
 	summarizeInvokeSkill,
 	validateInvokeSkillInput,
 } from './service';
@@ -15,15 +16,38 @@ import { invokeSkillToolSchema, type InvokeSkillArgs } from './schema';
 export const INVOKE_SKILL_TOOL_NAME = 'invoke_skill';
 export const LEGACY_INVOKE_SKILL_TOOL_NAME = 'Skill';
 
+const skillReturnPacketSchema = z.object({
+	invocationId: z.string(),
+	skillId: z.string(),
+	skillName: z.string(),
+	status: z.enum(['completed', 'failed', 'cancelled']),
+	content: z.string(),
+	sessionId: z.string().nullable(),
+	messageCount: z.number(),
+	producedAt: z.number(),
+	metadata: z.record(z.unknown()).optional(),
+}).strict();
+
+const invokeSkillResultSchema = z.object({
+	status: z.enum(['completed', 'failed', 'cancelled']),
+	message: z.string(),
+	nextAction: z.string().nullable(),
+	executionMode: z.string().nullable(),
+	packet: skillReturnPacketSchema,
+}).strict();
+
 export const createInvokeSkillTool = (
-	scanner: SkillScannerService,
-): BuiltinTool<InvokeSkillArgs, string> => buildBuiltinTool<InvokeSkillArgs, string>({
+	executeSkillExecution: ExecuteSkillExecution,
+): BuiltinTool<InvokeSkillArgs, InvokeSkillResult> => buildBuiltinTool<
+	InvokeSkillArgs,
+	InvokeSkillResult
+>({
 	name: INVOKE_SKILL_TOOL_NAME,
 	title: INVOKE_SKILL_TOOL_NAME,
 	description: buildSkillToolDescription(),
 	aliases: [LEGACY_INVOKE_SKILL_TOOL_NAME],
 	inputSchema: invokeSkillToolSchema,
-	outputSchema: z.string(),
+	outputSchema: invokeSkillResultSchema,
 	annotations: skillReadOnlyAnnotations,
 	surface: {
 		family: 'workflow.skill',
@@ -43,5 +67,5 @@ export const createInvokeSkillTool = (
 	validateInput: (args) => validateInvokeSkillInput(args),
 	getToolUseSummary: summarizeInvokeSkill,
 	getActivityDescription: describeInvokeSkillActivity,
-	execute: async (args) => await executeInvokeSkill(args, scanner),
+	execute: async (args) => await executeInvokeSkill(args, executeSkillExecution),
 });

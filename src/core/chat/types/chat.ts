@@ -18,6 +18,7 @@ import type {
 	SelectedFile,
 	SelectedFolder,
 	SelectedItem,
+	SelectedTextContext,
 	ToolCall,
 	LayoutMode,
 	MultiModelMode,
@@ -38,6 +39,7 @@ import type {
 	ChatToolSettingsPort,
 	ChatVaultPort,
 } from 'src/domains/chat/service';
+import type { SkillSessionState } from 'src/domains/skills/session-state';
 import {
 	DEFAULT_CHAT_SETTINGS,
 	DEFAULT_MESSAGE_MANAGEMENT_SETTINGS,
@@ -75,9 +77,11 @@ export type {
 	SelectedFile,
 	SelectedFolder,
 	SelectedItem,
+	SelectedTextContext,
 	SubAgentExecutionState,
 	SubAgentExecutionStatus,
 	ToolCall,
+	SkillSessionState,
 }
 
 export type {

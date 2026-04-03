@@ -1,4 +1,6 @@
 import type { ToolDefinition, ToolExecutionRecord } from 'src/types/tool';
+import { DebugLogger } from 'src/utils/DebugLogger';
+import { buildSkillsSystemPromptBlock } from 'src/domains/skills/service';
 import {
 	DISCOVER_SKILLS_TOOL_NAME,
 	INVOKE_SKILL_TOOL_NAME,
@@ -145,13 +147,13 @@ export const findInstalledSkillDefinition = (
 	if (!trimmedName) {
 		return undefined;
 	}
-	const snapshotMatch = internals.service
-		.getInstalledSkillsSnapshot()
-		?.skills.find((skill) => skill.metadata.name === trimmedName);
-	if (snapshotMatch) {
-		return snapshotMatch;
+	const scanner = internals.runtimeDeps.getSkillScannerService();
+	if (scanner) {
+		return scanner.findByName(trimmedName);
 	}
-	return internals.runtimeDeps.getSkillScannerService()?.findByName(trimmedName);
+	return internals.service
+		.getInstalledSkillsSnapshot()
+		?.skills.find((skill) => skill.metadata.name === trimmedName && skill.metadata.enabled !== false);
 };
 
 export const normalizeToolExecutionRecord = (
@@ -178,19 +180,31 @@ export const normalizeToolExecutionRecord = (
 
 export const resolveSkillsSystemPromptBlock = async (
 	internals: ChatServiceInternals,
-	requestTools: ToolDefinition[],
+	input: {
+		requestTools: ToolDefinition[];
+		relevanceQuery?: string;
+		limit?: number;
+	},
 ): Promise<string | undefined> => {
-	const includesSkillTool = requestTools.some((tool) =>
+	const includesSkillTool = input.requestTools.some((tool) =>
 		tool.name === INVOKE_SKILL_TOOL_NAME || tool.name === DISCOVER_SKILLS_TOOL_NAME,
 	);
 	if (!includesSkillTool) {
 		return undefined;
 	}
-	void internals;
-	return [
-		'<skills>',
-		'Use discover_skills to inspect available skills when the exact skill name is unknown.',
-		'Use invoke_skill only after you know the target skill name or when the user gives a slash command such as /commit or /pdf.',
-		'</skills>',
-	].join('\n');
+	const trimmedQuery = input.relevanceQuery?.trim();
+	if (!trimmedQuery) {
+		return buildSkillsSystemPromptBlock([]);
+	}
+	const scanner = internals.runtimeDeps.getSkillScannerService();
+	if (!scanner) {
+		return buildSkillsSystemPromptBlock([]);
+	}
+	try {
+		const relevantSkills = await scanner.resolveRelevantSkills(trimmedQuery, input.limit ?? 3);
+		return buildSkillsSystemPromptBlock(relevantSkills);
+	} catch (error) {
+		DebugLogger.warn('[ChatService] 解析相关 Skill 提示失败', error);
+		return buildSkillsSystemPromptBlock([]);
+	}
 };

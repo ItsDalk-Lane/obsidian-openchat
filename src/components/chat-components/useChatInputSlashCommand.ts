@@ -28,7 +28,7 @@ export function useChatInputSlashCommand(
 
 			try {
 				const [skillsResult, agentsResult] = await Promise.all([
-					service.loadInstalledSkills(),
+					service.loadRunnableSkills(),
 					service.loadInstalledSubAgents(),
 				]);
 

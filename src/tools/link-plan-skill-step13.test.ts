@@ -21,6 +21,7 @@ import {
 } from './skill/skill-tools';
 import { createDiscoverSkillsTool } from './skill/discover-skills/tool';
 import { createInvokeSkillTool } from './skill/invoke-skill/tool';
+import type { SkillReturnPacket } from 'src/domains/skills/session-state';
 
 const CURRENT_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -81,6 +82,18 @@ function createScanner(skills: readonly SkillDefinition[]): SkillScannerService 
 	return scanner as SkillScannerService;
 }
 
+const createExecuteSkillExecution = async (): Promise<SkillReturnPacket> => ({
+	invocationId: 'invoke-1',
+	skillId: PDF_SKILL.skillFilePath,
+	skillName: PDF_SKILL.metadata.name,
+	status: 'completed',
+	content: 'skill-result',
+	sessionId: 'chat-main',
+	messageCount: 2,
+	producedAt: 1,
+	metadata: { executionMode: 'isolated_resume', trigger: 'invoke_skill' },
+});
+
 const readToolSource = async (relativePath: string): Promise<string> => {
 	return await readFile(resolve(CURRENT_DIR, relativePath), 'utf8');
 };
@@ -135,10 +148,10 @@ test('Step 13 write_plan 迁入单工具目录并保留计划摘要行为', asyn
 	});
 });
 
-test('Step 13 skill 工具保留 discover 对象结果与 invoke 字符串结果', async () => {
+test('Step 13 skill 工具保留 discover 对象结果与 invoke 结构化结果', async () => {
 	const scanner = createScanner([PDF_SKILL]);
 	const discoverTool = createDiscoverSkillsTool(scanner);
-	const invokeTool = createInvokeSkillTool(scanner);
+	const invokeTool = createInvokeSkillTool(createExecuteSkillExecution);
 
 	const discoverResult = await discoverTool.execute({ query: 'pdf' }, TOOL_CONTEXT) as {
 		skills: Array<{ name: string; description: string; path: string }>;
@@ -161,10 +174,9 @@ test('Step 13 skill 工具保留 discover 对象结果与 invoke 字符串结果
 		skill: 'pdf',
 		args: '--pages 1-2',
 	}, TOOL_CONTEXT);
-	assert.equal(typeof invokeResult, 'string');
-	assert.match(invokeResult, /Base Path: System\/AI Data\/skills\/pdf\//);
-	assert.match(invokeResult, /<invocation-args>\n--pages 1-2\n<\/invocation-args>/);
-	assert.match(invokeResult, /<command-name>pdf<\/command-name>/);
+	assert.equal(typeof invokeResult, 'object');
+	assert.equal((invokeResult as { status: string }).status, 'completed');
+	assert.equal((invokeResult as { packet: SkillReturnPacket }).packet.skillName, 'pdf');
 });
 
 test('Step 13 legacy 工厂与桥接入口改为复用新目录', async () => {
@@ -183,7 +195,7 @@ test('Step 13 legacy 工厂与桥接入口改为复用新目录', async () => {
 		['write_plan'],
 	);
 	assert.deepEqual(
-		createSkillTools(createScanner([PDF_SKILL])).map((tool) => tool.name),
+		createSkillTools(createScanner([PDF_SKILL]), createExecuteSkillExecution).map((tool) => tool.name),
 		[DISCOVER_SKILLS_TOOL_NAME, INVOKE_SKILL_TOOL_NAME],
 	);
 });

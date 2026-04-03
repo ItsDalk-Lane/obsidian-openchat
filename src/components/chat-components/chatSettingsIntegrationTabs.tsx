@@ -1,7 +1,7 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { ToggleSwitch } from 'src/components/toggle-switch/ToggleSwitch'
 import { localInstance } from 'src/i18n/locals'
-import type { SkillScanResult } from 'src/domains/skills/types'
+import type { SkillDefinition, SkillScanResult } from 'src/domains/skills/types'
 import type { McpServerState } from 'src/services/mcp/types'
 import type { SubAgentScanResult } from 'src/tools/sub-agents/types'
 import { getMcpStatusColor, getMcpStatusText } from './chatSettingsHelpers'
@@ -23,6 +23,10 @@ interface McpServersSettingsTabProps {
 interface SkillsSettingsTabProps {
 	skillScanResult: SkillScanResult
 	refreshInstalledSkills: () => Promise<void>
+	handleCreateInstalledSkill: () => void
+	handleEditInstalledSkill: (skill: SkillDefinition) => Promise<void>
+	handleToggleInstalledSkill: (skill: SkillDefinition, enabled: boolean) => Promise<void>
+	handleDeleteInstalledSkill: (skill: SkillDefinition) => Promise<void>
 }
 
 interface SubAgentsSettingsTabProps {
@@ -131,10 +135,24 @@ export const McpServersSettingsTab = ({
 
 export const SkillsSettingsTab = ({
 	skillScanResult,
-	refreshInstalledSkills,
+	refreshInstalledSkills: _refreshInstalledSkills,
+	handleCreateInstalledSkill,
+	handleEditInstalledSkill,
+	handleToggleInstalledSkill,
+	handleDeleteInstalledSkill,
 }: SkillsSettingsTabProps) => (
 	<section className="chat-settings-panel">
 		<div className="chat-settings-subsection">
+			<div className="chat-settings-toolbar">
+				<button
+					type="button"
+					className="mod-cta"
+					onClick={handleCreateInstalledSkill}
+				>
+					<Plus size={16} />
+					<span>{localInstance.chat_settings_skill_create}</span>
+				</button>
+			</div>
 			<div className="chat-settings-list">
 				{skillScanResult.skills.map((skill) => (
 					<div key={skill.skillFilePath} className="chat-settings-server-card">
@@ -143,6 +161,35 @@ export const SkillsSettingsTab = ({
 								<span className="chat-settings-server-card__title">
 									{skill.metadata.name}
 								</span>
+							</div>
+							<div className="chat-settings-server-card__actions">
+								<ToggleSwitch
+									checked={skill.metadata.enabled ?? true}
+									onChange={(checked) => {
+										void handleToggleInstalledSkill(skill, checked)
+									}}
+									ariaLabel={skill.metadata.name}
+								/>
+								<button
+									type="button"
+									className="chat-settings-icon-button"
+									title={localInstance.chat_settings_skill_edit}
+									onClick={() => {
+										void handleEditInstalledSkill(skill)
+									}}
+								>
+									<Pencil size={16} />
+								</button>
+								<button
+									type="button"
+									className="chat-settings-icon-button chat-settings-icon-button--danger"
+									title={localInstance.chat_settings_skill_delete}
+									onClick={() => {
+										void handleDeleteInstalledSkill(skill)
+									}}
+								>
+									<Trash2 size={16} />
+								</button>
 							</div>
 						</div>
 						<OverflowTooltip content={skill.metadata.description}>

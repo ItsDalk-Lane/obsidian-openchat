@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import React from "react";
+import React, { useMemo } from "react";
 import "./Dialog.css";
 import { Strings } from "src/utils/Strings";
 import { localInstance } from "src/i18n/locals";
@@ -12,6 +12,21 @@ function isInsideRadixFloatingLayer(target: EventTarget | null): boolean {
 	}
 
 	return target.closest("[data-radix-popper-content-wrapper]") != null;
+}
+
+/**
+ * 找到最适合的 Portal 挂载容器。
+ * 如果当前处于 Obsidian 模态框（如设置面板）内，
+ * 则挂载到该 .modal-container，保证与设置面板在同一 stacking context。
+ * 否则回退到 document body。
+ */
+function findPortalContainer(): HTMLElement {
+	const doc = window.activeDocument ?? document
+	const containers = doc.querySelectorAll('.modal-container')
+	if (containers.length > 0) {
+		return containers[containers.length - 1] as HTMLElement
+	}
+	return doc.body
 }
 
 export default function Dialog(props: {
@@ -32,13 +47,14 @@ export default function Dialog(props: {
 	const { title, titleNode, titleRight, open, onOpenChange, description } = props;
 	const showTitle = titleNode != null || Strings.isNotBlank(title);
 	const closeOnInteractOutside = props.closeOnInteractOutside !== false;
+	const portalContainer = useMemo(() => findPortalContainer(), [])
 	return (
 		<DialogPrimitive.Root
 			open={open}
 			onOpenChange={onOpenChange}
 			modal={props.modal === true}
 		>
-			<DialogPrimitive.Portal container={window.activeDocument.body}>
+			<DialogPrimitive.Portal container={portalContainer}>
 				<div className="form--DialogRoot">
 					<div className="form--DialogOverlay" />
 					<DialogPrimitive.Content
