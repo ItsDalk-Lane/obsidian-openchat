@@ -1,4 +1,4 @@
-import { resolveCurrentTools, toOpenAITools } from 'src/core/agents/loop/openAILoopShared'
+import { toOpenAITools } from 'src/core/agents/loop/openAILoopShared'
 import { executeToolCalls } from 'src/core/agents/loop/openAILoopUtils'
 import type { ToolDefinition, ToolExecutor } from 'src/core/agents/loop/types'
 import { McpToolExecutor, mcpToolToToolDefinition } from 'src/services/mcp/McpToolExecutor'
@@ -205,10 +205,10 @@ const resolveLegacyMcpTools = async (
 export const resolveActiveTools = async (
 	options: DoubaoOptions,
 ): Promise<ToolDefinition[]> => {
-	const [genericTools, legacyMcpTools] = await Promise.all([
-		resolveCurrentTools(options.tools, options.getTools),
+	const [legacyMcpTools] = await Promise.all([
 		resolveLegacyMcpTools(options),
 	])
+	const genericTools = Array.isArray(options.tools) ? options.tools : []
 	return dedupeToolDefinitions([...genericTools, ...legacyMcpTools])
 }
 

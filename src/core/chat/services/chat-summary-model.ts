@@ -36,7 +36,6 @@ export const runSummaryModelRequest = async (
 			enableWebSearch: false,
 			tools: [],
 			toolExecutor: undefined,
-			getTools: undefined,
 			maxToolCallLoops: undefined,
 			mcpTools: undefined,
 			mcpGetTools: undefined,

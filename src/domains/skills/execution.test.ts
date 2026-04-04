@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { INLINE_ALLOWED_TOOLS_UNSUPPORTED_REASON } from './config';
 import { SkillExecutionService } from './execution';
 import type {
 	LoadedSkillContent,
@@ -312,44 +311,4 @@ test('SkillExecutionService 会拒绝执行已禁用的 Skill', async () => {
 
 	assert.equal(packet.status, 'failed');
 	assert.match(packet.content, /已禁用/);
-});
-
-test('SkillExecutionService 会拒绝 inline 与 allowed_tools 的组合', async () => {
-	const inlineSkill: SkillDefinition = {
-		...SKILL,
-		metadata: {
-			...SKILL.metadata,
-			execution: { mode: 'inline' },
-			allowed_tools: ['read_file'],
-		},
-	};
-	const service = new SkillExecutionService(
-		{
-			findByName: () => inlineSkill,
-			scan: async () => ({ skills: [inlineSkill], errors: [] }),
-			loadSkillContent: async () => ({
-				...LOADED_SKILL,
-				definition: inlineSkill,
-			}),
-		},
-		{
-			executeInline: async () => {
-				throw new Error('不应执行');
-			},
-			executeIsolated: async () => {
-				throw new Error('不应执行');
-			},
-			freezeMainTask: () => createInvocationFrame(),
-			writeReturnPacket: () => createInvocationFrame(),
-			restoreMainTask: () => null,
-		},
-	);
-
-	const packet = await service.execute({
-		skillName: 'code-audit',
-		trigger: 'slash_command',
-	});
-
-	assert.equal(packet.status, 'failed');
-	assert.equal(packet.content, INLINE_ALLOWED_TOOLS_UNSUPPORTED_REASON);
 });

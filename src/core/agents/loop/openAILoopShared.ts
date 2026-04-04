@@ -1,5 +1,4 @@
-import { DebugLogger } from 'src/utils/DebugLogger'
-import type { GetToolsFn, ToolDefinition } from './types'
+import type { ToolDefinition } from './types'
 
 /** 工具调用循环最大次数（默认值） */
 export const DEFAULT_MAX_TOOL_CALL_LOOPS = 10
@@ -77,23 +76,4 @@ export function toOpenAITools(tools: ToolDefinition[]): OpenAIToolDefinition[] {
 			parameters: tool.inputSchema,
 		},
 	}))
-}
-
-/** 解析当前可用工具集（支持动态刷新） */
-export async function resolveCurrentTools(
-	staticTools: ToolDefinition[] | undefined,
-	getTools?: GetToolsFn,
-): Promise<ToolDefinition[]> {
-	if (typeof getTools === 'function') {
-		try {
-			const nextTools = await getTools()
-			if (Array.isArray(nextTools) && nextTools.length > 0) {
-				return nextTools
-			}
-		} catch (error) {
-			DebugLogger.warn('[AgentLoop] 读取动态工具集失败，回退静态工具集', error)
-		}
-	}
-
-	return Array.isArray(staticTools) ? staticTools : []
 }

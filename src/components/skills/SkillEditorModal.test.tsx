@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import { INLINE_ALLOWED_TOOLS_UNSUPPORTED_REASON } from 'src/domains/skills/config'
 
 const require = createRequire(import.meta.url)
 require.extensions['.css'] = () => undefined
@@ -31,7 +30,6 @@ const createDetail = (): SkillEditorDetail => ({
 				{ name: 'path', description: 'target path', required: true },
 			],
 			execution: { mode: 'isolated_resume' },
-			allowed_tools: ['read_file', 'run_command'],
 		},
 		skillFilePath: 'System/AI Data/skills/alpha/SKILL.md',
 		basePath: 'System/AI Data/skills/alpha',
@@ -50,7 +48,6 @@ test('buildSkillEditorDraft 会把 skill 详情格式化为表单草稿', () => 
 	assert.equal(draft.whenToUseInput, 'Need alpha help')
 	assert.match(draft.argumentsInput, /"name": "path"/)
 	assert.equal(draft.executionMode, 'isolated_resume')
-	assert.equal(draft.allowedToolsInput, 'read_file\nrun_command')
 	assert.equal(draft.bodyContent, '# Alpha\nBody')
 })
 
@@ -64,7 +61,6 @@ test('parseSkillEditorSubmitValue 会把表单草稿解析为保存载荷', () =
 			{ name: 'path', required: true, default: null },
 		]),
 		executionMode: 'isolated',
-		allowedToolsInput: 'read_file\nrun_command, read_file',
 		bodyContent: 'line1\r\nline2',
 	})
 
@@ -74,7 +70,6 @@ test('parseSkillEditorSubmitValue 会把表单草稿解析为保存载荷', () =
 		whenToUse: 'Run when alpha is needed',
 		arguments: [{ name: 'path', required: true, default: null }],
 		executionMode: 'isolated',
-		allowedTools: ['read_file', 'run_command'],
 		bodyContent: 'line1\nline2',
 	})
 })
@@ -88,26 +83,9 @@ test('parseSkillEditorSubmitValue 在参数定义不是数组时抛错', () => {
 			whenToUseInput: '',
 			argumentsInput: '{"name":"path"}',
 			executionMode: 'inline',
-			allowedToolsInput: '',
 			bodyContent: 'body',
 		}),
 		/参数定义必须是 JSON 数组/,
-	)
-})
-
-test('parseSkillEditorSubmitValue 会拒绝 inline 与 allowed_tools 的组合', () => {
-	const { parseSkillEditorSubmitValue } = skillEditorModalModule!
-	assert.throws(
-		() => parseSkillEditorSubmitValue({
-			description: 'Alpha skill',
-			enabled: true,
-			whenToUseInput: '',
-			argumentsInput: '',
-			executionMode: 'inline',
-			allowedToolsInput: 'read_file',
-			bodyContent: 'body',
-		}),
-		new RegExp(INLINE_ALLOWED_TOOLS_UNSUPPORTED_REASON.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')),
 	)
 })
 

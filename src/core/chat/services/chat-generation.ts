@@ -8,10 +8,6 @@ import { t } from 'src/i18n/ai-runtime/helper';
 import { localInstance } from 'src/i18n/locals';
 import { DebugLogger } from 'src/utils/DebugLogger';
 import type {
-	PreparedToolTurn,
-	ToolSelectionInput,
-} from './chat-tool-selection-types';
-import type {
 	ResolvedToolRuntime,
 	SubAgentStateCallback,
 } from 'src/tools/sub-agents/types';
@@ -43,9 +39,7 @@ export interface ChatGenerationDeps {
 		session: ChatSession,
 		shouldAttachToSession: boolean
 	) => SubAgentStateCallback;
-	prepareToolTurn: (input: ToolSelectionInput) => Promise<PreparedToolTurn>;
 	resolveToolRuntime: (options?: {
-		includeSubAgents?: boolean;
 		parentSessionId?: string;
 		subAgentStateCallback?: SubAgentStateCallback;
 		session?: ChatSession;
@@ -58,8 +52,6 @@ export interface ChatGenerationDeps {
 			systemPrompt?: string;
 			modelTag?: string;
 			requestTools?: ToolDefinition[];
-			providerDiscoveryPayload?: PreparedToolTurn['providerDiscoveryPayload'];
-			providerExecutablePayload?: PreparedToolTurn['providerExecutablePayload'];
 		}
 	) => Promise<ProviderMessage[]>;
 	normalizeToolExecutionRecord: (

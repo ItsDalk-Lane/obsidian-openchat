@@ -14,7 +14,6 @@ export interface SkillMetadata {
 	readonly when_to_use?: string;
 	readonly arguments?: readonly SkillArgumentDefinition[];
 	readonly execution?: SkillExecutionConfig;
-	readonly allowed_tools?: readonly string[];
 	readonly license?: string;
 	readonly compatibility?: string | string[] | Record<string, unknown>;
 	readonly metadata?: Record<string, unknown>;
@@ -78,7 +77,6 @@ export interface CreateSkillInput {
 	readonly when_to_use?: string;
 	readonly arguments?: readonly SkillArgumentDefinition[];
 	readonly execution?: SkillExecutionConfig;
-	readonly allowed_tools?: readonly string[];
 	readonly license?: string;
 	readonly compatibility?: SkillMetadata['compatibility'];
 	readonly metadata?: Record<string, unknown>;
@@ -91,7 +89,6 @@ export interface UpdateSkillInput {
 	readonly when_to_use?: string | null;
 	readonly arguments?: readonly SkillArgumentDefinition[] | null;
 	readonly execution?: SkillExecutionConfig | null;
-	readonly allowed_tools?: readonly string[] | null;
 	readonly license?: string | null;
 	readonly compatibility?: SkillMetadata['compatibility'] | null;
 	readonly metadata?: Record<string, unknown> | null;

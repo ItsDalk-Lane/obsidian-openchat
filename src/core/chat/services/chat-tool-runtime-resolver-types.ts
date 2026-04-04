@@ -14,9 +14,6 @@ import type { SkillExecutionRequest } from 'src/domains/skills/execution';
 import type { SkillReturnPacket } from 'src/domains/skills/session-state';
 
 export interface ResolveToolRuntimeOptions {
-	includeSubAgents?: boolean;
-	explicitToolNames?: string[];
-	explicitMcpServerIds?: string[];
 	parentSessionId?: string;
 	subAgentStateCallback?: SubAgentStateCallback;
 	session?: ChatSession;

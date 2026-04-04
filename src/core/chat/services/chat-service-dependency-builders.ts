@@ -42,10 +42,6 @@ export const buildGenerationDeps = (internals: ChatServiceInternals) => ({
 		session: ChatSession,
 		shouldAttachToSession: boolean,
 	) => internals.service.createSubAgentStateUpdater(assistantMessage, session, shouldAttachToSession),
-	prepareToolTurn: async (
-		input: Parameters<typeof internals.toolSelectionCoordinator.prepareTurn>[0],
-	) =>
-		await internals.toolSelectionCoordinator.prepareTurn(input),
 	resolveToolRuntime: (options?: Parameters<typeof internals.service.resolveToolRuntime>[0]) =>
 		internals.service.resolveToolRuntime(options),
 	buildProviderMessagesWithOptions: (

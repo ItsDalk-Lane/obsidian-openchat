@@ -10,7 +10,6 @@ import type {
 import {
 	normalizeOptionalModel,
 	normalizePositiveInteger,
-	normalizeStringArray,
 	requireNonEmptyString,
 } from './types';
 
@@ -162,13 +161,6 @@ export class SubAgentScannerService {
 			name: requireNonEmptyString(parsed.name, 'name'),
 			description: requireNonEmptyString(parsed.description, 'description'),
 		};
-
-		if (Array.isArray(parsed.tools)) {
-			metadata.tools = normalizeStringArray(parsed.tools) ?? [];
-		}
-		if (Array.isArray(parsed.mcps)) {
-			metadata.mcps = normalizeStringArray(parsed.mcps) ?? [];
-		}
 
 		const models = normalizeOptionalModel(parsed.models);
 		if (models) {

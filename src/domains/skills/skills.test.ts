@@ -555,28 +555,6 @@ test('LocalVaultSkillSource 支持 create、update、setEnabled 与 remove', asy
 	assert.equal((await source.scan()).skills.length, 0);
 });
 
-test('LocalVaultSkillSource updateSkill 可写回可选数组字段', async () => {
-	const root = buildSkillsRootPath('System/AI Data');
-	const provider = createFakeProvider({
-		folders: {
-			[root]: [{ path: `${root}/alpha`, name: 'alpha', kind: 'folder' }],
-			[`${root}/alpha`]: [{ path: `${root}/alpha/SKILL.md`, name: 'SKILL.md', kind: 'file' }],
-		},
-		files: {
-			[`${root}/alpha/SKILL.md`]: '---\nname: alpha\ndescription: first skill\n---\nalpha body',
-		},
-	});
-	const source = new LocalVaultSkillSource(provider, { getAiDataFolder: () => 'System/AI Data' });
-	await source.updateSkill({
-		skillId: `${root}/alpha/SKILL.md`,
-		allowed_tools: ['read_file', 'grep_search'],
-	});
-	const content = provider.getWrittenFile(`${root}/alpha/SKILL.md`) ?? '';
-	assert.match(content, /allowed_tools:/);
-	assert.match(content, /- read_file/);
-	assert.match(content, /- grep_search/);
-});
-
 test('LocalVaultSkillSource 会拒绝重复名称的 Skill 创建', async () => {
 	const root = buildSkillsRootPath('System/AI Data');
 	const provider = createFakeProvider({
@@ -793,7 +771,6 @@ test('parseSkillMetadata 为旧 Skill 回填 Step01 默认字段', () => {
 	assert.equal(metadata.execution?.mode, 'isolated_resume');
 	assert.equal(metadata.when_to_use, undefined);
 	assert.equal(metadata.arguments, undefined);
-	assert.equal(metadata.allowed_tools, undefined);
 });
 
 test('parseSkillMetadata 解析 Step01 新字段', () => {
@@ -809,7 +786,6 @@ test('parseSkillMetadata 解析 Step01 新字段', () => {
 					{ name: 'target-language', default: 'zh-CN' },
 				],
 				execution: { mode: 'isolated' },
-				allowed_tools: ['read_file', 'grep_search'],
 			};
 		},
 	});
@@ -820,7 +796,6 @@ test('parseSkillMetadata 解析 Step01 新字段', () => {
 		{ name: 'target-language', default: 'zh-CN' },
 	]);
 	assert.deepEqual(metadata.execution, { mode: 'isolated' });
-	assert.deepEqual(metadata.allowed_tools, ['read_file', 'grep_search']);
 });
 
 test('parseSkillMetadata 校验 Step01 新字段类型', () => {
@@ -851,15 +826,6 @@ test('parseSkillMetadata 校验 Step01 新字段类型', () => {
 			};
 		},
 	}), /frontmatter\.execution\.mode 不支持该执行模式/);
-	assert.throws(() => parseSkillMetadata('---\nignored: true\n---', {
-		parseYaml(): unknown {
-			return {
-				name: 'invalid-tools',
-				description: 'demo',
-				allowed_tools: ['read_file', 1],
-			};
-		},
-	}), /frontmatter\.allowed_tools\[1\] 必须是非空字符串/);
 });
 
 test('内容辅助函数会剥离 frontmatter、格式化结果并转义 skills prompt', () => {

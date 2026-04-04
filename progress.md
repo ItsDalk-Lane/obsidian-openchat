@@ -57,6 +57,43 @@
   - `npm run test`
 - 内置工具方向当前只剩真实 Obsidian 手工 smoke test 与发布准备。
 
+## 2026-04-04
+
+- 完成“每次请求注入静态全量 tools 快照”主链改造：
+  - `chat-generation-for-model.ts` 改为直接解析一次 `ResolvedToolRuntime`
+  - OpenAI/Claude loop 与 Ollama/Poe/Doubao 均移除 `getTools` 动态刷新路径
+  - `ToolDefinition` 新增内部 `execution` 绑定
+- 删除旧工具暴露策略整套代码：
+  - 删除 tool-surface prompt、selection coordinator、candidate scoring/routing、
+    workflow selection、capability matrix 及相关测试夹具
+  - 移除 `AiRuntimeSettings.toolSurface`
+- 清理 Skill / Sub-Agent 白名单：
+  - 删除 `allowed_tools` / `tools` / `mcps` 类型、解析、执行约束、设置页表单与测试
+- 清理 dead tool 与 runtime 暴露面：
+  - 删除 `src/tools/vault/nav-tools.ts`
+  - 删除 `src/tools/vault/open-file/*`
+  - 删除 `src/tools/time/time-wrapper-tools.ts`
+  - 删除 `src/tools/web/fetch-wrapper-tools.ts`
+  - runtime 只注册 canonical time/fetch/filesystem tools
+- 本轮定向验证已通过：
+
+  ```bash
+  npx tsx --test src/core/chat/services/chat-generation-for-model.test.ts \
+    src/core/chat/services/chatGenerationFacade.test.ts \
+    src/core/chat/services/chat-skill-execution.test.ts \
+    src/tools/sub-agents/SubAgentToolExecutor.test.ts \
+    src/domains/skills/execution.test.ts \
+    src/domains/skills/skills.test.ts \
+    src/components/skills/CreateSkillForm.test.tsx \
+    src/components/skills/SkillEditorModal.test.tsx \
+    src/core/chat/services/chat-tool-discovery-blueprints-step14.test.ts \
+    src/tools/runtime/tool-module-layout.test.ts
+  ```
+
+- 当前剩余未处理项：
+  - 全仓 `npx tsc --noEmit` 仍存在大量与本轮无关的既有基线错误
+  - 尚未跑更大范围的全量测试集与真实 Obsidian smoke
+
 ## 2026-03-31
 
 - 已完成聊天域清理与兼容收口，包括：

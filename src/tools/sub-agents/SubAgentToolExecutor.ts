@@ -95,9 +95,6 @@ export class SubAgentToolExecutor implements ToolExecutor {
 			}
 
 			const toolRuntime = await this.chatService.resolveToolRuntime({
-				includeSubAgents: false,
-				explicitToolNames: definition.metadata.tools,
-				explicitMcpServerIds: definition.metadata.mcps,
 				parentSessionId: this.parentSessionId,
 			});
 
@@ -184,8 +181,6 @@ export class SubAgentToolExecutor implements ToolExecutor {
 			.map((agent) => ({
 				name: agent.metadata.name,
 				description: agent.metadata.description,
-				tools: [...(agent.metadata.tools ?? [])],
-				mcps: [...(agent.metadata.mcps ?? [])],
 				model: agent.metadata.models ?? null,
 				maxTokens: agent.metadata.maxTokens ?? null,
 			}));

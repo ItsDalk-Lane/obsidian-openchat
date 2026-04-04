@@ -16,7 +16,6 @@ import type {
 import { CALLOUT_BLOCK_END, CALLOUT_BLOCK_START } from 'src/LLMProviders/utils'
 import { normalizeProviderError } from 'src/LLMProviders/errors'
 import type { ToolCallRequest, ToolDefinition, ToolExecutor } from './types'
-import { resolveCurrentTools } from './OpenAILoopHandler'
 
 /** 最大工具调用循环次数 */
 const DEFAULT_MAX_TOOL_LOOPS = 10
@@ -70,11 +69,9 @@ export function withClaudeToolCallLoopSupport(
 ): (settings: ClaudeLoopSettings) => SendRequest {
 	return (settings: ClaudeLoopSettings): SendRequest => {
 		const toolDefs = settings.tools as ToolDefinition[] | undefined
-		const getToolsFn = settings.getTools
 		const executor = settings.toolExecutor as ToolExecutor | undefined
 		const hasStaticTools = Array.isArray(toolDefs) && toolDefs.length > 0
-		const hasDynamicTools = typeof getToolsFn === 'function'
-		if ((!hasStaticTools && !hasDynamicTools) || !executor) {
+		if (!hasStaticTools || !executor) {
 			return originalFactory(settings)
 		}
 
@@ -122,7 +119,7 @@ export function withClaudeToolCallLoopSupport(
 
 				for (let loop = 0; loop < maxLoops; loop++) {
 					if (controller.signal.aborted) return
-					const currentTools = await resolveCurrentTools(toolDefs, getToolsFn)
+					const currentTools = toolDefs ?? []
 					const claudeTools = toClaudeTools(currentTools)
 
 					const stream = await client.messages.create(

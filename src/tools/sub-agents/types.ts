@@ -5,7 +5,6 @@ import type {
 	SubAgentExecutionStatus,
 } from 'src/domains/chat/types';
 import type {
-	GetToolsFn,
 	ToolDefinition,
 	ToolExecutionRecord,
 	ToolExecutor,
@@ -24,8 +23,6 @@ export type { SubAgentExecutionState, SubAgentExecutionStatus };
 export interface SubAgentMetadata {
 	name: string;
 	description: string;
-	tools?: string[];
-	mcps?: string[];
 	models?: string;
 	maxTokens?: number;
 }
@@ -62,9 +59,6 @@ export interface SubAgentStateUpdate {
 export type SubAgentStateCallback = (update: SubAgentStateUpdate) => void;
 
 export interface ToolRuntimeResolutionOptions {
-	includeSubAgents?: boolean;
-	explicitToolNames?: string[];
-	explicitMcpServerIds?: string[];
 	parentSessionId?: string;
 	subAgentStateCallback?: SubAgentStateCallback;
 	session?: ChatSession;
@@ -73,7 +67,6 @@ export interface ToolRuntimeResolutionOptions {
 export interface ResolvedToolRuntime {
 	requestTools: ToolDefinition[];
 	toolExecutor?: ToolExecutor;
-	getTools?: GetToolsFn;
 	maxToolCallLoops?: number;
 }
 
@@ -101,15 +94,6 @@ export const requireNonEmptyString = (value: unknown, fieldName: string): string
 		throw new Error(`frontmatter.${fieldName} 为必填项`);
 	}
 	return value.trim();
-};
-
-export const normalizeStringArray = (value: unknown): string[] | undefined => {
-	if (!Array.isArray(value)) {
-		return undefined;
-	}
-	return value
-		.filter((entry): entry is string => typeof entry === 'string')
-		.map((entry) => entry.trim());
 };
 
 export const normalizeOptionalModel = (value: unknown): string | undefined => {

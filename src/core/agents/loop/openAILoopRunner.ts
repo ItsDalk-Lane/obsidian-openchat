@@ -10,7 +10,6 @@ import {
 	type OpenAIToolDefinition,
 	type ToolLoopMessage,
 	type ToolNameMapping,
-	resolveCurrentTools,
 	toOpenAITools,
 } from './openAILoopShared'
 import {
@@ -347,9 +346,8 @@ export function createOpenAIToolLoopSupportFactory(
 ): (settings: BaseOptions) => SendRequest {
 	return (settings: BaseOptions): SendRequest => {
 		const hasStaticTools = Array.isArray(settings.tools) && settings.tools.length > 0
-		const hasDynamicTools = typeof settings.getTools === 'function'
-		const { tools, toolExecutor, getTools } = settings
-		if ((!hasStaticTools && !hasDynamicTools) || !toolExecutor) {
+		const { tools, toolExecutor } = settings
+		if (!hasStaticTools || !toolExecutor) {
 			return originalFactory(settings)
 		}
 
@@ -378,7 +376,7 @@ export function createOpenAIToolLoopSupportFactory(
 				const apiParamsForToolLoop = sanitizeApiParamsForToolLoop(apiParams)
 				const apiParamsForFinalRequest = sanitizeApiParamsForFinalRequest(apiParams)
 				const client = createOpenAIClient(allOptions, apiKey, baseURL, loopOptions)
-				const initialTools = await resolveCurrentTools(tools, getTools)
+				const initialTools = Array.isArray(tools) ? tools : []
 
 				DebugLogger.debug(
 					`[AgentLoop] 工具调用循环启动: ${initialTools.length} 个工具可用, model=${model}, `
@@ -393,7 +391,7 @@ export function createOpenAIToolLoopSupportFactory(
 					if (controller.signal.aborted) return
 
 					DebugLogger.debug(`[AgentLoop] 工具调用循环 #${loop + 1}`)
-					const currentTools = await resolveCurrentTools(tools, getTools)
+					const currentTools = initialTools
 					const { transformedTools, toolNameMapping } = applyToolTransform(
 						currentTools,
 						loopOptions,

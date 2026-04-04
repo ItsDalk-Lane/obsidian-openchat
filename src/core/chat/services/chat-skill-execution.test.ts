@@ -10,10 +10,7 @@ import type {
 	SkillScanResult,
 } from 'src/domains/skills/types';
 import type { GenerateAssistantOptions } from './chat-service-types';
-import type {
-	ResolvedToolRuntime,
-	ToolRuntimeResolutionOptions,
-} from 'src/tools/sub-agents/types';
+import type { ResolvedToolRuntime } from 'src/tools/sub-agents/types';
 
 const SKILL: SkillDefinition = {
 	metadata: {
@@ -25,23 +22,10 @@ const SKILL: SkillDefinition = {
 	basePath: 'System/AI Data/skills/code-audit',
 };
 
-const TOOL_RESTRICTED_SKILL: SkillDefinition = {
-	...SKILL,
-	metadata: {
-		...SKILL.metadata,
-		allowed_tools: ['read_file', 'glob_search'],
-	},
-};
-
 const LOADED_SKILL: LoadedSkillContent = {
 	definition: SKILL,
 	fullContent: '---\nname: code-audit\n---\n请审查下面的实现',
 	bodyContent: '请审查下面的实现',
-};
-
-const TOOL_RESTRICTED_LOADED_SKILL: LoadedSkillContent = {
-	...LOADED_SKILL,
-	definition: TOOL_RESTRICTED_SKILL,
 };
 
 const createStateStore = () => new ChatStateStore({
@@ -135,23 +119,12 @@ test('createChatSkillExecutionService 的 inline 模式复用现有 sendMessage 
 	assert.equal(packet.status, 'completed');
 });
 
-test('createChatSkillExecutionService 的 isolated 模式会构建独立会话与工具白名单', async () => {
+test('createChatSkillExecutionService 的 isolated 模式会构建独立会话并传入全量静态工具 runtime', async () => {
 	const stateStore = createStateStore();
-	let resolvedRuntimeOptions: Parameters<ChatServiceInternals['service']['resolveToolRuntime']>[0]
-		| undefined;
 	let generatedSessionId = '';
 	let generatedContext = '';
 	let generatedTaskDescription = '';
 	let generatedRuntime: ResolvedToolRuntime | undefined;
-	const runtimeTools: ResolvedToolRuntime = {
-		requestTools: [{
-			name: 'read_file',
-			description: 'read file',
-			inputSchema: { type: 'object' },
-			source: 'builtin',
-			sourceId: 'test-runtime',
-		}],
-	};
 	const scanResult: SkillScanResult = { skills: [SKILL], errors: [] };
 	const internals = {
 		stateStore,
@@ -169,19 +142,15 @@ test('createChatSkillExecutionService 的 isolated 模式会构建独立会话�
 		},
 		runtimeDeps: {
 			getSkillScannerService: () => ({
-				findByName: () => TOOL_RESTRICTED_SKILL,
-				loadSkillContent: async () => TOOL_RESTRICTED_LOADED_SKILL,
+				findByName: () => SKILL,
+				loadSkillContent: async () => LOADED_SKILL,
 			}),
 			ensureSkillsInitialized: async () => {},
-			scanSkills: async () => ({ skills: [TOOL_RESTRICTED_SKILL], errors: scanResult.errors }),
+			scanSkills: async () => ({ skills: [SKILL], errors: scanResult.errors }),
 		},
 		service: {
 			getCurrentModelTag: () => 'model-a',
 			getDefaultProviderTag: () => 'model-a',
-			resolveToolRuntime: async (options?: ToolRuntimeResolutionOptions) => {
-				resolvedRuntimeOptions = options;
-				return runtimeTools;
-			},
 			generateAssistantResponseForModel: async (
 				session: ChatSession,
 				_modelTag: string,
@@ -260,8 +229,7 @@ test('createChatSkillExecutionService 的 isolated 模式会构建独立会话�
 	assert.match(generatedContext, /主任务当前输入/);
 	assert.match(generatedContext, /主任务最近用户消息/);
 	assert.equal(generatedTaskDescription, '执行 Skill: code-audit');
-	assert.deepEqual(resolvedRuntimeOptions?.explicitToolNames, ['read_file', 'glob_search']);
-	assert.equal(generatedRuntime, runtimeTools);
+	assert.equal(generatedRuntime, undefined);
 });
 
 test('createChatSkillExecutionService 会拒绝执行已禁用的 Skill', async () => {

@@ -34,10 +34,6 @@ import type {
 	SkillSessionState,
 	WriteSkillReturnPacketInput,
 } from 'src/domains/skills/session-state';
-import type {
-	ProviderToolDiscoveryPayload,
-	ProviderToolExecutablePayload,
-} from './chat-tool-selection-types';
 
 export type ChatTriggerSource =
 	| 'chat_input'
@@ -68,8 +64,6 @@ export interface GenerateAssistantOptions {
 	manageGeneratingState?: boolean;
 	maxTokensOverride?: number;
 	toolRuntimeOverride?: ResolvedToolRuntime;
-	providerDiscoveryPayload?: ProviderToolDiscoveryPayload;
-	providerExecutablePayload?: ProviderToolExecutablePayload;
 }
 
 export interface SavedChatSessionState extends AttachmentSelectionSnapshot {
@@ -163,9 +157,6 @@ export interface ChatServiceStatePort {
 
 export interface ChatToolRuntimeAdapter {
 	resolveToolRuntime(options?: {
-		includeSubAgents?: boolean;
-		explicitToolNames?: string[];
-		explicitMcpServerIds?: string[];
 		parentSessionId?: string;
 		subAgentStateCallback?: SubAgentStateCallback;
 		session?: ChatSession;

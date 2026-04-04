@@ -1,5 +1,4 @@
 import OpenAI from 'openai'
-import { resolveCurrentTools } from 'src/core/agents/loop/OpenAILoopHandler'
 import type { ToolDefinition } from 'src/core/agents/loop/types'
 import { t } from 'src/i18n/ai-runtime/helper'
 import {
@@ -129,14 +128,13 @@ const resolveLegacyMcpToolsAsGeneric = async (
 
 const resolveActiveTools = async (options: {
 	tools?: ToolDefinition[]
-	getTools?: BaseOptions['getTools']
 	mcpTools?: BaseOptions['mcpTools']
 	mcpGetTools?: BaseOptions['mcpGetTools']
 }): Promise<ToolDefinition[]> => {
-	const [genericTools, legacyMcpTools] = await Promise.all([
-		resolveCurrentTools(options.tools, options.getTools),
+	const [legacyMcpTools] = await Promise.all([
 		resolveLegacyMcpToolsAsGeneric(options.mcpTools, options.mcpGetTools),
 	])
+	const genericTools = Array.isArray(options.tools) ? options.tools : []
 	return dedupeToolDefinitions([...genericTools, ...legacyMcpTools])
 }
 
@@ -212,7 +210,6 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 				tools,
 				toolExecutor,
 				maxToolCallLoops,
-				getTools,
 				onToolCallResult,
 				mcpTools,
 				mcpGetTools,
@@ -226,19 +223,23 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 
 			const resolvedToolExecutor = toolExecutor
 				?? (typeof mcpCallTool === 'function' ? new McpToolExecutor(mcpCallTool) : undefined)
+			const staticGenericTools = Array.isArray(tools) ? tools : []
 
 			const hasToolRuntime = (
-				(Array.isArray(tools) && tools.length > 0)
-				|| typeof getTools === 'function'
+				staticGenericTools.length > 0
 				|| (Array.isArray(mcpTools) && mcpTools.length > 0)
 				|| typeof mcpGetTools === 'function'
 			) && Boolean(resolvedToolExecutor)
 
-			const getCurrentTools = async () => {
-				return hasToolRuntime
-					? await resolveActiveTools({ tools, getTools, mcpTools, mcpGetTools })
-					: []
-			}
+			const initialTools = hasToolRuntime
+				? await resolveActiveTools({
+					tools: staticGenericTools,
+					mcpTools,
+					mcpGetTools,
+				})
+				: []
+
+			const getCurrentTools = async () => initialTools
 
 			const getCurrentMcpTools = async () => {
 				const currentTools = await getCurrentTools()
@@ -257,7 +258,6 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 			const responseApiTools = responseBaseParams.tools
 			delete responseBaseParams.tools
 
-			const initialTools = await getCurrentTools()
 			const toolCandidateState = {
 				current: mergeResponseTools(
 					responseApiTools,
@@ -286,11 +286,10 @@ const sendRequestFunc = (settings: PoeOptions): SendRequest =>
 			})
 
 			const refreshToolCandidates = async () => {
-				const currentTools = await getCurrentTools()
 				toolCandidateState.current = mergeResponseTools(
 					responseApiTools,
 					enableWebSearch,
-					currentTools
+					initialTools
 				)
 				return toolCandidateState.current
 			}

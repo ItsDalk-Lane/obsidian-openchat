@@ -5,13 +5,8 @@ import {
 	BUILTIN_FILESYSTEM_SERVER_ID,
 	BUILTIN_FILESYSTEM_SERVER_NAME,
 } from '../runtime/constants';
-import {
-	normalizeStructuredToolResult,
-	serializeMcpToolResult,
-} from '../runtime/tool-result';
 import { BuiltinToolRegistry, type BuiltinToolInfo } from '../runtime/tool-registry';
 import { registerReadWriteHandlers } from './filesystemReadWriteHandlers';
-import { registerListDirHandler } from './filesystemListDirHandlers';
 import { registerSearchHandlers } from './filesystemSearchHandlers';
 import { registerFilesystemWrapperTools } from './filesystemWrapperTools';
 
@@ -72,7 +67,6 @@ export function registerFilesystemBuiltinTools(
 	registry: BuiltinToolRegistry
 ): void {
 	registerReadWriteHandlers(server, app, registry);
-	registerListDirHandler(server, app, registry);
 	registerFilesystemWrapperTools(server, app, registry);
 	registerSearchHandlers(server, app, registry);
 }

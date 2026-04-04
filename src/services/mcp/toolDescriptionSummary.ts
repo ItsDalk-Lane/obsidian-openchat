@@ -18,7 +18,6 @@ const BUILTIN_TOOL_UI_SUMMARIES: Record<string, string> = {
 	convert_time: '把一个时间从源时区换算到目标时区。',
 	calculate_time_range: '把自然语言时间表达解析为时间范围。',
 	get_first_link_path: '把 Obsidian 内部链接解析为实际文件路径。',
-	open_file: '在 Obsidian 中打开一个已知路径的文件。',
 	read_file: '读取单个文本文件，支持分段、开头、结尾和整篇读取。',
 	read_media: '读取图片或音频文件，并返回媒体内容与类型信息。',
 	read_files: '批量预览多个文本文件的部分内容。',

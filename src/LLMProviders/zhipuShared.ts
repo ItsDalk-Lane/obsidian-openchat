@@ -180,7 +180,6 @@ const ZHIPU_INTERNAL_OPTION_KEYS = new Set([
 	'tools',
 	'toolExecutor',
 	'maxToolCallLoops',
-	'getTools',
 	'onToolCallResult',
 	'mcpTools',
 	'mcpGetTools',

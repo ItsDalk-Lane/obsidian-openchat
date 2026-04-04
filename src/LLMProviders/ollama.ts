@@ -12,7 +12,6 @@ import {
 import { arrayBufferToBase64, getMimeTypeFromFilename, buildReasoningBlockStart, buildReasoningBlockEnd } from './utils'
 import {
 	toOpenAITools,
-	resolveCurrentTools,
 } from 'src/core/agents/loop/OpenAILoopHandler'
 import type { ToolCallRequest } from 'src/core/agents/loop/types'
 import { normalizeProviderError } from './errors'
@@ -77,7 +76,6 @@ const OLLAMA_INTERNAL_OPTION_KEYS = new Set([
 	'tools',
 	'toolExecutor',
 	'maxToolCallLoops',
-	'getTools',
 	'mcpTools',
 	'mcpGetTools',
 	'mcpCallTool',
@@ -238,8 +236,7 @@ const sendRequestFuncBase = (settings: BaseOptions): SendRequest =>
 
 const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 	const hasStaticTools = Array.isArray(settings.tools) && settings.tools.length > 0
-	const hasDynamicTools = typeof settings.getTools === 'function'
-	if ((!hasStaticTools && !hasDynamicTools) || !settings.toolExecutor) {
+	if (!hasStaticTools || !settings.toolExecutor) {
 		return sendRequestFuncBase(settings)
 	}
 
@@ -257,14 +254,13 @@ const sendRequestFunc = (settings: BaseOptions): SendRequest => {
 					? settings.maxToolCallLoops
 					: DEFAULT_MAX_TOOL_CALL_LOOPS
 			const isReasoningEnabled = options.enableReasoning ?? false
+			const currentTools = Array.isArray(settings.tools) ? settings.tools : []
 
 			for (let loop = 0; loop < maxToolCallLoops; loop++) {
 				if (controller.signal.aborted) {
 					ollama.abort()
 					return
 				}
-
-				const currentTools = await resolveCurrentTools(settings.tools, settings.getTools)
 				const response = await ollama.chat(
 					buildOllamaChatRequest(
 						options,

@@ -21,10 +21,6 @@ const REQUIRED_LAYOUT_FILES = [
 	'src/tools/vault/read-media/schema.ts',
 	'src/tools/vault/read-media/description.ts',
 	'src/tools/vault/read-media/service.ts',
-	'src/tools/vault/open-file/tool.ts',
-	'src/tools/vault/open-file/schema.ts',
-	'src/tools/vault/open-file/description.ts',
-	'src/tools/vault/open-file/service.ts',
 	'src/tools/web/fetch/tool.ts',
 	'src/tools/web/fetch/schema.ts',
 	'src/tools/web/fetch/description.ts',
@@ -61,4 +57,3 @@ test('Step 04 骨架文件已经落在 vault/web 目录中', () => {
 		);
 	}
 });
-

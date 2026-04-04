@@ -103,3 +103,20 @@
 - 推荐下一步：
   - 不再在当前 roadmap 内继续补 Step；若继续推进 Skill，先新建下一轮 roadmap
   - 并在新一轮中优先选择“清理无关全局 TypeScript 基线”或“执行真实 Obsidian smoke”之一
+
+## 2026-04-04 全量 tools 注入与暴露面清理
+
+| 阶段 | 状态 | 说明 |
+| --- | --- | --- |
+| 1. 静态 tools 主链改造 | completed | 主聊天、Claude/OpenAI loop、Ollama/Poe/Doubao 已统一走静态 `tools + toolExecutor` |
+| 2. ToolDefinition 执行绑定 | completed | 已新增 `execution`，builtin/mcp/sub-agent/workflow 在内部携带执行绑定 |
+| 3. 旧 tool-surface / selection 链删除 | completed | 两阶段筛选、surface prompt、capability matrix 与相关测试夹具已删除 |
+| 4. Skill / Sub-Agent 白名单删除 | completed | `allowed_tools`、`tools`、`mcps` 的类型、执行限制、UI 与测试已清理 |
+| 5. dead tool / legacy 暴露清理 | completed | 移除未注册的 `open_file` / `nav-tools`，runtime 只注册 canonical time/fetch/filesystem tools |
+| 6. 定向验证 | completed | 已跑静态 tools、Skill、Sub-Agent、tool layout 等定向测试 |
+
+## 本轮约束与结论
+
+- `npx tsc --noEmit` 仍有大量仓库既有基线错误，但这次改动引入的主链残留已基本清零。
+- 旧 tool selection 相关文件已直接删除，而不是保留兼容 shim。
+- legacy `get_time` / `fetch` / `list_directory` 当前保留底层实现或描述兼容信息，但不再作为 runtime 注册的独立 model-facing tool。

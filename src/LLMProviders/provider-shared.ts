@@ -2,7 +2,6 @@ import { EmbedCache } from 'obsidian'
 import type { McpToolAnnotations } from 'src/services/mcp/types'
 import { stripInternalProviderParameters } from 'src/utils/aiProviderMetadata'
 import type {
-	GetToolsFn,
 	ToolDefinition,
 	ToolExecutionRecord,
 	ToolExecutor,
@@ -80,8 +79,6 @@ export interface BaseOptions {
 	toolExecutor?: ToolExecutor
 	/** 工具调用循环最大次数（可选，默认 10） */
 	maxToolCallLoops?: number
-	/** 动态工具集解析函数（可选，支持按轮次动态刷新工具集） */
-	getTools?: GetToolsFn
 	/** 工具执行完成后的回调，用于回填结构化 toolCalls */
 	onToolCallResult?: (record: ToolExecutionRecord) => void
 	/** 工具执行期间向宿主请求用户澄清输入 */
@@ -94,7 +91,7 @@ export interface BaseOptions {
 	 */
 	mcpTools?: McpToolDefinitionForProvider[]
 	/**
-	 * @deprecated 使用 getTools 代替。保留用于向后兼容过渡期
+	 * @deprecated 仅保留兼容旧路径；当前运行时会在请求开始前一次性解析快照
 	 */
 	mcpGetTools?: McpGetToolsFnForProvider
 	/**

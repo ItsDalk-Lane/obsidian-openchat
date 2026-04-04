@@ -104,22 +104,6 @@ const findLatestAssistantMessage = (
 	return assistantMessages[assistantMessages.length - 1] ?? null;
 };
 
-const resolveSkillToolRuntime = async (
-	internals: ChatServiceInternals,
-	context: SkillExecutionContext,
-	session: ChatSession,
-) => {
-	const explicitToolNames = context.skill.metadata.allowed_tools?.filter(Boolean);
-	if (!explicitToolNames || explicitToolNames.length === 0) {
-		return undefined;
-	}
-	return await internals.service.resolveToolRuntime({
-		explicitToolNames: [...explicitToolNames],
-		parentSessionId: session.id,
-		session,
-	});
-};
-
 const executeInlineWithChatService = async (
 	internals: ChatServiceInternals,
 	context: SkillExecutionContext,
@@ -185,7 +169,6 @@ const executeIsolatedWithChatService = async (
 			},
 		};
 	}
-	const toolRuntimeOverride = await resolveSkillToolRuntime(internals, context, session);
 	const assistantMessage = await internals.service.generateAssistantResponseForModel(
 		session,
 		modelTag,
@@ -194,7 +177,6 @@ const executeIsolatedWithChatService = async (
 			taskDescription: `执行 Skill: ${context.skill.metadata.name}`,
 			createMessageInSession: true,
 			manageGeneratingState: false,
-			toolRuntimeOverride,
 		},
 	);
 	return {
@@ -205,9 +187,6 @@ const executeIsolatedWithChatService = async (
 			executionMode: context.executionMode,
 			trigger: context.request.trigger ?? 'manual_test',
 			modelTag,
-			allowedTools: context.skill.metadata.allowed_tools
-				? [...context.skill.metadata.allowed_tools]
-				: [],
 		},
 	};
 };

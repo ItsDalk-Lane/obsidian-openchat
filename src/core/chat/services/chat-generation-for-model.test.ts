@@ -4,15 +4,7 @@ import test from 'node:test';
 import type { ToolExecutor } from 'src/core/agents/loop/types';
 import type { BaseOptions, Message, ProviderSettings, Vendor } from 'src/types/provider';
 import type { ToolDefinition, ToolExecutionRecord } from 'src/types/tool';
-import {
-	attachToolSurfaceMetadata,
-	buildDiscoveryCatalog,
-	compileExecutableToolDefinition,
-} from './chat-tool-discovery-catalog';
 import type { ChatGenerationDeps } from './chat-generation';
-import { resolveToolSurfaceSettings } from './chat-tool-feature-flags';
-import { createProviderToolSurfaceAdapter } from './chat-tool-surface-adapter';
-import type { PreparedToolTurn } from './chat-tool-selection-types';
 import type { ChatMessage, ChatSession, ChatState } from '../types/chat';
 
 const PROVIDER_NAMES = ['OpenAI', 'Claude', 'OpenRouter'] as const;
@@ -92,7 +84,11 @@ function createProvider(vendor: string): ProviderSettings {
 	};
 }
 
-function createMessage(role: ChatMessage['role'], content: string, extras?: Partial<ChatMessage>): ChatMessage {
+function createMessage(
+	role: ChatMessage['role'],
+	content: string,
+	extras?: Partial<ChatMessage>,
+): ChatMessage {
 	return {
 		id: `message-${role}-${Math.random().toString(16).slice(2)}`,
 		role,
@@ -106,8 +102,12 @@ function createMessage(role: ChatMessage['role'], content: string, extras?: Part
 	};
 }
 
-function createTool(name: string, source: ToolDefinition['source'] = 'builtin', sourceId = 'builtin'): ToolDefinition {
-	return compileExecutableToolDefinition(attachToolSurfaceMetadata({
+function createTool(
+	name: string,
+	source: ToolDefinition['source'] = 'builtin',
+	sourceId = 'builtin',
+): ToolDefinition {
+	return {
 		name,
 		description: `${name} description`,
 		inputSchema: {
@@ -119,68 +119,33 @@ function createTool(name: string, source: ToolDefinition['source'] = 'builtin', 
 		},
 		source,
 		sourceId,
-	}));
+		...(source === 'builtin'
+			? {
+				execution: {
+					kind: 'builtin' as const,
+					canonicalName: name,
+				},
+			}
+			: {}),
+		...(source === 'mcp'
+			? {
+				execution: {
+					kind: 'mcp' as const,
+					serverId: sourceId,
+				},
+			}
+			: {}),
+	};
 }
 
-function createPreparedToolTurn(
-	tools: readonly ToolDefinition[],
-	options?: {
-		toolExecutor?: ToolExecutor;
-		getTools?: () => Promise<ToolDefinition[]>;
-		maxToolCallLoops?: number;
-		candidateServerIds?: string[];
-		mode?: PreparedToolTurn['mode'];
+function createDeps(
+	provider: ProviderSettings,
+	hooks?: {
+		resolveToolRuntime?: ChatGenerationDeps['resolveToolRuntime'];
+		buildProviderMessagesWithOptions?: ChatGenerationDeps['buildProviderMessagesWithOptions'];
+		showMcpNoticeOnce?: (message: string) => void;
 	},
-): PreparedToolTurn {
-	const candidateScope = {
-		mode: options?.mode ?? 'atomic-tools',
-		candidateToolNames: tools.map((tool) => tool.name),
-		candidateServerIds: options?.candidateServerIds ?? [],
-		reasons: ['test'],
-		query: 'test-query',
-	};
-	const adapter = createProviderToolSurfaceAdapter(resolveToolSurfaceSettings({
-		toolSurface: { nativeDeferredAdapter: false },
-	}));
-	const discoveryCatalog = buildDiscoveryCatalog({
-		tools: [...tools],
-		serverEntries: (options?.candidateServerIds ?? []).map((serverId) => ({
-			id: serverId,
-			name: serverId,
-			description: `${serverId} server`,
-			capabilityTags: [serverId],
-		})),
-	});
-	const toolRuntime = {
-		requestTools: [...tools],
-		toolExecutor: options?.toolExecutor,
-		getTools: options?.getTools,
-		maxToolCallLoops: options?.maxToolCallLoops,
-	};
-	const providerDiscoveryPayload = adapter.buildDiscoveryPayload({
-		catalog: discoveryCatalog,
-		scope: candidateScope,
-	});
-	const providerExecutablePayload = adapter.buildExecutablePayload({
-		scope: candidateScope,
-		toolRuntime,
-	});
-	return {
-		candidateScope,
-		executableToolSet: providerExecutablePayload.toolSet,
-		toolPolicies: { byToolName: {} },
-		mode: candidateScope.mode,
-		discoveryCatalog,
-		providerDiscoveryPayload,
-		providerExecutablePayload,
-	};
-}
-
-function createDeps(provider: ProviderSettings, hooks?: {
-	prepareToolTurn?: ChatGenerationDeps['prepareToolTurn'];
-	buildProviderMessagesWithOptions?: ChatGenerationDeps['buildProviderMessagesWithOptions'];
-	showMcpNoticeOnce?: (message: string) => void;
-}): ChatGenerationDeps {
+): ChatGenerationDeps {
 	let controller: AbortController | null = null;
 	const state = {
 		multiModelMode: 'single',
@@ -203,12 +168,12 @@ function createDeps(provider: ProviderSettings, hooks?: {
 		notify: () => {},
 		getAvailableAttachmentPath: async (filename) => filename,
 		writeVaultBinary: async () => {},
+		requestToolUserInput: async () => ({ outcome: 'cancelled' }),
 		getDefaultProviderTag: () => provider.tag,
 		findProviderByTagExact: (tag?: string) => tag === provider.tag ? provider : null,
 		getModelDisplayName: () => provider.options.model,
 		createSubAgentStateUpdater: () => () => {},
-		prepareToolTurn: hooks?.prepareToolTurn ?? (async () => createPreparedToolTurn([])),
-		resolveToolRuntime: async () => ({ requestTools: [] }),
+		resolveToolRuntime: hooks?.resolveToolRuntime ?? (async () => ({ requestTools: [] })),
 		buildProviderMessagesWithOptions: hooks?.buildProviderMessagesWithOptions
 			?? (async (_session, options) => [{
 				role: 'user',
@@ -216,7 +181,7 @@ function createDeps(provider: ProviderSettings, hooks?: {
 			}]),
 		normalizeToolExecutionRecord: (record) => record,
 		showMcpNoticeOnce: hooks?.showMcpNoticeOnce ?? (() => {}),
-		getOllamaCapabilities: async () => ({ reasoning: false }),
+		getOllamaCapabilities: async () => ({ reasoning: false, checkedAt: 0 }),
 		normalizeOllamaBaseUrl: (baseURL = '') => baseURL,
 		providerSupportsImageGeneration: () => false,
 		rethrowImageGenerationError: (error) => { throw error; },
@@ -259,10 +224,10 @@ async function withPatchedVendor<T>(
 	}
 }
 
-test('generateAssistantResponseForModelImpl 会把 prepared tool turn 注入主链 provider 请求', { concurrency: false }, async (t) => {
+test('generateAssistantResponseForModelImpl 会把静态 tool runtime 注入主链 provider 请求', { concurrency: false }, async (t) => {
 	const { generateAssistantResponseForModelImpl } = await loadRuntimeModules();
 	for (const vendorName of PROVIDER_NAMES) {
-		await t.test(`${vendorName} 路径保持同一注入契约`, async () => {
+		await t.test(`${vendorName} 路径保持同一静态注入契约`, async () => {
 			const provider = createProvider(vendorName);
 			const toolExecutor: ToolExecutor = {
 				execute: async (call) => ({
@@ -275,33 +240,23 @@ test('generateAssistantResponseForModelImpl 会把 prepared tool turn 注入主�
 				createTool('read_file'),
 				createTool('github_search', 'mcp', 'github'),
 			];
-			const getTools = async () => [...tools];
-			const preparedToolTurn = createPreparedToolTurn(tools, {
-				toolExecutor,
-				getTools,
-				maxToolCallLoops: 7,
-				candidateServerIds: ['github'],
-			});
-			const prepareCalls: Array<{ includeSubAgents?: boolean; parentSessionId?: string }> = [];
+			const resolvedCalls: Array<Parameters<ChatGenerationDeps['resolveToolRuntime']>[0]> = [];
 			const buildMessageRequests: ToolDefinition[][] = [];
-			const buildDiscoveryPayloads: Array<PreparedToolTurn['providerDiscoveryPayload'] | undefined> = [];
-			const buildExecutablePayloads: Array<PreparedToolTurn['providerExecutablePayload'] | undefined> = [];
 			const callbackRecords: ToolExecutionRecord[] = [];
 			const session = createSession();
 
 			await withPatchedVendor(vendorName, async ({ getMessages, getProviderOptions }) => {
 				const deps = createDeps(provider, {
-					prepareToolTurn: async (input) => {
-						prepareCalls.push({
-							includeSubAgents: input.includeSubAgents,
-							parentSessionId: input.parentSessionId,
-						});
-						return preparedToolTurn;
+					resolveToolRuntime: async (options) => {
+						resolvedCalls.push(options);
+						return {
+							requestTools: tools,
+							toolExecutor,
+							maxToolCallLoops: 7,
+						};
 					},
 					buildProviderMessagesWithOptions: async (_session, options) => {
 						buildMessageRequests.push([...(options?.requestTools ?? [])]);
-						buildDiscoveryPayloads.push(options?.providerDiscoveryPayload);
-						buildExecutablePayloads.push(options?.providerExecutablePayload);
 						return [{ role: 'user', content: 'hello' }];
 					},
 				});
@@ -315,7 +270,6 @@ test('generateAssistantResponseForModelImpl 会把 prepared tool turn 注入主�
 				const providerOptions = getProviderOptions();
 				assert.ok(providerOptions);
 				assert.deepEqual(providerOptions.tools?.map((tool) => tool.name), ['read_file', 'github_search']);
-				assert.equal(providerOptions.getTools, preparedToolTurn.executableToolSet.getTools);
 				assert.equal(providerOptions.toolExecutor, toolExecutor);
 				assert.equal(providerOptions.maxToolCallLoops, 7);
 				providerOptions.onToolCallResult?.({
@@ -331,33 +285,30 @@ test('generateAssistantResponseForModelImpl 会把 prepared tool turn 注入主�
 				assert.equal(message.toolCalls?.length, 1);
 				assert.equal(callbackRecords.length, 1);
 				assert.deepEqual(buildMessageRequests[0]?.map((tool) => tool.name), ['read_file', 'github_search']);
-				assert.equal(buildDiscoveryPayloads[0], preparedToolTurn.providerDiscoveryPayload);
-				assert.equal(buildExecutablePayloads[0], preparedToolTurn.providerExecutablePayload);
-				assert.equal(prepareCalls.length, 1);
-				assert.equal(prepareCalls[0]?.includeSubAgents, true);
-				assert.equal(prepareCalls[0]?.parentSessionId, session.id);
+				assert.equal(resolvedCalls.length, 1);
+				assert.equal(resolvedCalls[0]?.parentSessionId, session.id);
+				assert.equal(resolvedCalls[0]?.session, session);
+				assert.equal(typeof resolvedCalls[0]?.subAgentStateCallback, 'function');
 				assert.deepEqual(getMessages(), [{ role: 'user', content: 'hello' }]);
 			});
 		});
 	}
 });
 
-test('generateAssistantResponseForModelImpl 在 prepareToolTurn 失败时会回退为空工具集继续请求', { concurrency: false }, async () => {
+test('generateAssistantResponseForModelImpl 在 resolveToolRuntime 失败时会回退为空工具集继续请求', { concurrency: false }, async () => {
 	const { generateAssistantResponseForModelImpl } = await loadRuntimeModules();
 	const provider = createProvider('OpenAI');
 	const notices: string[] = [];
 	const buildMessageRequests: ToolDefinition[][] = [];
-	const buildDiscoveryPayloads: Array<PreparedToolTurn['providerDiscoveryPayload'] | undefined> = [];
 	const session = createSession();
 
 	await withPatchedVendor('OpenAI', async ({ getProviderOptions }) => {
 		const deps = createDeps(provider, {
-			prepareToolTurn: async () => {
+			resolveToolRuntime: async () => {
 				throw new Error('boom');
 			},
 			buildProviderMessagesWithOptions: async (_session, options) => {
 				buildMessageRequests.push([...(options?.requestTools ?? [])]);
-				buildDiscoveryPayloads.push(options?.providerDiscoveryPayload);
 				return [{ role: 'user', content: 'fallback' }];
 			},
 			showMcpNoticeOnce: (message) => {
@@ -369,14 +320,13 @@ test('generateAssistantResponseForModelImpl 在 prepareToolTurn 失败时会回�
 		assert.ok(providerOptions);
 		assert.equal(providerOptions.tools, undefined);
 		assert.deepEqual(buildMessageRequests[0], []);
-		assert.equal(buildDiscoveryPayloads[0], undefined);
 		assert.equal(message.content, 'OpenAI response');
 	});
 
 	assert.deepEqual(notices, ['MCP 工具初始化失败: boom']);
 });
 
-test('generateAssistantResponseForModelImpl 在提供 override 时跳过 prepareToolTurn 并使用 override 工具集', { concurrency: false }, async () => {
+test('generateAssistantResponseForModelImpl 在提供 override 时跳过 resolver 并使用 override 工具集', { concurrency: false }, async () => {
 	const { generateAssistantResponseForModelImpl } = await loadRuntimeModules();
 	const provider = createProvider('Claude');
 	const overrideTool = createTool('override_tool');
@@ -387,20 +337,17 @@ test('generateAssistantResponseForModelImpl 在提供 override 时跳过 prepare
 			content: 'override',
 		}),
 	};
-	let prepareCalled = 0;
-	const overrideGetTools = async () => [overrideTool];
+	let resolveCalled = 0;
 	const buildMessageRequests: ToolDefinition[][] = [];
-	const buildDiscoveryPayloads: Array<PreparedToolTurn['providerDiscoveryPayload'] | undefined> = [];
 
 	await withPatchedVendor('Claude', async ({ getProviderOptions }) => {
 		const deps = createDeps(provider, {
-			prepareToolTurn: async () => {
-				prepareCalled += 1;
-				return createPreparedToolTurn([]);
+			resolveToolRuntime: async () => {
+				resolveCalled += 1;
+				return { requestTools: [] };
 			},
 			buildProviderMessagesWithOptions: async (_session, options) => {
 				buildMessageRequests.push([...(options?.requestTools ?? [])]);
-				buildDiscoveryPayloads.push(options?.providerDiscoveryPayload);
 				return [{ role: 'user', content: 'override' }];
 			},
 		});
@@ -411,7 +358,6 @@ test('generateAssistantResponseForModelImpl 在提供 override 时跳过 prepare
 			{
 				toolRuntimeOverride: {
 					requestTools: [overrideTool],
-					getTools: overrideGetTools,
 					toolExecutor,
 					maxToolCallLoops: 3,
 				},
@@ -420,13 +366,11 @@ test('generateAssistantResponseForModelImpl 在提供 override 时跳过 prepare
 		const providerOptions = getProviderOptions();
 		assert.ok(providerOptions);
 		assert.deepEqual(providerOptions.tools?.map((tool) => tool.name), ['override_tool']);
-		assert.equal(providerOptions.getTools, overrideGetTools);
 		assert.equal(providerOptions.toolExecutor, toolExecutor);
 		assert.equal(providerOptions.maxToolCallLoops, 3);
 		assert.deepEqual(buildMessageRequests[0]?.map((tool) => tool.name), ['override_tool']);
-		assert.equal(buildDiscoveryPayloads[0], undefined);
 		assert.equal(message.content, 'Claude response');
 	});
 
-	assert.equal(prepareCalled, 0);
+	assert.equal(resolveCalled, 0);
 });

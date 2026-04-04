@@ -25,7 +25,6 @@ import {
 	buildSelectedTextSourceLabel,
 	buildSelectionContextPromptBlock,
 } from './chat-selection-context-prompt';
-import { buildToolSurfacePromptBlock } from './chat-tool-surface-prompt';
 import type {
 	ChatMessage,
 	ChatSession,
@@ -169,14 +168,10 @@ export const buildProviderMessagesWithOptions = async (
 	return await buildProviderMessagesForAgent(
 		deps,
 		requestMessages,
-		session,
-		options?.systemPrompt,
-		options?.modelTag,
-		options?.requestTools,
-		{
-			providerDiscoveryPayload: options?.providerDiscoveryPayload,
-			providerExecutablePayload: options?.providerExecutablePayload,
-		},
+	session,
+	options?.systemPrompt,
+	options?.modelTag,
+	options?.requestTools,
 	);
 };
 export const buildProviderMessagesForAgent = async (
@@ -186,10 +181,6 @@ export const buildProviderMessagesForAgent = async (
 	systemPrompt?: string,
 	modelTag?: string,
 	requestTools: ToolDefinition[] = [],
-	toolPayloads?: {
-		providerDiscoveryPayload?: ChatProviderMessageBuildOptions['providerDiscoveryPayload'];
-		providerExecutablePayload?: ChatProviderMessageBuildOptions['providerExecutablePayload'];
-	},
 ): Promise<ProviderMessage[]> => {
 	const resolveSelectedTextContext = (
 		message?: ChatMessage | null,
@@ -219,7 +210,6 @@ export const buildProviderMessagesForAgent = async (
 		selectedText,
 		selectedTextContext,
 	});
-	const toolSurfaceGuidance = buildToolSurfacePromptBlock(toolPayloads ?? {});
 	const skillsPromptBlock = await deps.resolveSkillsSystemPromptBlock({
 		requestTools,
 		relevanceQuery: buildSkillsRelevanceQuery(messages, session.messages, selectedText),
@@ -228,7 +218,6 @@ export const buildProviderMessagesForAgent = async (
 		configuredSystemPrompt: effectiveSystemPrompt,
 		livePlanGuidance: activePlanGuidance,
 		selectionContextGuidance,
-		toolSurfaceGuidance,
 		skillsPromptBlock,
 	});
 	const sourcePath = deps.getActiveFilePath() ?? '';

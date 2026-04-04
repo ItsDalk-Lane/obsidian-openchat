@@ -1,11 +1,11 @@
 export type {
-	GetToolsFn,
 	ToolCallRequest,
 	ToolCallResult,
 	ToolCompatibilityMetadata,
 	ToolDiscoveryMetadata,
 	ToolDiscoveryVisibility,
 	ToolDefinition,
+	ToolExecutionBinding,
 	ToolErrorContext,
 	ToolConfirmationRequest,
 	ToolConfirmationResponse,

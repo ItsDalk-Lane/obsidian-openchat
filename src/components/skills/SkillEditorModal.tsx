@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { INLINE_ALLOWED_TOOLS_UNSUPPORTED_REASON } from 'src/domains/skills/config'
 import type {
 	SkillArgumentDefaultValue,
 	SkillArgumentDefinition,
@@ -25,7 +24,6 @@ export interface SkillEditorDraft {
 	whenToUseInput: string
 	argumentsInput: string
 	executionMode: SkillExecutionMode
-	allowedToolsInput: string
 	bodyContent: string
 }
 
@@ -35,7 +33,6 @@ export interface SkillEditorSubmitValue {
 	readonly whenToUse: string | null
 	readonly arguments: readonly SkillArgumentDefinition[] | null
 	readonly executionMode: SkillExecutionMode
-	readonly allowedTools: readonly string[] | null
 	readonly bodyContent: string
 }
 
@@ -63,13 +60,6 @@ const formatArgumentsInput = (
 		return ''
 	}
 	return JSON.stringify(argumentDefinitions, null, 2)
-}
-
-const formatAllowedToolsInput = (allowedTools?: readonly string[]): string => {
-	if (allowedTools === undefined) {
-		return ''
-	}
-	return allowedTools.join('\n')
 }
 
 const normalizeOptionalString = (value: string): string | null => {
@@ -168,17 +158,6 @@ const parseSkillArgumentsInput = (
 	})
 }
 
-const parseAllowedToolsInput = (value: string): readonly string[] | null => {
-	const items = value
-		.split(/[\n,]/gu)
-		.map((item) => item.trim())
-		.filter(Boolean)
-	if (items.length === 0) {
-		return null
-	}
-	return [...new Set(items)]
-}
-
 export function buildSkillEditorDraft(detail: SkillEditorDetail): SkillEditorDraft {
 	return {
 		description: detail.skill.metadata.description,
@@ -186,7 +165,6 @@ export function buildSkillEditorDraft(detail: SkillEditorDetail): SkillEditorDra
 		whenToUseInput: detail.skill.metadata.when_to_use ?? '',
 		argumentsInput: formatArgumentsInput(detail.skill.metadata.arguments),
 		executionMode: detail.skill.metadata.execution?.mode ?? 'isolated_resume',
-		allowedToolsInput: formatAllowedToolsInput(detail.skill.metadata.allowed_tools),
 		bodyContent: detail.bodyContent,
 	}
 }
@@ -198,17 +176,12 @@ export function parseSkillEditorSubmitValue(
 	if (!description) {
 		throw new Error(localInstance.chat_settings_skill_description_required)
 	}
-	const allowedTools = parseAllowedToolsInput(draft.allowedToolsInput)
-	if (draft.executionMode === 'inline' && allowedTools !== null) {
-		throw new Error(INLINE_ALLOWED_TOOLS_UNSUPPORTED_REASON)
-	}
 	return {
 		description,
 		enabled: draft.enabled,
 		whenToUse: normalizeOptionalString(draft.whenToUseInput),
 		arguments: parseSkillArgumentsInput(draft.argumentsInput),
 		executionMode: draft.executionMode,
-		allowedTools,
 		bodyContent: normalizeLineEndings(draft.bodyContent),
 	}
 }
@@ -380,24 +353,6 @@ export const SkillEditorModal = ({
 								disabled={disabled}
 								onChange={(event) => {
 									updateDraft({ argumentsInput: event.currentTarget.value })
-								}}
-							/>
-						</label>
-
-						<label className="chat-settings-field">
-							<span className="chat-settings-field__title">
-								{localInstance.chat_settings_skill_allowed_tools}
-							</span>
-							<span className="chat-settings-field__desc">
-								{localInstance.chat_settings_skill_allowed_tools_desc}
-							</span>
-							<textarea
-								className="chat-settings-input skill-editor-modal__textarea"
-								rows={4}
-								value={draft.allowedToolsInput}
-								disabled={disabled}
-								onChange={(event) => {
-									updateDraft({ allowedToolsInput: event.currentTarget.value })
 								}}
 							/>
 						</label>

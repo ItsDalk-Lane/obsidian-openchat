@@ -211,17 +211,6 @@ export const BUILTIN_TOOL_HINTS: Record<string, ToolHint> = {
 		},
 		fallbackTool: 'find_paths',
 	},
-	open_file: {
-		aliases: {
-			path: 'file_path',
-			filePath: 'file_path',
-			new_panel: 'open_in_new_panel',
-			newPanel: 'open_in_new_panel',
-		},
-		valueCoercions: {
-			open_in_new_panel: 'boolean',
-		},
-	},
 	get_current_time: {
 		aliases: {
 			timezoneName: 'timezone',

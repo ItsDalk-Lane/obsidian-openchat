@@ -214,7 +214,7 @@ const INTERNAL_OPTION_KEYS = new Set([
 	'apiKey', 'baseURL', 'model', 'parameters',
 	'apiSecret', 'vendorApiKeys', 'vendorApiKeysByDevice',
 	'mcpTools', 'mcpCallTool', 'mcpMaxToolCallLoops', 'mcpGetTools',
-	'tools', 'toolExecutor', 'maxToolCallLoops', 'getTools',
+	'tools', 'toolExecutor', 'maxToolCallLoops',
 	'enableReasoning',
 	'reasoningEffort',
 	'tag', 'vendor',

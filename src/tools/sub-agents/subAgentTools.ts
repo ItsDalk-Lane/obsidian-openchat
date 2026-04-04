@@ -33,6 +33,10 @@ export const subAgentToToolDefinition = (definition: SubAgentDefinition): ToolDe
 		},
 		source: 'sub_agent',
 		sourceId: definition.metadata.name,
+		execution: {
+			kind: 'sub-agent',
+			target: definition.metadata.name,
+		},
 	};
 };
 
@@ -54,6 +58,10 @@ export const createDiscoverSubAgentsToolDefinition = (): ToolDefinition => {
 		},
 		source: 'custom',
 		sourceId: 'sub-agents',
+		execution: {
+			kind: 'custom',
+			target: 'discover_sub_agents',
+		},
 	};
 };
 
@@ -83,6 +91,10 @@ export const createDelegateSubAgentToolDefinition = (): ToolDefinition => {
 		},
 		source: 'workflow',
 		sourceId: 'sub-agents',
+		execution: {
+			kind: 'workflow',
+			target: DELEGATE_SUB_AGENT_TOOL_NAME,
+		},
 	};
 };
 

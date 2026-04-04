@@ -36,13 +36,11 @@ import { createScriptTools } from '../script/script-tools';
 import { createDiscoverSkillsTool } from '../skill/discover-skills/tool';
 import { createInvokeSkillTool } from '../skill/invoke-skill/tool';
 import { createTimeTools } from '../time/time-tools';
-import { createTimeWrapperTools } from '../time/time-wrapper-tools';
 import { createBingSearchTools } from '../web/bing-search-tools';
 import {
 	createFetchTools,
 	type FetchToolsOptions,
 } from '../web/fetch-tools';
-import { createFetchWrapperTools } from '../web/fetch-wrapper-tools';
 import { createWorkflowTools } from '../workflow/workflow-tools';
 import { registerFilesystemTools } from '../vault/filesystemTools';
 
@@ -126,12 +124,6 @@ export async function createBuiltinToolsRuntime(
 				?? DEFAULT_MCP_SETTINGS.builtinTimeDefaultTimezone
 				?? 'UTC',
 		}));
-		registry.registerAll(createTimeWrapperTools({
-			defaultTimezone:
-				settings.builtinTimeDefaultTimezone
-				?? DEFAULT_MCP_SETTINGS.builtinTimeDefaultTimezone
-				?? 'UTC',
-		}));
 		registry.registerAll(createCanvasTools(options.app));
 		registry.registerAll(createLinkTools());
 		registry.registerAll(createGraphTools(options.app));
@@ -152,7 +144,6 @@ export async function createBuiltinToolsRuntime(
 			ignoreRobotsTxt: settings.builtinFetchIgnoreRobotsTxt === true,
 		};
 		registry.registerAll(createFetchTools(fetchOptions));
-		registry.registerAll(createFetchWrapperTools(fetchOptions));
 	}
 
 	if (settings.builtinBingSearchEnabled !== false) {

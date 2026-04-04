@@ -16,14 +16,12 @@ export const composeChatSystemPrompt =(params: {
 	configuredSystemPrompt?: string;
 	livePlanGuidance?: string | null;
 	skillsPromptBlock?: string | null;
-	toolSurfaceGuidance?: string | null;
 	selectionContextGuidance?: string | null;
 }): string | undefined => {
 	const layers = [
 		params.configuredSystemPrompt,
 		params.livePlanGuidance ?? undefined,
 		params.selectionContextGuidance ?? undefined,
-		params.toolSurfaceGuidance ?? undefined,
 		params.skillsPromptBlock ?? undefined,
 	]
 		.map((value) => value?.trim())

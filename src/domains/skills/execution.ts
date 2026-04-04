@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import {
 	DEFAULT_SKILL_EXECUTION_MODE,
-	INLINE_ALLOWED_TOOLS_UNSUPPORTED_REASON,
 } from './config';
 import type { SkillScannerService } from './service';
 import type {
@@ -156,12 +155,6 @@ const buildDisabledSkillMessage = (skillName: string): string => {
 	return `Skill "${skillName}" 当前已禁用，无法执行。`;
 };
 
-const hasRestrictedAllowedTools = (
-	allowedTools: readonly string[] | undefined,
-): boolean => {
-	return (allowedTools?.filter(Boolean).length ?? 0) > 0;
-};
-
 export class SkillExecutionService {
 	constructor(
 		private readonly skillPort: SkillExecutionSkillPort,
@@ -194,9 +187,6 @@ export class SkillExecutionService {
 				return buildFailurePacket(request, emptyBodyMessage);
 			}
 			const executionMode = resolveExecutionMode(request, skill);
-			if (executionMode === 'inline' && hasRestrictedAllowedTools(skill.metadata.allowed_tools)) {
-				return buildFailurePacket(request, INLINE_ALLOWED_TOOLS_UNSUPPORTED_REASON);
-			}
 			const invocationId = `skill-invocation-${uuidv4()}`;
 			const context: SkillExecutionContext = {
 				invocationId,

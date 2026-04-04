@@ -248,26 +248,6 @@ export const SubAgentsSettingsTab = ({
 							{agent.metadata.description}
 						</OverflowTooltip>
 						<div className="chat-settings-metadata-list">
-							{agent.metadata.tools && agent.metadata.tools.length > 0 && (
-								<div className="chat-settings-metadata-row">
-									<span className="chat-settings-metadata-row__label">
-										{localInstance.chat_settings_sub_agents_tools}
-									</span>
-									<span className="chat-settings-metadata-row__value">
-										{agent.metadata.tools.join(', ')}
-									</span>
-								</div>
-							)}
-							{agent.metadata.mcps && agent.metadata.mcps.length > 0 && (
-								<div className="chat-settings-metadata-row">
-									<span className="chat-settings-metadata-row__label">
-										{localInstance.chat_settings_sub_agents_mcps}
-									</span>
-									<span className="chat-settings-metadata-row__value">
-										{agent.metadata.mcps.join(', ')}
-									</span>
-								</div>
-							)}
 							{agent.metadata.models && (
 								<div className="chat-settings-metadata-row">
 									<span className="chat-settings-metadata-row__label">

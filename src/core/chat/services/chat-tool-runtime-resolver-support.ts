@@ -15,7 +15,6 @@ export const BUILTIN_FILESYSTEM_TOOL_NAMES = new Set([
 	'write_file',
 	'edit_file',
 	'create_directory',
-	'list_directory',
 	'list_directory_flat',
 	'list_directory_tree',
 	'list_vault_overview',
@@ -25,7 +24,6 @@ export const BUILTIN_FILESYSTEM_TOOL_NAMES = new Set([
 	'search_content',
 	'query_index',
 	'stat_path',
-	'open_file',
 ]);
 
 export const getEnabledChatMcpServers = (

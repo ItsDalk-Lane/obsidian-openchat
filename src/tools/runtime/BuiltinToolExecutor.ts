@@ -47,7 +47,7 @@ export class BuiltinToolExecutor implements ToolExecutor {
 
 	canHandle(call: ToolCallRequest, tools: ToolDefinition[]): boolean {
 		const tool = this.resolveDefinition(call.name, tools);
-		return tool?.source === 'builtin';
+		return tool?.execution?.kind === 'builtin' || tool?.source === 'builtin';
 	}
 
 	async execute(

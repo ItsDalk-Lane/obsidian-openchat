@@ -161,8 +161,6 @@ export interface LocalPart3 {
 	chat_settings_skill_arguments: string;
 	chat_settings_skill_arguments_desc: string;
 	chat_settings_skill_execution_mode: string;
-	chat_settings_skill_allowed_tools: string;
-	chat_settings_skill_allowed_tools_desc: string;
 	chat_settings_skill_body: string;
 	chat_settings_skill_error: string;
 	chat_settings_skill_open_file: string;
@@ -177,8 +175,6 @@ export interface LocalPart3 {
 	chat_settings_sub_agents_refresh: string;
 	chat_settings_sub_agents_empty: string;
 	chat_settings_sub_agents_errors: string;
-	chat_settings_sub_agents_tools: string;
-	chat_settings_sub_agents_mcps: string;
 	chat_settings_sub_agents_model: string;
 	chat_settings_sub_agents_max_tokens: string;
 	chat_settings_sub_agents_system_prompt: string;

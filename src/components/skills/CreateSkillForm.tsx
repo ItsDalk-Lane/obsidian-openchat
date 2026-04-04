@@ -31,7 +31,6 @@ const buildCreateSkillDraft = (): CreateSkillDraft => ({
 	whenToUseInput: '',
 	argumentsInput: '',
 	executionMode: DEFAULT_SKILL_EXECUTION_MODE as SkillExecutionMode,
-	allowedToolsInput: '',
 	bodyContent: DEFAULT_NEW_SKILL_BODY,
 })
 
@@ -54,7 +53,6 @@ export function parseCreateSkillSubmitValue(
 		...(parsed.whenToUse !== null ? { when_to_use: parsed.whenToUse } : {}),
 		...(parsed.arguments !== null ? { arguments: parsed.arguments } : {}),
 		execution: { mode: parsed.executionMode },
-		...(parsed.allowedTools !== null ? { allowed_tools: parsed.allowedTools } : {}),
 	}
 }
 
@@ -198,24 +196,6 @@ export const CreateSkillForm = ({
 								disabled={isSubmitting}
 								onChange={(event) => {
 									updateDraft({ argumentsInput: event.currentTarget.value })
-								}}
-							/>
-						</label>
-
-						<label className="chat-settings-field">
-							<span className="chat-settings-field__title">
-								{localInstance.chat_settings_skill_allowed_tools}
-							</span>
-							<span className="chat-settings-field__desc">
-								{localInstance.chat_settings_skill_allowed_tools_desc}
-							</span>
-							<textarea
-								className="chat-settings-input skill-editor-modal__textarea"
-								rows={4}
-								value={draft.allowedToolsInput}
-								disabled={isSubmitting}
-								onChange={(event) => {
-									updateDraft({ allowedToolsInput: event.currentTarget.value })
 								}}
 							/>
 						</label>

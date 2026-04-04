@@ -20,19 +20,6 @@ export interface ToolExecutionSettings {
 	timeoutMs: number;
 }
 
-export interface ToolSurfaceSettings {
-	toolDiscoveryCatalogV2?: boolean;
-	twoStageToolSelection?: boolean;
-	scopedMcpResolve?: boolean;
-	runtimeArgCompletionV2?: boolean;
-	workflowToolsDefaultHidden?: boolean;
-	workflowModeV1?: boolean;
-	timeWrappersV1?: boolean;
-	vaultWrappersV1?: boolean;
-	fetchWrappersV1?: boolean;
-	nativeDeferredAdapter?: boolean;
-}
-
 export interface EditorStatus {
 	isTextInserting: boolean;
 }
@@ -56,7 +43,6 @@ export interface AiRuntimeSettings {
 	tabCompletionPromptTemplate: string;
 	mcp?: McpSettings;
 	toolExecution?: ToolExecutionSettings;
-	toolSurface?: ToolSurfaceSettings;
 	modelCapabilityCache?: ModelCapabilityCache;
 	quickActionsSystemPrompt?: string;
 }

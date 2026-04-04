@@ -28,7 +28,6 @@ export function parseSkillMetadata(content: string, obsidianApi: SkillYamlReader
 	const whenToUse = readOptionalTrimmedString(parsed.when_to_use, 'when_to_use');
 	const argumentDefinitions = parseSkillArguments(parsed.arguments);
 	const execution = parseSkillExecution(parsed.execution);
-	const allowedTools = parseAllowedTools(parsed.allowed_tools);
 	const license = readOptionalTrimmedString(parsed.license, 'license');
 	const compatibility = parseCompatibilityValue(parsed.compatibility);
 	const additionalMetadata = parseNestedMetadata(parsed.metadata);
@@ -39,7 +38,6 @@ export function parseSkillMetadata(content: string, obsidianApi: SkillYamlReader
 		execution,
 		...(whenToUse !== undefined ? { when_to_use: whenToUse } : {}),
 		...(argumentDefinitions !== undefined ? { arguments: argumentDefinitions } : {}),
-		...(allowedTools !== undefined ? { allowed_tools: allowedTools } : {}),
 		...(license !== undefined ? { license } : {}),
 		...(compatibility !== undefined ? { compatibility } : {}),
 		...(additionalMetadata !== undefined ? { metadata: additionalMetadata } : {}),
@@ -72,9 +70,6 @@ export function buildFrontmatterForCreate(metadata: SkillMetadata): Record<strin
 		execution: metadata.execution?.mode ?? DEFAULT_SKILL_EXECUTION_MODE,
 		...(metadata.when_to_use !== undefined ? { when_to_use: metadata.when_to_use } : {}),
 		...(metadata.arguments !== undefined ? { arguments: cloneSkillArguments(metadata.arguments) } : {}),
-		...(metadata.allowed_tools !== undefined
-			? { allowed_tools: [...metadata.allowed_tools] }
-			: {}),
 		...(metadata.license !== undefined ? { license: metadata.license } : {}),
 		...(metadata.compatibility !== undefined
 			? { compatibility: cloneCompatibilityValue(metadata.compatibility) }
@@ -87,9 +82,6 @@ export function normalizeCreateSkillInput(input: CreateSkillInput): SkillMetadat
 	const argumentsValue = input.arguments === undefined
 		? undefined
 		: cloneSkillArguments(validateSkillArguments(input.arguments));
-	const allowedTools = input.allowed_tools === undefined
-		? undefined
-		: validateAllowedTools(input.allowed_tools);
 	const license = normalizeOptionalText(input.license);
 	return {
 		name: normalizeSkillName(input.name),
@@ -99,7 +91,6 @@ export function normalizeCreateSkillInput(input: CreateSkillInput): SkillMetadat
 			?? { mode: DEFAULT_SKILL_EXECUTION_MODE },
 		...(whenToUse !== undefined ? { when_to_use: whenToUse } : {}),
 		...(argumentsValue !== undefined ? { arguments: argumentsValue } : {}),
-		...(allowedTools !== undefined ? { allowed_tools: allowedTools } : {}),
 		...(license !== undefined ? { license } : {}),
 		...(input.compatibility !== undefined
 			? { compatibility: cloneCompatibilityValue(input.compatibility) }
@@ -132,13 +123,6 @@ export function applyUpdateToSkillMetadata(
 			next,
 			'execution',
 			input.execution === null ? undefined : normalizeExecutionConfig(input.execution),
-		);
-	}
-	if (input.allowed_tools !== undefined) {
-		setOptionalObjectValue(
-			next,
-			'allowed_tools',
-			input.allowed_tools === null ? undefined : validateAllowedTools(input.allowed_tools),
 		);
 	}
 	if (input.license !== undefined) {
@@ -185,13 +169,6 @@ export function applyUpdateToFrontmatter(
 			input.execution === null ? undefined : normalizeExecutionConfig(input.execution)?.mode,
 		);
 	}
-	if (input.allowed_tools !== undefined) {
-		setOptionalObjectValue(
-			next,
-			'allowed_tools',
-			input.allowed_tools === null ? undefined : validateAllowedTools(input.allowed_tools),
-		);
-	}
 	if (input.license !== undefined) {
 		setOptionalObjectValue(next, 'license', normalizeOptionalText(input.license));
 	}
@@ -220,7 +197,6 @@ export function orderSkillFrontmatter(frontmatter: Record<string, unknown>): Rec
 		'when_to_use',
 		'arguments',
 		'execution',
-		'allowed_tools',
 		'license',
 		'compatibility',
 		'metadata',
@@ -406,23 +382,6 @@ function parseSkillExecutionMode(value: unknown, fieldName: string): SkillExecut
 		throw new Error(`frontmatter.${fieldName} 不支持该执行模式`);
 	}
 	return value as SkillExecutionMode;
-}
-function parseAllowedTools(value: unknown): readonly string[] | undefined {
-	if (value === undefined) {
-		return undefined;
-	}
-	if (!Array.isArray(value)) {
-		throw new Error('frontmatter.allowed_tools 必须是数组');
-	}
-	return validateAllowedTools(value);
-}
-function validateAllowedTools(value: readonly string[]): readonly string[] {
-	return value.map((entry, index) => {
-		if (typeof entry !== 'string' || !entry.trim()) {
-			throw new Error(`frontmatter.allowed_tools[${index}] 必须是非空字符串`);
-		}
-		return entry.trim();
-	});
 }
 function parseCompatibilityValue(
 	value: unknown,

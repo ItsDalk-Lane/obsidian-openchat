@@ -16,7 +16,6 @@ import { MessageContextOptimizer } from './message-context-optimizer';
 import { ChatStateStore } from './chat-state-store';
 import { ChatAttachmentSelectionService } from './chat-attachment-selection-service';
 import { ChatPlanSyncService } from './chat-plan-sync-service';
-import { ChatToolSelectionCoordinator } from './chat-tool-selection-coordinator';
 import { ChatToolRuntimeResolver } from './chat-tool-runtime-resolver';
 import { ChatSessionManager } from './chat-session-manager';
 import { ChatImageResolver } from './chat-image-resolver';
@@ -55,7 +54,6 @@ export interface ChatServiceInternals {
 	attachmentSelectionService: ChatAttachmentSelectionService;
 	planSyncService: ChatPlanSyncService;
 	toolRuntimeResolver: ChatToolRuntimeResolver;
-	toolSelectionCoordinator: ChatToolSelectionCoordinator;
 	sessionManager: ChatSessionManager;
 	imageResolver: ChatImageResolver;
 	contextCompactionService: ChatContextCompactionService;
@@ -128,11 +126,6 @@ export const createChatServiceInternals = (
 		chatServiceAdapter: service,
 		executeSkillExecution: async (request) => await service.executeSkillExecution(request),
 	});
-	const toolSelectionCoordinator = new ChatToolSelectionCoordinator({
-		toolRuntimeResolver,
-		settingsAccessor,
-		getActiveFilePath: () => obsidianApi.getActiveFilePath(),
-	});
 	const sessionManager = new ChatSessionManager(
 		obsidianApi,
 		settingsAccessor.getAiDataFolder(),
@@ -178,7 +171,6 @@ export const createChatServiceInternals = (
 		attachmentSelectionService,
 		planSyncService,
 		toolRuntimeResolver,
-		toolSelectionCoordinator,
 		sessionManager,
 		imageResolver,
 		contextCompactionService,

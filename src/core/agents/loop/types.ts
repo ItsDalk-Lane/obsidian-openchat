@@ -120,6 +120,13 @@ export interface ToolCompatibilityMetadata {
 	readonly deprecationStatus?: 'active' | 'legacy' | 'deprecated'
 }
 
+export interface ToolExecutionBinding {
+	readonly kind: 'builtin' | 'mcp' | 'sub-agent' | 'workflow' | 'custom'
+	readonly canonicalName?: string
+	readonly serverId?: string
+	readonly target?: string
+}
+
 /** 通用工具定义（Provider 无关） */
 export interface ToolDefinition {
 	readonly name: string
@@ -136,6 +143,7 @@ export interface ToolDefinition {
 	readonly discovery?: ToolDiscoveryMetadata
 	readonly runtimePolicy?: ToolRuntimePolicy
 	readonly compatibility?: ToolCompatibilityMetadata
+	readonly execution?: ToolExecutionBinding
 }
 
 /** 模型返回的工具调用请求 */
@@ -254,6 +262,3 @@ export interface ToolExecutor {
 		options?: ToolExecutionOptions,
 	): Promise<ToolCallResult>
 }
-
-/** 动态工具集解析函数 */
-export type GetToolsFn = () => Promise<ToolDefinition[]>

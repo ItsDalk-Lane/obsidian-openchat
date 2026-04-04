@@ -23,8 +23,6 @@ export const generateAssistantResponseForModelImpl = async (
 		throw new Error(`未找到模型配置: ${modelTag}`);
 	}
 	let requestTools = options?.toolRuntimeOverride?.requestTools ?? [];
-	let providerDiscoveryPayload = options?.providerDiscoveryPayload;
-	let providerExecutablePayload = options?.providerExecutablePayload;
 	const {
 		providerOptions,
 		enableReasoning,
@@ -53,9 +51,6 @@ export const generateAssistantResponseForModelImpl = async (
 	);
 	if (options?.toolRuntimeOverride) {
 		providerOptions.tools = options.toolRuntimeOverride.requestTools;
-		if (options.toolRuntimeOverride.getTools) {
-			providerOptions.getTools = options.toolRuntimeOverride.getTools;
-		}
 		if (options.toolRuntimeOverride.toolExecutor) {
 			providerOptions.toolExecutor = options.toolRuntimeOverride.toolExecutor;
 		}
@@ -64,26 +59,18 @@ export const generateAssistantResponseForModelImpl = async (
 		}
 	} else {
 		try {
-			const preparedToolTurn = await deps.prepareToolTurn({
-				includeSubAgents: true,
+			const toolRuntime = await deps.resolveToolRuntime({
 				parentSessionId: session.id,
 				subAgentStateCallback,
 				session,
-				context: options?.context,
-				taskDescription: options?.taskDescription,
 			});
-			requestTools = preparedToolTurn.executableToolSet.tools;
-			providerDiscoveryPayload = preparedToolTurn.providerDiscoveryPayload;
-			providerExecutablePayload = preparedToolTurn.providerExecutablePayload;
-			providerOptions.tools = preparedToolTurn.executableToolSet.tools;
-			if (preparedToolTurn.executableToolSet.getTools) {
-				providerOptions.getTools = preparedToolTurn.executableToolSet.getTools;
+			requestTools = toolRuntime.requestTools;
+			providerOptions.tools = toolRuntime.requestTools;
+			if (toolRuntime.toolExecutor) {
+				providerOptions.toolExecutor = toolRuntime.toolExecutor;
 			}
-			if (preparedToolTurn.executableToolSet.toolExecutor) {
-				providerOptions.toolExecutor = preparedToolTurn.executableToolSet.toolExecutor;
-			}
-			if (preparedToolTurn.executableToolSet.maxToolCallLoops) {
-				providerOptions.maxToolCallLoops = preparedToolTurn.executableToolSet.maxToolCallLoops;
+			if (toolRuntime.maxToolCallLoops) {
+				providerOptions.maxToolCallLoops = toolRuntime.maxToolCallLoops;
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -115,8 +102,6 @@ export const generateAssistantResponseForModelImpl = async (
 		systemPrompt: options?.systemPromptOverride,
 		modelTag,
 		requestTools,
-		providerDiscoveryPayload,
-		providerExecutablePayload,
 	});
 	DebugLogger.logLlmMessages('ChatService.generateAssistantResponseForModel', messages, {
 		level: 'debug',

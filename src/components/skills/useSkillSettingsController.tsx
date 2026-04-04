@@ -85,7 +85,6 @@ const buildSkillUpdateInput = (
 	const whenToUseChanged = value.whenToUse !== previousWhenToUse
 	const argumentsChanged = !isSameValue(value.arguments, detail.skill.metadata.arguments)
 	const executionChanged = value.executionMode !== previousExecutionMode
-	const allowedToolsChanged = !isSameValue(value.allowedTools, detail.skill.metadata.allowed_tools)
 	const bodyChanged = normalizedBodyContent !== normalizeLineEndings(detail.bodyContent)
 
 	if (
@@ -93,7 +92,6 @@ const buildSkillUpdateInput = (
 		&& !whenToUseChanged
 		&& !argumentsChanged
 		&& !executionChanged
-		&& !allowedToolsChanged
 		&& !bodyChanged
 	) {
 		return null
@@ -105,7 +103,6 @@ const buildSkillUpdateInput = (
 		...(whenToUseChanged ? { when_to_use: value.whenToUse } : {}),
 		...(argumentsChanged ? { arguments: value.arguments } : {}),
 		...(executionChanged ? { execution: { mode: value.executionMode } } : {}),
-		...(allowedToolsChanged ? { allowed_tools: value.allowedTools } : {}),
 		...(bodyChanged ? { bodyContent: normalizedBodyContent } : {}),
 	}
 }

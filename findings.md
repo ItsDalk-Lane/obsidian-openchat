@@ -58,3 +58,16 @@
   - 不覆盖工作树中的用户改动
   - 优先保留兼容 shim 与真实调用链
   - 以测试、lint、build 作为最终验收口径
+
+## 2026-04-04 全量 tools 注入与清理发现
+
+- 当前聊天主链真正需要的 provider 契约只有三项：
+  `tools`、`toolExecutor`、`maxToolCallLoops`；`getTools` 与 provider payload
+  只是旧两阶段暴露策略的残留。
+- `ToolDefinition.execution` 适合作为内部唯一执行绑定层：
+  provider 仍只发送标准 function schema，执行器侧则能稳定拿到 canonical builtin
+  名称或 MCP serverId。
+- Skill 与 Sub-Agent 的工具白名单是另一套“局部裁剪工具面”的旧语义；
+  在改成请求级全量静态快照后，这些 frontmatter 字段已经没有必要继续存在。
+- `open_file` / `nav-tools` 确认为未注册死代码；`list_directory`、`get_time`、`fetch`
+  则属于 legacy 工具实现，适合保留兼容语义但从 runtime 注册面摘除。

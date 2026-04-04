@@ -9,8 +9,8 @@ import type { SubAgentDefinition } from 'src/tools/sub-agents/types';
 import {
 	attachToolSurfaceMetadata,
 	createBuiltinToolDefinition,
-	createSubAgentDiscoveryTool,
-} from './chat-tool-discovery-catalog';
+	createSubAgentToolDefinition,
+} from './chat-tool-definition-factory';
 import {
 	resolveSurfaceBlueprintBase,
 	SURFACE_BLUEPRINT_ARCHITECTURE_NOTE,
@@ -93,8 +93,6 @@ test('Step 14 builtin aliases 会进入 compatibility legacyCallNames', () => {
 		aliases: ['Skill'],
 		description: '调用 Skill',
 		inputSchema: MINIMAL_SCHEMA,
-		source: 'builtin',
-		sourceId: 'builtin',
 		serverId: 'builtin',
 	});
 
@@ -120,8 +118,8 @@ test('Step 14 sub-agents 继续保持独立 ToolDefinition 体系', () => {
 	assert.equal(discoverTool.source, 'custom');
 	assert.equal(delegateTool.source, 'workflow');
 
-	const surfacedDiscover = createSubAgentDiscoveryTool(discoverTool);
-	const surfacedDelegate = createSubAgentDiscoveryTool(delegateTool);
+	const surfacedDiscover = createSubAgentToolDefinition(discoverTool);
+	const surfacedDelegate = createSubAgentToolDefinition(delegateTool);
 	assert.equal(surfacedDiscover.identity?.source, 'custom');
 	assert.equal(surfacedDelegate.identity?.source, 'workflow');
 	assert.equal(

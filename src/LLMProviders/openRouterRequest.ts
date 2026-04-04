@@ -38,7 +38,6 @@ const OPENROUTER_INTERNAL_CHAT_PARAM_KEYS = [
 	'plugins',
 	'responseFormat',
 	'toolExecutor',
-	'getTools',
 	'maxToolCallLoops',
 	'mcpTools',
 	'mcpCallTool',

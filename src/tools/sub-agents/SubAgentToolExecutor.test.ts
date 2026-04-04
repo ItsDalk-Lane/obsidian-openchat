@@ -55,8 +55,6 @@ test('discover_sub_agents 会按 query 过滤并返回 agent 元数据', async (
 		metadata: {
 			name: 'reviewer',
 			description: 'Review the current changes for bugs.',
-			tools: ['read_file'],
-			mcps: ['github'],
 			models: 'claude-reviewer',
 			maxTokens: 2048,
 		},
@@ -89,7 +87,7 @@ test('discover_sub_agents 会按 query 过滤并返回 agent 元数据', async (
 		arguments: JSON.stringify({ query: 'review' }),
 	}, TOOL_DEFINITIONS);
 	const payload = JSON.parse(result.content) as {
-		agents: Array<{ name: string; description: string; tools: string[]; mcps: string[] }>;
+		agents: Array<{ name: string; description: string }>;
 		meta: { query: string | null; returned: number; total: number };
 	};
 
@@ -98,8 +96,6 @@ test('discover_sub_agents 会按 query 过滤并返回 agent 元数据', async (
 		agents: [{
 			name: 'reviewer',
 			description: 'Review the current changes for bugs.',
-			tools: ['read_file'],
-			mcps: ['github'],
 			model: 'claude-reviewer',
 			maxTokens: 2048,
 		}],
@@ -116,8 +112,6 @@ test('legacy sub_agent_* 名称仍可通过 delegate 路径执行', async () => 
 		metadata: {
 			name: 'reviewer',
 			description: 'Review the current changes for bugs.',
-			tools: ['read_file'],
-			mcps: ['github'],
 			models: 'claude-reviewer',
 			maxTokens: 2048,
 		},
@@ -165,9 +159,6 @@ test('legacy sub_agent_* 名称仍可通过 delegate 路径执行', async () => 
 	assert.equal(result.name, 'sub_agent_reviewer');
 	assert.equal(result.content, 'Delegate result');
 	assert.deepEqual(resolveCalls[0], {
-		includeSubAgents: false,
-		explicitToolNames: ['read_file'],
-		explicitMcpServerIds: ['github'],
 		parentSessionId: 'parent-session',
 	});
 	assert.deepEqual(generateCalls[0], {

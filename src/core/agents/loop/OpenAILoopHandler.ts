@@ -7,10 +7,7 @@
 
 import type { BaseOptions, SendRequest } from 'src/types/provider'
 import { createOpenAIToolLoopSupportFactory } from './openAILoopRunner'
-import {
-	toOpenAITools,
-	resolveCurrentTools,
-} from './openAILoopShared'
+import { toOpenAITools } from './openAILoopShared'
 import type {
 	ContentPart,
 	OpenAILoopOptions,
@@ -20,10 +17,7 @@ import type {
 	ToolNameMapping,
 } from './openAILoopShared'
 
-export {
-	resolveCurrentTools,
-	toOpenAITools,
-}
+export { toOpenAITools }
 
 export type {
 	ContentPart,

@@ -53,7 +53,10 @@ export class McpToolExecutor implements ToolExecutor {
 	}
 
 	canHandle(call: ToolCallRequest, tools: ToolDefinition[]): boolean {
-		return tools.some((tool) => tool.name === call.name && tool.source === 'mcp')
+		return tools.some((tool) =>
+			tool.name === call.name
+			&& (tool.execution?.kind === 'mcp' || tool.source === 'mcp'),
+		)
 	}
 
 	async execute(
@@ -61,7 +64,10 @@ export class McpToolExecutor implements ToolExecutor {
 		tools: ToolDefinition[],
 		_options?: ToolExecutionOptions,
 	): Promise<ToolCallResult> {
-		const targetTool = tools.find((tool) => tool.name === call.name && tool.source === 'mcp')
+		const targetTool = tools.find((tool) =>
+			tool.name === call.name
+			&& (tool.execution?.kind === 'mcp' || tool.source === 'mcp'),
+		)
 		if (!targetTool) {
 			return {
 				toolCallId: call.id,
@@ -118,16 +124,24 @@ export class McpToolExecutor implements ToolExecutor {
 		}
 
 		const mcpTools: McpToolDefinitionForProvider[] = tools
-			.filter((tool) => tool.source === 'mcp')
-			.map((tool) => ({
-			name: tool.name,
-			title: tool.title,
-			description: tool.description,
-			inputSchema: tool.runtimePolicy?.validationSchema ?? tool.inputSchema,
-			outputSchema: tool.outputSchema,
-			annotations: tool.annotations,
-			serverId: tool.sourceId,
-		}))
+			.filter((tool) => tool.execution?.kind === 'mcp' || tool.source === 'mcp')
+			.flatMap((tool) => {
+				const serverId = tool.execution?.kind === 'mcp'
+					? tool.execution.serverId
+					: tool.sourceId
+				if (!serverId) {
+					return []
+				}
+				return [{
+					name: tool.name,
+					title: tool.title,
+					description: tool.description,
+					inputSchema: tool.runtimePolicy?.validationSchema ?? tool.inputSchema,
+					outputSchema: tool.outputSchema,
+					annotations: tool.annotations,
+					serverId,
+				}]
+			})
 
 		const results: ToolLoopMessage[] = await executeMcpToolCalls(
 			[openAIToolCall],
@@ -162,5 +176,9 @@ export function mcpToolToToolDefinition(mcpTool: McpToolDefinitionForProvider): 
 		annotations: mcpTool.annotations,
 		source: 'mcp',
 		sourceId: mcpTool.serverId,
+		execution: {
+			kind: 'mcp',
+			serverId: mcpTool.serverId,
+		},
 	}
 }
