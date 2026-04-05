@@ -260,5 +260,3 @@ export const QuickActionResultModal = ({
 
 	return createPortal(modalContent, document.body);
 };
-
-export default QuickActionResultModal;

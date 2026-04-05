@@ -45,30 +45,6 @@ export function buildBlacklistSet(domains: readonly string[]): Set<string> {
 }
 
 /**
- * 检查指定主机名是否命中黑名单
- * 支持精确匹配和子域名匹配：
- *   黑名单 "zhihu.com" 会匹配 "zhihu.com"、"www.zhihu.com"、"zhuanlan.zhihu.com" 等
- */
-export function isHostnameBlacklisted(
-	hostname: string,
-	blacklistSet: Set<string>
-): boolean {
-	const lower = hostname.toLowerCase();
-
-	// 精确匹配
-	if (blacklistSet.has(lower)) return true;
-
-	// 子域名匹配：逐级剥离最左侧子域名
-	const parts = lower.split('.');
-	for (let i = 1; i < parts.length - 1; i++) {
-		const parent = parts.slice(i).join('.');
-		if (blacklistSet.has(parent)) return true;
-	}
-
-	return false;
-}
-
-/**
  * 检查 URL 是否命中爬虫黑名单
  * @returns 如果命中则返回匹配的域名，否则返回 null
  */

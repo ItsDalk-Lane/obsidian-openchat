@@ -139,7 +139,7 @@ export function validateIanaTimezone(tz: string): string {
 	return normalized;
 }
 
-export function formatHourDiff(diffHours: number): string {
+const formatHourDiff = (diffHours: number): string => {
 	if (!Number.isFinite(diffHours)) {
 		throw new Error('Invalid hour difference');
 	}
@@ -151,7 +151,7 @@ export function formatHourDiff(diffHours: number): string {
 	const absValue = Math.abs(diffHours);
 	const compact = absValue.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 	return `${diffHours >= 0 ? '+' : '-'}${compact}h`;
-}
+};
 
 export function buildCurrentTimeResult(timezone: string): TimeResult {
 	const normalizedTimezone = validateIanaTimezone(timezone);

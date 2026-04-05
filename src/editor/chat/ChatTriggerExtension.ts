@@ -102,10 +102,6 @@ export function createChatTriggerExtension(
 	});
 }
 
-/**
- * 全局 Chat 触发服务
- */
-let globalChatTriggerEnabled = true;
 let globalSettings: ChatSettings | null = null;
 
 /**
@@ -113,19 +109,4 @@ let globalSettings: ChatSettings | null = null;
  */
 export function updateChatTriggerSettings(settings: ChatSettings): void {
 	globalSettings = settings;
-	globalChatTriggerEnabled = settings.enableChatTrigger;
-}
-
-/**
- * 获取当前 Chat 触发是否启用
- */
-export function isChatTriggerEnabled(): boolean {
-	return globalChatTriggerEnabled;
-}
-
-/**
- * 获取当前 Chat 触发设置
- */
-export function getChatTriggerSettings(): ChatSettings | null {
-	return globalSettings;
 }

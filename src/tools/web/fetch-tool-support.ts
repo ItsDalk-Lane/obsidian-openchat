@@ -163,7 +163,7 @@ async function fetchUrl(
 	};
 }
 
-export const fetchSingleUrl: FetchSingleUrlHandler = async (
+const fetchSingleUrl: FetchSingleUrlHandler = async (
 	url,
 	userAgent,
 	ignoreRobotsTxt,
@@ -217,7 +217,7 @@ export const fetchSingleUrl: FetchSingleUrlHandler = async (
 	return `${prefix}Contents of ${validatedUrl}:\n${resultContent}`;
 };
 
-export const fetchBatch: FetchBatchHandler = async (
+const fetchBatch: FetchBatchHandler = async (
 	urls,
 	userAgent,
 	ignoreRobotsTxt,

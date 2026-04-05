@@ -49,7 +49,7 @@ export interface ChatInputMenuLayoutOptions {
 const isValidTriggerPrefix = (character: string): boolean =>
 	character === '' || character === ' ' || character === '\n';
 
-export const findTriggerMatch = (
+const findTriggerMatch = (
 	text: string,
 	cursorIndex: number,
 	source: Pick<ChatInputTriggerSource, 'key' | 'trigger'>,

@@ -11,7 +11,6 @@ import type {
 	ChatMessage,
 	ChatSession,
 	ChatSettings,
-	ChatState,
 	SelectedTextContext,
 	SelectedFile,
 	SelectedFolder,
@@ -24,12 +23,11 @@ import type {
 import type { AttachmentSelectionSnapshot } from './chat-attachment-selection-service';
 import type { FileContentService } from './file-content-service';
 import type { MessageService } from './message-service';
-import type { ResolvedToolRuntime, SubAgentStateCallback } from 'src/tools/sub-agents/types';
+import type { ResolvedToolRuntime } from 'src/tools/sub-agents/types';
 import type { SubAgentScannerService } from 'src/tools/sub-agents/SubAgentScannerService';
 import type { SubAgentWatcherService } from 'src/tools/sub-agents/SubAgentWatcherService';
 import type {
 	BeginSkillInvocationInput,
-	SkillInvocationFrame,
 	SkillReturnPacket,
 	SkillSessionState,
 	WriteSkillReturnPacketInput,
@@ -75,13 +73,7 @@ export interface SavedChatSessionState extends AttachmentSelectionSnapshot {
 
 export type FreezeSkillMainTaskInput = BeginSkillInvocationInput;
 
-export type FreezeSkillMainTaskResult = SkillInvocationFrame;
-
 export type WriteActiveSkillReturnPacketInput = WriteSkillReturnPacketInput;
-
-export type WriteActiveSkillReturnPacketResult = SkillInvocationFrame;
-
-export type RestoreSkillMainTaskResult = SkillReturnPacket | null;
 
 export interface ChatSettingsAccessor {
 	getManifestId(): string;
@@ -148,17 +140,4 @@ export interface ChatHostDeps {
 export interface ChatServiceDeps {
 	host: ChatHostDeps;
 	runtimeDeps: ChatRuntimeDeps;
-}
-
-export interface ChatServiceStatePort {
-	getState(): ChatState;
-	emitState(): void;
-}
-
-export interface ChatToolRuntimeAdapter {
-	resolveToolRuntime(options?: {
-		parentSessionId?: string;
-		subAgentStateCallback?: SubAgentStateCallback;
-		session?: ChatSession;
-	}): Promise<ResolvedToolRuntime>;
 }

@@ -10,5 +10,3 @@ export const zhTw: Local = {
 	...zhTwPart3,
 	...zhTwPart4,
 };
-
-export default zhTw;

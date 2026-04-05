@@ -12,77 +12,10 @@ export interface ToolFailureTrackerEntry {
 
 export type ToolFailureTracker = Map<string, ToolFailureTrackerEntry>
 
-export function maybeBuildAlternateArgsForServerError(
-	schema: Record<string, unknown> | undefined,
-	args: Record<string, unknown>,
-): Record<string, unknown> | null {
-	const { required } = getSchemaMeta(schema)
-	if (required.length !== 1) return null
-
-	const key = required[0]
-	const current = args[key]
-	if (typeof current !== 'string' || !current.trim()) return null
-
-	if (isUrlLikeKey(key) && isGithubRepoSlug(current)) {
-		return { ...args, [key]: toGithubUrl(current) }
-	}
-
-	if (isRepoLikeKey(key) && !isUrlLikeKey(key) && isGithubUrl(current)) {
-		return { ...args, [key]: toGithubSlug(current) }
-	}
-
-	return null
-}
-
 export function getNonEmptyString(value: unknown): string | null {
 	if (typeof value !== 'string') return null
 	const trimmed = value.trim()
 	return trimmed ? trimmed : null
-}
-
-export function extractRepoHints(args: Record<string, unknown>): {
-	owner?: string
-	repoName?: string
-	slug?: string
-	url?: string
-} {
-	const owner =
-		getNonEmptyString(args.owner)
-		?? getNonEmptyString(args.repo_owner)
-		?? getNonEmptyString(args.org)
-		?? getNonEmptyString(args.organization)
-		?? undefined
-	const repoName =
-		getNonEmptyString(args.repo)
-		?? getNonEmptyString(args.repository)
-		?? getNonEmptyString(args.repo_name)
-		?? getNonEmptyString(args.name)
-		?? undefined
-
-	let slug: string | undefined
-	let url: string | undefined
-
-	for (const [key, val] of Object.entries(args)) {
-		if (typeof val !== 'string') continue
-		const text = val.trim()
-		if (!text) continue
-		if (isGithubUrl(text) && !url) {
-			url = text
-			if (!slug) slug = toGithubSlug(text)
-		}
-		if ((isRepoLikeKey(key) || isUrlLikeKey(key)) && isGithubRepoSlug(text) && !slug) {
-			slug = text.replace(/\.git$/i, '')
-		}
-	}
-
-	if (!slug && owner && repoName) {
-		slug = `${owner}/${repoName}`.replace(/\.git$/i, '')
-	}
-	if (!url && slug) {
-		url = toGithubUrl(slug)
-	}
-
-	return { owner, repoName, slug, url }
 }
 
 export function safeJsonPreview(value: unknown, maxLen = 400): string {

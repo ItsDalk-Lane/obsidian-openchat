@@ -16,13 +16,6 @@ export interface ToolContext {
 	) => Promise<unknown>;
 }
 
-export interface BuiltinToolDescriptionContext {
-	readonly app: App;
-	readonly activeFilePath?: string | null;
-	readonly enabledToolNames?: readonly string[];
-	readonly sessionMode?: 'default' | 'plan' | 'workflow';
-}
-
 export interface BuiltinToolSelectedTextContext {
 	readonly filePath?: string | null;
 	readonly startLine?: number;

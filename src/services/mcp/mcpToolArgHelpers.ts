@@ -13,14 +13,14 @@ export function hasUsableValue(value: unknown): boolean {
 	return true
 }
 
-export function toSnakeCaseKey(key: string): string {
+function toSnakeCaseKey(key: string): string {
 	return key
 		.replace(/([a-z0-9])([A-Z])/g, '$1_$2')
 		.replace(/[\s-]+/g, '_')
 		.toLowerCase()
 }
 
-export function trimArgsDeep(value: unknown): unknown {
+function trimArgsDeep(value: unknown): unknown {
 	if (typeof value === 'string') return value.trim()
 	if (Array.isArray(value)) return value.map((item) => trimArgsDeep(item))
 	if (!value || typeof value !== 'object') return value
@@ -32,7 +32,7 @@ export function trimArgsDeep(value: unknown): unknown {
 	)
 }
 
-export function coerceValue(value: unknown, coercion: ToolHintCoercion): unknown {
+function coerceValue(value: unknown, coercion: ToolHintCoercion): unknown {
 	if (coercion === 'string_array') {
 		if (Array.isArray(value)) {
 			return value
@@ -67,25 +67,17 @@ export function coerceValue(value: unknown, coercion: ToolHintCoercion): unknown
 	return value
 }
 
-export function getSchemaType(propertySchema: unknown): string | null {
+function getSchemaType(propertySchema: unknown): string | null {
 	if (!propertySchema || typeof propertySchema !== 'object') return null
 	const type = (propertySchema as { type?: unknown }).type
 	return typeof type === 'string' ? type : null
 }
 
-export function getSchemaEnum(propertySchema: unknown): string[] | null {
+function getSchemaEnum(propertySchema: unknown): string[] | null {
 	if (!propertySchema || typeof propertySchema !== 'object') return null
 	const enumValues = (propertySchema as { enum?: unknown }).enum
 	if (!Array.isArray(enumValues)) return null
 	return enumValues.filter((value): value is string => typeof value === 'string')
-}
-
-export function validateToolArgs(
-	toolName: string,
-	schema: Record<string, unknown> | undefined,
-	args: Record<string, unknown>,
-): string[] {
-	return validateToolArgsDetailed(toolName, schema, args).issues.map((issue) => issue.message)
 }
 
 export interface ToolArgsValidationResult {
@@ -257,38 +249,6 @@ export function getSchemaMeta(schema: Record<string, unknown> | undefined): {
 			: {}
 
 	return { required, properties }
-}
-
-export function isRepoLikeKey(key: string): boolean {
-	return /(repo|repository|project)/i.test(key)
-}
-
-export function isUrlLikeKey(key: string): boolean {
-	return /(url|uri|link|endpoint)/i.test(key)
-}
-
-export function isGithubRepoSlug(value: string): boolean {
-	return /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+(?:\.git)?$/.test(value.trim())
-}
-
-export function isGithubUrl(value: string): boolean {
-	return /^https?:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+(?:\.git)?(?:\/.*)?$/i.test(
-		value.trim(),
-	)
-}
-
-export function toGithubUrl(value: string): string {
-	const trimmed = value.trim().replace(/^github\.com\//i, '')
-	if (isGithubUrl(trimmed)) return trimmed
-	if (isGithubRepoSlug(trimmed)) return `https://github.com/${trimmed}`
-	return value.trim()
-}
-
-export function toGithubSlug(value: string): string {
-	const trimmed = value.trim()
-	if (!isGithubUrl(trimmed)) return trimmed
-	const matched = trimmed.match(/^https?:\/\/github\.com\/([A-Za-z0-9._-]+\/[A-Za-z0-9._-]+)(?:\.git)?(?:\/.*)?$/i)
-	return matched ? matched[1] : trimmed
 }
 
 export function normalizeToolArgs(

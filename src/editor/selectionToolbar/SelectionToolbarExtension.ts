@@ -106,13 +106,6 @@ export function isSelectionToolbarEnabled(): boolean {
 }
 
 /**
- * 获取选区工具栏设置
- */
-export function getSelectionToolbarSettings(): ChatSettings | null {
-	return globalSelectionToolbarSettings;
-}
-
-/**
  * 创建选区工具栏 CodeMirror 6 扩展
  * 
  * @param app Obsidian App 实例

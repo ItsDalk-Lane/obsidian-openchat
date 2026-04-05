@@ -237,87 +237,97 @@ export const runPR15 = () => {
 }
 
 export const runPR16 = () => {
-	const doubaoPath = path.resolve(PROVIDERS_ROOT, 'doubao.ts')
-	let capturedTransformApiParams = null
-
-	const doubaoModule = loadTsModule(doubaoPath, {
-		obsidian: {
-			requestUrl: async () => ({ status: 200, json: {}, text: '' }),
+	const doubaoSupportPath = path.resolve(PROVIDERS_ROOT, 'doubao-responses-support.ts')
+	const doubaoSupportModule = loadTsModule(doubaoSupportPath, {
+		'src/core/agents/loop/openAILoopShared': {
+			toOpenAITools: (tools) => tools,
 		},
-		'tars/lang/helper': { t: (text) => text },
-		'.': {},
-		'./utils': {
-			buildReasoningBlockEnd: () => '',
-			buildReasoningBlockStart: () => '',
-			convertEmbedToImageUrl: async () => ({ type: 'image_url', image_url: { url: '' } }),
-			getMimeTypeFromFilename: () => 'image/png',
+		'src/core/agents/loop/openAILoopUtils': {
+			executeToolCalls: async () => [],
 		},
-		'./errors': {
-			normalizeProviderError: (error) => error,
+		'src/services/mcp/McpToolExecutor': {
+			McpToolExecutor: class {},
+			mcpToolToToolDefinition: (tool) => tool,
+		},
+		'src/services/mcp/mcpToolCallHandler': {
+			resolveCurrentMcpTools: async () => [],
+		},
+		'./poeMessageTransforms': {
+			extractResponseFunctionCalls: () => [],
 		},
 		'./retry': {
 			withRetry: async (operation) => operation(),
 		},
-		'src/core/agents/loop': {
-			withToolCallLoopSupport: (factory, options) => {
-				capturedTransformApiParams = options?.transformApiParams
-				return factory
-			},
+		'./sse': {
+			feedChunk: () => ({ rest: '', events: [] }),
 		},
-		'./doubaoImage': {
-			DEFAULT_DOUBAO_IMAGE_OPTIONS: {
-				displayWidth: 400,
-				size: '1024x1024',
-				response_format: 'b64_json',
-				watermark: false,
-				sequential_image_generation: false,
-				stream: false,
-				optimize_prompt_mode: 'auto',
-			},
-			doubaoImageVendor: {
-				sendRequestFunc: () =>
-					async function* () {
-						yield ''
-					},
-			},
-			DOUBAO_IMAGE_MODELS: [],
-			isDoubaoImageGenerationModel: () => false,
+		'./utils': {
+			buildReasoningBlockEnd: () => '',
+			buildReasoningBlockStart: () => '',
+		},
+		'./doubaoUtils': {
+			createDoubaoHTTPError: (_status, message) => new Error(message),
+			extractString: (value) => (typeof value === 'string' ? value : ''),
 		},
 	})
 
 	assert(
-		doubaoModule.doubaoUseResponsesAPI({ enableReasoning: true, enableWebSearch: false }) === false,
-		'PR16-1: Doubao reasoning-only mode should stay on chat.completions (MCP-compatible path)',
+		doubaoSupportModule.resolveDoubaoResponsesEndpoint('https://ark.cn-beijing.volces.com/api/v3/chat/completions') ===
+			'https://ark.cn-beijing.volces.com/api/v3/responses',
+		'PR16-1: Doubao chat completion endpoint should normalize to the Responses endpoint',
 	)
 	assert(
-		doubaoModule.doubaoUseResponsesAPI({ enableReasoning: false, enableWebSearch: true }) === true,
-		'PR16-1: Doubao web-search mode should use responses API',
-	)
-	assert(
-		typeof capturedTransformApiParams === 'function',
-		'PR16-2: Doubao MCP wrapper should provide transformApiParams',
+		doubaoSupportModule.resolveDoubaoResponsesEndpoint('') ===
+			'https://ark.cn-beijing.volces.com/api/v3/responses',
+		'PR16-1: empty Doubao baseURL should fall back to the default Responses endpoint',
 	)
 
-	const transformedEnabled = capturedTransformApiParams(
-		{ temperature: 0.2, thinkingType: 'enabled' },
-		{ enableReasoning: true, thinkingType: 'auto' },
+	const baseParams = doubaoSupportModule.buildBaseResponsesParams(
+		{ enableStructuredOutput: false },
+		{ temperature: 0.2, max_tokens: 256, enableWebSearch: true, thinkingType: 'enabled' },
 	)
 	assert(
-		transformedEnabled.thinking?.type === 'auto',
-		'PR16-2: Doubao MCP transform should map thinkingType to thinking.type when reasoning is enabled',
+		baseParams.max_output_tokens === 256,
+		'PR16-2: Doubao Responses base params should map max_tokens to max_output_tokens',
 	)
 	assert(
-		transformedEnabled.thinkingType === undefined,
-		'PR16-2: Doubao MCP transform should strip thinkingType from direct API params',
+		baseParams.max_tokens === undefined,
+		'PR16-2: Doubao Responses base params should remove raw max_tokens',
+	)
+	assert(
+		baseParams.enableWebSearch === undefined && baseParams.thinkingType === undefined,
+		'PR16-2: Doubao Responses base params should strip web-search and thinking-only UI flags',
 	)
 
-	const transformedDisabled = capturedTransformApiParams(
-		{ temperature: 0.2, thinkingType: 'enabled' },
-		{ enableReasoning: false, thinkingType: 'enabled' },
+	const requestDataEnabled = doubaoSupportModule.buildRequestData({
+		model: 'doubao-seed-1-6',
+		input: [{ role: 'user', content: [{ type: 'input_text', text: 'hi' }] }],
+		baseParams: { temperature: 0.2 },
+		responseTools: [],
+		thinkingType: 'auto',
+		reasoningEffort: 'high',
+		includeThinking: true,
+	})
+	assert(
+		requestDataEnabled.thinking?.type === 'auto',
+		'PR16-3: Doubao request data should map thinkingType to thinking.type when reasoning is enabled',
 	)
 	assert(
-		transformedDisabled.thinking === undefined,
-		'PR16-2: Doubao MCP transform should not inject thinking when reasoning is disabled',
+		requestDataEnabled.reasoning?.effort === 'high',
+		'PR16-3: Doubao request data should preserve reasoning effort when thinking is enabled',
+	)
+
+	const requestDataDisabled = doubaoSupportModule.buildRequestData({
+		model: 'doubao-seed-1-6',
+		input: [{ role: 'user', content: [{ type: 'input_text', text: 'hi' }] }],
+		baseParams: { temperature: 0.2 },
+		responseTools: [],
+		thinkingType: 'enabled',
+		includeThinking: false,
+	})
+	assert(
+		requestDataDisabled.thinking === undefined && requestDataDisabled.reasoning === undefined,
+		'PR16-3: Doubao request data should not inject thinking fields when reasoning is disabled',
 	)
 }
 

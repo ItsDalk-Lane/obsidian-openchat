@@ -60,9 +60,4 @@ export class Locals {
 	}
 }
 
-export function isZh(): boolean {
-	const lang = getCurrentLanguage();
-	return lang === 'zh' || lang === 'zh-TW' || lang === 'zh-CN';
-}
-
 export const localInstance = Locals.get();

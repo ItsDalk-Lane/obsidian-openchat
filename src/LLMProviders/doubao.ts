@@ -38,8 +38,6 @@ const DOUBAO_KNOWN_CHAT_MODELS = [
 export const DOUBAO_REASONING_EFFORT_OPTIONS: DoubaoReasoningEffort[] = ['minimal', 'low', 'medium', 'high']
 export const DEFAULT_DOUBAO_THINKING_TYPE: DoubaoThinkingType = 'enabled'
 
-export const doubaoUseResponsesAPI = (_options: DoubaoOptions): boolean => true
-
 // Doubao图片理解配置选项
 export interface DoubaoOptions extends BaseOptions {
 	enableReasoning?: boolean // 是否启用推理功能（受聊天界面“推理”按钮控制）

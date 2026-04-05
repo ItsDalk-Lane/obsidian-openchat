@@ -9,9 +9,6 @@ import { ChatMessages } from './ChatMessages';
 import { ChatControls } from './ChatControls';
 import { ChatInput } from './ChatInput';
 
-export const VIEW_TYPE_CHAT_SIDEBAR = 'form-chat-sidebar';
-export const VIEW_TYPE_CHAT_TAB = 'form-chat-tab';
-
 export type ChatViewMode = 'sidebar' | 'tab';
 
 export class ChatView extends ItemView {

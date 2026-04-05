@@ -7,7 +7,6 @@ export const AI_MCP_SERVERS_SUBFOLDER = 'mcp-servers';
 export const AI_MULTI_MODEL_SUBFOLDER = 'multi-model';
 export const AI_SKILLS_SUBFOLDER = 'skills';
 export const AI_AGENTS_SUBFOLDER = 'agents';
-export const AI_CHAT_INPUT_IMPORTS_SUBFOLDER = 'chat-input-imports';
 
 export const trimTrailingSlash = (value: string): string => value.replace(/[\\/]+$/gu, '');
 
@@ -60,8 +59,4 @@ export const getSkillsPath = (aiDataFolder: string): string => {
 
 export const getAgentsPath = (aiDataFolder: string): string => {
 	return joinAiPath(aiDataFolder, AI_AGENTS_SUBFOLDER);
-};
-
-export const getChatInputImportsPath = (aiDataFolder: string): string => {
-	return joinAiPath(aiDataFolder, AI_CHAT_INPUT_IMPORTS_SUBFOLDER);
 };

@@ -54,7 +54,7 @@ function isPrivateHostname(hostname: string): boolean {
 /**
  * 构建 robots.txt 的 URL
  */
-export function getRobotsTxtUrl(url: string): string {
+function getRobotsTxtUrl(url: string): string {
 	const parsed = new URL(url);
 	return `${parsed.protocol}//${parsed.host}/robots.txt`;
 }
@@ -62,7 +62,7 @@ export function getRobotsTxtUrl(url: string): string {
 /**
  * 解析 robots.txt，检查是否允许指定 User-Agent 访问目标 URL
  */
-export function parseRobotsTxt(robotsTxt: string, url: string, userAgent: string): boolean {
+function parseRobotsTxt(robotsTxt: string, url: string, userAgent: string): boolean {
 	const lines = robotsTxt.split('\n').map((line) => {
 		// 移除注释
 		const commentIndex = line.indexOf('#');
@@ -130,7 +130,7 @@ export function parseRobotsTxt(robotsTxt: string, url: string, userAgent: string
 /**
  * 匹配 robots.txt 路径规则
  */
-export function matchRobotsPath(urlPath: string, pattern: string): boolean {
+function matchRobotsPath(urlPath: string, pattern: string): boolean {
 	if (!pattern) return false;
 
 	// 将 robots.txt 通配符模式转换为正则

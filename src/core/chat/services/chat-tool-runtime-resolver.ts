@@ -1,6 +1,3 @@
-import {
-	BUILTIN_SERVER_ID,
-} from 'src/tools/runtime/constants';
 import type { BuiltinToolsRuntime } from 'src/tools/runtime/BuiltinToolsRuntime';
 import { BuiltinToolExecutor } from 'src/tools/runtime/BuiltinToolExecutor';
 import type { ResolvedToolRuntime } from 'src/tools/sub-agents/types';

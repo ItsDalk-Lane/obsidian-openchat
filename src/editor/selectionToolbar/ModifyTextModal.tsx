@@ -183,5 +183,3 @@ export const ModifyTextModal = ({
 
 	return createPortal(modalContent, document.body);
 };
-
-export default ModifyTextModal;

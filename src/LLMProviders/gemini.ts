@@ -109,8 +109,6 @@ const buildGeminiContents = async (messages: readonly Message[], resolveEmbedAsB
 	}
 }
 
-export const geminiBuildContents = buildGeminiContents
-
 type OpenAIMessagePart =
 	| {
 		type: 'image_url'

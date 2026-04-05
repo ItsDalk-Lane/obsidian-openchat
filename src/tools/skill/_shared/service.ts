@@ -1,5 +1,3 @@
-import type { SkillScannerService } from 'src/domains/skills/service';
-
 export const skillReadOnlyAnnotations = {
 	readOnlyHint: true,
 	destructiveHint: false,

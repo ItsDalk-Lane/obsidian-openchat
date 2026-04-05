@@ -408,5 +408,3 @@ export const SelectionToolbar = ({
 	return createPortal(toolbarContent, document.body);
 };
 
-export default SelectionToolbar;
-

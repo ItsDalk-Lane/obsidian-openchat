@@ -17,7 +17,6 @@ import {
 } from './builtin-tool-direct-execution';
 import { completeToolArguments } from 'src/core/agents/loop/tool-call-argument-completion';
 import {
-	buildToolArgumentValidationErrorContext,
 	buildToolArgumentParseErrorContext,
 	formatToolErrorContext,
 } from 'src/core/agents/loop/tool-call-validation';

@@ -1,5 +1,4 @@
 import {
-	buildToolRecoveryHint,
 	safeJsonPreview,
 	summarizeSchema,
 } from 'src/services/mcp/mcpToolCallHandlerInternals';
@@ -276,10 +275,6 @@ export const formatToolErrorContext = (context: ToolErrorContext): string => {
 		parts.push(`修复建议=${context.repairHints.map((hint) => hint.message).join('；')}`);
 	}
 	return parts.join('。');
-};
-
-export const buildToolRecoveryHintText = (toolName: string): string => {
-	return buildToolRecoveryHint(toolName);
 };
 
 export const buildToolValidationResult = (

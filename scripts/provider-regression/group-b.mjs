@@ -108,12 +108,12 @@ export const runPR9 = () => {
 		'PR9-1: QianFan default baseURL should use official /v2 endpoint',
 	)
 	assert(
-		qianFanModule.qianFanNormalizeBaseURLForTest('https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat') ===
+		qianFanModule.qianFanNormalizeBaseURL('https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat') ===
 			'https://qianfan.baidubce.com/v2',
 		'PR9-1: legacy Wenxin RPC baseURL should migrate to official /v2 endpoint',
 	)
 	assert(
-		qianFanModule.qianFanNormalizeBaseURLForTest('https://qianfan.bj.baidubce.com/v2/chat/completions') ===
+		qianFanModule.qianFanNormalizeBaseURL('https://qianfan.bj.baidubce.com/v2/chat/completions') ===
 			'https://qianfan.bj.baidubce.com/v2',
 		'PR9-1: regional QianFan baseURL should normalize to /v2 root',
 	)
@@ -136,13 +136,16 @@ export const runPR9 = () => {
 		'PR9-3: QianFan capabilities should include vision, reasoning, and image generation',
 	)
 
-	const settingTabSource = fs.readFileSync(SETTINGS_PANEL_PATH, 'utf-8')
+	const providerUtilsSource = fs.readFileSync(
+		path.resolve(ROOT, 'src/components/settings-components/provider-config/providerUtils.ts'),
+		'utf-8',
+	)
 	assert(
-		settingTabSource.includes('resolveQianFanModelListURL'),
+		providerUtilsSource.includes('${qianFanNormalizeBaseURL(options.baseURL)}/models'),
 		'PR9-4: QianFan model list fetching should resolve official /v2/models URL',
 	)
 	assert(
-		settingTabSource.includes('qianFanNormalizeBaseURL(baseURL)'),
+		providerUtilsSource.includes('qianFanNormalizeBaseURL(options.baseURL)'),
 		'PR9-4: QianFan model list URL should reuse provider baseURL normalization',
 	)
 }

@@ -37,10 +37,8 @@ import { createDiscoverSkillsTool } from '../skill/discover-skills/tool';
 import { createInvokeSkillTool } from '../skill/invoke-skill/tool';
 import { createTimeTools } from '../time/time-tools';
 import { createBingSearchTools } from '../web/bing-search-tools';
-import {
-	createFetchTools,
-	type FetchToolsOptions,
-} from '../web/fetch-tools';
+import { createFetchTools } from '../web/fetch-tools';
+import type { FetchToolsOptions } from '../web/fetch/schema';
 import { createWorkflowTools } from '../workflow/workflow-tools';
 import { registerFilesystemTools } from '../vault/filesystemTools';
 

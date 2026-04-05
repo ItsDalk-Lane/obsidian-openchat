@@ -22,12 +22,6 @@ export interface BuiltinExecutionMeta {
 	activityDescription: string | null;
 }
 
-export interface PreparedBuiltinToolExecution {
-	args: unknown;
-	meta: BuiltinExecutionMeta;
-	context: BuiltinToolExecutionContext<unknown>;
-}
-
 export const defaultBuiltinToolInvoker: BuiltinToolInvoker = async (
 	tool,
 	args,
@@ -42,7 +36,7 @@ export const getBuiltinExecutionMeta = (
 	activityDescription: tool.getActivityDescription?.(args as never) ?? null,
 });
 
-export const toToolConfirmationRequest = (
+const toToolConfirmationRequest = (
 	call: ToolCallRequest,
 	request: {
 		title: string;
@@ -57,7 +51,7 @@ export const toToolConfirmationRequest = (
 	confirmLabel: request.confirmLabel,
 });
 
-export const toToolUserInputRequest = (
+const toToolUserInputRequest = (
 	call: ToolCallRequest,
 	request: {
 		question: string;

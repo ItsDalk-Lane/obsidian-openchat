@@ -214,7 +214,7 @@ const createAbsolutePathAttachmentSource = (absolutePath: string): ChatInputAtta
 	return { kind, name, absolutePath };
 };
 
-export const createBrowserFileAttachmentSource = (file: File): ChatInputAttachmentSource => {
+const createBrowserFileAttachmentSource = (file: File): ChatInputAttachmentSource => {
 	const typedFile = file as ElectronFile;
 	const name = resolveAttachmentSourceName(file.name, file.type);
 	const kind = getChatInputAttachmentKind(name, file.type);
@@ -244,7 +244,7 @@ export const createBrowserFileAttachmentSource = (file: File): ChatInputAttachme
 	};
 };
 
-export const looksLikeAbsolutePathText = (value: string): boolean => {
+const looksLikeAbsolutePathText = (value: string): boolean => {
 	const trimmed = value.trim();
 	if (!trimmed) {
 		return false;
@@ -270,7 +270,7 @@ export const extractAbsolutePathsFromClipboardText = (value: string): string[] =
 		.filter((entry) => looksLikeAbsolutePathText(entry));
 };
 
-export const collectClipboardPathAttachmentSources = async (
+const collectClipboardPathAttachmentSources = async (
 	text: string,
 ): Promise<ChatInputAttachmentSource[]> => {
 	const candidatePaths = extractAbsolutePathsFromClipboardText(text);

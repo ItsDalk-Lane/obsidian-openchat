@@ -73,7 +73,7 @@ export const runPR2 = () => {
 		'./sse': { feedChunk },
 	})
 
-	const { qianFanNormalizeBaseURL, qianFanBuildApiError } = qianFanModule
+	const { qianFanNormalizeBaseURL } = qianFanModule
 	assert(
 		qianFanNormalizeBaseURL('https://qianfan.baidubce.com') === 'https://qianfan.baidubce.com/v2',
 		'PR2-1: baseURL should normalize to the current QianFan OpenAI-compatible v2 endpoint',
@@ -128,23 +128,40 @@ export const runPR2 = () => {
 		)
 	}
 
-	{
-		const authError = qianFanBuildApiError(401, 'bad key')
-		assert(authError.retryable === false, 'PR2-3: 401 errors must not be retryable')
-		const rateLimitError = qianFanBuildApiError(429, 'limit')
-		assert(rateLimitError.retryable === true, 'PR2-3: 429 errors must be retryable')
-		const serverError = qianFanBuildApiError(503, 'down')
-		assert(serverError.retryable === true, 'PR2-3: 5xx errors must be retryable')
-	}
 }
 
 export const runPR3 = async () => {
 	const geminiPath = path.resolve(PROVIDERS_ROOT, 'gemini.ts')
+	let capturedGenerateContentArgs = null
 	const geminiModule = loadTsModule(geminiPath, {
+		'@google/genai': {
+			GoogleGenAI: class MockGoogleGenAI {
+				constructor() {
+					this.models = {
+						generateContentStream: async (args) => {
+							capturedGenerateContentArgs = args
+							return (async function* () {
+								yield { text: () => 'streamed output' }
+							})()
+						},
+					}
+				}
+			},
+		},
 		openai: class MockOpenAI {},
-		'tars/lang/helper': { t: (text) => text },
-		'.': {},
-		'../mcp/mcpToolCallHandler': MCP_HANDLER_MOCK,
+		'./provider-shared': {
+			mergeProviderOptionsWithParameters: (settings) => {
+				const merged = {
+					...settings,
+					...(settings?.parameters && typeof settings.parameters === 'object' ? settings.parameters : {}),
+				}
+				delete merged.parameters
+				return merged
+			},
+		},
+		'src/core/agents/loop/OpenAILoopHandler': {
+			withToolCallLoopSupport: (factory) => factory,
+		},
 		'./utils': {
 			arrayBufferToBase64: () => 'ZmFrZQ==',
 			getMimeTypeFromFilename: () => 'image/png',
@@ -155,7 +172,7 @@ export const runPR3 = async () => {
 		geminiNormalizeOpenAIBaseURL,
 		geminiBuildConfig,
 		geminiIsAuthError,
-		geminiBuildContents,
+		geminiVendor,
 	} = geminiModule
 
 	assert(
@@ -177,23 +194,41 @@ export const runPR3 = async () => {
 	assert(geminiIsAuthError({ message: 'invalid api key' }) === true, 'PR3-3: api key error text should be recognized')
 	assert(geminiIsAuthError({ message: 'timeout' }) === false, 'PR3-3: non-auth error should not be misclassified')
 
-	const result = await geminiBuildContents(
+	const sendRequest = geminiVendor.sendRequestFunc({
+		apiKey: 'test-key',
+		baseURL: 'https://generativelanguage.googleapis.com',
+		model: 'gemini-2.5-flash',
+		parameters: { max_tokens: 2048, temperature: 0.4 },
+	})
+	const chunks = []
+	for await (const chunk of sendRequest(
 		[
 			{ role: 'system', content: 'you are system' },
 			{ role: 'user', content: 'first question' },
 			{ role: 'assistant', content: 'first answer' },
 			{ role: 'user', content: 'second question', embeds: [{ link: 'a.png' }] },
 		],
+		new AbortController(),
 		async () => new ArrayBuffer(8),
-	)
+	)) {
+		chunks.push(chunk)
+	}
 
-	assert(result.systemInstruction === 'you are system', 'PR3-4: system message should map to systemInstruction')
-	assert(result.contents.length === 3, 'PR3-4: non-system history should remain in order')
-	assert(result.contents[0].role === 'user', 'PR3-4: first history message role mismatch')
-	assert(result.contents[1].role === 'model', 'PR3-4: assistant role should map to model')
+	assert(chunks.join('') === 'streamed output', 'PR3-4: Gemini vendor should stream SDK text output')
 	assert(
-		Boolean(result.contents[2].parts.find((part) => Boolean(part.inlineData))),
-		'PR3-4: image embeds should be preserved as inlineData parts',
+		capturedGenerateContentArgs?.config?.systemInstruction === 'you are system',
+		'PR3-4: system message should map to systemInstruction via public Gemini vendor flow',
+	)
+	assert(
+		capturedGenerateContentArgs?.config?.maxOutputTokens === 2048,
+		'PR3-4: public Gemini vendor flow should pass mapped maxOutputTokens to the SDK config',
+	)
+	assert(capturedGenerateContentArgs?.contents?.length === 3, 'PR3-4: non-system history should remain in order')
+	assert(capturedGenerateContentArgs?.contents?.[0]?.role === 'user', 'PR3-4: first history message role mismatch')
+	assert(capturedGenerateContentArgs?.contents?.[1]?.role === 'model', 'PR3-4: assistant role should map to model')
+	assert(
+		Boolean(capturedGenerateContentArgs?.contents?.[2]?.parts?.find((part) => Boolean(part.inlineData))),
+		'PR3-4: image embeds should be preserved as inlineData parts via public Gemini vendor flow',
 	)
 }
 

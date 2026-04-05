@@ -8,19 +8,11 @@ export const BUILTIN_CORE_TOOLS_SERVER_ID = '__builtin__:core-tools';
 /**
  * @deprecated 内置工具已统一到 BUILTIN_SERVER_ID。
  */
-export const BUILTIN_CORE_TOOLS_SERVER_NAME = '内置基础工具';
-export const BUILTIN_CORE_TOOLS_SERVER_VERSION = '1.0.0';
-export const BUILTIN_CORE_TOOLS_CLIENT_NAME = 'core-tools-builtin-client';
-/**
- * @deprecated 内置工具已统一到 BUILTIN_SERVER_ID。
- */
 export const BUILTIN_FILESYSTEM_SERVER_ID = '__builtin__:mcp-filesystem';
 /**
  * @deprecated 内置工具已统一到 BUILTIN_SERVER_ID。
  */
 export const BUILTIN_FILESYSTEM_SERVER_NAME = '内置 Filesystem 工具';
-export const BUILTIN_FILESYSTEM_SERVER_VERSION = '1.0.0';
-export const BUILTIN_FILESYSTEM_CLIENT_NAME = 'filesystem-builtin-client';
 /**
  * @deprecated 内置工具已统一到 BUILTIN_SERVER_ID。
  */
@@ -28,27 +20,11 @@ export const BUILTIN_FETCH_SERVER_ID = '__builtin__:mcp-fetch';
 /**
  * @deprecated 内置工具已统一到 BUILTIN_SERVER_ID。
  */
-export const BUILTIN_FETCH_SERVER_NAME = '内置 Fetch 工具';
-export const BUILTIN_FETCH_SERVER_VERSION = '1.0.0';
-export const BUILTIN_FETCH_CLIENT_NAME = 'fetch-builtin-client';
-/**
- * @deprecated 内置工具已统一到 BUILTIN_SERVER_ID。
- */
 export const BUILTIN_BING_SEARCH_SERVER_ID = '__builtin__:mcp-bing-search';
 /**
  * @deprecated 内置工具已统一到 BUILTIN_SERVER_ID。
  */
-export const BUILTIN_BING_SEARCH_SERVER_NAME = '内置必应搜索工具';
-export const BUILTIN_BING_SEARCH_SERVER_VERSION = '1.0.0';
-export const BUILTIN_BING_SEARCH_CLIENT_NAME = 'bing-search-builtin-client';
-/**
- * @deprecated 内置工具已统一到 BUILTIN_SERVER_ID。
- */
 export const BUILTIN_SKILLS_SERVER_ID = 'builtin_skills_server';
-/**
- * @deprecated 内置工具已统一到 BUILTIN_SERVER_ID。
- */
-export const BUILTIN_SKILLS_SERVER_NAME = '内置 Skills 工具';
 
 export const LEGACY_BUILTIN_SERVER_IDS = [
 	BUILTIN_CORE_TOOLS_SERVER_ID,
@@ -64,13 +40,7 @@ export const isBuiltinServerId = (serverId: string): boolean => {
 	);
 };
 
-export const normalizeBuiltinServerId = (serverId: string): string => {
-	return isBuiltinServerId(serverId) ? BUILTIN_SERVER_ID : serverId;
-};
-
 export const DEFAULT_FETCH_MAX_LENGTH = 5000;
-export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
-export const DEFAULT_FETCH_MAX_REDIRECTS = 10;
 export const DEFAULT_FETCH_USER_AGENT = 'ModelContextProtocol/1.0 (Autonomous; +https://github.com/modelcontextprotocol/servers)';
 export const DEFAULT_FETCH_MAX_CONTENT_LENGTH = 5_000_000;
 

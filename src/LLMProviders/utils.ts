@@ -67,11 +67,6 @@ export const CALLOUT_BLOCK_END = '\n\n'
 export const REASONING_BLOCK_START_MARKER = '{{FF_REASONING_START}}'
 export const REASONING_BLOCK_END_MARKER = '{{FF_REASONING_END}}'
 
-export const formatReasoningDuration = (durationMs: number) => {
-	const centiSeconds = Math.max(1, Math.round(durationMs / 10))
-	return `${(centiSeconds / 100).toFixed(2)}s`
-}
-
 // 推理区块开始标记（包含时间戳）
 export const buildReasoningBlockStart = (startMs: number) => {
 	return `${REASONING_BLOCK_START_MARKER}:${startMs}:`

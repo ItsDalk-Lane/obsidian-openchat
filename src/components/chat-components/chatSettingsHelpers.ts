@@ -2,13 +2,6 @@ import type { Local } from 'src/i18n/local';
 import type { ProviderSettings } from 'src/types/provider';
 import type { McpServerStatus } from 'src/services/mcp/types';
 import { getProviderModelDisplayName } from 'src/utils/aiProviderMetadata';
-import {
-	BUILTIN_SERVER_ID,
-	BUILTIN_SERVER_NAME,
-} from 'src/tools/runtime/constants';
-import {
-	type McpSettings,
-} from 'src/services/mcp/types';
 
 type McpStatusLocale = Pick<
 	Local,
@@ -19,13 +12,6 @@ type McpStatusLocale = Pick<
 	| 'mcp_status_stopped'
 	| 'mcp_status_error'
 >;
-
-export interface BuiltinToolEntry {
-	serverId: string;
-	name: string;
-	enabled: boolean;
-	transportLabel: string;
-}
 
 export const formatProviderOptionLabel = (
 	provider: ProviderSettings,
@@ -72,19 +58,3 @@ export const getMcpStatusColor = (status: McpServerStatus): string => {
 			return 'var(--text-muted)';
 	}
 };
-
-export const getBuiltinToolEntries = (
-	mcpSettings: McpSettings,
-	transportLabel: string
-): BuiltinToolEntry[] => [
-	{
-		serverId: BUILTIN_SERVER_ID,
-		name: BUILTIN_SERVER_NAME,
-		enabled:
-			mcpSettings.builtinCoreToolsEnabled !== false
-			|| mcpSettings.builtinFilesystemEnabled !== false
-			|| mcpSettings.builtinFetchEnabled !== false
-			|| mcpSettings.builtinBingSearchEnabled !== false,
-		transportLabel,
-	},
-];

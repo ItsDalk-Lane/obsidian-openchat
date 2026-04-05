@@ -1,5 +1,4 @@
 import type {
-	BuiltinPermissionDecision,
 	BuiltinTool,
 	BuiltinToolExecutionContext,
 	BuiltinValidationResult,
@@ -20,37 +19,9 @@ export type BuiltinToolInput<TArgs = unknown, TResult = unknown, TProgress = nev
 	Omit<BuiltinTool<TArgs, TResult, TProgress>, BuiltinToolDefaultableKeys>
 	& Partial<Pick<BuiltinTool<TArgs, TResult, TProgress>, BuiltinToolDefaultableKeys>>;
 
-type BuiltinToolDefaults = Pick<
-	BuiltinTool<unknown, unknown, never>,
-	BuiltinToolDefaultableKeys
->;
-
-const allowPermission = (
-): BuiltinPermissionDecision<unknown> => ({
-	behavior: 'allow',
-});
-
 const passValidation = (): BuiltinValidationResult => ({
 	ok: true,
 });
-
-export const BUILTIN_TOOL_DEFAULTS: BuiltinToolDefaults = {
-	isEnabled: () => true,
-	isReadOnly: () => false,
-	isDestructive: () => false,
-	isConcurrencySafe: () => false,
-	interruptBehavior: () => 'block',
-	validateInput: (
-		_args: unknown,
-		_context: BuiltinToolExecutionContext
-	) => passValidation(),
-	checkPermissions: (
-		_args: unknown,
-		_context: BuiltinToolExecutionContext
-	) => allowPermission(),
-	getToolUseSummary: () => null,
-	getActivityDescription: () => null,
-};
 
 function createBuiltinToolDefaults<TArgs, TProgress>(): Pick<
 	BuiltinTool<TArgs, unknown, TProgress>,

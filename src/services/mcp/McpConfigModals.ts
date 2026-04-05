@@ -1,9 +1,7 @@
-import { App, Modal, Notice, Setting, TextComponent, setIcon } from 'obsidian';
+import { App, Modal, Notice, Setting, TextComponent } from 'obsidian';
 import { localInstance } from 'src/i18n/locals';
 import { t } from 'src/i18n/ai-runtime/helper';
-import { summarizeToolDescriptionForUi } from './toolDescriptionSummary';
-import type { McpServerConfig, McpToolInfo } from './types';
-import { DebugLogger } from 'src/utils/DebugLogger';
+import type { McpServerConfig } from './types';
 
 export class McpServerEditModal extends Modal {
 	private server: McpServerConfig;
@@ -393,90 +391,6 @@ export class McpImportModal extends Modal {
 					.setButtonText(localInstance.cancel)
 					.onClick(() => this.close())
 			);
-	}
-
-	onClose() {
-		this.contentEl.empty();
-	}
-}
-
-export class BuiltinMcpToolsModal extends Modal {
-	constructor(
-		app: App,
-		private readonly serverName: string,
-		private readonly tools: McpToolInfo[],
-	) {
-		super(app);
-	}
-
-	private async copyToolName(toolName: string): Promise<void> {
-		try {
-			await navigator.clipboard.writeText(toolName);
-			new Notice(localInstance.copy_success);
-		} catch (error) {
-			DebugLogger.error('Failed to copy builtin MCP tool name', error);
-			new Notice(localInstance.copy_failed);
-		}
-	}
-
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.empty();
-
-		contentEl.createEl('h3', {
-			text: localInstance.mcp_builtin_tools_title.replace('{name}', this.serverName),
-		});
-		contentEl.createEl('p', {
-			text: localInstance.mcp_builtin_tools_desc,
-			cls: 'setting-item-description',
-		});
-
-		if (this.tools.length === 0) {
-			const empty = contentEl.createDiv({
-				text: localInstance.mcp_builtin_tools_empty,
-				cls: 'setting-item-description',
-			});
-			empty.style.cssText = 'padding: 8px 0 12px;';
-		} else {
-			const list = contentEl.createDiv();
-			list.style.cssText =
-				'display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px;';
-				for (const tool of this.tools) {
-					const uiDescription = summarizeToolDescriptionForUi(tool);
-					const item = list.createDiv();
-				item.style.cssText =
-					'padding: 8px 10px; border: 1px solid var(--background-modifier-border); border-radius: 6px;';
-				const header = item.createDiv();
-				header.style.cssText =
-					'display: flex; align-items: center; justify-content: space-between; gap: 8px;';
-				header.createEl('div', { text: tool.name }).style.cssText =
-					'font-weight: 600; word-break: break-all;';
-				const copyButton = header.createEl('button', {
-					attr: {
-						type: 'button',
-						'aria-label': localInstance.copy,
-						title: localInstance.copy,
-					},
-				});
-				copyButton.addClass('clickable-icon');
-				copyButton.style.flexShrink = '0';
-				setIcon(copyButton, 'copy');
-				copyButton.addEventListener('click', () => {
-					void this.copyToolName(tool.name);
-				});
-					item.createEl('div', {
-						text: uiDescription || localInstance.mcp_builtin_tool_no_description,
-						cls: 'setting-item-description',
-					});
-				}
-		}
-
-		new Setting(contentEl).addButton((btn) =>
-			btn
-				.setButtonText(localInstance.close)
-				.setCta()
-				.onClick(() => this.close())
-		);
 	}
 
 	onClose() {

@@ -115,16 +115,6 @@ export async function resolveCurrentMcpTools(
 }
 
 /**
- * 查找 MCP 工具对应的 serverId
- */
-export function findToolServerId(
-	toolName: string,
-	mcpTools: McpToolDefinitionForProvider[],
-): string | undefined {
-	return mcpTools.find((t) => t.name === toolName)?.serverId
-}
-
-/**
  * 执行 MCP 工具调用并返回结果
  */
 export async function executeMcpToolCalls(

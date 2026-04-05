@@ -1,8 +1,6 @@
 import { App, normalizePath, TFile } from 'obsidian';
 import { FormTemplateProcessEngine, type TemplateState } from './engine/FormTemplateProcessEngine';
-import { FileConflictResolution } from 'src/types/enums/FileConflictResolution';
-import { OpenPageInType } from 'src/types/enums/OpenPageInType';
-import type { FileConflictStrategy, OpenFileMode, WriteFileOptions } from './fileOperationTypes';
+import type { WriteFileOptions } from './fileOperationTypes';
 import { validateAndConvertToString, TypeConversionError, FormFieldValidationError } from 'src/utils/typeSafety';
 import { Strings } from 'src/utils/Strings';
 import { localInstance } from 'src/i18n/locals';
@@ -51,82 +49,6 @@ export function isLikelyDestructiveTextReplacement(
     }
 
     return nextLength < previousLength / 2;
-}
-
-/** 将用户提供的冲突策略映射为内部枚举 */
-export function mapConflictStrategy(strategy: FileConflictStrategy): FileConflictResolution {
-    if (strategy === FileConflictResolution.SKIP) return FileConflictResolution.SKIP;
-    if (strategy === FileConflictResolution.AUTO_RENAME || strategy === "rename") {
-        return FileConflictResolution.AUTO_RENAME;
-    }
-    if (strategy === FileConflictResolution.OVERWRITE) {
-        return FileConflictResolution.OVERWRITE;
-    }
-    return FileConflictResolution.OVERWRITE;
-}
-
-/** 判断冲突策略是否与预期一致 */
-export function isConflictStrategy(
-    strategy: FileConflictStrategy,
-    expected: FileConflictStrategy
-): boolean {
-    return String(strategy) === String(expected);
-}
-
-/** 将各种打开模式枚举规范化为统一的 OpenFileMode */
-export function normalizeOpenMode(mode?: OpenFileMode | OpenPageInType): OpenFileMode {
-    if (!mode) return "tab";
-    if (mode === OpenPageInType.tab) return "tab";
-    if (mode === OpenPageInType.window) return "window";
-    if (mode === OpenPageInType.modal) return "modal";
-    if (mode === OpenPageInType.current) return "current";
-    if (mode === OpenPageInType.split) return "split";
-    if (mode === OpenPageInType.none) return "none";
-    if (mode === "new-tab") return "tab";
-    if (mode === "new-window") return "window";
-    return mode;
-}
-
-/** 构建移动目标路径（目标文件夹 + 源文件名） */
-export function buildMoveTargetPath(targetFolder: string, sourceName: string): string {
-    const normalizedFolder = normalizePath(targetFolder);
-    if (!normalizedFolder || normalizedFolder === "/") {
-        return normalizePath(sourceName);
-    }
-    return normalizePath(`${normalizedFolder}/${sourceName}`);
-}
-
-/** 生成不冲突的可用路径（自动追加编号） */
-export function generateAvailablePath(app: App, originalPath: string, treatAsFile: boolean): string {
-    const normalized = normalizePath(originalPath);
-    if (!app.vault.getAbstractFileByPath(normalized)) {
-        return normalized;
-    }
-
-    const segments = normalized.split("/");
-    const name = segments.pop() ?? "";
-    const parent = segments.join("/");
-
-    let baseName = name;
-    let extension = "";
-
-    if (treatAsFile) {
-        const dotIndex = name.lastIndexOf(".");
-        if (dotIndex > 0) {
-            baseName = name.slice(0, dotIndex);
-            extension = name.slice(dotIndex);
-        }
-    }
-
-    let index = 1;
-    let candidate = normalized;
-    while (app.vault.getAbstractFileByPath(candidate)) {
-        const nextName = `${baseName} (${index})${extension}`;
-        candidate = parent ? normalizePath(`${parent}/${nextName}`) : normalizePath(nextName);
-        index += 1;
-    }
-
-    return candidate;
 }
 
 /** 确保文件夹路径存在（逐级创建） */

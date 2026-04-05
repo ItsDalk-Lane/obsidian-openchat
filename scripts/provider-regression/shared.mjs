@@ -37,6 +37,17 @@ const TOOL_LOOP_MOCK = {
 	withClaudeToolCallLoopSupport: (factory) => factory,
 }
 
+const PROVIDER_SHARED_MOCK = {
+	mergeProviderOptionsWithParameters: (settings) => {
+		const merged = {
+			...settings,
+			...(settings?.parameters && typeof settings.parameters === 'object' ? settings.parameters : {}),
+		}
+		delete merged.parameters
+		return merged
+	},
+}
+
 const DEFAULT_MOCKS = {
 	'src/i18n/ai-runtime/helper': I18N_HELPER_MOCK,
 	'tars/lang/helper': I18N_HELPER_MOCK,
@@ -44,7 +55,9 @@ const DEFAULT_MOCKS = {
 	'../../../utils/DebugLogger': DEBUG_LOGGER_MOCK,
 	'../utils/DebugLogger': DEBUG_LOGGER_MOCK,
 	'./DebugLogger': DEBUG_LOGGER_MOCK,
+	'./provider-shared': PROVIDER_SHARED_MOCK,
 	'src/core/agents/loop': TOOL_LOOP_MOCK,
+	'src/core/agents/loop/OpenAILoopHandler': TOOL_LOOP_MOCK,
 }
 
 export const logger = createScriptLogger('provider-regression')

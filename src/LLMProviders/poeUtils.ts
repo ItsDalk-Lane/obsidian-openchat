@@ -38,20 +38,6 @@ export const resolveErrorStatus = (error: unknown): number | undefined => {
 	return Number.isFinite(parsed) ? parsed : undefined
 }
 
-export const shouldFallbackToChatCompletions = (error: unknown): boolean => {
-	const status = resolveErrorStatus(error)
-	const message = (error instanceof Error ? error.message : String(error)).toLowerCase()
-
-	if (status === 404 || status === 405 || status === 422) return true
-
-	if (status === undefined && /connection\s*error/i.test(message)) return true
-
-	return (
-		/(responses?).*(unsupported|not support|not found|invalid)/i.test(message)
-		|| /(unsupported|not support|unknown).*(responses?)/i.test(message)
-	)
-}
-
 export const shouldRetryContinuationWithoutReasoning = (error: unknown): boolean => {
 	const status = resolveErrorStatus(error)
 	const message = (error instanceof Error ? error.message : String(error)).toLowerCase()
@@ -89,11 +75,6 @@ export const shouldRetryWithoutPreviousResponseId = (error: unknown): boolean =>
 	)
 }
 
-export const normalizeErrorText = (prefix: string, error: unknown): Error => {
-	const message = error instanceof Error ? error.message : String(error)
-	return new Error(`${prefix}: ${message}`)
-}
-
 export const normalizePoeBaseURL = (baseURL: string) => {
 	const trimmed = (baseURL || '').trim().replace(/\/+$/, '')
 	if (!trimmed) return DEFAULT_POE_BASE_URL
@@ -106,14 +87,6 @@ export const normalizePoeBaseURL = (baseURL: string) => {
 	return trimmed
 }
 
-export const ensureResponseEndpoint = (baseURL: string) => {
-	return `${normalizePoeBaseURL(baseURL)}/responses`
-}
-
-export const ensureCompletionEndpoint = (baseURL: string) => {
-	return `${normalizePoeBaseURL(baseURL)}/chat/completions`
-}
-
 export const poeMapResponsesParams = (params: Record<string, unknown>) => {
 	const mapped = { ...params }
 	if (typeof mapped.max_tokens === 'number') {
@@ -121,35 +94,6 @@ export const poeMapResponsesParams = (params: Record<string, unknown>) => {
 		delete mapped.max_tokens
 	}
 	delete mapped.previous_response_id
-	return mapped
-}
-
-export const mapResponsesParamsToChatParams = (
-	params: Record<string, unknown>
-): Record<string, unknown> => {
-	const mapped: Record<string, unknown> = { ...params }
-	if (typeof mapped.max_output_tokens === 'number' && typeof mapped.max_tokens !== 'number') {
-		mapped.max_tokens = mapped.max_output_tokens
-	}
-
-	delete mapped.max_output_tokens
-
-	if (mapped.reasoning && typeof mapped.reasoning === 'object') {
-		const effort = (mapped.reasoning as Record<string, unknown>).effort
-		if (typeof effort === 'string' && effort) {
-			mapped.reasoning_effort = effort
-		}
-	}
-	delete mapped.reasoning
-	delete mapped.tools
-	delete mapped.tool_choice
-	delete mapped.parallel_tool_calls
-	delete mapped.previous_response_id
-	delete mapped.input
-	delete mapped.text
-	delete mapped.truncation
-	delete mapped.include
-
 	return mapped
 }
 

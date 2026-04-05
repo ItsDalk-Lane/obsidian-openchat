@@ -1,5 +1,4 @@
 import type {
-	ChatMessage,
 	ChatSession,
 	MessageManagementSettings,
 } from '../types/chat';
@@ -21,57 +20,6 @@ export {
 	getStringMetadata,
 	hasBuildableContextPayload,
 	mergeCompactionState,
-};
-
-const isEphemeralContextMessage = (message: ChatMessage): boolean =>
-	Boolean(message.metadata?.isEphemeralContext);
-
-export const getLatestVisibleUserMessage = (
-	session: ChatSession
-): ChatMessage | null => {
-	for (let index = session.messages.length - 1; index >= 0; index -= 1) {
-		const message = session.messages[index];
-		if (message.role !== 'user') {
-			continue;
-		}
-		if (message.metadata?.hiddenFromModel || isEphemeralContextMessage(message)) {
-			continue;
-		}
-		const content = message.content.trim();
-		if (content) {
-			return message;
-		}
-	}
-	return null;
-};
-
-export const getLatestVisibleUserMessageContent = (session: ChatSession): string =>
-	getLatestVisibleUserMessage(session)?.content.trim() ?? '';
-
-export const getPreviousVisibleUserMessage = (
-	session: ChatSession,
-	excludeMessageId?: string
-): ChatMessage | null => {
-	let skippedCurrent = false;
-	for (let index = session.messages.length - 1; index >= 0; index -= 1) {
-		const message = session.messages[index];
-		if (message.role !== 'user') {
-			continue;
-		}
-		if (message.metadata?.hiddenFromModel || isEphemeralContextMessage(message)) {
-			continue;
-		}
-		const content = message.content.trim();
-		if (!content) {
-			continue;
-		}
-		if (!skippedCurrent && (!excludeMessageId || message.id === excludeMessageId)) {
-			skippedCurrent = true;
-			continue;
-		}
-		return message;
-	}
-	return null;
 };
 
 export const estimateSystemPromptTokens = (systemPrompt?: string): number => {

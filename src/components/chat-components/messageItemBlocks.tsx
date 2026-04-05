@@ -5,7 +5,7 @@ import type { ObsidianApiProvider } from 'src/providers/providers.types';
 import { renderMarkdownContent } from 'src/domains/chat/ui-markdown';
 
 /** 格式化推理耗时（毫秒 → 秒字符串） */
-export const formatDuration = (durationMs: number): string => {
+const formatDuration = (durationMs: number): string => {
 	const centiSeconds = Math.max(1, Math.round(durationMs / 10))
 	return `${(centiSeconds / 100).toFixed(2)}s`
 }

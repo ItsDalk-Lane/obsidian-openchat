@@ -1,7 +1,4 @@
-import type { McpRuntimeManager } from 'src/domains/mcp/types';
-import type { BuiltinToolsRuntime } from 'src/tools/runtime/BuiltinToolsRuntime';
 import type {
-	ResolvedToolRuntime,
 	SubAgentChatServiceAdapter,
 	SubAgentStateCallback,
 } from 'src/tools/sub-agents/types';
@@ -33,10 +30,3 @@ export interface ChatToolRuntimeResolverOptions {
 		request: SkillExecutionRequest,
 	) => Promise<SkillReturnPacket>;
 }
-
-export type BuiltinToolList = Awaited<ReturnType<BuiltinToolsRuntime['listTools']>>;
-export type McpCallTool =
-	| ((serverId: string, name: string, args: Record<string, unknown>) => Promise<string>)
-	| null;
-export type RuntimeResolutionResult = Promise<ResolvedToolRuntime>;
-export type RuntimeManagerLike = McpRuntimeManager | null | undefined;

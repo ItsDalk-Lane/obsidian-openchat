@@ -37,26 +37,6 @@ export const extractResponseFunctionCalls = (response: unknown): PoeFunctionCall
 		)
 }
 
-export const extractMessageText = (content: unknown): string => {
-	if (typeof content === 'string') return content
-	if (!Array.isArray(content)) return ''
-
-	const parts: string[] = []
-	for (const item of content) {
-		if (typeof item === 'string') {
-			parts.push(item)
-			continue
-		}
-		if (item && typeof item === 'object') {
-			const text = (item as Record<string, unknown>).text
-			if (typeof text === 'string') {
-				parts.push(text)
-			}
-		}
-	}
-	return parts.join('')
-}
-
 export const extractOutputTextFromResponse = (response: unknown): string => {
 	const responseLike = (response ?? {}) as PoeResponseLike
 	if (typeof responseLike.output_text === 'string') {

@@ -35,7 +35,7 @@ export const toQueryIndexResponse = (
 	},
 });
 
-export const isExcludedByPatterns = (
+const isExcludedByPatterns = (
 	relativePath: string,
 	patterns: string[]
 ): boolean => {
@@ -129,9 +129,9 @@ export const buildDirectoryTree = (
 	return result;
 };
 
-export const normalizeSearchText = (value: string): string => value.trim().toLowerCase();
+const normalizeSearchText = (value: string): string => value.trim().toLowerCase();
 
-export const matchSearchCandidate = (
+const matchSearchCandidate = (
 	query: string,
 	matchMode: 'contains' | 'exact' | 'prefix' | 'suffix' | 'glob',
 	candidate: string

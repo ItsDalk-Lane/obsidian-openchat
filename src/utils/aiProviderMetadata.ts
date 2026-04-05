@@ -37,15 +37,6 @@ export const extractOpenChatProviderMetadata = (
 	};
 };
 
-export const getOpenChatProviderDisplayName = (
-	tag: string,
-	parameters?: Record<string, unknown>
-): string => {
-	const metadata = extractOpenChatProviderMetadata(parameters);
-	const baseTag = typeof metadata.baseTag === 'string' ? metadata.baseTag.trim() : '';
-	return baseTag || tag;
-};
-
 export const isCustomOpenChatProvider = (
 	parameters?: Record<string, unknown>
 ): boolean => extractOpenChatProviderMetadata(parameters).source === 'custom';

@@ -1,4 +1,3 @@
-import { getCapabilityDisplayText } from 'src/LLMProviders/utils';
 import type { ProviderSettings, Vendor, BaseOptions } from 'src/types/provider';
 import {
 	createProviderGroupId,
@@ -193,9 +192,3 @@ export const buildProvidersFromDraft = (
 	});
 };
 
-export const getGroupCapabilityText = (group: ProviderGroupRecord, vendor: Vendor): string => {
-	if (group.providers.length === 0) {
-		return '';
-	}
-	return getCapabilityDisplayText(vendor, group.providers[0].settings.options);
-};

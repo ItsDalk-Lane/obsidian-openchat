@@ -97,7 +97,3 @@ export const createDelegateSubAgentToolDefinition = (): ToolDefinition => {
 		},
 	};
 };
-
-export const subAgentDefinitionsToTools = (definitions: SubAgentDefinition[]): ToolDefinition[] => {
-	return definitions.map(subAgentToToolDefinition);
-};

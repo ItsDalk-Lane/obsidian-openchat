@@ -65,7 +65,6 @@ const buildQianFanApiError = (status: number, detail: string) => {
 		status === 401 ? 'auth' : status === 403 ? 'permission' : status === 429 ? 'rate_limit' : status >= 500 ? 'server' : 'invalid_request'
 	return error
 }
-export const qianFanBuildApiError = buildQianFanApiError
 
 const LEGACY_QIANFAN_RPC_PATTERN = /\/rpc\/2\.0\/ai_custom\/v1\/wenxinworkshop/i
 const QIANFAN_HOST_PATTERN = /^qianfan(?:\.[a-z0-9-]+)?\.baidubce\.com$/i
@@ -105,7 +104,6 @@ const qianFanNormalizeBaseURL = (baseURL: string | undefined) => {
 	return `${parsed.origin}${pathname}`
 }
 export { qianFanNormalizeBaseURL }
-export const qianFanNormalizeBaseURLForTest = qianFanNormalizeBaseURL
 
 const KNOWN_IMAGE_GENERATION_MODELS = ['qwen-image', 'flux-1-schnell', 'air-image', 'qwen-image-plus']
 

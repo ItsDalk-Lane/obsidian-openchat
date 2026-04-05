@@ -10,5 +10,3 @@ export const en: Local = {
 	...enPart3,
 	...enPart4,
 };
-
-export default en;

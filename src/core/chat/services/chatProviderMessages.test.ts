@@ -360,7 +360,6 @@ test('buildProviderMessagesWithOptions 只向 skills resolver 传入当前请求
 	ensureWindowLocalStorage();
 	installObsidianStub();
 	const { buildProviderMessagesWithOptions } = await import('./chat-provider-messages');
-	let capturedSystemPrompt: string | undefined;
 	let capturedSkillsInput:
 		| { requestTools: { name: string }[]; relevanceQuery?: string; limit?: number }
 		| undefined;

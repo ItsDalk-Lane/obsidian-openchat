@@ -60,6 +60,9 @@ function createScanner(skills: readonly SkillDefinition[]): SkillScannerService 
 		async scan(): Promise<SkillScanResult> {
 			return scanResult;
 		},
+		async scanRuntimeSkills(): Promise<SkillScanResult> {
+			return scanResult;
+		},
 		findByName(name: string): SkillDefinition | undefined {
 			return byName.get(name.trim());
 		},

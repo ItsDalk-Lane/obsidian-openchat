@@ -1,7 +1,20 @@
 import { type TemplateState } from './engine/FormTemplateProcessEngine';
-import type { CreateFileOptions } from 'src/utils/createFileByText';
 import { FileConflictResolution } from 'src/types/enums/FileConflictResolution';
 import { OpenPageInType } from 'src/types/enums/OpenPageInType';
+
+export interface CreateFileOptions {
+    enableAutoTypeConversion?: boolean;
+    strictTypeChecking?: boolean;
+    logTypeConversions?: boolean;
+    onTypeConversionWarning?: (warning: {
+        fieldName?: string;
+        originalType: string;
+        originalValue: unknown;
+        convertedValue: string;
+        location: string;
+        timestamp: string;
+    }) => void;
+}
 
 export type FileConflictStrategy =
     | "error"

@@ -10,5 +10,3 @@ export const zh: Local = {
 	...zhPart3,
 	...zhPart4,
 };
-
-export default zh;

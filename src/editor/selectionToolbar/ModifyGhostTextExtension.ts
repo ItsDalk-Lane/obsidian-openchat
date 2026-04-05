@@ -55,10 +55,6 @@ export const modifyGhostStateField = StateField.define<ModifyGhostState>({
 	}
 });
 
-export function getModifyGhostState(state: EditorView['state']): ModifyGhostState {
-	return state.field(modifyGhostStateField, false) ?? defaultModifyGhostState;
-}
-
 class ModifyGhostTextWidget extends WidgetType {
 	constructor(readonly text: string) {
 		super();
