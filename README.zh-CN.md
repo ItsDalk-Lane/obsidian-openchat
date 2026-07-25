@@ -91,6 +91,29 @@ npm run lint
 
 开发时不要运行 `next build` / `npm run build`，它会写入 `.next/`，容易影响正在运行的 dev server。发布流程再执行构建。
 
+## 桌面应用（Electron）
+
+本仓库也可以作为桌面应用运行：同一个 Next.js 服务被包进 Electron 窗口。
+
+```bash
+npm install
+npm run electron:dev    # 先构建一次，再启动桌面应用
+npm run electron:start  # 不重新构建，直接再次启动
+```
+
+各平台都提供了双击启动器：
+
+- **Windows**：`Pi-Web-Desktop.vbs`（或 `electron\start-windows.bat` / `electron\start-desktop.vbs`）
+- **macOS**：`Pi-Web-Desktop.command`（或 `electron/start-macos.command`）。首次打开需右键 →「打开」并确认，以绕过 Gatekeeper。如果文件没有可执行权限（例如不是通过 git 拷贝的），先执行一次 `chmod +x Pi-Web-Desktop.command`。
+
+构建当前平台的安装包：
+
+```bash
+npm run electron:build  # Windows 产出 NSIS 安装包,macOS 在 dist-electron/ 产出未签名的 .dmg
+```
+
+macOS 的 `.dmg` 未签名（不需要 Apple 开发者账号）。首次启动时在「系统设置 → 隐私与安全性」中允许即可。
+
 ## 项目结构
 
 ```

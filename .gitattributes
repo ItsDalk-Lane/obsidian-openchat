@@ -1,0 +1,7 @@
+# Shell scripts must keep LF line endings even when checked out on Windows
+*.command text eol=lf
+*.sh text eol=lf
+
+# Windows scripts require CRLF (batch labels/goto break with LF)
+*.bat text eol=crlf
+*.vbs text eol=crlf

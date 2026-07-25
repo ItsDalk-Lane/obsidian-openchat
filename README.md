@@ -95,6 +95,29 @@ npm run lint
 
 Avoid running `next build` / `npm run build` during local development. It writes to `.next/` and can interfere with the dev server; leave builds for release work.
 
+## Desktop App (Electron)
+
+The repo can also run as a desktop app that bundles the same Next.js server in an Electron window.
+
+```bash
+npm install
+npm run electron:dev    # build once, then launch the desktop app
+npm run electron:start  # relaunch without rebuilding
+```
+
+Double-click launchers are provided per platform:
+
+- **Windows**: `Pi-Web-Desktop.vbs` (or `electron\start-windows.bat` / `electron\start-desktop.vbs`)
+- **macOS**: `Pi-Web-Desktop.command` (or `electron/start-macos.command`). The first time, right-click → **Open** and confirm to bypass Gatekeeper. If the file is not executable (e.g. copied without git), run `chmod +x Pi-Web-Desktop.command` once.
+
+To build an installer for the current platform:
+
+```bash
+npm run electron:build  # Windows: NSIS installer, macOS: unsigned .dmg in dist-electron/
+```
+
+The macOS `.dmg` is unsigned (no Apple Developer account required). On first launch, allow it under **System Settings → Privacy & Security**.
+
 ## Project Structure
 
 ```text

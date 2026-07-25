@@ -47,8 +47,8 @@ function Toggle({
       disabled={loading}
       title={
         enabled
-          ? "Visible in model prompt — click to disable"
-          : "Hidden from model prompt — click to enable"
+          ? "在模型提示中可见 — 点击禁用"
+          : "对模型提示隐藏 — 点击启用"
       }
       style={{
         flexShrink: 0,
@@ -167,7 +167,7 @@ function SkillDetail({
           <span
             style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}
           >
-            Source
+            来源
           </span>
           <a
             href={skill.install.skillsShUrl}
@@ -204,7 +204,7 @@ function SkillDetail({
           <span
             style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}
           >
-            Version
+            版本
           </span>
           <div
             style={{
@@ -238,7 +238,7 @@ function SkillDetail({
                   fontSize: 11,
                 }}
               >
-                Check
+                检查
               </button>
             )}
             {updateStatus?.state === "update-available" && (
@@ -267,12 +267,12 @@ function SkillDetail({
                 }}
               >
                 {checkingUpdate
-                  ? "Checking..."
+                  ? "检查中..."
                   : updateStatus?.state === "up-to-date"
-                    ? "Up to date"
+                    ? "已是最新版本"
                     : updateStatus?.state === "unsupported"
-                        ? "Automatic checks unavailable"
-                        : updateStatus?.message || "Check failed"}
+                        ? "不支持自动检查"
+                        : updateStatus?.message || "检查失败"}
               </span>
             )}
             {updateStatus?.state === "update-available" && (
@@ -291,7 +291,7 @@ function SkillDetail({
                   fontWeight: 600,
                 }}
               >
-                {updating ? "Updating..." : "Update"}
+                {updating ? "更新中..." : "更新"}
               </button>
             )}
           </div>
@@ -305,7 +305,7 @@ function SkillDetail({
         <span
           style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}
         >
-          Name
+          名称
         </span>
         <span
           style={{
@@ -322,7 +322,7 @@ function SkillDetail({
         <span
           style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}
         >
-          Description
+          描述
         </span>
         <span
           style={{ fontSize: 14, color: "var(--text-muted)", lineHeight: 1.6 }}
@@ -379,7 +379,7 @@ function AddSkillPanel({
         return;
       }
       setResults(d.results ?? []);
-      if ((d.results ?? []).length === 0) setSearchError("No skills found");
+      if ((d.results ?? []).length === 0) setSearchError("未找到技能");
     } catch (e) {
       setSearchError(String(e));
     } finally {
@@ -432,7 +432,7 @@ function AddSkillPanel({
         }}
       >
         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
-          Add Skill
+          添加技能
         </div>
 
         {/* Search row */}
@@ -444,7 +444,7 @@ function AddSkillPanel({
             onKeyDown={(e) => {
               if (e.key === "Enter") search(query);
             }}
-            placeholder="e.g. react, testing, deploy"
+            placeholder="例如 react、testing、deploy"
             style={{
               flex: 1,
               padding: "7px 10px",
@@ -471,7 +471,7 @@ function AddSkillPanel({
               flexShrink: 0,
             }}
           >
-            {searching ? "Searching…" : "Search"}
+            {searching ? "搜索中…" : "搜索"}
           </button>
         </div>
 
@@ -637,10 +637,10 @@ function AddSkillPanel({
                   }}
                 >
                   {isInstalled
-                    ? "✓ Installed"
+                    ? "✓ 已安装"
                     : isInstalling
-                      ? "Installing…"
-                      : "Install"}
+                      ? "安装中…"
+                      : "安装"}
                 </button>
               </div>
             );
@@ -652,7 +652,7 @@ function AddSkillPanel({
           <div
             style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.8 }}
           >
-            Search{" "}
+            搜索{" "}
             <a
               href="https://skills.sh"
               target="_blank"
@@ -661,7 +661,7 @@ function AddSkillPanel({
             >
               skills.sh
             </a>{" "}
-            to discover and install skills for your agent.
+            以发现并为您的 Agent 安装技能。
           </div>
         )
       )}
@@ -886,7 +886,7 @@ export function SkillsConfig({
             <span
               style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}
             >
-              Skills
+              技能
             </span>
             <code
               style={{
@@ -942,7 +942,7 @@ export function SkillsConfig({
                     color: "var(--text-muted)",
                   }}
                 >
-                  Loading…
+                  加载中…
                 </div>
               ) : error ? (
                 <div
@@ -962,7 +962,7 @@ export function SkillsConfig({
                     color: "var(--text-dim)",
                   }}
                 >
-                  No skills found
+                  未找到技能
                 </div>
               ) : (
                 (() => {
@@ -1087,7 +1087,7 @@ export function SkillsConfig({
                                 if (status?.state !== "update-available") return null;
                                 return (
                                   <span
-                                    title="Update available"
+                                    title="有可用更新"
                                     style={{
                                       color: "#d97706",
                                       fontSize: 13,
@@ -1150,7 +1150,7 @@ export function SkillsConfig({
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                Add skill
+                添加技能
               </div>
             </div>
           </div>
@@ -1210,7 +1210,7 @@ export function SkillsConfig({
                   fontSize: 13,
                 }}
               >
-                Select a skill
+                选择一个技能
               </div>
             )}
           </div>
@@ -1246,7 +1246,7 @@ export function SkillsConfig({
                   fontSize: 12,
                 }}
               >
-                {checkingAll ? "Checking..." : "Check updates"}
+                {checkingAll ? "检查中..." : "检查更新"}
               </button>
             )}
             {Object.values(updateStatuses).filter(
@@ -1258,11 +1258,7 @@ export function SkillsConfig({
                     (status) => status.state === "update-available",
                   ).length
                 }{" "}
-                {Object.values(updateStatuses).filter(
-                  (status) => status.state === "update-available",
-                ).length === 1
-                  ? "update"
-                  : "updates"}
+                个更新
               </span>
             )}
           </div>
@@ -1278,7 +1274,7 @@ export function SkillsConfig({
               fontSize: 13,
             }}
           >
-            Close
+            关闭
           </button>
         </div>
       </div>

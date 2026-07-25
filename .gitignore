@@ -40,3 +40,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .factory
+# electron
+/dist-electron/
+/logs/
+# build/ holds electron-builder resources (icon, generator), keep them tracked
+!/build/
+/build/*
+!/build/icon.png
+!/build/generate-icon.js
+
+# zcode session data
+/.zcode/

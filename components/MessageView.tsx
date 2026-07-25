@@ -239,7 +239,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
           }}>
             <button
               onClick={copyContent}
-              title="Copy message"
+              title="复制消息"
               style={{
                 display: "flex", alignItems: "center", gap: 4,
                 padding: "3px 8px", height: 22,
@@ -264,7 +264,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                 </svg>
               )}
-              {copied ? "Copied" : "Copy"}
+              {copied ? "已复制" : "复制"}
             </button>
           </div>
           {(canFork || canNavigate) && (
@@ -277,7 +277,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               {canNavigate && (
                 <button
                   onClick={() => { onNavigate!(prevAssistantEntryId!); onEditContent?.(content); }}
-                  title="Edit from here — branches within this session"
+                  title="从此处编辑 — 在此会话内分叉"
                   style={{
                     display: "flex", alignItems: "center", gap: 4,
                     padding: "3px 8px", height: 22,
@@ -296,14 +296,14 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                     <polyline points="15 10 20 15 15 20" />
                     <path d="M4 4v7a4 4 0 0 0 4 4h12" />
                   </svg>
-                  Edit from here
+                  从此处编辑
                 </button>
               )}
               {canFork && (
                 <button
                   onClick={() => { onFork!(entryId!); }}
                   disabled={forking}
-                  title={forking ? "Creating new session…" : "New session — creates an independent copy from here"}
+                  title={forking ? "正在创建新会话…" : "新建会话 — 从此处创建独立副本"}
                   style={{
                     display: "flex", alignItems: "center", gap: 4,
                     padding: "3px 8px", height: 22,
@@ -324,7 +324,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                     <circle cx="6" cy="18" r="3" />
                     <path d="M18 9a9 9 0 0 1-9 9" />
                   </svg>
-                  {forking ? "Creating…" : "New session"}
+                  {forking ? "创建中…" : "新建会话"}
                 </button>
               )}
             </div>
@@ -501,7 +501,7 @@ function AssistantMessageView({
             <>
 
               {est > 0 && (
-                <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)" }} title="Estimated token count while streaming">
+                <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)" }} title="流式传输时的估算 Token 数">
                   <span style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 11, fontWeight: 400 }}>
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="5" y1="1.5" x2="5" y2="8.5" /><polyline points="2 6 5 8.5 8 6" />
@@ -615,7 +615,7 @@ function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex }: {
     setExpanded(nextExpanded);
     if (!nextExpanded || !block.deferred || content !== null) return;
     if (!sessionId || !entryId) {
-      setError("Thinking content unavailable");
+      setError("思考内容不可用");
       return;
     }
 
@@ -655,7 +655,7 @@ function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex }: {
           textAlign: "left",
         }}
       >
-        <span>Thinking</span>
+        <span>思考中</span>
         {duration !== undefined && (
           <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>{duration}s</span>
         )}
@@ -672,7 +672,7 @@ function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex }: {
             borderTop: "1px solid var(--border)",
           }}
         >
-          {loading ? "Loading thinking..." : error ?? (block.deferred ? content : block.thinking)}
+          {loading ? "加载思考中..." : error ?? (block.deferred ? content : block.thinking)}
         </div>
       )}
     </div>
@@ -822,8 +822,8 @@ function SplitPatchView({ text }: { text: string }) {
                 borderBottom: "1px solid var(--border)",
               }}
             >
-              <SplitDiffHeader title={file.oldPath || "Before"} side="left" />
-              <SplitDiffHeader title={file.newPath || "After"} side="right" />
+              <SplitDiffHeader title={file.oldPath || "修改前"} side="left" />
+              <SplitDiffHeader title={file.newPath || "修改后"} side="right" />
             </div>
           )}
 
@@ -1046,7 +1046,7 @@ function PairedResult({ text, isEmpty, isError }: {
           opacity: isEmpty ? 0.6 : 1,
         }}
       >
-        {isEmpty ? "(no output)" : text}
+        {isEmpty ? "（无输出）" : text}
       </pre>
     </div>
   );
@@ -1079,22 +1079,22 @@ function CompactionMessageView({ message }: { message: CustomMessage }) {
           }}
         >
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 650 }}>
-            compaction
+            压缩
           </span>
           {time && <span style={{ marginLeft: "auto", color: "var(--text-dim)", fontSize: 10 }}>{time}</span>}
         </div>
 
         <div style={{ padding: "11px 13px 12px" }}>
           <div style={{ color: "var(--text)", fontSize: 15, fontWeight: 700, lineHeight: 1.35 }}>
-            Conversation compacted
+            对话已压缩
           </div>
           <div style={{ marginTop: 3, marginBottom: 10, color: "var(--text)", fontSize: 14, lineHeight: 1.5 }}>
-            The conversation history before this point was compacted into the following summary:
+            此点之前的对话历史已压缩为以下摘要：
           </div>
           {parsedSummary.body ? (
             <MarkdownBody className="markdown-compaction-message">{parsedSummary.body}</MarkdownBody>
           ) : (
-            <span style={{ color: "var(--text-dim)", fontSize: 12 }}>(no summary)</span>
+            <span style={{ color: "var(--text-dim)", fontSize: 12 }}>（无摘要）</span>
           )}
           <CompactionFileMetadata readFiles={parsedSummary.readFiles} modifiedFiles={parsedSummary.modifiedFiles} />
         </div>
@@ -1108,14 +1108,14 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
   if (total === 0) return null;
 
   const parts = [];
-  if (readFiles.length > 0) parts.push(`${readFiles.length} read`);
-  if (modifiedFiles.length > 0) parts.push(`${modifiedFiles.length} modified`);
+  if (readFiles.length > 0) parts.push(`${readFiles.length} 个已读`);
+  if (modifiedFiles.length > 0) parts.push(`${modifiedFiles.length} 个已修改`);
 
   return (
     <details className="compaction-file-details">
-      <summary>File context: {parts.join(", ")}</summary>
-      {modifiedFiles.length > 0 && <CompactionFileList title="Modified files" files={modifiedFiles} />}
-      {readFiles.length > 0 && <CompactionFileList title="Read files" files={readFiles} />}
+      <summary>文件上下文: {parts.join(", ")}</summary>
+      {modifiedFiles.length > 0 && <CompactionFileList title="已修改文件" files={modifiedFiles} />}
+      {readFiles.length > 0 && <CompactionFileList title="已读文件" files={readFiles} />}
     </details>
   );
 }
@@ -1178,7 +1178,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
           <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 650 }}>
             {title}
           </span>
-          {isHiddenDisplay && <span style={{ color: "var(--text-dim)", fontSize: 11 }}>hidden extension message</span>}
+          {isHiddenDisplay && <span style={{ color: "var(--text-dim)", fontSize: 11 }}>隐藏的扩展消息</span>}
           {time && <span style={{ marginLeft: "auto", color: "var(--text-dim)", fontSize: 10 }}>{time}</span>}
         </div>
 
@@ -1201,7 +1201,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
                 })}
               </div>
             )}
-            {text ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody> : <span style={{ color: "var(--text-dim)", fontSize: 12 }}>(no message)</span>}
+            {text ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody> : <span style={{ color: "var(--text-dim)", fontSize: 12 }}>（无消息）</span>}
           </div>
         ) : (
           <button
@@ -1218,7 +1218,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
               textAlign: "left",
             }}
           >
-            {text ? previewText(text) : "Show extension message"}
+            {text ? previewText(text) : "显示扩展消息"}
           </button>
         )}
 
@@ -1244,7 +1244,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
                 fontSize: 11,
               }}
             >
-              {copied ? "Copied" : "Copy"}
+              {copied ? "已复制" : "复制"}
             </button>
           ) : null}
           {(hasDetails || isHiddenDisplay) && (
@@ -1264,8 +1264,8 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
               }}
             >
               {isHiddenDisplay
-                ? (contentExpanded ? "Collapse" : "Expand")
-                : (detailsExpanded ? "Hide details" : "Show details")}
+                ? (contentExpanded ? "收起" : "展开")
+                : (detailsExpanded ? "隐藏详情" : "显示详情")}
             </button>
           )}
         </div>
@@ -1327,12 +1327,12 @@ function safeJson(value: unknown): string {
 }
 
 function formatCustomType(type: string): string {
-  return type || "extension";
+  return type || "扩展";
 }
 
 function previewText(text: string): string {
   const normalized = text.replace(/\s+/g, " ").trim();
-  if (!normalized) return "Show extension message";
+  if (!normalized) return "显示扩展消息";
   return normalized.length > 140 ? `${normalized.slice(0, 140)}...` : normalized;
 }
 
@@ -1362,9 +1362,9 @@ function formatUsage(usage: {
   cost: { total: number };
 }): string {
   const parts = [];
-  if (usage.input) parts.push(`${usage.input.toLocaleString()} in`);
-  if (usage.output) parts.push(`${usage.output.toLocaleString()} out`);
-  if (usage.cacheRead) parts.push(`${usage.cacheRead.toLocaleString()} cache`);
+  if (usage.input) parts.push(`${usage.input.toLocaleString()} 输入`);
+  if (usage.output) parts.push(`${usage.output.toLocaleString()} 输出`);
+  if (usage.cacheRead) parts.push(`${usage.cacheRead.toLocaleString()} 缓存`);
   if (usage.cost?.total) parts.push(`$${usage.cost.total.toFixed(4)}`);
   return parts.join(" · ");
 }
@@ -1392,7 +1392,7 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
       if (d.success) {
         setFullOutput(d.data?.output ?? "");
       } else {
-        setFullError(d.error ?? "failed");
+        setFullError(d.error ?? "失败");
       }
     } catch (e) {
       setFullError(String(e));
@@ -1433,14 +1433,14 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
               disabled={loadingFull}
               style={{ background: "none", border: "none", color: "var(--accent)", cursor: loadingFull ? "default" : "pointer", fontSize: 11, padding: 0, textDecoration: "underline" }}
             >
-              {loadingFull ? "loading…" : "view full output"}
+              {loadingFull ? "加载中…" : "查看完整输出"}
             </button>
           )}
           <a
             href={`${fullOutputUrl}&download=1`}
             style={{ marginLeft: showFullButton ? 10 : 0, color: "var(--accent)", fontSize: 11, textDecoration: "underline" }}
           >
-            download full output
+            下载完整输出
           </a>
           {fullError && <span style={{ marginLeft: 6, color: "var(--text-dim)", fontSize: 11 }}>({fullError})</span>}
         </div>

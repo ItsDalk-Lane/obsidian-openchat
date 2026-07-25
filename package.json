@@ -24,12 +24,55 @@
     "next.config.ts",
     "package.json"
   ],
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev -p 30141",
     "build": "next build --webpack",
     "start": "next start -p 30141",
     "lint": "eslint .",
-    "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public"
+    "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public",
+    "electron:build": "npm run build && electron-builder",
+    "electron:dev": "npm run build && node electron/launcher.js",
+    "electron:start": "node electron/launcher.js"
+  },
+  "build": {
+    "appId": "com.agegr.pi-web-desktop",
+    "productName": "Pi Web Desktop",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "!.next/cache/**",
+      "!.next/dev/**",
+      "public/**/*",
+      "next.config.ts",
+      "package.json",
+      "node_modules/**/*",
+      "!node_modules/**/.cache/**",
+      "!node_modules/**/test/**",
+      "!node_modules/**/tests/**",
+      "!node_modules/**/.github/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png",
+      "category": "public.app-category.developer-tools",
+      "identity": null
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.81.1",
@@ -48,6 +91,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "jiti": "^2.7.0",
