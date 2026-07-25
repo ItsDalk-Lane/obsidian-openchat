@@ -796,19 +796,7 @@ export function McpConfig({
                   </div>
                 );
               })()
-            ) : (
-              <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.7 }}>
-                <p style={{ marginTop: 0 }}>
-                  Pi Web 已内置 pi-mcp-adapter — 每个会话自动带一个轻量的 <code>mcp</code> 代理工具，
-                  模型可按需搜索并调用已配置 MCP 服务器的工具，不会占用大量上下文。
-                </p>
-                <p>点击左下角「添加服务器」配置第一个 MCP 服务器，或直接编辑：</p>
-                <ul style={{ paddingLeft: 18, fontFamily: "var(--font-mono)", fontSize: 11 }}>
-                  <li>项目：<code>.mcp.json</code></li>
-                  <li>全局：<code>~/.config/mcp/mcp.json</code></li>
-                </ul>
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
