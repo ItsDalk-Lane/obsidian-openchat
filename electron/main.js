@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell } = require("electron");
+const { app, BrowserWindow, Menu, shell, dialog, ipcMain, nativeTheme } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
@@ -206,6 +206,22 @@ function buildAppMenu() {
 
 // ─── Window management ──────────────────────────────────────
 
+// Renderer reports the in-app theme so the native title bar matches it.
+ipcMain.on("pi-web:set-theme", (_event, theme) => {
+  if (theme === "dark" || theme === "light") {
+    nativeTheme.themeSource = theme;
+  }
+});
+
+// Native directory picker for the sidebar's custom working directory flow.
+ipcMain.handle("pi-web:select-directory", async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openDirectory", "createDirectory"],
+  });
+  return result.canceled ? null : (result.filePaths[0] ?? null);
+});
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -219,6 +235,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: path.join(__dirname, "preload.js"),
     },
     show: false,
   });

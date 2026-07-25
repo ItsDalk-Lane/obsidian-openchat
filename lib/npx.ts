@@ -34,6 +34,12 @@ function findNpxCli(): string | null {
   return null;
 }
 
+/** Same lookup as findNpxCli, but for `npm-cli.js` (sits next to npx-cli.js). */
+function findNpmCli(): string | null {
+  const npxCli = findNpxCli();
+  return npxCli ? join(dirname(npxCli), "npm-cli.js") : null;
+}
+
 export interface RunNpxOptions {
   timeout?: number;
   cwd?: string;
@@ -54,6 +60,22 @@ export async function runNpx(args: string[], opts: RunNpxOptions = {}): Promise<
   const { command, commandArgs } = npxCli
     ? { command: execPath, commandArgs: [npxCli, ...args] }
     : { command: "npx", commandArgs: args };
+  return execFileAsync(command, commandArgs, {
+    timeout: opts.timeout,
+    cwd: opts.cwd,
+    env: opts.env,
+  });
+}
+
+/**
+ * Cross-platform wrapper for invoking `npm <args>` without a shell, mirroring
+ * runNpx. Rejects with an error carrying `stdout`/`stderr` on non-zero exit.
+ */
+export async function runNpm(args: string[], opts: RunNpxOptions = {}): Promise<RunNpxResult> {
+  const npmCli = findNpmCli();
+  const { command, commandArgs } = npmCli
+    ? { command: execPath, commandArgs: [npmCli, ...args] }
+    : { command: "npm", commandArgs: args };
   return execFileAsync(command, commandArgs, {
     timeout: opts.timeout,
     cwd: opts.cwd,

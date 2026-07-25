@@ -1,8 +1,9 @@
-import { createAgentSessionFromServices, createAgentSessionServices, getAgentDir, initTheme, SessionManager, Theme } from "@earendil-works/pi-coding-agent";
+import { createAgentSessionFromServices, createAgentSessionServices, createEventBus, getAgentDir, initTheme, SessionManager, SettingsManager, Theme } from "@earendil-works/pi-coding-agent";
 import { KeybindingsManager as TuiKeybindingsManager, TUI_KEYBINDINGS } from "@earendil-works/pi-tui";
 import { randomUUID } from "crypto";
 import { existsSync, writeFileSync } from "fs";
 import { invalidateModelsCache } from "./models-cache";
+import { isMcpAdapterInstalledAsPackage, MCP_STATUS_EVENT, resolveBundledMcpAdapterDir, type McpStatusSnapshot } from "./mcp-extension";
 import { cacheSessionPath, invalidateSessionListCache } from "./session-reader";
 import type { SlashCommandInfo } from "@earendil-works/pi-coding-agent";
 import type { AgentSessionLike, ExtensionUiContextLike, ToolInfo } from "./pi-types";
@@ -117,6 +118,7 @@ export class AgentSessionWrapper {
   private extensionBindingPromise: Promise<void> | null = null;
   private extensionBindingError: unknown = null;
   private forceEmptySystemPrompt = false;
+  private mcpStatus: McpStatusSnapshot | null = null;
   private unsubscribe: (() => void) | null = null;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private onDestroyCallback: (() => void) | null = null;
@@ -158,6 +160,16 @@ export class AgentSessionWrapper {
   setForceEmptySystemPrompt(force: boolean): void {
     this.forceEmptySystemPrompt = force;
     this.applyForcedEmptySystemPrompt();
+  }
+
+  /** Latest MCP status snapshot published by the bundled pi-mcp-adapter. */
+  getMcpStatus(): McpStatusSnapshot | null {
+    return this.mcpStatus;
+  }
+
+  setMcpStatus(snapshot: McpStatusSnapshot | null): void {
+    this.mcpStatus = snapshot;
+    this.emit({ type: "mcp_status", snapshot });
   }
 
   beginExtensionBinding(options: ExtensionBindingOptions = {}): void {
@@ -367,6 +379,7 @@ export class AgentSessionWrapper {
           thinkingLevel: this.inner.agent.state?.thinkingLevel ?? "off",
           extensionStatuses: this.getExtensionStatuses(),
           extensionWidgets: this.getExtensionWidgets(),
+          mcpStatus: this.mcpStatus,
         };
       }
 
@@ -1050,6 +1063,26 @@ export async function startRpcSession(
       ? SessionManager.open(sessionFile, undefined)
       : SessionManager.create(cwd, undefined);
 
+    // Bundled MCP support: inject pi-mcp-adapter unless the user already
+    // installed it as a pi package (avoid loading the extension twice).
+    // A dedicated event bus lets pi-web observe the adapter's status snapshots.
+    let mcpAdapterDir: string | null = null;
+    try {
+      const settingsProbe = SettingsManager.create(cwd, agentDir);
+      mcpAdapterDir = isMcpAdapterInstalledAsPackage(settingsProbe) ? null : resolveBundledMcpAdapterDir();
+    } catch (err) {
+      console.warn("[pi-web] failed to check installed packages for pi-mcp-adapter:", err instanceof Error ? err.message : err);
+      mcpAdapterDir = resolveBundledMcpAdapterDir();
+    }
+    const mcpEventBus = createEventBus();
+    let mcpStatusTarget: AgentSessionWrapper | null = null;
+    let pendingMcpStatus: McpStatusSnapshot | null = null;
+    const unsubMcpStatus = mcpEventBus.on(MCP_STATUS_EVENT, (data) => {
+      const snapshot = data as McpStatusSnapshot;
+      if (mcpStatusTarget) mcpStatusTarget.setMcpStatus(snapshot);
+      else pendingMcpStatus = snapshot;
+    });
+
     // Determine which tools to pass based on requested toolNames.
     // Since v0.68.0, session creation expects string[] tool names instead of Tool[] instances.
     let toolsOption: string[] | undefined;
@@ -1066,7 +1099,14 @@ export async function startRpcSession(
 
     // Build services first so extension-registered providers are available
     // before the SDK restores the saved model from the session file.
-    const services = await createAgentSessionServices({ cwd, agentDir });
+    const services = await createAgentSessionServices({
+      cwd,
+      agentDir,
+      resourceLoaderOptions: {
+        eventBus: mcpEventBus,
+        ...(mcpAdapterDir ? { additionalExtensionPaths: [mcpAdapterDir] } : {}),
+      },
+    });
     const { session: inner } = await createAgentSessionFromServices({
       services,
       sessionManager,
@@ -1093,9 +1133,15 @@ export async function startRpcSession(
     const realSessionFile = inner.sessionFile as string | undefined;
     if (realSessionFile) cacheSessionPath(realSessionId, realSessionFile);
 
-    wrapper.onDestroy(() => registry.delete(realSessionId));
+    wrapper.onDestroy(() => {
+      unsubMcpStatus();
+      registry.delete(realSessionId);
+    });
     registry.set(realSessionId, wrapper);
     wrapper.beginExtensionBinding({ forceEmptySystemPrompt: toolNames?.length === 0 });
+
+    mcpStatusTarget = wrapper;
+    if (pendingMcpStatus) wrapper.setMcpStatus(pendingMcpStatus);
 
     return { session: wrapper, realSessionId };
   })().finally(() => locks.delete(sessionId));

@@ -41,6 +41,8 @@ export function useTheme() {
       } catch {
         // ignore storage errors (private mode, quota, etc.)
       }
+      // Sync the native title bar when running inside the Electron app
+      window.piDesktop?.setTheme?.(next);
       listeners.forEach((cb) => cb());
     };
 

@@ -4,14 +4,6 @@ import { useEffect, useLayoutEffect, useState, useCallback, useRef, type CSSProp
 import type { SessionInfo } from "@/lib/types";
 import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
 
-declare global {
-  interface Window {
-    piDesktop?: {
-      selectDirectory: () => Promise<string | null>;
-    };
-  }
-}
-
 interface Props {
   selectedSessionId: string | null;
   onSelectSession: (session: SessionInfo, isRestore?: boolean) => void;
@@ -586,7 +578,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
 
   const handleCustomPathClick = useCallback(async () => {
     const desktop = window.piDesktop;
-    if (!desktop) {
+    if (!desktop?.selectDirectory) {
       setCustomPathOpen(true);
       setCustomPathError(null);
       setTimeout(() => customPathInputRef.current?.focus(), 0);

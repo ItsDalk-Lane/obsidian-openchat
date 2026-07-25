@@ -18,10 +18,53 @@ import type {
   PluginScope,
   PluginsResponse,
 } from "@/lib/api-types";
+import { runNpm } from "@/lib/npx";
 
 export const dynamic = "force-dynamic";
 
 type PluginAction = "install" | "remove" | "update" | "disable" | "enable";
+
+/**
+ * Example placeholders shown in the plugin UI. They can never resolve, so
+ * reject them up front with a clear message instead of an opaque npm failure.
+ */
+const PLACEHOLDER_PATTERNS = [
+  /(^|:)@scope\//, // npm:@scope/pi-plugin
+  /github\.com\/user\/repo/i, // git:https://github.com/user/repo
+  /^\/absolute\/path\//, // /absolute/path/to/plugin
+];
+
+function placeholderSourceError(source: string): string | null {
+  if (PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(source))) {
+    return `"${source}" 是界面示例中的占位符，请替换为真实的插件来源（真实 npm 包名、git 仓库地址或本地路径）。`;
+  }
+  return null;
+}
+
+/** Pull the actionable lines (E404, ETARGET, network errors) out of raw npm output. */
+function summarizeNpmError(stderr: string, stdout: string): string {
+  const lines = `${stderr}\n${stdout}`
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("npm error"));
+  return [...new Set(lines)].slice(0, 5).join("\n");
+}
+
+/**
+ * Cheap existence check before handing an npm: source to the SDK. The SDK
+ * runs `npm install` with inherited stdio, so its error message loses the
+ * actual reason — run `npm view` ourselves and surface stderr instead.
+ */
+async function npmPreflightError(spec: string): Promise<string | null> {
+  try {
+    await runNpm(["view", spec, "version"], { timeout: 30_000 });
+    return null;
+  } catch (error) {
+    const err = error as { stderr?: string; stdout?: string; message?: string };
+    const detail = summarizeNpmError(err.stderr ?? "", err.stdout ?? "") || err.message || String(error);
+    return `npm 仓库中找不到或无法解析 "${spec}":\n${detail}`;
+  }
+}
 
 function emptyCounts(): PluginResourceCounts {
   return { extensions: 0, skills: 0, prompts: 0, themes: 0 };
@@ -301,6 +344,12 @@ export async function POST(req: Request) {
 
     if (body.action === "install") {
       if (!source) return NextResponse.json({ error: "source required" }, { status: 400 });
+      const placeholderError = placeholderSourceError(source);
+      if (placeholderError) return NextResponse.json({ error: placeholderError }, { status: 400 });
+      if (source.startsWith("npm:")) {
+        const preflightError = await npmPreflightError(source.slice(4));
+        if (preflightError) return NextResponse.json({ error: preflightError }, { status: 400 });
+      }
       await packageManager.installAndPersist(source, { local });
     } else if (body.action === "remove") {
       if (!source) return NextResponse.json({ error: "source required" }, { status: 400 });

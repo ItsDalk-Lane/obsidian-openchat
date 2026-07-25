@@ -8,6 +8,22 @@ import type { PluginPackageInfo, PluginsResponse } from "@/lib/api-types";
 type PluginScope = PluginPackageInfo["scope"];
 type PluginAction = "install" | "remove" | "update" | "disable" | "enable";
 
+/** Placeholder patterns from the example list — installing these always fails. */
+const PLACEHOLDER_PATTERNS = [
+  /(^|:)@scope\//, // npm:@scope/pi-plugin
+  /github\.com\/user\/repo/i, // git:https://github.com/user/repo
+  /^\/absolute\/path\//, // /absolute/path/to/plugin
+];
+
+function placeholderWarning(source: string): string | null {
+  const trimmed = source.trim();
+  if (!trimmed) return null;
+  if (PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(trimmed))) {
+    return "这是示例占位符，请替换为真实的包名、git 地址或本地路径";
+  }
+  return null;
+}
+
 function shortenPath(path: string): string {
   return path.replace(/^\/(?:Users|home)\/[^/]+/, "~");
 }
@@ -290,6 +306,7 @@ function AddPluginPanel({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const examples = ["npm:@scope/pi-plugin", "git:https://github.com/user/repo", "/absolute/path/to/plugin"];
+  const warning = placeholderWarning(source);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -329,9 +346,14 @@ function AddPluginPanel({
             outline: "none",
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && source.trim() && !busy) onInstall();
+            if (e.key === "Enter" && source.trim() && !busy && !warning) onInstall();
           }}
         />
+        {warning && (
+          <div style={{ fontSize: 12, color: "#d97706" }}>
+            {warning}
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -339,9 +361,9 @@ function AddPluginPanel({
         <button
           type="button"
           onClick={onInstall}
-          disabled={busy || !source.trim()}
+          disabled={busy || !source.trim() || !!warning}
           style={{
-            ...buttonStyle(busy || !source.trim()),
+            ...buttonStyle(busy || !source.trim() || !!warning),
             background: "var(--accent)",
             color: "white",
             borderColor: "var(--accent)",
@@ -353,7 +375,7 @@ function AddPluginPanel({
 
       <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>
-          示例
+          示例<span style={{ fontWeight: 400, color: "var(--text-dim)" }}>（点击填入格式模板，需改成真实来源后再安装）</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {examples.map((example) => (
@@ -646,7 +668,7 @@ export function PluginsConfig({
 
   const installPlugin = useCallback(async () => {
     const source = installSource.trim();
-    if (!source) return;
+    if (!source || placeholderWarning(source)) return;
     const key = `${installScope}\0${source}`;
     setBusyKey(`install:${key}`);
     setActionError(null);

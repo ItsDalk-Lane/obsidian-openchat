@@ -30,6 +30,7 @@
     "build": "next build --webpack",
     "start": "next start -p 30141",
     "lint": "eslint .",
+    "update:pi": "npm install --save-exact @earendil-works/pi-agent-core@latest @earendil-works/pi-ai@latest @earendil-works/pi-coding-agent@latest @earendil-works/pi-tui@latest && tsc --noEmit && npm run lint",
     "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public",
     "electron:build": "npm run build && electron-builder",
     "electron:dev": "npm run build && node electron/launcher.js",
@@ -75,13 +76,15 @@
     }
   },
   "dependencies": {
-    "@earendil-works/pi-agent-core": "0.81.1",
-    "@earendil-works/pi-ai": "0.81.1",
-    "@earendil-works/pi-coding-agent": "0.81.1",
-    "@earendil-works/pi-tui": "0.81.1",
+    "@earendil-works/pi-agent-core": "0.82.0",
+    "@earendil-works/pi-ai": "0.82.0",
+    "@earendil-works/pi-coding-agent": "0.82.0",
+    "@earendil-works/pi-tui": "0.82.0",
     "next": "16.2.9",
+    "pi-mcp-adapter": "^2.13.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "strip-json-comments": "^5.0.3",
     "undici": "8.5.0"
   },
   "devDependencies": {
