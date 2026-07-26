@@ -1364,7 +1364,8 @@ function formatUsage(usage: {
   const parts = [];
   if (usage.input) parts.push(`${usage.input.toLocaleString()} 输入`);
   if (usage.output) parts.push(`${usage.output.toLocaleString()} 输出`);
-  if (usage.cacheRead) parts.push(`${usage.cacheRead.toLocaleString()} 缓存`);
+  if (usage.cacheRead) parts.push(`${usage.cacheRead.toLocaleString()} 缓存读`);
+  if (usage.cacheWrite) parts.push(`${usage.cacheWrite.toLocaleString()} 缓存写`);
   if (usage.cost?.total) parts.push(`$${usage.cost.total.toFixed(4)}`);
   return parts.join(" · ");
 }
