@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Pi Web Desktop</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #1a1a2e;
+    color: #c8c8d4;
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+  .box { text-align: center; }
+  .spinner {
+    width: 36px;
+    height: 36px;
+    margin: 0 auto 18px;
+    border: 3px solid rgba(255, 255, 255, 0.12);
+    border-top-color: #7c8cf8;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .title { font-size: 15px; font-weight: 600; letter-spacing: 0.4px; }
+  .sub { margin-top: 8px; font-size: 12px; color: #8a8a9c; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="spinner"></div>
+    <div class="title">Pi Web Desktop</div>
+    <div class="sub">正在启动服务,请稍候…</div>
+  </div>
+</body>
+</html>

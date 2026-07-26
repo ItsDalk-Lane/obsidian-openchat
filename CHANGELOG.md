@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-07-27 - 修复桌面端启动慢/长时间无窗口
+
+- 问题:双击 `Pi-Web-Desktop.vbs` 后长时间没有任何窗口出现;日志显示 Next 已 `Ready` 但 Electron 健康检查全部"失败",白等约 19 秒才开窗。
+- 原因一(`electron/main.js` `waitForServer`):3 秒超时后 `req.destroy()` 会再次触发 `error` 事件,同一次失败被计数两次并派生出重复检查链,60 次重试约 19 秒就耗尽;且 3 秒超时对冷启动首次请求(中间件/页面模块初始化)过于苛刻。
+- 修复一:每次探测用 `settled` 标志保证只结算一次,`error` 改 `once` 注册;单次超时放宽到 8 秒,重试间隔 500ms、上限 120 次。
+- 原因二:窗口要等服务器通过健康检查后才创建,启动期间零视觉反馈;启动中重复双击还会被单实例锁静默退出。
+- 修复二:`app.whenReady` 后立即创建窗口并加载 `electron/loading.html`(新增,深色启动页 + 加载动画);服务器就绪后再 `loadURL` 切换到真实界面;健康检查最终失败时兜底仍尝试加载真实地址(服务器可能实际可用)。
+- 影响范围:`electron/main.js`、`electron/loading.html`(新增,已随 `electron/**/*` 进入打包清单)。
+- 验证方式:`node --check electron/main.js`、`npm run lint`。
+
 ## 2026-07-26 - 最终架构阶段推进：Capability/Policy/Evaluation/Context/Workspace 基线
 
 - 新增 Runtime/Capability 基础接口：

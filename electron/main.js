@@ -33,22 +33,36 @@ function log(msg) {
 
 // ─── Server lifecycle ───────────────────────────────────────
 
-function waitForServer(maxRetries = 60, interval = 1000) {
+function waitForServer(maxRetries = 120, interval = 500) {
   return new Promise((resolve, reject) => {
     let retries = 0;
     const check = () => {
+      // Each attempt must settle exactly once: req.destroy() after a timeout
+      // also emits "error", which used to double-count retries and spawn
+      // duplicate check chains, burning all 60 retries in ~19 seconds.
+      let settled = false;
+      const fail = () => {
+        if (settled) return;
+        settled = true;
+        if (++retries >= maxRetries) {
+          reject(new Error(`Server not reachable after ${maxRetries} retries`));
+        } else {
+          setTimeout(check, interval);
+        }
+      };
       const req = http.get(SERVER_URL, (res) => {
+        if (settled) return;
+        settled = true;
         res.resume();
         resolve();
       });
-      req.on("error", () => {
-        if (++retries >= maxRetries) reject(new Error(`Server not reachable after ${maxRetries} retries`));
-        else setTimeout(check, interval);
-      });
-      req.setTimeout(3000, () => {
+      req.once("error", fail);
+      // Generous timeout: cold-start first hits initialize middleware/page
+      // modules and can exceed 3s on a busy machine even though the server
+      // is up and healthy.
+      req.setTimeout(8000, () => {
         req.destroy();
-        if (++retries >= maxRetries) reject(new Error(`Server not reachable after ${maxRetries} retries`));
-        else setTimeout(check, interval);
+        fail();
       });
     };
     check();
@@ -254,7 +268,15 @@ function createWindow() {
   });
 
   mainWindow.on("closed", () => { mainWindow = null; });
-  mainWindow.loadURL(SERVER_URL);
+  // Show a lightweight loading page immediately; the real app URL is loaded
+  // once the Next.js server answers the health check.
+  mainWindow.loadFile(path.join(__dirname, "loading.html"));
+}
+
+function loadAppUrl() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.loadURL(SERVER_URL);
+  }
 }
 
 // ─── App lifecycle ──────────────────────────────────────────
@@ -275,15 +297,23 @@ if (!gotTheLock) {
 
 app.whenReady().then(async () => {
   buildAppMenu();
+  // Open the window first so the user gets immediate visual feedback
+  // (loading page) instead of staring at nothing while the server boots.
+  // This also makes the single-instance "second launch focuses window"
+  // path work during startup.
+  createWindow();
   startNextServer();
   try {
     log("Waiting for Next.js server...");
     await waitForServer();
-    log("Server is ready, opening window...");
-    createWindow();
+    log("Server is ready, loading app...");
+    loadAppUrl();
   } catch (err) {
-    log(`Failed to start: ${err.message}`);
-    createWindow();
+    // The health check is stricter than reality: the server has been seen
+    // serving requests even after every probe "failed" on a loaded machine.
+    // Try loading the app anyway before giving up.
+    log(`Health check failed: ${err.message}; loading app URL anyway`);
+    loadAppUrl();
   }
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
