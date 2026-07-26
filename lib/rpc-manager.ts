@@ -15,21 +15,24 @@ import {
   applyEmptySystemPromptPatch,
   applySessionManagerFlushedPatch,
   createPiSession,
-  normalizePiEvent,
+  getPiRunId,
+  getPiTaskId,
   parseAgentImages,
+  toKernelEventFromPiEvent,
   withExtensionTools,
 } from "./adapters/pi";
+import {
+  createKernelEvent,
+  createOperationId,
+  type KernelEvent,
+  type RuntimeCommand,
+} from "./kernel";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface AgentEvent {
-  type: string;
-  [key: string]: unknown;
-}
-
-type EventListener = (event: AgentEvent) => void;
+type EventListener = (event: KernelEvent) => void;
 
 type PendingUiResponse = {
   resolve: (response: ExtensionUiResponse) => void;
@@ -77,7 +80,7 @@ type ExtensionBindingOptions = {
 export class AgentSessionWrapper {
   private listeners: EventListener[] = [];
   private pendingUiResponses = new Map<string, PendingUiResponse>();
-  private pendingUiRequests = new Map<string, AgentEvent>();
+  private pendingUiRequests = new Map<string, KernelEvent>();
   private activeCustomUis = new Map<string, ActiveCustomUi>();
   private extensionStatuses = new Map<string, string>();
   private extensionWidgets = new Map<string, ExtensionWidgetItem>();
@@ -92,6 +95,9 @@ export class AgentSessionWrapper {
   private onDestroyCallback: (() => void) | null = null;
   private _alive = true;
   private readonly runtime: PiRuntimeAdapter;
+  private activePromptOperationId: string | undefined;
+  private activeBashOperationId: string | undefined;
+  private activeCompactionOperationId: string | undefined;
 
   constructor(public readonly inner: AgentSessionLike) {
     this.runtime = new PiRuntimeAdapter(inner);
@@ -114,13 +120,18 @@ export class AgentSessionWrapper {
   }
 
   start(): void {
-    this.unsubscribe = this.inner.subscribe((event: AgentEvent) => {
-      const normalizedEvent = normalizePiEvent(event);
+    this.unsubscribe = this.inner.subscribe((event: { type: string; [key: string]: unknown }) => {
       this.resetIdleTimer();
-      if (normalizedEvent.type === "agent_end") {
+      if (event.type === "agent_end") {
         invalidateSessionListCache();
+        this.activePromptOperationId = undefined;
       }
-      this.emit(normalizedEvent);
+      const kernelEvent = toKernelEventFromPiEvent(event, {
+        taskId: getPiTaskId(this.sessionId),
+        runId: getPiRunId(this.sessionId),
+        operationId: this.activePromptOperationId ?? this.activeBashOperationId ?? this.activeCompactionOperationId,
+      });
+      if (kernelEvent) this.emit(kernelEvent);
       // Streaming / compaction / tool events flow through here; re-broadcast
       // the running-status snapshot so the sidebar can update live.
       notifyRunningChange();
@@ -141,7 +152,14 @@ export class AgentSessionWrapper {
 
   setMcpStatus(snapshot: McpStatusSnapshot | null): void {
     this.mcpStatus = snapshot;
-    this.emit({ type: "mcp_status", snapshot });
+    this.emit(createKernelEvent(
+      "runtime.status.updated",
+      getPiTaskId(this.sessionId),
+      getPiRunId(this.sessionId),
+      { statusType: "mcp", snapshot },
+      { kind: "runtime", adapter: "pi", nativeType: "mcp_status" },
+      this.activePromptOperationId ?? this.activeBashOperationId ?? this.activeCompactionOperationId,
+    ));
   }
 
   beginExtensionBinding(options: ExtensionBindingOptions = {}): void {
@@ -178,18 +196,17 @@ export class AgentSessionWrapper {
           uiContext,
           mode: "rpc",
           commandContextActions: this.createExtensionCommandContextActions(),
-          shutdownHandler: () => this.emit({
+          shutdownHandler: () => this.emitExtensionUiRequest({
             type: "extension_ui_request",
             id: randomUUID(),
             method: "notify",
             notifyType: "warning",
             message: "Extension requested shutdown, but shutdown is not supported in Pi Web.",
-          } as ExtensionUiRequest as AgentEvent),
-          onError: (error) => this.emit({
-            type: "extension_error",
+          }),
+          onError: (error) => this.emitExtensionError({
             extensionPath: error.extensionPath,
             event: error.event,
-            error: error.error,
+            errorMessage: error.error,
           }),
         });
       } else {
@@ -235,7 +252,44 @@ export class AgentSessionWrapper {
     applyEmptySystemPromptPatch(this.inner, this.forceEmptySystemPrompt);
   }
 
-  private emit(event: AgentEvent): void {
+  private getTaskId() {
+    return getPiTaskId(this.sessionId);
+  }
+
+  private getRunId() {
+    return getPiRunId(this.sessionId);
+  }
+
+  private getCurrentOperationId(): string | undefined {
+    return this.activePromptOperationId ?? this.activeBashOperationId ?? this.activeCompactionOperationId;
+  }
+
+  private emitExtensionUiRequest(request: ExtensionUiRequest): KernelEvent {
+    const event = createKernelEvent(
+      "extension.ui.requested",
+      this.getTaskId(),
+      this.getRunId(),
+      { request },
+      { kind: "extension", adapter: "pi", nativeType: "extension_ui_request" },
+      this.getCurrentOperationId(),
+    );
+    this.pendingUiRequests.set(request.id, event);
+    this.emit(event);
+    return event;
+  }
+
+  private emitExtensionError(payload: { extensionPath?: string; event?: string; errorMessage: string }): void {
+    this.emit(createKernelEvent(
+      "extension.failed",
+      this.getTaskId(),
+      this.getRunId(),
+      payload,
+      { kind: "extension", adapter: "pi", nativeType: "extension_error" },
+      this.getCurrentOperationId(),
+    ));
+  }
+
+  private emit(event: KernelEvent): void {
     for (const l of this.listeners) l(event);
   }
 
@@ -283,9 +337,9 @@ export class AgentSessionWrapper {
     this.onDestroyCallback = cb;
   }
 
-  async send(command: Record<string, unknown>): Promise<unknown> {
+  async send(command: RuntimeCommand): Promise<unknown> {
     this.resetIdleTimer();
-    const type = command.type as string;
+    const type = command.type;
     if (this.shouldWaitForExtensions(type)) await this.waitForExtensionsBound();
 
     switch (type) {
@@ -295,25 +349,59 @@ export class AgentSessionWrapper {
         }
         // Fire and forget — events come via subscribe
         const promptImages = parseAgentImages(command.images, "prompt");
-        const streamingBehavior = command.streamingBehavior as "steer" | "followUp" | undefined;
+        const streamingBehavior = command.streamingBehavior;
+        const operationId = createOperationId("prompt");
+        this.activePromptOperationId = operationId;
+        this.emit(createKernelEvent(
+          "operation.started",
+          this.getTaskId(),
+          this.getRunId(),
+          { operationKind: "prompt" },
+          { kind: "runtime", adapter: "pi", nativeType: "prompt" },
+          operationId,
+        ));
         this.promptRunning = true;
         notifyRunningChange();
-        this.inner.prompt(command.message as string, {
+        this.inner.prompt(command.message, {
           ...(promptImages?.length ? { images: promptImages } : {}),
           ...(streamingBehavior ? { streamingBehavior } : {}),
           source: "rpc",
         }).then(() => {
           this.promptRunning = false;
-          if (!streamingBehavior) this.emit({ type: "prompt_done" });
+          if (!streamingBehavior) {
+            this.emit(createKernelEvent(
+              "operation.completed",
+              this.getTaskId(),
+              this.getRunId(),
+              { operationKind: "prompt" },
+              { kind: "runtime", adapter: "pi", nativeType: "prompt_done" },
+              operationId,
+            ));
+          }
+          this.activePromptOperationId = undefined;
           notifyRunningChange();
         }).catch((error) => {
           this.promptRunning = false;
           invalidateSessionListCache();
-          this.emit({
-            type: "prompt_error",
-            errorMessage: error instanceof Error ? error.message : String(error),
-          });
-          if (!streamingBehavior) this.emit({ type: "prompt_done" });
+          this.emit(createKernelEvent(
+            "operation.failed",
+            this.getTaskId(),
+            this.getRunId(),
+            { operationKind: "prompt", errorMessage: error instanceof Error ? error.message : String(error) },
+            { kind: "runtime", adapter: "pi", nativeType: "prompt_error" },
+            operationId,
+          ));
+          if (!streamingBehavior) {
+            this.emit(createKernelEvent(
+              "operation.completed",
+              this.getTaskId(),
+              this.getRunId(),
+              { operationKind: "prompt" },
+              { kind: "runtime", adapter: "pi", nativeType: "prompt_done" },
+              operationId,
+            ));
+          }
+          this.activePromptOperationId = undefined;
           notifyRunningChange();
         });
         return null;
@@ -321,6 +409,14 @@ export class AgentSessionWrapper {
 
       case "abort":
         await this.withFinalRunningNotification(() => this.inner.abort());
+        this.emit(createKernelEvent(
+          "operation.aborted",
+          this.getTaskId(),
+          this.getRunId(),
+          { operationKind: "prompt" },
+          { kind: "runtime", adapter: "pi", nativeType: "abort" },
+          this.activePromptOperationId,
+        ));
         return null;
 
       case "get_state": {
@@ -352,7 +448,7 @@ export class AgentSessionWrapper {
         if (this.inner.isBashRunning) {
           throw new Error("Cannot fork while a shell command is running");
         }
-        const entryId = command.entryId as string;
+        const entryId = command.entryId;
         const sessionManager = this.inner.sessionManager;
         const currentSessionFile = this.inner.sessionFile;
 
@@ -389,29 +485,58 @@ export class AgentSessionWrapper {
         if (this.inner.isBashRunning) {
           throw new Error("Cannot navigate while a shell command is running");
         }
-        const result = await this.inner.navigateTree(command.targetId as string, {});
+        const result = await this.inner.navigateTree(command.targetId, {});
         return { cancelled: result.cancelled };
       }
 
       case "set_thinking_level": {
-        const level = command.level as string;
-        this.runtime.setThinkingLevel(level);
+        this.runtime.setThinkingLevel(command.level);
         invalidateSessionListCache();
         return null;
       }
 
       case "compact": {
+        const operationId = createOperationId("compact");
+        this.activeCompactionOperationId = operationId;
+        this.emit(createKernelEvent(
+          "operation.started",
+          this.getTaskId(),
+          this.getRunId(),
+          { operationKind: "compact" },
+          { kind: "runtime", adapter: "pi", nativeType: "compact" },
+          operationId,
+        ));
         try {
-          return await this.withFinalRunningNotification(() =>
-            this.inner.compact(command.customInstructions as string | undefined)
+          const result = await this.withFinalRunningNotification(() =>
+            this.inner.compact(command.customInstructions)
           );
+          this.emit(createKernelEvent(
+            "operation.completed",
+            this.getTaskId(),
+            this.getRunId(),
+            { operationKind: "compact", result: (result as Record<string, unknown>) ?? null },
+            { kind: "runtime", adapter: "pi", nativeType: "compact_done" },
+            operationId,
+          ));
+          return result;
+        } catch (error) {
+          this.emit(createKernelEvent(
+            "operation.failed",
+            this.getTaskId(),
+            this.getRunId(),
+            { operationKind: "compact", errorMessage: error instanceof Error ? error.message : String(error) },
+            { kind: "runtime", adapter: "pi", nativeType: "compact_error" },
+            operationId,
+          ));
+          throw error;
         } finally {
+          this.activeCompactionOperationId = undefined;
           invalidateSessionListCache();
         }
       }
 
       case "set_session_name": {
-        const name = (command.name as string | undefined)?.trim();
+        const name = command.name?.trim();
         if (!name) throw new Error("Session name cannot be empty");
         this.inner.setSessionName(name);
         invalidateSessionListCache();
@@ -430,7 +555,7 @@ export class AgentSessionWrapper {
       }
 
       case "set_auto_compaction": {
-        this.inner.setAutoCompactionEnabled(command.enabled as boolean);
+        this.inner.setAutoCompactionEnabled(command.enabled);
         return null;
       }
 
@@ -442,13 +567,13 @@ export class AgentSessionWrapper {
 
       case "steer": {
         const steerImages = parseAgentImages(command.images, "steer");
-        await this.inner.steer(command.message as string, steerImages);
+        await this.inner.steer(command.message, steerImages);
         return null;
       }
 
       case "follow_up": {
         const followImages = parseAgentImages(command.images, "follow_up");
-        await this.inner.followUp(command.message as string, followImages);
+        await this.inner.followUp(command.message, followImages);
         return null;
       }
 
@@ -486,7 +611,7 @@ export class AgentSessionWrapper {
       }
 
       case "set_tools": {
-        const toolNames = command.toolNames as string[];
+        const toolNames = command.toolNames;
         this.setForceEmptySystemPrompt(toolNames.length === 0);
         this.runtime.setTools(toolNames);
         this.applyForcedEmptySystemPrompt();
@@ -507,21 +632,29 @@ export class AgentSessionWrapper {
 
       case "abort_compaction": {
         this.inner.abortCompaction();
+        this.emit(createKernelEvent(
+          "operation.aborted",
+          this.getTaskId(),
+          this.getRunId(),
+          { operationKind: "compact" },
+          { kind: "runtime", adapter: "pi", nativeType: "abort_compaction" },
+          this.activeCompactionOperationId,
+        ));
         return null;
       }
 
       case "extension_ui_response": {
-        this.resolveExtensionUiResponse(command as ExtensionUiResponse);
+        this.resolveExtensionUiResponse(command);
         return null;
       }
 
       case "extension_ui_input": {
-        this.handleExtensionUiInput(command.id as string, command.data as string);
+        this.handleExtensionUiInput(command.id, command.data);
         return null;
       }
 
       case "set_auto_retry": {
-        this.inner.setAutoRetryEnabled(command.enabled as boolean);
+        this.inner.setAutoRetryEnabled(command.enabled);
         return null;
       }
 
@@ -529,17 +662,46 @@ export class AgentSessionWrapper {
         if (this.promptRunning || this.inner.isStreaming || this.inner.isCompacting || this.inner.isBashRunning) {
           throw new Error("Cannot run a shell command while the session is busy");
         }
+        const operationId = createOperationId("bash");
+        this.activeBashOperationId = operationId;
+        this.emit(createKernelEvent(
+          "operation.started",
+          this.getTaskId(),
+          this.getRunId(),
+          { operationKind: "bash" },
+          { kind: "runtime", adapter: "pi", nativeType: "bash" },
+          operationId,
+        ));
         const execution = this.inner.executeBash(
-          command.command as string,
+          command.command,
           undefined,
-          { excludeFromContext: command.excludeFromContext as boolean | undefined },
+          { excludeFromContext: command.excludeFromContext },
         );
         notifyRunningChange();
         try {
           const result = await execution;
           this.persistBashOnlySession();
+          this.emit(createKernelEvent(
+            "operation.completed",
+            this.getTaskId(),
+            this.getRunId(),
+            { operationKind: "bash", result: (result as Record<string, unknown>) ?? null },
+            { kind: "runtime", adapter: "pi", nativeType: "bash_done" },
+            operationId,
+          ));
           return result;
+        } catch (error) {
+          this.emit(createKernelEvent(
+            "operation.failed",
+            this.getTaskId(),
+            this.getRunId(),
+            { operationKind: "bash", errorMessage: error instanceof Error ? error.message : String(error) },
+            { kind: "runtime", adapter: "pi", nativeType: "bash_error" },
+            operationId,
+          ));
+          throw error;
         } finally {
+          this.activeBashOperationId = undefined;
           invalidateSessionListCache();
           notifyRunningChange();
         }
@@ -547,6 +709,14 @@ export class AgentSessionWrapper {
 
       case "abort_bash": {
         this.inner.abortBash();
+        this.emit(createKernelEvent(
+          "operation.aborted",
+          this.getTaskId(),
+          this.getRunId(),
+          { operationKind: "bash" },
+          { kind: "runtime", adapter: "pi", nativeType: "abort_bash" },
+          this.activeBashOperationId,
+        ));
         return null;
       }
 
@@ -601,14 +771,12 @@ export class AgentSessionWrapper {
     } catch (error) {
       lines = [`Extension custom UI render failed: ${error instanceof Error ? error.message : String(error)}`];
     }
-    const event = {
+    this.emitExtensionUiRequest({
       type: "extension_ui_request",
       id,
       method: "custom",
       lines,
-    } as ExtensionUiRequest as AgentEvent;
-    this.pendingUiRequests.set(id, event);
-    this.emit(event);
+    });
   }
 
   private closeCustomUi(id: string, value: unknown): void {
@@ -622,13 +790,13 @@ export class AgentSessionWrapper {
     } catch {
       // Ignore dispose errors from extension UI components.
     }
-    this.emit({
+    this.emitExtensionUiRequest({
       type: "extension_ui_request",
       id,
       method: "custom",
       lines: [],
       closed: true,
-    } as ExtensionUiRequest as AgentEvent);
+    });
     custom.resolve(value);
   }
 
@@ -640,11 +808,10 @@ export class AgentSessionWrapper {
       if (this.activeCustomUis.has(id)) this.emitCustomUiRender(id, custom);
     } catch (error) {
       this.closeCustomUi(id, undefined);
-      this.emit({
-        type: "extension_error",
+      this.emitExtensionError({
         extensionPath: `custom-ui:${id}`,
         event: "custom_ui_input",
-        error: error instanceof Error ? error.message : String(error),
+        errorMessage: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -706,11 +873,10 @@ export class AgentSessionWrapper {
         })
         .catch((error) => {
           if (completed) return;
-          this.emit({
-            type: "extension_error",
+          this.emitExtensionError({
             extensionPath: `custom-ui:${id}`,
             event: "custom_ui",
-            error: error instanceof Error ? error.message : String(error),
+            errorMessage: error instanceof Error ? error.message : String(error),
           });
           finish(undefined as T);
         });
@@ -732,7 +898,7 @@ export class AgentSessionWrapper {
       id,
       ...request,
       ...(timeout ? { timeout, expiresAt: Date.now() + timeout } : {}),
-    };
+    } as ExtensionUiRequest;
 
     return new Promise((resolve) => {
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -751,12 +917,11 @@ export class AgentSessionWrapper {
       if (timeout) timeoutId = setTimeout(() => settle(defaultValue), timeout);
       signal?.addEventListener("abort", onAbort, { once: true });
 
-      this.pendingUiRequests.set(id, fullRequest as AgentEvent);
       this.pendingUiResponses.set(id, {
         resolve: (response) => settle(parseResponse(response)),
         cancel: () => settle(defaultValue),
       });
-      this.emit(fullRequest as AgentEvent);
+      this.emitExtensionUiRequest(fullRequest);
     });
   }
 
@@ -791,25 +956,25 @@ export class AgentSessionWrapper {
         opts?.signal,
       ),
       notify: (message, type) => {
-        this.emit({
+        this.emitExtensionUiRequest({
           type: "extension_ui_request",
           id: randomUUID(),
           method: "notify",
           message,
           notifyType: type,
-        } as ExtensionUiRequest as AgentEvent);
+        });
       },
       onTerminalInput: () => () => {},
       setStatus: (key, text) => {
         if (text === undefined) this.extensionStatuses.delete(key);
         else this.extensionStatuses.set(key, text);
-        this.emit({
+        this.emitExtensionUiRequest({
           type: "extension_ui_request",
           id: randomUUID(),
           method: "setStatus",
           statusKey: key,
           statusText: text,
-        } as ExtensionUiRequest as AgentEvent);
+        });
       },
       setWorkingMessage: () => {},
       setWorkingVisible: () => {},
@@ -826,41 +991,41 @@ export class AgentSessionWrapper {
             placement: options?.placement ?? "aboveEditor",
           });
         }
-        this.emit({
+        this.emitExtensionUiRequest({
           type: "extension_ui_request",
           id: randomUUID(),
           method: "setWidget",
           widgetKey: key,
           widgetLines: content,
           widgetPlacement: options?.placement,
-        } as ExtensionUiRequest as AgentEvent);
+        });
       },
       setFooter: () => {},
       setHeader: () => {},
       setTitle: (title) => {
-        this.emit({
+        this.emitExtensionUiRequest({
           type: "extension_ui_request",
           id: randomUUID(),
           method: "setTitle",
           title,
-        } as ExtensionUiRequest as AgentEvent);
+        });
       },
       custom: <T = unknown>(factory: unknown, options?: unknown) => this.requestExtensionCustomUi<T>(factory, options),
       pasteToEditor: (text) => {
-        this.emit({
+        this.emitExtensionUiRequest({
           type: "extension_ui_request",
           id: randomUUID(),
           method: "set_editor_text",
           text,
-        } as ExtensionUiRequest as AgentEvent);
+        });
       },
       setEditorText: (text) => {
-        this.emit({
+        this.emitExtensionUiRequest({
           type: "extension_ui_request",
           id: randomUUID(),
           method: "set_editor_text",
           text,
-        } as ExtensionUiRequest as AgentEvent);
+        });
       },
       getEditorText: () => "",
       addAutocompleteProvider: () => {},

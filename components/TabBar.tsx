@@ -2,13 +2,9 @@
 
 import { useState } from "react";
 import { getFileIcon } from "./FileIcons";
+import type { WorkbenchTab } from "@/lib/workbench";
 
-export interface Tab {
-  id: string;
-  label: string;
-  filePath: string;
-  sourceSessionId?: string | null;
-}
+export type Tab = WorkbenchTab;
 
 interface Props {
   tabs: Tab[];
@@ -76,7 +72,9 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
                 flex: 1,
                 fontWeight: isActive ? 500 : 400,
               }}
-              title={tab.filePath}
+              title={tab.kind === "artifact" && tab.artifact.representations[0]?.kind === "file"
+                ? tab.artifact.representations[0].path
+                : tab.label}
             >
               {tab.label}
             </span>

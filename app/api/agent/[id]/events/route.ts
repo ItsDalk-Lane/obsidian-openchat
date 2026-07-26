@@ -1,5 +1,7 @@
 import { getSessionCwd, resolveSessionPath } from "@/lib/session-reader";
 import { getRpcSession, startRpcSession } from "@/lib/rpc-manager";
+import { createKernelEvent } from "@/lib/kernel";
+import { getPiRunId, getPiTaskId } from "@/lib/adapters/pi";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +35,13 @@ export async function GET(
       };
 
       // Send initial connected event
-      encode({ type: "connected", sessionId: id });
+      encode(createKernelEvent(
+        "transport.connected",
+        getPiTaskId(id),
+        getPiRunId(id),
+        { sessionId: id },
+        { kind: "transport", adapter: "pi", nativeType: "connected" },
+      ));
 
       const unsubscribe = session.onEvent((event) => {
         encode(event);

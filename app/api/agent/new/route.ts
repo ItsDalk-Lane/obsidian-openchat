@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { allowFileRoot } from "@/lib/file-access";
 import { invalidateSessionListCache } from "@/lib/session-reader";
 import { startRpcSession } from "@/lib/rpc-manager";
+import { parseNewSessionCommand } from "@/lib/kernel";
 // POST /api/agent/new  body: { cwd: string; type: string; message?: string; ... }
 // Spawns a brand-new pi session. Most calls immediately send the first command;
 // type:"ensure_session" only creates the runtime so clients can query commands.
@@ -21,7 +22,12 @@ export async function POST(req: Request) {
     }
 
     // Use a one-time key so startRpcSession's lock doesn't conflict with real session ids
-    const { provider, modelId, toolNames, thinkingLevel, ...promptCommand } = command as { provider?: string; modelId?: string; toolNames?: string[]; thinkingLevel?: string; [key: string]: unknown };
+    const { provider, modelId, toolNames, thinkingLevel, ...rawCommand } = command as { provider?: string; modelId?: string; toolNames?: string[]; thinkingLevel?: string; [key: string]: unknown };
+    const parsedCommand = parseNewSessionCommand(rawCommand);
+    if (!parsedCommand.ok) {
+      return NextResponse.json({ error: parsedCommand.error }, { status: 400 });
+    }
+    const parsed = parsedCommand.value;
 
     // Must be unique per request: startRpcSession coalesces concurrent callers
     // that share a key onto one session. Date.now() (ms resolution) collides for
@@ -45,11 +51,11 @@ export async function POST(req: Request) {
       await session.send({ type: "set_thinking_level", level: thinkingLevel });
     }
 
-    if (promptCommand.type === "ensure_session") {
+    if (parsed.type === "ensure_session") {
       return NextResponse.json({ success: true, sessionId: realSessionId, data: null });
     }
 
-    const result = await session.send(promptCommand);
+    const result = await session.send(parsed);
 
     return NextResponse.json({ success: true, sessionId: realSessionId, data: result });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionCwd, resolveSessionPath } from "@/lib/session-reader";
 import { startRpcSession, getRpcSession } from "@/lib/rpc-manager";
+import { parseRuntimeCommand } from "@/lib/kernel";
 
 // POST /api/agent/[id] - Send a command to an existing session
 export async function POST(
@@ -10,7 +11,12 @@ export async function POST(
   const { id } = await params;
 
   try {
-    const body = await req.json() as { type: string; [key: string]: unknown };
+    const rawBody = await req.json();
+    const parsed = parseRuntimeCommand(rawBody);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.value;
 
     // Fast path: already-running session
     const existing = getRpcSession(id);

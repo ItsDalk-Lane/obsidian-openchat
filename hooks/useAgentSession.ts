@@ -13,6 +13,12 @@ import { normalizeToolCalls } from "@/lib/normalize";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { getToolNamesForPreset, type ToolEntry } from "@/lib/tool-presets";
 import type { SessionStatsInfo } from "@/lib/pi-types";
+import {
+  createRunId,
+  createTaskId,
+  decodeKernelEvent,
+  type KernelEvent,
+} from "@/lib/kernel";
 
 export interface SessionData {
   sessionId: string;
@@ -50,11 +56,6 @@ function streamReducer(state: StreamingState, action: StreamAction): StreamingSt
     default:
       return state;
   }
-}
-
-interface AgentEvent {
-  type: string;
-  [key: string]: unknown;
 }
 
 interface CompactCommandResult {
@@ -373,7 +374,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const agentRunningRef = useRef(false);
   const bashRunningRef = useRef(false);
   const bashRecoveryIdRef = useRef(0);
-  const handleAgentEventRef = useRef<((event: AgentEvent) => void) | null>(null);
+  const handleAgentEventRef = useRef<((event: KernelEvent) => void) | null>(null);
   const initialScrollDoneRef = useRef(false);
   const lastUserMsgRef = useRef<HTMLDivElement | null>(null);
   const pendingScrollToUserRef = useRef(false);
@@ -511,7 +512,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   const loadTools = useCallback(async (sid: string) => {
     try {
-      const tools = await sendAgentCommand<ToolEntry[]>(sid, { type: "get_tools" });
+      const tools = await sendAgentCommand(sid, { type: "get_tools" }) as unknown as ToolEntry[];
       if (tools) {
         const { getPresetFromTools } = await import("@/lib/tool-presets");
         setToolPresetState(getPresetFromTools(tools));
@@ -580,7 +581,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
     setSlashCommandsLoading(true);
     try {
-      const data = await sendAgentCommand<SlashCommandsResponse>(sid, { type: "get_commands" });
+      const data = await sendAgentCommand(sid, { type: "get_commands" }) as unknown as SlashCommandsResponse;
       const commands = data?.commands ?? [];
       setSlashCommands(commands);
       return commands;
@@ -613,8 +614,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
       es.onmessage = (e) => {
         try {
-          const event = JSON.parse(e.data) as AgentEvent;
-          if (event.type === "connected") settle("connected");
+          const rawEvent = JSON.parse(e.data);
+          const event = decodeKernelEvent(rawEvent, {
+            taskId: createTaskId(`pi:session:${sid}`),
+            runId: createRunId(`pi:session:${sid}:default-run`),
+            sessionId: sid,
+          });
+          if (!event) return;
+          if (event.type === "transport.connected") settle("connected");
           handleAgentEventRef.current?.(event);
         } catch {
           // ignore
@@ -877,15 +884,17 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentRunningRef.current = agentRunning;
   }, [agentRunning]);
 
-  const handleAgentEvent = useCallback((event: AgentEvent) => {
+  const handleAgentEvent = useCallback((event: KernelEvent) => {
     switch (event.type) {
-      case "agent_start":
+      case "operation.started":
+        if (event.payload.operationKind !== "prompt") break;
         agentRunningRef.current = true;
         setAgentRunning(true);
         setAgentPhase({ kind: "waiting_model" });
         dispatch({ type: "start" });
         break;
-      case "agent_end":
+      case "operation.completed":
+        if (event.payload.operationKind !== "prompt") break;
         // A late agent_end can arrive over SSE after reconcileAgentState
         // already finished this run — don't re-trigger completion.
         if (!agentRunningRef.current) break;
@@ -911,26 +920,23 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         }
         onAgentEnd?.();
         break;
-      case "prompt_done":
-        if (!agentRunningRef.current) break;
-        void finishPromptWithoutStream(sessionIdRef.current);
+      case "operation.failed":
+        if (event.payload.operationKind !== "prompt") break;
+        addNotice({ type: "error", message: event.payload.errorMessage ?? "Command failed" });
         break;
-      case "prompt_error":
-        addNotice({ type: "error", message: (event.errorMessage as string | undefined) ?? "Command failed" });
-        break;
-      case "extension_error":
+      case "extension.failed":
         addNotice({
           type: "error",
-          message: (event.error as string | undefined) ?? "Extension command failed",
+          message: event.payload.errorMessage ?? "Extension command failed",
         });
         break;
-      case "message_start":
-      case "message_update": {
+      case "message.started":
+      case "message.updated": {
         // Ignore streaming events arriving after this run already finished
         // (e.g. SSE data buffered while the tab was frozen, flushed after
         // reconcile) — they would resurrect a ghost streaming bubble.
         if (!agentRunningRef.current) break;
-        const msg = event.message as Partial<AgentMessage> | undefined;
+        const msg = event.payload.message as Partial<AgentMessage> | undefined;
         if (msg?.role === "user") {
           break;
         }
@@ -940,12 +946,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setAgentPhase(null);
         break;
       }
-      case "message_end": {
+      case "message.completed": {
         // Same late-event guard: after reconcile finished this run,
         // loadSession already loaded this message from the session file —
         // appending it again would duplicate it.
         if (!agentRunningRef.current) break;
-        const completed = event.message as AgentMessage | undefined;
+        const completed = event.payload.message as AgentMessage | undefined;
         if (completed && completed.role === "user") {
           // Delivered steering/follow-up messages surface here as user
           // messages. The run's initial prompt also emits one, but handleSend
@@ -971,9 +977,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setAgentPhase({ kind: "waiting_model" });
         break;
       }
-      case "tool_execution_start": {
-        const id = event.toolCallId as string;
-        const name = event.toolName as string;
+      case "capability.execution.started": {
+        const id = event.payload.executionId;
+        const name = event.payload.capabilityName;
         setAgentPhase((prev) => {
           const tools = prev?.kind === "running_tools" ? [...prev.tools] : [];
           if (!tools.some((t) => t.id === id)) tools.push({ id, name });
@@ -981,8 +987,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         });
         break;
       }
-      case "tool_execution_end": {
-        const id = event.toolCallId as string;
+      case "capability.execution.completed": {
+        const id = event.payload.executionId;
         setAgentPhase((prev) => {
           if (prev?.kind !== "running_tools") return prev;
           const tools = prev.tools.filter((t) => t.id !== id);
@@ -991,38 +997,38 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         });
         break;
       }
-      case "queue_update":
+      case "queue.updated":
         setQueuedMessages({
-          steering: [...((event.steering as string[] | undefined) ?? [])],
-          followUp: [...((event.followUp as string[] | undefined) ?? [])],
+          steering: [...(event.payload.steering ?? [])],
+          followUp: [...(event.payload.followUp ?? [])],
         });
         break;
-      case "auto_retry_start":
-        setRetryInfo({ attempt: event.attempt as number, maxAttempts: event.maxAttempts as number, errorMessage: event.errorMessage as string | undefined });
+      case "retry.started":
+        setRetryInfo({ attempt: event.payload.attempt as number, maxAttempts: event.payload.maxAttempts as number, errorMessage: event.payload.errorMessage });
         break;
-      case "auto_retry_end":
+      case "retry.completed":
         setRetryInfo(null);
         break;
-      case "compaction_start":
+      case "compaction.started":
         setIsCompacting(true);
         setCompactError(null);
         setCompactResult(null);
         break;
-      case "compaction_end":
+      case "compaction.completed":
         setIsCompacting(false);
-        if (event.errorMessage) {
-          setCompactError(event.errorMessage as string);
+        if (event.payload.errorMessage) {
+          setCompactError(event.payload.errorMessage);
           setCompactResult(null);
-        } else if (!event.aborted) {
-          setCompactResult(readCompactResult(event.result, (event.reason as string | undefined) ?? "auto"));
+        } else if (!event.payload.aborted) {
+          setCompactResult(readCompactResult(event.payload.result, event.payload.reason ?? "auto"));
           if (sessionIdRef.current) loadSession(sessionIdRef.current);
         }
         break;
-      case "extension_ui_request":
-        handleExtensionUiRequest(event as ExtensionUiRequest);
+      case "extension.ui.requested":
+        handleExtensionUiRequest(event.payload.request);
         break;
     }
-  }, [addNotice, finishPromptWithoutStream, handleExtensionUiRequest, loadSession, onAgentEnd]);
+  }, [addNotice, handleExtensionUiRequest, loadSession, onAgentEnd]);
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {
@@ -1171,10 +1177,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (!sid) return;
     setForkingEntryId(entryId);
     try {
-      const result = await sendAgentCommand<{ cancelled?: boolean; newSessionId?: string }>(sid, {
+      const result = await sendAgentCommand(sid, {
         type: "fork",
         entryId,
-      });
+      }) as { cancelled?: boolean; newSessionId?: string };
       const { cancelled, newSessionId } = result ?? {};
       if (!cancelled && newSessionId) {
         onSessionForked?.(newSessionId);
@@ -1236,7 +1242,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     setCompactError(null);
     setCompactResult(null);
     try {
-      const result = await sendAgentCommand<CompactCommandResult>(sid, { type: "compact" });
+      const result = await sendAgentCommand(sid, { type: "compact" }) as CompactCommandResult;
       setCompactResult(readCompactResult(result, "manual"));
       await loadSession(sid, true);
     } catch (e) {
@@ -1293,10 +1299,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           setIsCompacting(true);
           setCompactError(null);
           setCompactResult(null);
-          const result = await sendAgentCommand<CompactCommandResult>(sid, {
+          const result = await sendAgentCommand(sid, {
             type: "compact",
             ...(args ? { customInstructions: args } : {}),
-          });
+          }) as CompactCommandResult;
           setCompactResult(readCompactResult(result, "manual"));
           if (await loadSession(sid, true)) promoteNewSession();
           return complete({ handled: true, message: "Compacted context" });
@@ -1324,7 +1330,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
         case "session": {
           if (!sid) return complete({ handled: true, error: "No active session" });
-          const stats = await sendAgentCommand<SessionStatsInfo>(sid, { type: "get_session_stats" });
+          const stats = await sendAgentCommand(sid, { type: "get_session_stats" }) as unknown as SessionStatsInfo;
           if (stats) {
             setSessionStatsOverride(stats);
           }
@@ -1334,7 +1340,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
         case "copy": {
           if (!sid) return complete({ handled: true, error: "No active session" });
-          const data = await sendAgentCommand<LastAssistantTextResponse>(sid, { type: "get_last_assistant_text" });
+          const data = await sendAgentCommand(sid, { type: "get_last_assistant_text" }) as LastAssistantTextResponse;
           const textToCopy = data?.text ?? "";
           if (!textToCopy) return complete({ handled: true, error: "No assistant message to copy" });
           await navigator.clipboard.writeText(textToCopy);
@@ -1419,7 +1425,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const sid = sessionIdRef.current;
     if (!sid) return;
     try {
-      const result = await sendAgentCommand<{ steering?: string[]; followUp?: string[] }>(sid, { type: "clear_queue" });
+      const result = await sendAgentCommand(sid, { type: "clear_queue" }) as { steering?: string[]; followUp?: string[] };
       // clearQueue also emits an empty queue_update, but that only reaches us
       // while SSE is connected — clear locally so idle recalls update the UI.
       setQueuedMessages({ steering: [], followUp: [] });

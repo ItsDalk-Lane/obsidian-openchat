@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar } from "./SessionSidebar";
-import { ChatWindow } from "./ChatWindow";
-import { FileViewer } from "./FileViewer";
+import { ChatWorkspaceView } from "./workspace/ChatWorkspaceView";
+import { ArtifactWorkspaceView } from "./workspace/ArtifactWorkspaceView";
 import { TabBar, type Tab } from "./TabBar";
 import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
@@ -21,6 +21,8 @@ import { getInitialNavigation } from "@/lib/initial-navigation";
 import type { SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { ChatInputHandle } from "./ChatInput";
 import type { SessionStatsInfo } from "@/lib/pi-types";
+import { createFileArtifact } from "@/lib/artifacts";
+import { projectPiSession } from "@/lib/adapters/pi/pi-task-projector";
 
 type SessionCopyField = "file" | "id";
 type AutoNameStatus =
@@ -382,15 +384,25 @@ export function AppShell() {
     const tabId = `file:${filePath}`;
     setFileTabs((prev) => {
       const existing = prev.find((t) => t.id === tabId);
-      if (!existing) return [...prev, { id: tabId, label: fileName, filePath, sourceSessionId }];
-      if (!sourceSessionId || existing.sourceSessionId === sourceSessionId) return prev;
-      return prev.map((t) => t.id === tabId ? { ...t, sourceSessionId } : t);
+      if (!existing) {
+        return [...prev, {
+          id: tabId,
+          kind: "artifact",
+          label: fileName,
+          artifact: createFileArtifact(filePath, { sourceSessionId, cwd: activeCwd ?? undefined, title: fileName }),
+          sourceSessionId,
+        }];
+      }
+      if (existing.kind !== "artifact") return prev;
+      const nextSourceSessionId = sourceSessionId ?? existing.sourceSessionId;
+      if (existing.sourceSessionId === nextSourceSessionId) return prev;
+      return prev.map((t) => t.id === tabId && t.kind === "artifact" ? { ...t, sourceSessionId: nextSourceSessionId } : t);
     });
     setActiveFileTabId(tabId);
     setRightPanelOpen(true);
     // On mobile the file panel is full-screen; close the drawer so it shows.
     if (isMobile) setSidebarOpen(false);
-  }, [isMobile]);
+  }, [activeCwd, isMobile]);
 
   const handleOpenLinkedFile = useCallback((filePath: string) => {
     handleOpenFile(filePath, getFileName(filePath), selectedSession?.id ?? null);
@@ -425,6 +437,10 @@ export function AppShell() {
   const showPlaceholder = initialSessionRestored && !showChat;
 
   const activeFileTab = fileTabs.find((t) => t.id === activeFileTabId) ?? null;
+  const activeTaskRun = useMemo(() => {
+    if (!selectedSession) return null;
+    return projectPiSession(selectedSession);
+  }, [selectedSession]);
   const activeCwdName = activeCwd ? getFileName(activeCwd) || activeCwd : null;
   const windowTitle = activeCwdName ? `${activeCwdName} - Pi Web` : "Pi Web";
 
@@ -1168,7 +1184,9 @@ export function AppShell() {
         {/* Chat content */}
         <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
           {showChat ? (
-            <ChatWindow
+            <ChatWorkspaceView
+              task={activeTaskRun?.task ?? null}
+              run={activeTaskRun?.run ?? null}
               key={sessionKey}
               session={selectedSession}
               newSessionCwd={effectiveNewSessionCwd}
@@ -1253,9 +1271,9 @@ export function AppShell() {
 
         {/* File content */}
         <div style={{ flex: 1, overflow: "hidden" }}>
-          {activeFileTab?.filePath ? (
-            <FileViewer
-              filePath={activeFileTab.filePath}
+          {activeFileTab?.kind === "artifact" && activeFileTab.artifact.representations[0]?.kind === "file" ? (
+            <ArtifactWorkspaceView
+              artifact={activeFileTab.artifact}
               cwd={activeCwd ?? undefined}
               sourceSessionId={activeFileTab.sourceSessionId}
               gitRefreshKey={explorerRefreshKey}

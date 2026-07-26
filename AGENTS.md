@@ -30,6 +30,32 @@ Browser                Next.js Server              AgentSession (in-process)
   │◀── data: {...} ─────────│                               │
 ```
 
+## Phase 2 Kernel Baseline (General Agent Kernel)
+
+- `lib/kernel/**` now defines shared, runtime-agnostic domain/protocol primitives:
+  - `Task`, `Run`, `Artifact`, `WorkspaceView`
+  - `RuntimeCommand` discriminated union
+  - `KernelEvent` v1 envelope + decoder/factory
+- `lib/kernel/**` must stay free of:
+  - Pi SDK imports
+  - React / Next.js imports
+  - Node-only modules (`fs`, `path`, `crypto`, etc.)
+- Pi-specific mapping remains in `lib/adapters/pi/**`:
+  - Session projection: `SessionInfo -> Task + default Run`
+  - Native event translation: `Pi event -> KernelEvent`
+- Branch semantics remain unchanged:
+  - **Fork** creates a new session file and now projects to a new Task with `parentTaskId`
+  - **In-session branch** (`navigate_tree`) stays in the same Task/Run
+- `agent_end` is **operation-level completion**, not Task completion.
+  - Task persistence/completion workflows are intentionally out of scope for this phase.
+- File viewing is now Artifact-based:
+  - `filePath -> Artifact` via `lib/artifacts/file-artifact.ts`
+  - UI selection uses renderer registry (`components/artifacts/*`)
+  - `FileViewer` remains the backward-compatible entry point.
+- Workbench model is generalized:
+  - tabs use `WorkbenchTab` (`artifact` or `view`) instead of hard-coding `filePath`
+  - chat/file panes keep current layout; wrappers (`ChatWorkspaceView`, `ArtifactWorkspaceView`) provide view boundaries.
+
 **Session browsing** (read-only): reads `.jsonl` files through SDK `SessionManager` helpers and `lib/session-reader.ts` — no AgentSession created.  
 **Sending a message**: `startRpcSession()` in `lib/rpc-manager.ts` creates an AgentSession in-process.
 

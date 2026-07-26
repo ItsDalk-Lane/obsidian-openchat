@@ -23,6 +23,9 @@ import { markdownPreviewRehypePlugins, markdownPreviewRemarkPlugins, normalizeDi
 import { parseUnifiedPatch } from "@/lib/patch";
 import type { GitFileDiffResponse } from "@/lib/git-types";
 import { CodeBlock, MermaidBlock } from "./MermaidBlock";
+import { createFileArtifact } from "@/lib/artifacts";
+import { ArtifactViewer } from "./artifacts/ArtifactViewer";
+import type { ArtifactRenderer } from "./artifacts/artifact-renderer-registry";
 
 interface Props {
   filePath: string;
@@ -31,6 +34,10 @@ interface Props {
   onOpenFile?: (filePath: string) => void;
   onMentionLines?: (relativePath: string, startLine: number, endLine: number) => void;
   gitRefreshKey?: number;
+}
+
+function getArtifactFilePath(filePath: string) {
+  return createFileArtifact(filePath);
 }
 
 interface FileData {
@@ -773,17 +780,72 @@ function DocumentViewer({ filePath, cwd, sourceSessionId }: Props) {
   );
 }
 
+type FileArtifactContext = Props;
+
+const FILE_ARTIFACT_RENDERERS: ArtifactRenderer<FileArtifactContext>[] = [
+  {
+    id: "image-artifact-renderer",
+    priority: 400,
+    canRender: (artifact) => {
+      const file = artifact.representations.find((rep) => rep.kind === "file");
+      return Boolean(file && isImagePath(file.path));
+    },
+    render: ({ context }) => <ImageViewer filePath={context.filePath} cwd={context.cwd} sourceSessionId={context.sourceSessionId} />,
+  },
+  {
+    id: "audio-artifact-renderer",
+    priority: 300,
+    canRender: (artifact) => {
+      const file = artifact.representations.find((rep) => rep.kind === "file");
+      return Boolean(file && isAudioPath(file.path));
+    },
+    render: ({ context }) => <AudioViewer filePath={context.filePath} cwd={context.cwd} sourceSessionId={context.sourceSessionId} />,
+  },
+  {
+    id: "document-artifact-renderer",
+    priority: 200,
+    canRender: (artifact) => {
+      const file = artifact.representations.find((rep) => rep.kind === "file");
+      return Boolean(file && isDocumentPreviewPath(file.path));
+    },
+    render: ({ context }) => <DocumentViewer filePath={context.filePath} cwd={context.cwd} sourceSessionId={context.sourceSessionId} />,
+  },
+  {
+    id: "text-artifact-renderer",
+    priority: 100,
+    canRender: () => true,
+    render: ({ context }) => (
+      <TextFileViewer
+        filePath={context.filePath}
+        cwd={context.cwd}
+        sourceSessionId={context.sourceSessionId}
+        onOpenFile={context.onOpenFile}
+        onMentionLines={context.onMentionLines}
+        gitRefreshKey={context.gitRefreshKey}
+      />
+    ),
+  },
+];
+
 export function FileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionLines, gitRefreshKey }: Props) {
-  if (isImagePath(filePath)) {
-    return <ImageViewer filePath={filePath} cwd={cwd} sourceSessionId={sourceSessionId} />;
-  }
-  if (isAudioPath(filePath)) {
-    return <AudioViewer filePath={filePath} cwd={cwd} sourceSessionId={sourceSessionId} />;
-  }
-  if (isDocumentPreviewPath(filePath)) {
-    return <DocumentViewer filePath={filePath} cwd={cwd} sourceSessionId={sourceSessionId} />;
-  }
-  return <TextFileViewer filePath={filePath} cwd={cwd} sourceSessionId={sourceSessionId} onOpenFile={onOpenFile} onMentionLines={onMentionLines} gitRefreshKey={gitRefreshKey} />;
+  const artifact = getArtifactFilePath(filePath);
+  return (
+    <ArtifactViewer
+      artifact={artifact}
+      context={{ filePath, cwd, sourceSessionId, onOpenFile, onMentionLines, gitRefreshKey }}
+      renderers={FILE_ARTIFACT_RENDERERS}
+      fallback={(_, context) => (
+        <TextFileViewer
+          filePath={context.filePath}
+          cwd={context.cwd}
+          sourceSessionId={context.sourceSessionId}
+          onOpenFile={context.onOpenFile}
+          onMentionLines={context.onMentionLines}
+          gitRefreshKey={context.gitRefreshKey}
+        />
+      )}
+    />
+  );
 }
 
 function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionLines, gitRefreshKey }: Props) {
