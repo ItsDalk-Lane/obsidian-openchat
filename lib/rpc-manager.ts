@@ -16,6 +16,7 @@ import {
   applySessionManagerFlushedPatch,
   createPiSession,
   normalizePiEvent,
+  parseAgentImages,
   withExtensionTools,
 } from "./adapters/pi";
 
@@ -293,7 +294,7 @@ export class AgentSessionWrapper {
           throw new Error("Cannot send a prompt while a shell command is running");
         }
         // Fire and forget — events come via subscribe
-        const promptImages = command.images as Array<{ type: "image"; data: string; mimeType: string }> | undefined;
+        const promptImages = parseAgentImages(command.images, "prompt");
         const streamingBehavior = command.streamingBehavior as "steer" | "followUp" | undefined;
         this.promptRunning = true;
         notifyRunningChange();
@@ -335,7 +336,11 @@ export class AgentSessionWrapper {
 
       case "set_model": {
         const { provider, modelId } = command as { provider: string; modelId: string };
-        const model = this.inner.modelRuntime.getModel(provider, modelId);
+        let model = this.inner.modelRuntime.getModel(provider, modelId);
+        if (!model) {
+          await this.inner.modelRuntime.refresh?.({ allowNetwork: false });
+          model = this.inner.modelRuntime.getModel(provider, modelId);
+        }
         if (!model) throw new Error(`Model not found: ${provider}/${modelId}`);
         await this.inner.setModel(model);
         invalidateModelsCache();
@@ -436,14 +441,14 @@ export class AgentSessionWrapper {
       }
 
       case "steer": {
-        const steerImages = command.images as Array<{ type: "image"; data: string; mimeType: string }> | undefined;
-        await this.inner.steer(command.message as string, steerImages?.length ? steerImages : undefined);
+        const steerImages = parseAgentImages(command.images, "steer");
+        await this.inner.steer(command.message as string, steerImages);
         return null;
       }
 
       case "follow_up": {
-        const followImages = command.images as Array<{ type: "image"; data: string; mimeType: string }> | undefined;
-        await this.inner.followUp(command.message as string, followImages?.length ? followImages : undefined);
+        const followImages = parseAgentImages(command.images, "follow_up");
+        await this.inner.followUp(command.message as string, followImages);
         return null;
       }
 

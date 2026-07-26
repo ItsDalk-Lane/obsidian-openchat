@@ -19,6 +19,7 @@ import type {
   PluginsResponse,
 } from "@/lib/api-types";
 import { runNpm } from "@/lib/npx";
+import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
 
 export const dynamic = "force-dynamic";
 
@@ -315,6 +316,10 @@ export async function GET(req: Request) {
   if (!cwd) return NextResponse.json({ error: "cwd required" }, { status: 400 });
 
   try {
+    const allowedRoots = await getAllowedFileRoots();
+    if (!isExistingFilePathAllowed(cwd, allowedRoots)) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
     return NextResponse.json(await readPlugins(cwd));
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
@@ -332,6 +337,10 @@ export async function POST(req: Request) {
     };
     if (!body.cwd) return NextResponse.json({ error: "cwd required" }, { status: 400 });
     if (!body.action) return NextResponse.json({ error: "action required" }, { status: 400 });
+    const allowedRoots = await getAllowedFileRoots();
+    if (!isExistingFilePathAllowed(body.cwd, allowedRoots)) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
 
     const settingsManager = SettingsManager.create(body.cwd, getAgentDir());
     const packageManager = new DefaultPackageManager({
