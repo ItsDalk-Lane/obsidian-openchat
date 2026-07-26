@@ -29,8 +29,11 @@ pi-web -p 8080 -H 127.0.0.1     # 组合使用
 pi-web --no-open                # 不自动打开浏览器
 
 PORT=8080 pi-web                # 也支持环境变量
+PI_WEB_HOSTNAME=0.0.0.0 pi-web  # 暴露到局域网（仅用于可信网络）
 PI_WEB_NO_OPEN=1 pi-web         # 适用于后台服务或开机自启
 ```
+
+默认会监听在 `127.0.0.1`。如果改为非回环地址，Pi Web 本身没有内置鉴权，请仅在可信网络中使用。
 
 ## HTTP 代理
 
@@ -60,6 +63,8 @@ npm run dev
 - **放心试不同方向**：可以从某条历史消息重新开始，也可以复制出一条独立的新路线，探索方案时不怕弄乱原来的对话。
 - **跨分支工作**：在侧边栏切换 Git worktree，让新会话和 Explorer 跟随你选择的 checkout。
 - **边聊边看项目文件**：左侧浏览项目文件，右侧打开源码、文档、图片、音频和 PDF；文件变化会自动刷新，适合边让 agent 改边检查结果。
+- **精确引用文件行号**：在 File Viewer 里选中代码行，可用工具栏按钮或 `Ctrl/Cmd+I` 快捷键插入 `@file:start-end` 引用。
+- **Markdown 预览增强**：Mermaid 支持源码/预览切换与放大查看，本地 Markdown 图片链接可直接通过文件 API 渲染。
 - **随时掌握会话状态**：在顶部就能看到上下文占用、花费、压缩结果和系统提示，长会话不再像黑箱。
 - **少离开当前界面**：模型、登录/API key、模型测试和技能开关都能在网页里处理，配置 agent 时不用在多个工具之间来回切换。
 
@@ -77,6 +82,7 @@ npm run dev
 ```bash
 npm install
 npm run dev
+npm run dev:lan   # 可选：监听局域网
 ```
 
 本地开发端口为 [http://localhost:30141](http://localhost:30141)。
@@ -86,6 +92,7 @@ npm run dev
 ```bash
 npm run build
 npm run start
+npm run start:lan # 可选：监听局域网
 ```
 
 常用检查：
@@ -98,6 +105,11 @@ npm run check
 ```
 
 开发时不要运行 `next build` / `npm run build`，它会写入 `.next/`，容易影响正在运行的 dev server。发布流程再执行构建。
+
+## 上游同步基线记录
+
+- 同步的上游标签：`v0.8.1`
+- 上游提交：`678d01243ab4fccf0241280c31d05026efda3b9e`
 
 ## 桌面应用（Electron）
 

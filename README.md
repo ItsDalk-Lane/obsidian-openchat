@@ -33,8 +33,11 @@ pi-web -p 8080 -H 127.0.0.1     # combine options
 pi-web --no-open                # do not open the browser automatically
 
 PORT=8080 pi-web                # environment variable is also supported
+PI_WEB_HOSTNAME=0.0.0.0 pi-web  # expose to LAN (use only on trusted networks)
 PI_WEB_NO_OPEN=1 pi-web         # useful when running as a background service
 ```
+
+By default the server binds to `127.0.0.1`. If you bind to non-loopback addresses, Pi Web has no built-in authentication, so restrict it to trusted networks.
 
 ## HTTP Proxy
 
@@ -64,6 +67,8 @@ npm run dev
 - **Try different directions safely**: continue from an earlier message or fork a session into a separate route.
 - **Work across branches**: switch Git worktrees from the sidebar so new sessions and the Explorer follow the checkout you choose.
 - **Chat beside the project**: browse files on the left and preview source, docs, images, audio, and PDFs on the right while the agent works.
+- **Reference exact file lines**: select lines in File Viewer and use the toolbar button or `Ctrl/Cmd+I` to insert `@file:start-end` mentions into chat.
+- **Better Markdown rendering**: Mermaid diagrams support source/preview switching and zoom viewer; local markdown image links render directly from the file API.
 - **See session state clearly**: context usage, cost, compaction state, and system prompt details are visible from the top bar.
 - **Configure less from the terminal**: manage models, login/API keys, model tests, and skill switches from the web UI.
 
@@ -81,6 +86,7 @@ npm run dev
 ```bash
 npm install
 npm run dev
+npm run dev:lan   # optional LAN binding
 ```
 
 The local dev server runs at [http://localhost:30141](http://localhost:30141).
@@ -90,6 +96,7 @@ Production run:
 ```bash
 npm run build
 npm run start
+npm run start:lan # optional LAN binding
 ```
 
 Common checks:
@@ -102,6 +109,11 @@ npm run check
 ```
 
 Avoid running `next build` / `npm run build` during local development. It writes to `.next/` and can interfere with the dev server; leave builds for release work.
+
+## Upstream Sync Reference
+
+- Synced upstream tag: `v0.8.1`
+- Upstream commit: `678d01243ab4fccf0241280c31d05026efda3b9e`
 
 ## Desktop App (Electron)
 
