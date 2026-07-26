@@ -188,12 +188,12 @@ function buildAppMenu() {
       role: "help",
       submenu: [
         { label: "访问 Pi 项目", click: () => shell.openExternal("https://github.com/earendil-works/pi") },
-        { label: "访问 pi-web 项目", click: () => shell.openExternal("https://github.com/agegr/pi-web") },
+        { label: "访问 pi-web 项目", click: () => shell.openExternal("https://github.com/ItsDalk-Lane/pi-web") },
         { type: "separator" },
         { label: "关于", click: () => {
           if (mainWindow) {
             mainWindow.webContents.executeJavaScript(
-              `alert("Pi Web Desktop\\n\\n将 Pi 编码代理的 Web 界面打包为桌面应用\\n\\n基于 agegr/pi-web 项目")`
+              `alert("Pi Web Desktop\\n\\n将 Pi 编码代理的 Web 界面打包为桌面应用\\n\\n基于 agegr/pi-web 的维护分支")`
             );
           }
         } },

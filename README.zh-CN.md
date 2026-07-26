@@ -2,24 +2,23 @@
 
 [English](./README.md)
 
-[pi 编程智能体](https://github.com/badlogic/pi-mono) 的本地网页界面。它会读取本机的 pi 会话文件，在浏览器里提供会话管理、实时对话、模型配置、技能管理和项目文件预览。
+[pi 编程智能体](https://github.com/badlogic/pi-mono) 的本地网页界面。  
+本仓库是 [agegr/pi-web](https://github.com/agegr/pi-web) 的维护分支（fork），保留上游归属，并针对本项目做适配层与兼容层改造。
 
 ## 快速开始
 
-**无需安装，直接运行：**
+**推荐方式：克隆本仓库后本地运行**
 
 ```bash
-npx @agegr/pi-web@latest
-```
-
-**或全局安装后使用：**
-
-```bash
-npm install -g @agegr/pi-web
-pi-web
+git clone https://github.com/ItsDalk-Lane/pi-web.git
+cd pi-web
+npm install
+npm run dev
 ```
 
 启动后打开 [http://localhost:30141](http://localhost:30141)。命令行版本会在服务就绪后尝试自动打开浏览器。
+
+如果你需要上游已发布的 npm 包，请使用 `@agegr/pi-web`。
 
 **可选参数：**
 
@@ -43,7 +42,7 @@ macOS 或 Linux：
 HTTP_PROXY=http://127.0.0.1:7890 \
 HTTPS_PROXY=http://127.0.0.1:7890 \
 NO_PROXY=localhost,127.0.0.1 \
-npx @agegr/pi-web@latest
+npm run dev
 ```
 
 Windows PowerShell：
@@ -52,7 +51,7 @@ Windows PowerShell：
 $env:HTTP_PROXY = "http://127.0.0.1:7890"
 $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 $env:NO_PROXY = "localhost,127.0.0.1"
-npx @agegr/pi-web@latest
+npm run dev
 ```
 
 ## 功能介绍
@@ -82,11 +81,20 @@ npm run dev
 
 本地开发端口为 [http://localhost:30141](http://localhost:30141)。
 
+生产模式运行：
+
+```bash
+npm run build
+npm run start
+```
+
 常用检查：
 
 ```bash
-node_modules/.bin/tsc --noEmit
+npm run typecheck
 npm run lint
+npm run test
+npm run check
 ```
 
 开发时不要运行 `next build` / `npm run build`，它会写入 `.next/`，容易影响正在运行的 dev server。发布流程再执行构建。
