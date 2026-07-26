@@ -2,7 +2,8 @@
 
 [中文文档](./README.zh-CN.md)
 
-Local web UI for the [pi coding agent](https://github.com/badlogic/pi-mono). Pi Web reads your local pi session files and gives you a browser workspace for session browsing, real-time chat, model configuration, skill management, and project file preview.
+Local web UI for the [pi coding agent](https://github.com/badlogic/pi-mono).  
+This repository is a maintained fork of [agegr/pi-web](https://github.com/agegr/pi-web), and keeps upstream attribution while focusing on project-specific adapter and compatibility work.
 
 ![Pi Web shows the same pi session with structured Markdown, tool calls, and project navigation beside the CLI](https://raw.githubusercontent.com/agegr/pi-web/main/docs/screenshot2.png)
 
@@ -10,20 +11,18 @@ The same pi session in CLI and Pi Web: structured tool calls, readable Markdown,
 
 ## Quick Start
 
-**Run without installing:**
+**Clone and run locally (recommended for this fork):**
 
 ```bash
-npx @agegr/pi-web@latest
-```
-
-**Or install globally:**
-
-```bash
-npm install -g @agegr/pi-web
-pi-web
+git clone https://github.com/ItsDalk-Lane/pi-web.git
+cd pi-web
+npm install
+npm run dev
 ```
 
 Then open [http://localhost:30141](http://localhost:30141). The CLI will try to open the browser automatically after the server is ready.
+
+If you need the upstream published package, use `@agegr/pi-web` instead of this fork.
 
 **Options:**
 
@@ -47,7 +46,7 @@ On macOS or Linux:
 HTTP_PROXY=http://127.0.0.1:7890 \
 HTTPS_PROXY=http://127.0.0.1:7890 \
 NO_PROXY=localhost,127.0.0.1 \
-npx @agegr/pi-web@latest
+npm run dev
 ```
 
 On Windows PowerShell:
@@ -56,7 +55,7 @@ On Windows PowerShell:
 $env:HTTP_PROXY = "http://127.0.0.1:7890"
 $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 $env:NO_PROXY = "localhost,127.0.0.1"
-npx @agegr/pi-web@latest
+npm run dev
 ```
 
 ## Features
@@ -86,11 +85,20 @@ npm run dev
 
 The local dev server runs at [http://localhost:30141](http://localhost:30141).
 
+Production run:
+
+```bash
+npm run build
+npm run start
+```
+
 Common checks:
 
 ```bash
-node_modules/.bin/tsc --noEmit
+npm run typecheck
 npm run lint
+npm run test
+npm run check
 ```
 
 Avoid running `next build` / `npm run build` during local development. It writes to `.next/` and can interfere with the dev server; leave builds for release work.

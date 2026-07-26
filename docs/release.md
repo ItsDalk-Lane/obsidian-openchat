@@ -1,9 +1,9 @@
 # Release Checklist
 
-This repo publishes two artifacts for each release:
+This fork currently treats release as a quality gate and GitHub release process.
+Publishing a new npm package name/scope is maintainer-owned and intentionally not automated here.
 
-- npm package: `@agegr/pi-web`
-- GitHub Release: `agegr/pi-web`
+- GitHub Release: `ItsDalk-Lane/pi-web`
 
 Use this checklist from a clean `main` checkout.
 
@@ -21,30 +21,20 @@ Expected:
 
 - `git status` is clean, or only contains changes you intentionally plan to release.
 - GitHub is authenticated as an account that can push and create releases.
-- npm is authenticated as an account that can publish `@agegr/pi-web`.
+- npm authentication is optional unless maintainers explicitly re-enable package publishing.
 
-## 2. Publish to npm
+## 2. Run release quality gate
 
 ```bash
 npm run release
 ```
 
-The release script runs:
-
-```bash
-npm version patch --no-git-tag-version && npm run build && npm publish --access public
-```
+The release script runs `check + build` and stops on any failure.
 
 Notes:
 
-- This bumps `package.json` and `package-lock.json`.
+- This does not publish to npm in this fork.
 - It intentionally runs a production build. Do not run `next build` during normal development; release work is the exception.
-- If `npm view @agegr/pi-web version` briefly shows the previous version, check the exact version instead:
-
-```bash
-npm view @agegr/pi-web@<version> version --registry https://registry.npmjs.org/
-npm view @agegr/pi-web versions --json --registry https://registry.npmjs.org/
-```
 
 ## 3. Commit the Version Bump
 
@@ -67,7 +57,7 @@ Confirm the tag does not already exist before creating it when unsure:
 
 ```bash
 git ls-remote --tags origin v<version>
-gh release view v<version> --repo agegr/pi-web
+gh release view v<version> --repo ItsDalk-Lane/pi-web
 ```
 
 ## 5. Generate Release Notes from Commits
@@ -103,7 +93,7 @@ Suggested structure:
 
 ### 内部调整
 
-- 发布 npm 包 `@agegr/pi-web@<version>`。
+- 本仓库默认不发布 npm 包；如要发布，请先确认包名和所有权。
 
 ## English
 
@@ -123,7 +113,7 @@ Prepared from commits in `v<previous>..v<version>`.
 
 ### Internal
 
-- Published npm package `@agegr/pi-web@<version>`.
+- npm publishing is disabled by default in this fork; confirm package ownership before enabling.
 ```
 
 ## 6. Create or Update the GitHub Release
@@ -132,7 +122,7 @@ Create a new release:
 
 ```bash
 gh release create v<version> \
-  --repo agegr/pi-web \
+--repo ItsDalk-Lane/pi-web \
   --verify-tag \
   --title "v<version>" \
   --notes-file release-notes.md
@@ -142,14 +132,14 @@ If the release already exists and only the notes need updating:
 
 ```bash
 gh release edit v<version> \
-  --repo agegr/pi-web \
+  --repo ItsDalk-Lane/pi-web \
   --notes-file release-notes.md
 ```
 
 You can avoid a temporary file by passing notes through stdin:
 
 ```bash
-gh release edit v<version> --repo agegr/pi-web --notes-file - <<'EOF'
+gh release edit v<version> --repo ItsDalk-Lane/pi-web --notes-file - <<'EOF'
 ## 中文
 
 ...
@@ -163,8 +153,7 @@ EOF
 ## 7. Final Verification
 
 ```bash
-gh release view v<version> --repo agegr/pi-web
-npm view @agegr/pi-web@<version> version --registry https://registry.npmjs.org/
+gh release view v<version> --repo ItsDalk-Lane/pi-web
 git status --short --branch
 git log --oneline --decorate -3
 ```
@@ -172,6 +161,5 @@ git log --oneline --decorate -3
 Expected:
 
 - GitHub Release exists and is not a draft unless intentionally published as one.
-- npm exact version resolves.
 - `main` is aligned with `origin/main`.
 - `HEAD` points at the release commit and `v<version>` tag.

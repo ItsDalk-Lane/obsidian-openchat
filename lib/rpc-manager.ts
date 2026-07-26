@@ -1,14 +1,23 @@
-import { createAgentSessionFromServices, createAgentSessionServices, createEventBus, getAgentDir, initTheme, SessionManager, SettingsManager, Theme } from "@earendil-works/pi-coding-agent";
-import { KeybindingsManager as TuiKeybindingsManager, TUI_KEYBINDINGS } from "@earendil-works/pi-tui";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { randomUUID } from "crypto";
 import { existsSync, writeFileSync } from "fs";
 import { invalidateModelsCache } from "./models-cache";
-import { isMcpAdapterInstalledAsPackage, MCP_STATUS_EVENT, resolveBundledMcpAdapterDir, type McpStatusSnapshot } from "./mcp-extension";
+import type { McpStatusSnapshot } from "./mcp-extension";
 import { cacheSessionPath, invalidateSessionListCache } from "./session-reader";
 import type { SlashCommandInfo } from "@earendil-works/pi-coding-agent";
-import type { AgentSessionLike, ExtensionUiContextLike, ToolInfo } from "./pi-types";
+import type { AgentSessionLike, ExtensionUiContextLike } from "./pi-types";
 import type { ExtensionUiRequest, ExtensionUiResponse, ExtensionWidgetItem } from "./types";
 import { createHeadlessCustomUiTui, DEFAULT_CUSTOM_UI_COLUMNS } from "./custom-ui-terminal";
+import {
+  CUSTOM_UI_KEYBINDINGS,
+  PLAIN_TEXT_THEME,
+  PiRuntimeAdapter,
+  applyEmptySystemPromptPatch,
+  applySessionManagerFlushedPatch,
+  createPiSession,
+  normalizePiEvent,
+  withExtensionTools,
+} from "./adapters/pi";
 
 // ============================================================================
 // Types
@@ -59,48 +68,6 @@ type ExtensionBindingOptions = {
   forceEmptySystemPrompt?: boolean;
 };
 
-const CODING_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"];
-
-// Extensions require a complete Theme, while the web UI applies its own styling.
-class PlainTextTheme extends Theme {
-  constructor() {
-    super(
-      { thinkingXhigh: "" } as ConstructorParameters<typeof Theme>[0],
-      {} as ConstructorParameters<typeof Theme>[1],
-      "truecolor",
-    );
-  }
-
-  override fg(...[, text]: Parameters<Theme["fg"]>): string { return text; }
-  override bg(...[, text]: Parameters<Theme["bg"]>): string { return text; }
-  override bold(text: string): string { return text; }
-  override italic(text: string): string { return text; }
-  override underline(text: string): string { return text; }
-  override inverse(text: string): string { return text; }
-  override strikethrough(text: string): string { return text; }
-  override getFgAnsi(): string { return ""; }
-  override getBgAnsi(): string { return ""; }
-  override getThinkingBorderColor(): (text: string) => string {
-    return (text) => text;
-  }
-  override getBashModeBorderColor(): (text: string) => string { return (text) => text; }
-}
-
-const PLAIN_TEXT_THEME = new PlainTextTheme();
-const CUSTOM_UI_KEYBINDINGS = new TuiKeybindingsManager(TUI_KEYBINDINGS);
-
-function withExtensionTools(session: AgentSessionLike, toolNames: string[]): string[] {
-  if (toolNames.length === 0) return [];
-
-  const codingToolNames = new Set(CODING_TOOL_NAMES);
-  const extensionToolNames = session
-    .getAllTools()
-    .map((t) => t.name)
-    .filter((name) => !codingToolNames.has(name));
-
-  return [...new Set([...toolNames, ...extensionToolNames])];
-}
-
 // ============================================================================
 // AgentSessionWrapper
 // Wraps AgentSession with the same interface the rest of the app expects
@@ -123,8 +90,11 @@ export class AgentSessionWrapper {
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private onDestroyCallback: (() => void) | null = null;
   private _alive = true;
+  private readonly runtime: PiRuntimeAdapter;
 
-  constructor(public readonly inner: AgentSessionLike) {}
+  constructor(public readonly inner: AgentSessionLike) {
+    this.runtime = new PiRuntimeAdapter(inner);
+  }
 
   get sessionId(): string {
     return this.inner.sessionId;
@@ -144,11 +114,12 @@ export class AgentSessionWrapper {
 
   start(): void {
     this.unsubscribe = this.inner.subscribe((event: AgentEvent) => {
+      const normalizedEvent = normalizePiEvent(event);
       this.resetIdleTimer();
-      if (event.type === "agent_end") {
+      if (normalizedEvent.type === "agent_end") {
         invalidateSessionListCache();
       }
-      this.emit(event);
+      this.emit(normalizedEvent);
       // Streaming / compaction / tool events flow through here; re-broadcast
       // the running-status snapshot so the sidebar can update live.
       notifyRunningChange();
@@ -260,9 +231,7 @@ export class AgentSessionWrapper {
   }
 
   private applyForcedEmptySystemPrompt(): void {
-    if (this.forceEmptySystemPrompt && this.inner.agent.state) {
-      this.inner.agent.state.systemPrompt = "";
-    }
+    applyEmptySystemPromptPatch(this.inner, this.forceEmptySystemPrompt);
   }
 
   private emit(event: AgentEvent): void {
@@ -296,7 +265,7 @@ export class AgentSessionWrapper {
     // Pi normally delays the first flush until an assistant message exists.
     // A leading shell command has no assistant message, so mark this SDK
     // manager as flushed after writing its own generated entries.
-    (manager as unknown as { flushed: boolean }).flushed = true;
+    applySessionManagerFlushedPatch(this.inner);
     cacheSessionPath(this.inner.sessionId, sessionFile);
   }
 
@@ -354,29 +323,10 @@ export class AgentSessionWrapper {
         return null;
 
       case "get_state": {
-        const model = this.inner.model;
-        const contextUsage = this.inner.getContextUsage();
+        const state = this.runtime.getState(this.promptRunning);
         return {
-          sessionId: this.inner.sessionId,
-          sessionFile: this.inner.sessionFile ?? "",
-          isStreaming: this.inner.isStreaming,
-          isPromptRunning: this.promptRunning,
-          isBashRunning: this.inner.isBashRunning,
-          isCompacting: this.inner.isCompacting,
-          autoCompactionEnabled: this.inner.autoCompactionEnabled,
-          autoRetryEnabled: this.inner.autoRetryEnabled,
-          model: model ? { id: model.id, provider: model.provider } : undefined,
+          ...state,
           messageCount: 0,
-          pendingMessageCount: this.inner.pendingMessageCount,
-          queuedMessages: {
-            steering: [...this.inner.getSteeringMessages()],
-            followUp: [...this.inner.getFollowUpMessages()],
-          },
-          contextUsage: contextUsage
-            ? { percent: contextUsage.percent, contextWindow: contextUsage.contextWindow, tokens: contextUsage.tokens }
-            : null,
-          systemPrompt: this.inner.agent.state?.systemPrompt ?? "",
-          thinkingLevel: this.inner.agent.state?.thinkingLevel ?? "off",
           extensionStatuses: this.getExtensionStatuses(),
           extensionWidgets: this.getExtensionWidgets(),
           mcpStatus: this.mcpStatus,
@@ -440,13 +390,7 @@ export class AgentSessionWrapper {
 
       case "set_thinking_level": {
         const level = command.level as string;
-        this.inner.setThinkingLevel(level);
-        // setThinkingLevel clamps xhigh→high for models where supportsXhigh()===false.
-        // If the model has DeepSeek thinking compat (reasoningEffortMap maps xhigh→max),
-        // force the state back so the compat layer can use it correctly.
-        if (level === "xhigh" && (this.inner.model as { compat?: { thinkingFormat?: string } } | null)?.compat?.thinkingFormat === "deepseek" && this.inner.agent?.state) {
-          this.inner.agent.state.thinkingLevel = "xhigh";
-        }
+        this.runtime.setThinkingLevel(level);
         invalidateSessionListCache();
         return null;
       }
@@ -504,13 +448,7 @@ export class AgentSessionWrapper {
       }
 
       case "get_tools": {
-        const all: ToolInfo[] = this.inner.getAllTools();
-        const active = new Set<string>(this.inner.getActiveToolNames());
-        return all.map((t) => ({
-          name: t.name,
-          description: t.description,
-          active: active.has(t.name),
-        }));
+        return this.runtime.getTools();
       }
 
       case "get_commands": {
@@ -545,7 +483,7 @@ export class AgentSessionWrapper {
       case "set_tools": {
         const toolNames = command.toolNames as string[];
         this.setForceEmptySystemPrompt(toolNames.length === 0);
-        this.inner.setActiveToolsByName(withExtensionTools(this.inner, toolNames));
+        this.runtime.setTools(toolNames);
         this.applyForcedEmptySystemPrompt();
         return null;
       }
@@ -1055,93 +993,31 @@ export async function startRpcSession(
   if (inflight) return inflight;
 
   const starting = (async () => {
-    // Some extensions access the SDK's global theme even outside the terminal UI.
-    initTheme();
-    const agentDir = getAgentDir();
-
-    const sessionManager = sessionFile
-      ? SessionManager.open(sessionFile, undefined)
-      : SessionManager.create(cwd, undefined);
-
-    // Bundled MCP support: inject pi-mcp-adapter unless the user already
-    // installed it as a pi package (avoid loading the extension twice).
-    // A dedicated event bus lets pi-web observe the adapter's status snapshots.
-    let mcpAdapterDir: string | null = null;
-    try {
-      const settingsProbe = SettingsManager.create(cwd, agentDir);
-      mcpAdapterDir = isMcpAdapterInstalledAsPackage(settingsProbe) ? null : resolveBundledMcpAdapterDir();
-    } catch (err) {
-      console.warn("[pi-web] failed to check installed packages for pi-mcp-adapter:", err instanceof Error ? err.message : err);
-      mcpAdapterDir = resolveBundledMcpAdapterDir();
-    }
-    const mcpEventBus = createEventBus();
-    let mcpStatusTarget: AgentSessionWrapper | null = null;
-    let pendingMcpStatus: McpStatusSnapshot | null = null;
-    const unsubMcpStatus = mcpEventBus.on(MCP_STATUS_EVENT, (data) => {
-      const snapshot = data as McpStatusSnapshot;
-      if (mcpStatusTarget) mcpStatusTarget.setMcpStatus(snapshot);
-      else pendingMcpStatus = snapshot;
-    });
-
-    // Determine which tools to pass based on requested toolNames.
-    // Since v0.68.0, session creation expects string[] tool names instead of Tool[] instances.
-    let toolsOption: string[] | undefined;
-    if (toolNames !== undefined) {
-      // toolNames === [] -> "all off" (an empty allow-list disables every tool).
-      // Otherwise DO NOT pass a builtin-only allow-list: passing CODING_TOOL_NAMES
-      // set allowedToolNames to coding builtins only, which filtered every
-      // extension/package-provided tool (e.g. subagents, web access) out of the
-      // tool registry — so they were unavailable in Pi Web sessions even though the
-      // `pi` CLI keeps them. Leaving the allow-list unset lets the SDK register all
-      // tools (and activate extension tools); we narrow the ACTIVE set below.
-      toolsOption = toolNames.length === 0 ? [] : undefined;
-    }
-
-    // Build services first so extension-registered providers are available
-    // before the SDK restores the saved model from the session file.
-    const services = await createAgentSessionServices({
+    const runtime = await createPiSession({
       cwd,
-      agentDir,
-      resourceLoaderOptions: {
-        eventBus: mcpEventBus,
-        ...(mcpAdapterDir ? { additionalExtensionPaths: [mcpAdapterDir] } : {}),
-      },
-    });
-    const { session: inner } = await createAgentSessionFromServices({
-      services,
-      sessionManager,
-      ...(toolsOption !== undefined ? { tools: toolsOption } : {}),
+      sessionFile,
+      toolNames,
     });
 
-    // If specific tool names were requested (non-empty), set the active tools to the
-    // requested builtin coding tools PLUS all extension/package tools, so installed
-    // extensions stay usable in Pi Web just like in the `pi` CLI.
     if (toolNames && toolNames.length > 0) {
-      inner.setActiveToolsByName(withExtensionTools(inner, toolNames));
+      runtime.session.setActiveToolsByName(withExtensionTools(runtime.session, toolNames));
     }
 
-    const wrapper = new AgentSessionWrapper(inner);
-    // When all tools are disabled, clear the system prompt entirely.
-    // pi's buildSystemPrompt always produces a non-empty prompt even with no tools;
-    // keep this forced after extension resource discovery and reloads as well.
-    if (toolNames?.length === 0) {
-      wrapper.setForceEmptySystemPrompt(true);
-    }
+    const wrapper = new AgentSessionWrapper(runtime.session);
+    if (runtime.forceEmptySystemPrompt) wrapper.setForceEmptySystemPrompt(true);
     wrapper.start();
 
-    const realSessionId = inner.sessionId as string;
-    const realSessionFile = inner.sessionFile as string | undefined;
+    const realSessionId = runtime.realSessionId;
+    const realSessionFile = runtime.realSessionFile;
     if (realSessionFile) cacheSessionPath(realSessionId, realSessionFile);
 
     wrapper.onDestroy(() => {
-      unsubMcpStatus();
+      runtime.dispose();
       registry.delete(realSessionId);
     });
     registry.set(realSessionId, wrapper);
-    wrapper.beginExtensionBinding({ forceEmptySystemPrompt: toolNames?.length === 0 });
-
-    mcpStatusTarget = wrapper;
-    if (pendingMcpStatus) wrapper.setMcpStatus(pendingMcpStatus);
+    wrapper.beginExtensionBinding({ forceEmptySystemPrompt: runtime.forceEmptySystemPrompt });
+    runtime.subscribeMcpStatus((snapshot) => wrapper.setMcpStatus(snapshot));
 
     return { session: wrapper, realSessionId };
   })().finally(() => locks.delete(sessionId));

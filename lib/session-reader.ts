@@ -191,6 +191,10 @@ export function getSessionEntries(filePath: string): SessionEntry[] {
   return entries as unknown as SessionEntry[];
 }
 
+export function getSessionCwd(filePath: string): string | undefined {
+  return SessionManager.open(filePath).getHeader()?.cwd;
+}
+
 export function buildSessionContext(
   entries: SessionEntry[],
   leafId?: string | null,

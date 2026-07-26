@@ -1,16 +1,26 @@
 {
-  "name": "@agegr/pi-web",
+  "name": "@itsdalk-lane/pi-web",
   "version": "0.8.0",
-  "description": "Web UI for the pi coding agent",
-  "homepage": "https://github.com/agegr/pi-web#readme",
+  "description": "Fork of Pi Web: a web UI for the pi coding agent",
+  "private": true,
+  "homepage": "https://github.com/ItsDalk-Lane/pi-web#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/agegr/pi-web.git"
+    "url": "git+https://github.com/ItsDalk-Lane/pi-web.git"
   },
   "bugs": {
-    "url": "https://github.com/agegr/pi-web/issues"
+    "url": "https://github.com/ItsDalk-Lane/pi-web/issues"
   },
+  "author": "ItsDalk-Lane",
+  "keywords": [
+    "pi",
+    "agent",
+    "nextjs",
+    "web-ui",
+    "fork"
+  ],
   "license": "MIT",
+  "packageManager": "npm@11.9.0",
   "bin": {
     "pi-web": "bin/pi-web.js"
   },
@@ -30,8 +40,13 @@
     "build": "next build --webpack",
     "start": "next start -p 30141",
     "lint": "eslint .",
-    "update:pi": "npm install --save-exact @earendil-works/pi-agent-core@latest @earendil-works/pi-ai@latest @earendil-works/pi-coding-agent@latest @earendil-works/pi-tui@latest && tsc --noEmit && npm run lint",
-    "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "test": "node --test \"lib/*.test.mjs\" \"components/**/*.test.mjs\"",
+    "test:pi-adapter": "node --test \"lib/adapters/pi/__tests__/*.test.mjs\"",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run test:pi-adapter",
+    "prepublishOnly": "npm run check && npm run build",
+    "release": "npm run prepublishOnly && echo \"Publishing is disabled in this fork. Confirm package ownership before enabling npm publish.\"",
+    "update:pi": "npm install --save-exact @earendil-works/pi-agent-core@latest @earendil-works/pi-ai@latest @earendil-works/pi-coding-agent@latest @earendil-works/pi-tui@latest && npm run typecheck && npm run lint",
     "electron:build": "npm run build && electron-builder",
     "electron:dev": "npm run build && node electron/launcher.js",
     "electron:start": "node electron/launcher.js"
