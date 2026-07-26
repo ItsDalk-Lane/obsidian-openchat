@@ -1,7 +1,6 @@
 import { getSessionCwd, resolveSessionPath } from "@/lib/session-reader";
 import { getRpcSession, startRpcSession } from "@/lib/rpc-manager";
 import { createKernelEvent } from "@/lib/kernel";
-import { getPiRunId, getPiTaskId } from "@/lib/adapters/pi";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +13,7 @@ export async function GET(
 
   // Fast path: already-running session
   let session = getRpcSession(id);
+  let runtimeContext = session?.getRuntimeContext();
   if (!session || !session.isAlive()) {
     const filePath = await resolveSessionPath(id);
     if (!filePath) {
@@ -21,7 +21,7 @@ export async function GET(
     }
     const cwd = getSessionCwd(filePath) ?? process.cwd();
     try {
-      ({ session } = await startRpcSession(id, filePath, cwd));
+      ({ session, runtimeContext } = await startRpcSession(id, filePath, cwd));
     } catch (error) {
       return new Response(`Failed to start agent: ${error}`, { status: 500 });
     }
@@ -37,8 +37,8 @@ export async function GET(
       // Send initial connected event
       encode(createKernelEvent(
         "transport.connected",
-        getPiTaskId(id),
-        getPiRunId(id),
+        runtimeContext?.taskId ?? session.getRuntimeContext().taskId,
+        runtimeContext?.runId ?? session.getRuntimeContext().runId,
         { sessionId: id },
         { kind: "transport", adapter: "pi", nativeType: "connected" },
       ));

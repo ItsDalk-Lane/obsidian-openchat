@@ -13,6 +13,7 @@ import { useAudio } from "@/hooks/useAudio";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { SessionStatsInfo } from "@/lib/pi-types";
+import type { Run, Task } from "@/lib/kernel";
 import {
   captureScrollDistance,
   getNextVisibleCount,
@@ -22,6 +23,8 @@ import {
 } from "@/lib/chat-lazy-load";
 
 interface Props {
+  task?: Task | null;
+  run?: Run | null;
   session: SessionInfo | null;
   newSessionCwd: string | null;
   onAgentEnd?: () => void;
@@ -168,7 +171,7 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, children }: { messag
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile }: Props) {
+export function ChatWindow({ task, run, session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile }: Props) {
   const { soundEnabled, onSoundToggle, playDoneSound, unlockAudio } = useAudio();
   const isMobile = useIsMobile();
 
@@ -390,6 +393,8 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
 
   return (
     <div
+      data-task-id={task?.id ?? ""}
+      data-run-id={run?.id ?? ""}
       className="relative flex h-full flex-col overflow-hidden"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}

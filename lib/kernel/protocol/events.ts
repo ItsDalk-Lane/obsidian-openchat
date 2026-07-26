@@ -1,7 +1,8 @@
-import type { AgentMessage, ExtensionUiRequest } from "../../types";
 import type { RunId, TaskId } from "../domain";
+import type { AgentMessage, ExtensionUiRequest } from "./interactions";
 
 export const KERNEL_EVENT_SCHEMA_VERSION = 1 as const;
+export type KernelEventDurability = "durable" | "transient";
 
 export type KernelEventSourceKind = "runtime" | "system" | "extension" | "transport";
 
@@ -17,13 +18,19 @@ export interface KernelEventEnvelope<TType extends string, TPayload> {
   type: TType;
   occurredAt: string;
   taskId: TaskId;
-  runId: RunId;
+  runId?: RunId;
   operationId?: string;
   source: KernelEventSource;
   payload: TPayload;
 }
 
 export type TransportConnectedEvent = KernelEventEnvelope<"transport.connected", { sessionId: string }>;
+export type TaskCreatedEvent = KernelEventEnvelope<"task.created", { task: { id: TaskId; status: string; title: string } }>;
+export type TaskUpdatedEvent = KernelEventEnvelope<"task.updated", { changedFields: string[] }>;
+export type TaskStatusChangedEvent = KernelEventEnvelope<"task.status.changed", { previousStatus: string; status: string }>;
+export type RunCreatedEvent = KernelEventEnvelope<"run.created", { run: { id: RunId; runtimeKind: string; nativeRuntimeId: string } }>;
+export type RunStatusChangedEvent = KernelEventEnvelope<"run.status.changed", { previousStatus: string; status: string }>;
+export type RunInterruptedEvent = KernelEventEnvelope<"run.interrupted", { previousStatus: string }>;
 export type OperationStartedEvent = KernelEventEnvelope<"operation.started", { operationKind: "prompt" | "bash" | "compact" }>;
 export type OperationCompletedEvent = KernelEventEnvelope<"operation.completed", { operationKind: "prompt" | "bash" | "compact"; result?: Record<string, unknown> | null }>;
 export type OperationFailedEvent = KernelEventEnvelope<"operation.failed", { operationKind: "prompt" | "bash" | "compact"; errorMessage: string }>;
@@ -42,9 +49,18 @@ export type ExtensionUiRequestedEvent = KernelEventEnvelope<"extension.ui.reques
 export type ExtensionFailedEvent = KernelEventEnvelope<"extension.failed", { extensionPath?: string; event?: string; errorMessage: string }>;
 export type RuntimeStatusUpdatedEvent = KernelEventEnvelope<"runtime.status.updated", { statusType: "mcp"; snapshot: unknown }>;
 export type NativeDiagnosticEvent = KernelEventEnvelope<"native.diagnostic", { nativeType: string; message: string }>;
+export type ArtifactRegisteredEvent = KernelEventEnvelope<"artifact.registered", { artifactId: string; artifactType: string }>;
+export type ArtifactUpdatedEvent = KernelEventEnvelope<"artifact.updated", { artifactId: string; changedFields: string[] }>;
+export type ArtifactArchivedEvent = KernelEventEnvelope<"artifact.archived", { artifactId: string }>;
 
 export type KernelEvent =
   | TransportConnectedEvent
+  | TaskCreatedEvent
+  | TaskUpdatedEvent
+  | TaskStatusChangedEvent
+  | RunCreatedEvent
+  | RunStatusChangedEvent
+  | RunInterruptedEvent
   | OperationStartedEvent
   | OperationCompletedEvent
   | OperationFailedEvent
@@ -62,7 +78,16 @@ export type KernelEvent =
   | ExtensionUiRequestedEvent
   | ExtensionFailedEvent
   | RuntimeStatusUpdatedEvent
-  | NativeDiagnosticEvent;
+  | NativeDiagnosticEvent
+  | ArtifactRegisteredEvent
+  | ArtifactUpdatedEvent
+  | ArtifactArchivedEvent;
+
+export interface StoredKernelEvent {
+  sequence: number;
+  durability: KernelEventDurability;
+  event: KernelEvent;
+}
 
 export type LegacyFlatEvent = {
   type: string;

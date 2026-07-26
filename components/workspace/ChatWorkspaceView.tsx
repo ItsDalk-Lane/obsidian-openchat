@@ -9,7 +9,5 @@ type Props = React.ComponentProps<typeof ChatWindow> & {
 };
 
 export function ChatWorkspaceView({ task, run, ...chatProps }: Props) {
-  void task;
-  void run;
-  return <ChatWindow {...chatProps} />;
+  return <ChatWindow task={task ?? null} run={run ?? null} {...chatProps} />;
 }

@@ -11,8 +11,8 @@ import { parseNewSessionCommand } from "@/lib/kernel";
 // Returns { sessionId, data } where sessionId is pi's real session id.
 export async function POST(req: Request) {
   try {
-    const body = await req.json() as { cwd?: string; [key: string]: unknown };
-    const { cwd, ...command } = body;
+    const body = await req.json() as { cwd?: string; taskId?: string; [key: string]: unknown };
+    const { cwd, taskId, ...command } = body;
 
     if (!cwd || typeof cwd !== "string") {
       return NextResponse.json({ error: "cwd is required" }, { status: 400 });
@@ -33,7 +33,9 @@ export async function POST(req: Request) {
     // that share a key onto one session. Date.now() (ms resolution) collides for
     // requests in the same millisecond, merging two new sessions into one.
     const tempKey = `__new__${randomUUID()}`;
-    const { session, realSessionId } = await startRpcSession(tempKey, "", cwd, toolNames);
+    const { session, realSessionId, runtimeContext } = await startRpcSession(tempKey, "", cwd, toolNames, {
+      taskId: taskId as never,
+    });
 
     // Keep the files-route allowed-roots cache (see app/api/files/[...path]/route.ts)
     // in sync so the new cwd is immediately readable via /api/files. Without this,
@@ -52,12 +54,24 @@ export async function POST(req: Request) {
     }
 
     if (parsed.type === "ensure_session") {
-      return NextResponse.json({ success: true, sessionId: realSessionId, data: null });
+      return NextResponse.json({
+        success: true,
+        sessionId: realSessionId,
+        taskId: runtimeContext.taskId,
+        runId: runtimeContext.runId,
+        data: null,
+      });
     }
 
     const result = await session.send(parsed);
 
-    return NextResponse.json({ success: true, sessionId: realSessionId, data: result });
+    return NextResponse.json({
+      success: true,
+      sessionId: realSessionId,
+      taskId: runtimeContext.taskId,
+      runId: runtimeContext.runId,
+      data: result,
+    });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }

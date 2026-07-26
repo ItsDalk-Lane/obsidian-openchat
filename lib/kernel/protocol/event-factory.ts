@@ -9,7 +9,7 @@ function createEventId(): string {
 export function createKernelEvent<T extends KernelEvent["type"]>(
   type: T,
   taskId: TaskId,
-  runId: RunId,
+  runId: RunId | undefined,
   payload: Extract<KernelEvent, { type: T }>["payload"],
   source: KernelEventSource,
   operationId?: string,
@@ -20,7 +20,7 @@ export function createKernelEvent<T extends KernelEvent["type"]>(
     type,
     occurredAt: new Date().toISOString(),
     taskId,
-    runId,
+    ...(runId ? { runId } : {}),
     ...(operationId ? { operationId } : {}),
     source,
     payload,

@@ -71,15 +71,18 @@ npm run dev
 - **Better Markdown rendering**: Mermaid diagrams support source/preview switching and zoom viewer; local markdown image links render directly from the file API.
 - **See session state clearly**: context usage, cost, compaction state, and system prompt details are visible from the top bar.
 - **Configure less from the terminal**: manage models, login/API keys, model tests, and skill switches from the web UI.
+- **Track durable work**: sessions now reconcile into persistent Tasks/Runs with an event journal and artifact catalog that survive server restarts.
 
 ## Notes
 
 - **Data directory**: Pi Web reads `~/.pi/agent/sessions` by default. Set `PI_CODING_AGENT_DIR` to point at another pi agent directory.
+- **Task runtime database**: Pi Web stores durable task/run/artifact/event state in `PI_WEB_DATA_DIR`, or by default in `<PI_CODING_AGENT_DIR or ~/.pi/agent>/pi-web/kernel.sqlite`.
 - **Session files**: files are stored as `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`.
 - **Model config**: the Models panel reads and writes `models.json` in the pi agent directory. Model lists and defaults come from pi's config.
 - **File access**: file browsing and preview are scoped to the selected project directory and working directories that appear in sessions.
 - **Git worktrees**: see [Worktrees in Pi Web](./docs/worktrees.md) for when the switcher appears, how new worktrees are created, and what removal does.
 - **Forks vs in-session branches**: Fork creates a new `.jsonl` file. "Edit from here" creates another branch inside the same session file.
+- **Durable runtime details**: see [Durable Task Runtime - Phase 3](./docs/durable-task-runtime-phase-3.md).
 
 ## Development
 
@@ -105,6 +108,9 @@ Common checks:
 npm run typecheck
 npm run lint
 npm run test
+npm run test:persistence
+npm run test:task-runtime
+npm run test:event-journal
 npm run check
 ```
 
@@ -153,6 +159,7 @@ app/
     models-config/  # read/write models.json and test models
     sessions/       # session reads, rename, delete, context, HTML export
     skills/         # skill listing, search, install, enable/disable
+    tasks/          # durable task, run, event, and artifact APIs
 components/
   AppShell.tsx        # main layout, URL state, top panels, file tabs
   SessionSidebar.tsx  # project selector, session tree, Explorer
@@ -164,6 +171,8 @@ components/
   FileExplorer.tsx    # file tree
   FileViewer.tsx      # source, diff, image, audio, PDF, DOCX preview
 lib/
+  application/      # task/run/artifact/event services and ports
+  persistence/      # SQLite database, repositories, migrations, data-dir logic
   http-dispatcher.ts  # HTTP(S) proxy setup for server-side fetch
   rpc-manager.ts      # AgentSessionWrapper lifecycle and global registry
   session-reader.ts   # parses .jsonl session files and branch contexts

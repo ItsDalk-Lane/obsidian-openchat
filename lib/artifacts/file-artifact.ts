@@ -63,11 +63,16 @@ function inferArtifactType(filePath: string, mediaType?: string): string {
 export function createFileArtifact(filePath: string, options: FileArtifactOptions = {}): Artifact {
   const stablePath = normalizePathForId(filePath);
   const mediaType = inferMediaType(filePath);
+  const now = new Date().toISOString();
   return {
     id: createArtifactId(`file:${stablePath}`),
     type: inferArtifactType(filePath, mediaType),
     title: options.title ?? getFileName(filePath) ?? filePath,
     mediaType,
+    version: 1,
+    status: "ready",
+    createdAt: now,
+    updatedAt: now,
     representations: [
       {
         kind: "file",
@@ -76,7 +81,9 @@ export function createFileArtifact(filePath: string, options: FileArtifactOption
       },
     ],
     provenance: {
+      kind: "file",
       sourceSessionId: options.sourceSessionId ?? undefined,
+      capturedAt: now,
     },
     metadata: {
       cwd: options.cwd,

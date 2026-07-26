@@ -15,8 +15,6 @@ import {
   applyEmptySystemPromptPatch,
   applySessionManagerFlushedPatch,
   createPiSession,
-  getPiRunId,
-  getPiTaskId,
   parseAgentImages,
   toKernelEventFromPiEvent,
   withExtensionTools,
@@ -25,8 +23,10 @@ import {
   createKernelEvent,
   createOperationId,
   type KernelEvent,
+  type RuntimeContext,
   type RuntimeCommand,
 } from "./kernel";
+import { getKernelServices } from "./application/services";
 
 // ============================================================================
 // Types
@@ -72,6 +72,38 @@ type ExtensionBindingOptions = {
   forceEmptySystemPrompt?: boolean;
 };
 
+type OperationKind = "prompt" | "bash" | "compact";
+
+class OperationLifecycleTracker {
+  private active = new Map<OperationKind, string>();
+  private terminal = new Set<string>();
+
+  begin(kind: OperationKind, operationId: string): void {
+    this.active.set(kind, operationId);
+    this.terminal.delete(operationId);
+  }
+
+  current(kind: OperationKind): string | undefined {
+    return this.active.get(kind);
+  }
+
+  finish(kind: OperationKind, operationId: string): boolean {
+    const active = this.active.get(kind);
+    if (!active || active !== operationId || this.terminal.has(operationId)) return false;
+    this.terminal.add(operationId);
+    this.active.delete(kind);
+    return true;
+  }
+
+  abort(kind: OperationKind): string | undefined {
+    const active = this.active.get(kind);
+    if (!active || this.terminal.has(active)) return undefined;
+    this.terminal.add(active);
+    this.active.delete(kind);
+    return active;
+  }
+}
+
 // ============================================================================
 // AgentSessionWrapper
 // Wraps AgentSession with the same interface the rest of the app expects
@@ -95,11 +127,12 @@ export class AgentSessionWrapper {
   private onDestroyCallback: (() => void) | null = null;
   private _alive = true;
   private readonly runtime: PiRuntimeAdapter;
-  private activePromptOperationId: string | undefined;
-  private activeBashOperationId: string | undefined;
-  private activeCompactionOperationId: string | undefined;
+  private readonly operationLifecycle = new OperationLifecycleTracker();
 
-  constructor(public readonly inner: AgentSessionLike) {
+  constructor(
+    public readonly inner: AgentSessionLike,
+    private readonly runtimeContext: RuntimeContext,
+  ) {
     this.runtime = new PiRuntimeAdapter(inner);
   }
 
@@ -109,6 +142,10 @@ export class AgentSessionWrapper {
 
   get sessionFile(): string {
     return this.inner.sessionFile ?? "";
+  }
+
+  getRuntimeContext(): RuntimeContext {
+    return this.runtimeContext;
   }
 
   isAlive(): boolean {
@@ -124,12 +161,11 @@ export class AgentSessionWrapper {
       this.resetIdleTimer();
       if (event.type === "agent_end") {
         invalidateSessionListCache();
-        this.activePromptOperationId = undefined;
       }
       const kernelEvent = toKernelEventFromPiEvent(event, {
-        taskId: getPiTaskId(this.sessionId),
-        runId: getPiRunId(this.sessionId),
-        operationId: this.activePromptOperationId ?? this.activeBashOperationId ?? this.activeCompactionOperationId,
+        taskId: this.runtimeContext.taskId,
+        runId: this.runtimeContext.runId,
+        operationId: this.getCurrentOperationId(),
       });
       if (kernelEvent) this.emit(kernelEvent);
       // Streaming / compaction / tool events flow through here; re-broadcast
@@ -154,11 +190,11 @@ export class AgentSessionWrapper {
     this.mcpStatus = snapshot;
     this.emit(createKernelEvent(
       "runtime.status.updated",
-      getPiTaskId(this.sessionId),
-      getPiRunId(this.sessionId),
+      this.runtimeContext.taskId,
+      this.runtimeContext.runId,
       { statusType: "mcp", snapshot },
       { kind: "runtime", adapter: "pi", nativeType: "mcp_status" },
-      this.activePromptOperationId ?? this.activeBashOperationId ?? this.activeCompactionOperationId,
+      this.getCurrentOperationId(),
     ));
   }
 
@@ -253,15 +289,17 @@ export class AgentSessionWrapper {
   }
 
   private getTaskId() {
-    return getPiTaskId(this.sessionId);
+    return this.runtimeContext.taskId;
   }
 
   private getRunId() {
-    return getPiRunId(this.sessionId);
+    return this.runtimeContext.runId;
   }
 
   private getCurrentOperationId(): string | undefined {
-    return this.activePromptOperationId ?? this.activeBashOperationId ?? this.activeCompactionOperationId;
+    return this.operationLifecycle.current("prompt")
+      ?? this.operationLifecycle.current("bash")
+      ?? this.operationLifecycle.current("compact");
   }
 
   private emitExtensionUiRequest(request: ExtensionUiRequest): KernelEvent {
@@ -290,6 +328,7 @@ export class AgentSessionWrapper {
   }
 
   private emit(event: KernelEvent): void {
+    getKernelServices().eventService.tryAppendRuntimeEvent(event);
     for (const l of this.listeners) l(event);
   }
 
@@ -351,7 +390,7 @@ export class AgentSessionWrapper {
         const promptImages = parseAgentImages(command.images, "prompt");
         const streamingBehavior = command.streamingBehavior;
         const operationId = createOperationId("prompt");
-        this.activePromptOperationId = operationId;
+        this.operationLifecycle.begin("prompt", operationId);
         this.emit(createKernelEvent(
           "operation.started",
           this.getTaskId(),
@@ -368,7 +407,7 @@ export class AgentSessionWrapper {
           source: "rpc",
         }).then(() => {
           this.promptRunning = false;
-          if (!streamingBehavior) {
+          if (this.operationLifecycle.finish("prompt", operationId)) {
             this.emit(createKernelEvent(
               "operation.completed",
               this.getTaskId(),
@@ -378,46 +417,40 @@ export class AgentSessionWrapper {
               operationId,
             ));
           }
-          this.activePromptOperationId = undefined;
           notifyRunningChange();
         }).catch((error) => {
           this.promptRunning = false;
           invalidateSessionListCache();
-          this.emit(createKernelEvent(
-            "operation.failed",
-            this.getTaskId(),
-            this.getRunId(),
-            { operationKind: "prompt", errorMessage: error instanceof Error ? error.message : String(error) },
-            { kind: "runtime", adapter: "pi", nativeType: "prompt_error" },
-            operationId,
-          ));
-          if (!streamingBehavior) {
+          if (this.operationLifecycle.finish("prompt", operationId)) {
             this.emit(createKernelEvent(
-              "operation.completed",
+              "operation.failed",
               this.getTaskId(),
               this.getRunId(),
-              { operationKind: "prompt" },
-              { kind: "runtime", adapter: "pi", nativeType: "prompt_done" },
+              { operationKind: "prompt", errorMessage: error instanceof Error ? error.message : String(error) },
+              { kind: "runtime", adapter: "pi", nativeType: "prompt_error" },
               operationId,
             ));
           }
-          this.activePromptOperationId = undefined;
           notifyRunningChange();
         });
         return null;
       }
 
-      case "abort":
+      case "abort": {
         await this.withFinalRunningNotification(() => this.inner.abort());
-        this.emit(createKernelEvent(
-          "operation.aborted",
-          this.getTaskId(),
-          this.getRunId(),
-          { operationKind: "prompt" },
-          { kind: "runtime", adapter: "pi", nativeType: "abort" },
-          this.activePromptOperationId,
-        ));
+        const activeOperationId = this.operationLifecycle.abort("prompt");
+        if (activeOperationId) {
+          this.emit(createKernelEvent(
+            "operation.aborted",
+            this.getTaskId(),
+            this.getRunId(),
+            { operationKind: "prompt" },
+            { kind: "runtime", adapter: "pi", nativeType: "abort" },
+            activeOperationId,
+          ));
+        }
         return null;
+      }
 
       case "get_state": {
         const state = this.runtime.getState(this.promptRunning);
@@ -497,7 +530,7 @@ export class AgentSessionWrapper {
 
       case "compact": {
         const operationId = createOperationId("compact");
-        this.activeCompactionOperationId = operationId;
+        this.operationLifecycle.begin("compact", operationId);
         this.emit(createKernelEvent(
           "operation.started",
           this.getTaskId(),
@@ -510,27 +543,30 @@ export class AgentSessionWrapper {
           const result = await this.withFinalRunningNotification(() =>
             this.inner.compact(command.customInstructions)
           );
-          this.emit(createKernelEvent(
-            "operation.completed",
-            this.getTaskId(),
-            this.getRunId(),
-            { operationKind: "compact", result: (result as Record<string, unknown>) ?? null },
-            { kind: "runtime", adapter: "pi", nativeType: "compact_done" },
-            operationId,
-          ));
+          if (this.operationLifecycle.finish("compact", operationId)) {
+            this.emit(createKernelEvent(
+              "operation.completed",
+              this.getTaskId(),
+              this.getRunId(),
+              { operationKind: "compact", result: (result as Record<string, unknown>) ?? null },
+              { kind: "runtime", adapter: "pi", nativeType: "compact_done" },
+              operationId,
+            ));
+          }
           return result;
         } catch (error) {
-          this.emit(createKernelEvent(
-            "operation.failed",
-            this.getTaskId(),
-            this.getRunId(),
-            { operationKind: "compact", errorMessage: error instanceof Error ? error.message : String(error) },
-            { kind: "runtime", adapter: "pi", nativeType: "compact_error" },
-            operationId,
-          ));
+          if (this.operationLifecycle.finish("compact", operationId)) {
+            this.emit(createKernelEvent(
+              "operation.failed",
+              this.getTaskId(),
+              this.getRunId(),
+              { operationKind: "compact", errorMessage: error instanceof Error ? error.message : String(error) },
+              { kind: "runtime", adapter: "pi", nativeType: "compact_error" },
+              operationId,
+            ));
+          }
           throw error;
         } finally {
-          this.activeCompactionOperationId = undefined;
           invalidateSessionListCache();
         }
       }
@@ -632,14 +668,17 @@ export class AgentSessionWrapper {
 
       case "abort_compaction": {
         this.inner.abortCompaction();
-        this.emit(createKernelEvent(
-          "operation.aborted",
-          this.getTaskId(),
-          this.getRunId(),
-          { operationKind: "compact" },
-          { kind: "runtime", adapter: "pi", nativeType: "abort_compaction" },
-          this.activeCompactionOperationId,
-        ));
+        const activeOperationId = this.operationLifecycle.abort("compact");
+        if (activeOperationId) {
+          this.emit(createKernelEvent(
+            "operation.aborted",
+            this.getTaskId(),
+            this.getRunId(),
+            { operationKind: "compact" },
+            { kind: "runtime", adapter: "pi", nativeType: "abort_compaction" },
+            activeOperationId,
+          ));
+        }
         return null;
       }
 
@@ -663,7 +702,7 @@ export class AgentSessionWrapper {
           throw new Error("Cannot run a shell command while the session is busy");
         }
         const operationId = createOperationId("bash");
-        this.activeBashOperationId = operationId;
+        this.operationLifecycle.begin("bash", operationId);
         this.emit(createKernelEvent(
           "operation.started",
           this.getTaskId(),
@@ -681,27 +720,30 @@ export class AgentSessionWrapper {
         try {
           const result = await execution;
           this.persistBashOnlySession();
-          this.emit(createKernelEvent(
-            "operation.completed",
-            this.getTaskId(),
-            this.getRunId(),
-            { operationKind: "bash", result: (result as Record<string, unknown>) ?? null },
-            { kind: "runtime", adapter: "pi", nativeType: "bash_done" },
-            operationId,
-          ));
+          if (this.operationLifecycle.finish("bash", operationId)) {
+            this.emit(createKernelEvent(
+              "operation.completed",
+              this.getTaskId(),
+              this.getRunId(),
+              { operationKind: "bash", result: (result as Record<string, unknown>) ?? null },
+              { kind: "runtime", adapter: "pi", nativeType: "bash_done" },
+              operationId,
+            ));
+          }
           return result;
         } catch (error) {
-          this.emit(createKernelEvent(
-            "operation.failed",
-            this.getTaskId(),
-            this.getRunId(),
-            { operationKind: "bash", errorMessage: error instanceof Error ? error.message : String(error) },
-            { kind: "runtime", adapter: "pi", nativeType: "bash_error" },
-            operationId,
-          ));
+          if (this.operationLifecycle.finish("bash", operationId)) {
+            this.emit(createKernelEvent(
+              "operation.failed",
+              this.getTaskId(),
+              this.getRunId(),
+              { operationKind: "bash", errorMessage: error instanceof Error ? error.message : String(error) },
+              { kind: "runtime", adapter: "pi", nativeType: "bash_error" },
+              operationId,
+            ));
+          }
           throw error;
         } finally {
-          this.activeBashOperationId = undefined;
           invalidateSessionListCache();
           notifyRunningChange();
         }
@@ -709,14 +751,17 @@ export class AgentSessionWrapper {
 
       case "abort_bash": {
         this.inner.abortBash();
-        this.emit(createKernelEvent(
-          "operation.aborted",
-          this.getTaskId(),
-          this.getRunId(),
-          { operationKind: "bash" },
-          { kind: "runtime", adapter: "pi", nativeType: "abort_bash" },
-          this.activeBashOperationId,
-        ));
+        const activeOperationId = this.operationLifecycle.abort("bash");
+        if (activeOperationId) {
+          this.emit(createKernelEvent(
+            "operation.aborted",
+            this.getTaskId(),
+            this.getRunId(),
+            { operationKind: "bash" },
+            { kind: "runtime", adapter: "pi", nativeType: "abort_bash" },
+            activeOperationId,
+          ));
+        }
         return null;
       }
 
@@ -1073,13 +1118,14 @@ export class AgentSessionWrapper {
 
 declare global {
   var __piSessions: Map<string, AgentSessionWrapper> | undefined;
-  var __piStartLocks: Map<string, Promise<{ session: AgentSessionWrapper; realSessionId: string }>> | undefined;
+  var __piStartLocks: Map<string, Promise<{ session: AgentSessionWrapper; realSessionId: string; runtimeContext: RuntimeContext }>> | undefined;
   var __piRunningListeners: Set<(ids: string[]) => void> | undefined;
 }
 
 function getRegistry(): Map<string, AgentSessionWrapper> {
   if (!globalThis.__piSessions) {
     globalThis.__piSessions = new Map();
+    getKernelServices().piSessionReconciler.interruptStaleRuns(new Set());
     const cleanup = () => globalThis.__piSessions?.forEach((s) => s.destroy());
     process.once("exit", cleanup);
     process.once("SIGINT", cleanup);
@@ -1088,7 +1134,7 @@ function getRegistry(): Map<string, AgentSessionWrapper> {
   return globalThis.__piSessions;
 }
 
-function getLocks(): Map<string, Promise<{ session: AgentSessionWrapper; realSessionId: string }>> {
+function getLocks(): Map<string, Promise<{ session: AgentSessionWrapper; realSessionId: string; runtimeContext: RuntimeContext }>> {
   if (!globalThis.__piStartLocks) globalThis.__piStartLocks = new Map();
   return globalThis.__piStartLocks;
 }
@@ -1151,18 +1197,26 @@ export async function startRpcSession(
   sessionId: string,
   sessionFile: string,
   cwd: string,
-  toolNames?: string[]
-): Promise<{ session: AgentSessionWrapper; realSessionId: string }> {
+  toolNames?: string[],
+  options: { taskId?: RuntimeContext["taskId"] } = {},
+): Promise<{ session: AgentSessionWrapper; realSessionId: string; runtimeContext: RuntimeContext }> {
   const registry = getRegistry();
   const locks = getLocks();
+  const kernelServices = getKernelServices();
 
   const existing = registry.get(sessionId);
-  if (existing?.isAlive()) return { session: existing, realSessionId: sessionId };
+  if (existing?.isAlive()) {
+    return { session: existing, realSessionId: sessionId, runtimeContext: existing.getRuntimeContext() };
+  }
 
   const inflight = locks.get(sessionId);
   if (inflight) return inflight;
 
   const starting = (async () => {
+    let runtimeContext = sessionFile
+      ? await kernelServices.piSessionReconciler.reconcileSession(sessionId)
+      : null;
+
     const runtime = await createPiSession({
       cwd,
       sessionFile,
@@ -1173,13 +1227,21 @@ export async function startRpcSession(
       runtime.session.setActiveToolsByName(withExtensionTools(runtime.session, toolNames));
     }
 
-    const wrapper = new AgentSessionWrapper(runtime.session);
-    if (runtime.forceEmptySystemPrompt) wrapper.setForceEmptySystemPrompt(true);
-    wrapper.start();
-
     const realSessionId = runtime.realSessionId;
     const realSessionFile = runtime.realSessionFile;
     if (realSessionFile) cacheSessionPath(realSessionId, realSessionFile);
+
+    runtimeContext = runtimeContext ?? kernelServices.piSessionReconciler.ensureStartedPiSession({
+      sessionId: realSessionId,
+      cwd,
+      taskId: options.taskId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const wrapper = new AgentSessionWrapper(runtime.session, runtimeContext);
+    if (runtime.forceEmptySystemPrompt) wrapper.setForceEmptySystemPrompt(true);
+    wrapper.start();
 
     wrapper.onDestroy(() => {
       runtime.dispose();
@@ -1189,7 +1251,7 @@ export async function startRpcSession(
     wrapper.beginExtensionBinding({ forceEmptySystemPrompt: runtime.forceEmptySystemPrompt });
     runtime.subscribeMcpStatus((snapshot) => wrapper.setMcpStatus(snapshot));
 
-    return { session: wrapper, realSessionId };
+    return { session: wrapper, realSessionId, runtimeContext };
   })().finally(() => locks.delete(sessionId));
 
   locks.set(sessionId, starting);

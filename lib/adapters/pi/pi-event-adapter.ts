@@ -32,9 +32,8 @@ export function toKernelEventFromPiEvent(event: PiRuntimeEvent, context: PiEvent
   const source = { kind: "runtime" as const, adapter: "pi" as const, nativeType };
   switch (nativeType) {
     case "agent_start":
-      return createKernelEvent("operation.started", context.taskId, context.runId, { operationKind: "prompt" }, source, context.operationId);
     case "agent_end":
-      return createKernelEvent("operation.completed", context.taskId, context.runId, { operationKind: "prompt" }, source, context.operationId);
+      return null;
     case "message_start":
       return createKernelEvent("message.started", context.taskId, context.runId, { message: isRecord(event.message) ? normalizePiMessage(event.message as unknown as AgentMessage) as Partial<AgentMessage> : {} }, source, context.operationId);
     case "message_update":

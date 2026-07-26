@@ -22,7 +22,7 @@ import type { SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { ChatInputHandle } from "./ChatInput";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import { createFileArtifact } from "@/lib/artifacts";
-import { projectPiSession } from "@/lib/adapters/pi/pi-task-projector";
+import type { Run, Task } from "@/lib/kernel";
 
 type SessionCopyField = "file" | "id";
 type AutoNameStatus =
@@ -31,6 +31,12 @@ type AutoNameStatus =
   | { kind: "success" }
   | { kind: "error"; message: string };
 
+type ResolvedTaskState =
+  | { status: "idle"; task: null; run: null; runCount: number; artifactCount: number; error: null }
+  | { status: "loading"; task: Task | null; run: Run | null; runCount: number; artifactCount: number; error: null }
+  | { status: "ready"; task: Task; run: Run | null; runCount: number; artifactCount: number; error: null }
+  | { status: "error"; task: null; run: null; runCount: 0; artifactCount: 0; error: string };
+
 export function AppShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,6 +44,23 @@ export function AppShell() {
   const { isDark, toggleTheme } = useTheme();
   const isMobile = useIsMobile();
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
+  const [resolvedTaskState, setResolvedTaskState] = useState<ResolvedTaskState>({
+    status: "idle",
+    task: null,
+    run: null,
+    runCount: 0,
+    artifactCount: 0,
+    error: null,
+  });
+  const [taskDraft, setTaskDraft] = useState({
+    title: "",
+    goal: "",
+    constraints: "",
+    nonGoals: "",
+    updatedAt: "",
+  });
+  const [taskSaving, setTaskSaving] = useState(false);
+  const [taskSaveError, setTaskSaveError] = useState<string | null>(null);
   // When user clicks +, we only store the cwd — no fake session id
   const [newSessionCwd, setNewSessionCwd] = useState<string | null>(null);
   const [initialCwdStatus, setInitialCwdStatus] = useState<"idle" | "validating" | "ready" | "error">(
@@ -402,7 +425,26 @@ export function AppShell() {
     setRightPanelOpen(true);
     // On mobile the file panel is full-screen; close the drawer so it shows.
     if (isMobile) setSidebarOpen(false);
-  }, [activeCwd, isMobile]);
+    if (resolvedTaskState.status === "ready") {
+      void fetch(`/api/tasks/${encodeURIComponent(resolvedTaskState.task.id)}/artifacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filePath,
+          title: fileName,
+          sourceSessionId: sourceSessionId ?? selectedSession?.id ?? undefined,
+          runId: resolvedTaskState.run?.id,
+        }),
+      }).then(async (response) => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({})) as { error?: string };
+          throw new Error(body.error ?? `HTTP ${response.status}`);
+        }
+      }).catch((error) => {
+        console.warn("Background artifact registration failed:", error);
+      });
+    }
+  }, [activeCwd, isMobile, resolvedTaskState, selectedSession?.id]);
 
   const handleOpenLinkedFile = useCallback((filePath: string) => {
     handleOpenFile(filePath, getFileName(filePath), selectedSession?.id ?? null);
@@ -430,6 +472,47 @@ export function AppShell() {
     );
   }, [selectedSession]);
 
+  const handleSaveTaskDetails = useCallback(async () => {
+    if (resolvedTaskState.status !== "ready") return;
+    setTaskSaving(true);
+    setTaskSaveError(null);
+    try {
+      const response = await fetch(`/api/tasks/${encodeURIComponent(resolvedTaskState.task.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: taskDraft.title,
+          goal: taskDraft.goal,
+          constraints: taskDraft.constraints
+            .split(/\r?\n/)
+            .map((item) => item.trim())
+            .filter(Boolean),
+          nonGoals: taskDraft.nonGoals
+            .split(/\r?\n/)
+            .map((item) => item.trim())
+            .filter(Boolean),
+          expectedUpdatedAt: taskDraft.updatedAt,
+        }),
+      });
+      const body = await response.json().catch(() => ({})) as { task?: Task; error?: string; run?: Run | null; runCount?: number; artifactCount?: number };
+      if (!response.ok || !body.task) {
+        throw new Error(body.error ?? `HTTP ${response.status}`);
+      }
+      setResolvedTaskState({
+        status: "ready",
+        task: body.task,
+        run: body.run ?? resolvedTaskState.run,
+        runCount: body.runCount ?? resolvedTaskState.runCount,
+        artifactCount: body.artifactCount ?? resolvedTaskState.artifactCount,
+        error: null,
+      });
+    } catch (error) {
+      setTaskSaveError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setTaskSaving(false);
+    }
+  }, [resolvedTaskState, taskDraft]);
+
   // Show chat area if a session is selected, or if we have a cwd to start a new session in
   const effectiveNewSessionCwd = newSessionCwd ?? (selectedSession === null && activeCwd ? activeCwd : null);
   const showChat = selectedSession !== null || effectiveNewSessionCwd !== null;
@@ -437,12 +520,90 @@ export function AppShell() {
   const showPlaceholder = initialSessionRestored && !showChat;
 
   const activeFileTab = fileTabs.find((t) => t.id === activeFileTabId) ?? null;
-  const activeTaskRun = useMemo(() => {
-    if (!selectedSession) return null;
-    return projectPiSession(selectedSession);
-  }, [selectedSession]);
+  const activeTaskRun = useMemo(() => (
+    resolvedTaskState.status === "ready"
+      ? { task: resolvedTaskState.task, run: resolvedTaskState.run }
+      : null
+  ), [resolvedTaskState]);
   const activeCwdName = activeCwd ? getFileName(activeCwd) || activeCwd : null;
   const windowTitle = activeCwdName ? `${activeCwdName} - Pi Web` : "Pi Web";
+
+  useEffect(() => {
+    if (!selectedSession?.id) {
+      setResolvedTaskState({
+        status: "idle",
+        task: null,
+        run: null,
+        runCount: 0,
+        artifactCount: 0,
+        error: null,
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    setResolvedTaskState((current) => ({
+      status: "loading",
+      task: current.task,
+      run: current.run,
+      runCount: current.runCount,
+      artifactCount: current.artifactCount,
+      error: null,
+    }));
+
+    void fetch(`/api/tasks/resolve?runtimeKind=pi&nativeRuntimeId=${encodeURIComponent(selectedSession.id)}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({})) as {
+          task?: Task;
+          run?: Run | null;
+          runCount?: number;
+          artifactCount?: number;
+          error?: string;
+        };
+        if (!response.ok || !body.task) {
+          throw new Error(body.error ?? `HTTP ${response.status}`);
+        }
+        setResolvedTaskState({
+          status: "ready",
+          task: body.task,
+          run: body.run ?? null,
+          runCount: body.runCount ?? 0,
+          artifactCount: body.artifactCount ?? 0,
+          error: null,
+        });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setResolvedTaskState({
+          status: "error",
+          task: null,
+          run: null,
+          runCount: 0,
+          artifactCount: 0,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
+    return () => controller.abort();
+  }, [selectedSession?.id]);
+
+  useEffect(() => {
+    if (resolvedTaskState.status !== "ready") {
+      setTaskDraft({ title: "", goal: "", constraints: "", nonGoals: "", updatedAt: "" });
+      setTaskSaveError(null);
+      return;
+    }
+    setTaskDraft({
+      title: resolvedTaskState.task.title,
+      goal: resolvedTaskState.task.contract?.goal ?? "",
+      constraints: (resolvedTaskState.task.contract?.constraints ?? []).join("\n"),
+      nonGoals: (resolvedTaskState.task.contract?.nonGoals ?? []).join("\n"),
+      updatedAt: resolvedTaskState.task.updatedAt,
+    });
+    setTaskSaveError(null);
+  }, [resolvedTaskState]);
 
   useEffect(() => {
     const syncWindowTitle = () => {
@@ -1152,19 +1313,95 @@ export function AppShell() {
                         </div>
                       </div>
                     );
+                    const taskInfoSection = (
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>任务信息</div>
+                        {resolvedTaskState.status === "loading" ? (
+                          <div style={{ color: "var(--text-muted)" }}>正在解析持久任务...</div>
+                        ) : resolvedTaskState.status === "error" ? (
+                          <div style={{ color: "#dc2626", overflowWrap: "anywhere" }}>{resolvedTaskState.error}</div>
+                        ) : resolvedTaskState.status === "ready" ? (
+                          <div style={{ display: "grid", gap: 10 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", columnGap: 12, rowGap: 6 }}>
+                              <div style={{ color: "var(--text-dim)" }}>Task ID</div>
+                              <div style={{ color: "var(--text-muted)", overflowWrap: "anywhere" }}>{resolvedTaskState.task.id}</div>
+                              <div style={{ color: "var(--text-dim)" }}>状态</div>
+                              <div style={{ color: "var(--text-muted)" }}>{resolvedTaskState.task.status}</div>
+                              <div style={{ color: "var(--text-dim)" }}>当前 Run</div>
+                              <div style={{ color: "var(--text-muted)" }}>{resolvedTaskState.run?.status ?? "无"}</div>
+                              <div style={{ color: "var(--text-dim)" }}>Run 数量</div>
+                              <div style={{ color: "var(--text-muted)" }}>{resolvedTaskState.runCount}</div>
+                              <div style={{ color: "var(--text-dim)" }}>Artifact 数量</div>
+                              <div style={{ color: "var(--text-muted)" }}>{resolvedTaskState.artifactCount}</div>
+                            </div>
+                            <label style={{ display: "grid", gap: 4 }}>
+                              <span style={{ color: "var(--text-dim)" }}>任务标题</span>
+                              <input
+                                value={taskDraft.title}
+                                onChange={(e) => setTaskDraft((current) => ({ ...current, title: e.target.value }))}
+                                style={{ width: "100%", minWidth: 0, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)", font: "inherit" }}
+                              />
+                            </label>
+                            <label style={{ display: "grid", gap: 4 }}>
+                              <span style={{ color: "var(--text-dim)" }}>目标</span>
+                              <textarea
+                                value={taskDraft.goal}
+                                onChange={(e) => setTaskDraft((current) => ({ ...current, goal: e.target.value }))}
+                                rows={3}
+                                style={{ width: "100%", minWidth: 0, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)", font: "inherit", resize: "vertical" }}
+                              />
+                            </label>
+                            <label style={{ display: "grid", gap: 4 }}>
+                              <span style={{ color: "var(--text-dim)" }}>约束（每行一条）</span>
+                              <textarea
+                                value={taskDraft.constraints}
+                                onChange={(e) => setTaskDraft((current) => ({ ...current, constraints: e.target.value }))}
+                                rows={3}
+                                style={{ width: "100%", minWidth: 0, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)", font: "inherit", resize: "vertical" }}
+                              />
+                            </label>
+                            <label style={{ display: "grid", gap: 4 }}>
+                              <span style={{ color: "var(--text-dim)" }}>非目标（每行一条）</span>
+                              <textarea
+                                value={taskDraft.nonGoals}
+                                onChange={(e) => setTaskDraft((current) => ({ ...current, nonGoals: e.target.value }))}
+                                rows={3}
+                                style={{ width: "100%", minWidth: 0, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)", font: "inherit", resize: "vertical" }}
+                              />
+                            </label>
+                            {taskSaveError ? (
+                              <div style={{ color: "#dc2626", overflowWrap: "anywhere" }}>{taskSaveError}</div>
+                            ) : null}
+                            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveTaskDetails()}
+                                disabled={taskSaving}
+                                style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)", background: taskSaving ? "var(--bg-hover)" : "var(--bg)", color: "var(--text)", cursor: taskSaving ? "wait" : "pointer", font: "inherit" }}
+                              >
+                                {taskSaving ? "保存中..." : "保存任务"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ color: "var(--text-muted)" }}>当前会话尚未解析到持久任务</div>
+                        )}
+                      </div>
+                    );
 
                     return (
                       <div style={{
                         display: "grid",
                         gridTemplateColumns: isMobile
                           ? "1fr"
-                          : "minmax(360px, 1.7fr) minmax(140px, 0.55fr) minmax(190px, 0.75fr)",
+                          : "minmax(280px, 1.2fr) minmax(320px, 1.35fr) minmax(140px, 0.55fr) minmax(190px, 0.75fr)",
                         gap: isMobile ? 16 : 24,
                         fontSize: 12,
                         lineHeight: 1.5,
                         fontFamily: "var(--font-mono)",
                       }}>
                         {sessionInfoSection}
+                        {taskInfoSection}
                         {section("消息", messageRows)}
                         {section("Token", [...tokenRows, ...extraTokenRows], "right", true)}
                       </div>

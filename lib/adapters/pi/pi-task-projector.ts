@@ -47,6 +47,7 @@ export function projectPiSession(session: SessionInfo, runningSessionIds: Set<st
       id: taskId,
       title: normalizeTitle(session),
       status: mapTaskStatus(session.id, runningSessionIds),
+      origin: { kind: "pi-session", externalId: session.id },
       createdAt: session.created,
       updatedAt: session.modified,
       scope: {
@@ -56,6 +57,7 @@ export function projectPiSession(session: SessionInfo, runningSessionIds: Set<st
       },
       defaultRunId: runId,
       ...(parentTaskId ? { parentTaskId } : {}),
+      titleSource: session.name?.trim() ? "session-name" : session.firstMessage?.trim() && session.firstMessage !== "(no messages)" ? "first-message" : "fallback",
       metadata: {
         adapter: "pi",
         sourceSessionId: session.id,
@@ -69,6 +71,7 @@ export function projectPiSession(session: SessionInfo, runningSessionIds: Set<st
       status: mapRunStatus(session.id, runningSessionIds),
       createdAt: session.created,
       updatedAt: session.modified,
+      lastSeenAt: session.modified,
       metadata: {
         adapter: "pi",
         sourceSessionId: session.id,

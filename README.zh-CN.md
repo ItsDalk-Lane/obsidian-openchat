@@ -67,15 +67,18 @@ npm run dev
 - **Markdown 预览增强**：Mermaid 支持源码/预览切换与放大查看，本地 Markdown 图片链接可直接通过文件 API 渲染。
 - **随时掌握会话状态**：在顶部就能看到上下文占用、花费、压缩结果和系统提示，长会话不再像黑箱。
 - **少离开当前界面**：模型、登录/API key、模型测试和技能开关都能在网页里处理，配置 agent 时不用在多个工具之间来回切换。
+- **持久跟踪任务**：会话现在会同步为可持久化的 Task/Run，并带有事件日志与 Artifact 目录，服务重启后仍可恢复状态。
 
 ## 注意事项
 
 - **数据目录**：默认读取 `~/.pi/agent/sessions` 下的会话文件。可通过环境变量 `PI_CODING_AGENT_DIR` 指定其他 pi agent 目录。
+- **任务运行时数据库**：持久化的 Task/Run/Artifact/Event 状态保存在 `PI_WEB_DATA_DIR` 指向的位置；未设置时默认使用 `<PI_CODING_AGENT_DIR 或 ~/.pi/agent>/pi-web/kernel.sqlite`。
 - **会话文件**：路径形如 `~/.pi/agent/sessions/<编码后的工作目录>/<时间戳>_<uuid>.jsonl`。
 - **模型配置**：Models 面板读写 pi agent 目录下的 `models.json`，模型列表和默认模型由 pi 的配置解析得到。
 - **文件访问**：文件浏览和预览面向当前选择的项目目录，以及会话中已出现过的工作目录。
 - **Git worktree**：什么时候显示切换器、新建目录在哪里、删除会影响什么，见 [Pi Web 里的 Worktree](./docs/worktrees.zh-CN.md)。
 - **Fork 与会话内分支不同**：Fork 会创建新的 `.jsonl` 文件；“Edit from here” 是同一会话文件里的分支。
+- **持久运行时说明**：见 [第三阶段 Durable Task Runtime](./docs/durable-task-runtime-phase-3.md)。
 
 ## 开发
 
@@ -101,6 +104,9 @@ npm run start:lan # 可选：监听局域网
 npm run typecheck
 npm run lint
 npm run test
+npm run test:persistence
+npm run test:task-runtime
+npm run test:event-journal
 npm run check
 ```
 
@@ -149,6 +155,7 @@ app/
     models-config/  # 读写 models.json、测试模型
     sessions/       # 会话读取、重命名、删除、上下文、HTML 导出
     skills/         # skills 列表、搜索、安装、启停
+    tasks/          # 持久 Task、Run、Event、Artifact API
 components/
   AppShell.tsx        # 主布局、URL 状态、顶部面板、文件标签
   SessionSidebar.tsx  # 项目选择、会话树、Explorer
@@ -160,6 +167,8 @@ components/
   FileExplorer.tsx    # 文件树
   FileViewer.tsx      # 源码、diff、图片、音频、PDF、DOCX 预览
 lib/
+  application/      # task/run/artifact/event 服务与端口
+  persistence/      # SQLite 数据库、仓储、迁移与数据目录逻辑
   http-dispatcher.ts  # 服务端 fetch 的 HTTP(S) 代理配置
   rpc-manager.ts      # AgentSessionWrapper 生命周期和全局 registry
   session-reader.ts   # 解析 .jsonl 会话文件和分支上下文

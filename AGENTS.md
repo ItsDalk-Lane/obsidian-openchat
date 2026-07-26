@@ -59,6 +59,27 @@ Browser                Next.js Server              AgentSession (in-process)
 **Session browsing** (read-only): reads `.jsonl` files through SDK `SessionManager` helpers and `lib/session-reader.ts` — no AgentSession created.  
 **Sending a message**: `startRpcSession()` in `lib/rpc-manager.ts` creates an AgentSession in-process.
 
+## Phase 3 Durable Runtime Baseline
+
+- Persistent local runtime state now lives in SQLite under:
+  - `PI_WEB_DATA_DIR`, or
+  - `<PI_CODING_AGENT_DIR or ~/.pi/agent>/pi-web/kernel.sqlite`
+- Keep the layering strict:
+  - `lib/kernel/**`: pure domain/protocol types only
+  - `lib/application/**`: ports + services using kernel types
+  - `lib/persistence/**`: SQLite adapters only, never imported by client code
+- `app/api/tasks/**` is now the durable task surface:
+  - `/api/tasks/resolve` maps `runtimeKind + nativeRuntimeId` to persistent Task/Run
+  - `/api/tasks/[taskId]` accepts only durable `TaskId`
+- `PiSessionReconciler` is the only place that should import/sync Pi sessions into persistent Task/Run state.
+- `AppShell` must resolve active Task/Run through the task API, not via client-side `projectPiSession()`.
+- Event durability split:
+  - Journal durable task/run/artifact/operation/capability/compaction/retry events
+  - Do not persist streaming token/message bodies by default
+- Service restart rule:
+  - any persisted `running` run without a live in-memory runtime becomes `interrupted`
+  - do not auto-replay prompts or tools
+
 ---
 
 ## File Map

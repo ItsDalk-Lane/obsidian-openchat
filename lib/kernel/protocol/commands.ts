@@ -1,4 +1,4 @@
-import type { ExtensionUiResponse } from "../../types";
+import type { ExtensionUiResponse } from "./interactions";
 
 export type RuntimeCommand =
   | PromptCommand

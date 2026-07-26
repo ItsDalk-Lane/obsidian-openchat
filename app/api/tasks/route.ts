@@ -1,18 +1,63 @@
 import { NextResponse } from "next/server";
-import { projectPiSessions } from "@/lib/adapters/pi/pi-task-projector";
+import { getKernelServices } from "@/lib/application/services";
 import { getRunningRpcSessionIds } from "@/lib/rpc-manager";
-import { listAllSessions } from "@/lib/session-reader";
+import { badRequest, isTaskStatus, summarizeTask } from "./task-route-helpers";
 
-export async function GET() {
+export const runtime = "nodejs";
+
+export async function GET(req: Request) {
   try {
-    const sessions = await listAllSessions();
-    const runningSessionIds = new Set(getRunningRpcSessionIds());
-    const projections = projectPiSessions(sessions, runningSessionIds);
+    const url = new URL(req.url);
+    const services = getKernelServices();
+    const rawStatus = url.searchParams.get("status");
+    if (rawStatus && !isTaskStatus(rawStatus)) {
+      return badRequest("Invalid task status");
+    }
+    const status = rawStatus && isTaskStatus(rawStatus) ? rawStatus : undefined;
+    await services.piSessionReconciler.reconcileAll({
+      runningSessionIds: new Set(getRunningRpcSessionIds()),
+    });
+    const tasks = services.taskService.listTasks({
+      originKind: url.searchParams.get("origin") === "pi-session" || url.searchParams.get("origin") === "native"
+        ? url.searchParams.get("origin") as "pi-session" | "native"
+        : undefined,
+      status: status ?? undefined,
+      projectRoot: url.searchParams.get("project") ?? undefined,
+      includeArchived: url.searchParams.get("includeArchived") === "1",
+    });
     return NextResponse.json({
-      tasks: projections.map((projection) => projection.task),
-      runs: projections.map((projection) => projection.run),
+      tasks: tasks.map((task) => summarizeTask(task)),
     });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json() as {
+      title?: string;
+      goal?: string;
+      context?: string;
+      constraints?: string[];
+      nonGoals?: string[];
+      scope?: { cwd?: string; projectRoot?: string; worktreeBranch?: string };
+    };
+    if (!body.title || typeof body.title !== "string") {
+      return badRequest("title is required");
+    }
+
+    const task = getKernelServices().taskService.createTask({
+      title: body.title,
+      goal: body.goal,
+      context: body.context,
+      constraints: body.constraints,
+      nonGoals: body.nonGoals,
+      scope: body.scope,
+    });
+    return NextResponse.json(summarizeTask(task), { status: 201 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
