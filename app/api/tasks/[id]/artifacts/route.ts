@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createFileArtifact } from "@/lib/artifacts";
-import { getKernelServices } from "@/lib/application/services";
+import { getKernelServices } from "@/lib/server/kernel-services";
 import { getAllowedFileRoots, isExistingFilePathAllowed, isFilePathAllowed } from "@/lib/file-access";
 import { listAllSessions } from "@/lib/session-reader";
-import { badRequest, isRunId, isTaskId, notFound } from "../../task-route-helpers";
+import { badRequest, enforceSameOrigin, isRunId, isTaskId, notFound } from "../../task-route-helpers";
 
 export const runtime = "nodejs";
 
@@ -38,6 +38,8 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const forbidden = enforceSameOrigin(req);
+  if (forbidden) return forbidden;
   const { id } = await params;
   if (!isTaskId(id)) return badRequest("Invalid TaskId");
   try {

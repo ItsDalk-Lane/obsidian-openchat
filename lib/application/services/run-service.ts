@@ -15,6 +15,7 @@ export interface EnsurePiRunInput {
   createdAt?: string;
   updatedAt?: string;
   metadata?: Record<string, unknown>;
+  allowTaskRebind?: boolean;
 }
 
 export class RunService {
@@ -42,6 +43,9 @@ export class RunService {
 
       const existing = runs.findByNativeRuntime("pi", input.sessionId);
       if (existing) {
+        if (!input.allowTaskRebind && existing.taskId !== input.taskId) {
+          throw new Error("Run already belongs to another task");
+        }
         const updatedAt = input.updatedAt ?? new Date().toISOString();
         const nextRun: Run = {
           ...existing,

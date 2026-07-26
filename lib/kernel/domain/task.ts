@@ -37,7 +37,7 @@ export interface TaskScope {
 }
 
 export interface TaskOrigin {
-  kind: "native" | "pi-session";
+  kind: "native" | "pi-session" | (string & {});
   externalId?: string;
 }
 

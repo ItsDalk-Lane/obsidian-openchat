@@ -1,6 +1,13 @@
 export * from "./artifact-service";
+export * from "./capability-service";
+export * from "./context-compiler-service";
+export * from "./evaluation-service";
 export * from "./event-service";
 export * from "./kernel-services";
+export * from "./kernel-startup";
 export * from "./pi-session-reconciler";
 export * from "./run-service";
+export * from "./runtime-registry";
 export * from "./task-service";
+export { getKernelServices, resetKernelServicesForTests } from "@/lib/server/kernel-services";
+export { getRuntimeRegistry, resetRuntimeRegistryForTests } from "@/lib/server/runtime-registry";

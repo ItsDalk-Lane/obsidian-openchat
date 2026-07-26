@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getKernelServices } from "@/lib/application/services";
+import { getKernelServices } from "@/lib/server/kernel-services";
 import { badRequest, isKernelEventType, isRunId, isTaskId, notFound, parsePositiveInt } from "../../task-route-helpers";
 
 export const runtime = "nodejs";

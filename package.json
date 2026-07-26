@@ -53,6 +53,7 @@
     "test:event-journal": "node --test \"lib/phase3-event-journal.test.mjs\"",
     "test:kernel": "node --test \"lib/kernel*.test.mjs\" \"lib/pi-task-projector.test.mjs\" \"lib/architecture-boundary.test.mjs\" \"lib/file-artifact.test.mjs\"",
     "test:workbench": "node --test \"lib/workbench.test.mjs\" \"components/artifacts/*.test.mjs\"",
+    "test:runtime-registry": "node --test \"lib/runtime-registry.test.mjs\"",
     "check": "npm run typecheck && npm run lint && npm run test && npm run test:pi-adapter",
     "prepublishOnly": "npm run check && npm run build",
     "release": "npm run prepublishOnly && echo \"Publishing is disabled in this fork. Confirm package ownership before enabling npm publish.\"",

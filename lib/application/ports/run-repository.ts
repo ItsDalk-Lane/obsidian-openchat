@@ -3,6 +3,7 @@ import type { Run, RunId, RuntimeKind, RunStatus, TaskId } from "@/lib/kernel";
 export interface RunRepository {
   getById(id: RunId): Run | null;
   listByTask(taskId: TaskId): Run[];
+  listByRuntimeKind(runtimeKind: RuntimeKind): Run[];
   findByNativeRuntime(runtimeKind: RuntimeKind, nativeRuntimeId: string): Run | null;
   create(run: Run): Run;
   update(run: Run): Run;

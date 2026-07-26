@@ -1,7 +1,9 @@
 import type {
   ArtifactRepository,
   AttachArtifactInput,
+  TaskArtifactAttachmentStatus,
   TaskArtifactRecord,
+  UpdateTaskArtifactAttachmentInput,
 } from "@/lib/application/ports/artifact-repository";
 import type { Artifact, ArtifactId } from "@/lib/kernel";
 import type { DatabaseSync } from "node:sqlite";
@@ -26,6 +28,11 @@ type TaskArtifactRow = ArtifactRow & {
   run_id: string | null;
   source_session_id: string | null;
   attached_at: string;
+  status: TaskArtifactAttachmentStatus | null;
+  title_override: string | null;
+  role: string | null;
+  task_provenance_json: string | null;
+  task_metadata_json: string | null;
 };
 
 function mapArtifact(row: ArtifactRow | undefined): Artifact | null {
@@ -54,6 +61,11 @@ function mapTaskArtifact(row: TaskArtifactRow): TaskArtifactRecord | null {
     runId: (row.run_id ?? undefined) as TaskArtifactRecord["runId"],
     sourceSessionId: row.source_session_id ?? undefined,
     attachedAt: row.attached_at,
+    status: row.status ?? "ready",
+    titleOverride: row.title_override ?? undefined,
+    role: row.role ?? undefined,
+    provenance: (parseJsonValue(row.task_provenance_json) as Record<string, unknown> | undefined) ?? undefined,
+    metadata: (parseJsonValue(row.task_metadata_json) as Record<string, unknown> | undefined) ?? undefined,
   };
 }
 
@@ -68,7 +80,8 @@ export class SqliteArtifactRepository implements ArtifactRepository {
   listByTask(taskId: TaskArtifactRecord["taskId"]): TaskArtifactRecord[] {
     const rows = this.db.prepare(`
       SELECT a.id, a.type, a.title, a.media_type, a.version, a.status, a.representations_json, a.provenance_json, a.metadata_json, a.created_at, a.updated_at,
-             ta.task_id, ta.run_id, ta.source_session_id, ta.attached_at
+             ta.task_id, ta.run_id, ta.source_session_id, ta.attached_at, ta.status, ta.title_override, ta.role,
+             ta.provenance_json AS task_provenance_json, ta.metadata_json AS task_metadata_json
       FROM task_artifacts ta
       JOIN artifacts a ON a.id = ta.artifact_id
       WHERE ta.task_id = ?
@@ -110,23 +123,36 @@ export class SqliteArtifactRepository implements ArtifactRepository {
 
   attachToTask(input: AttachArtifactInput): TaskArtifactRecord {
     this.db.prepare(`
-      INSERT INTO task_artifacts (task_id, artifact_id, run_id, source_session_id, attached_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO task_artifacts (
+        task_id, artifact_id, run_id, source_session_id, attached_at, status, title_override, role, provenance_json, metadata_json
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(task_id, artifact_id) DO UPDATE SET
         run_id = COALESCE(excluded.run_id, task_artifacts.run_id),
         source_session_id = COALESCE(excluded.source_session_id, task_artifacts.source_session_id),
-        attached_at = excluded.attached_at
+        attached_at = excluded.attached_at,
+        status = COALESCE(excluded.status, task_artifacts.status),
+        title_override = COALESCE(excluded.title_override, task_artifacts.title_override),
+        role = COALESCE(excluded.role, task_artifacts.role),
+        provenance_json = COALESCE(task_artifacts.provenance_json, excluded.provenance_json),
+        metadata_json = COALESCE(excluded.metadata_json, task_artifacts.metadata_json)
     `).run(
       input.taskId,
       input.artifactId,
       input.runId ?? null,
       input.sourceSessionId ?? null,
       input.attachedAt,
+      input.status ?? "ready",
+      input.titleOverride ?? null,
+      input.role ?? null,
+      stringifyJson(input.provenance),
+      stringifyJson(input.metadata),
     );
 
     const row = this.db.prepare(`
       SELECT a.id, a.type, a.title, a.media_type, a.version, a.status, a.representations_json, a.provenance_json, a.metadata_json, a.created_at, a.updated_at,
-             ta.task_id, ta.run_id, ta.source_session_id, ta.attached_at
+             ta.task_id, ta.run_id, ta.source_session_id, ta.attached_at, ta.status, ta.title_override, ta.role,
+             ta.provenance_json AS task_provenance_json, ta.metadata_json AS task_metadata_json
       FROM task_artifacts ta
       JOIN artifacts a ON a.id = ta.artifact_id
       WHERE ta.task_id = ? AND ta.artifact_id = ?
@@ -136,6 +162,35 @@ export class SqliteArtifactRepository implements ArtifactRepository {
       throw new Error("Failed to attach artifact to task");
     }
     return mapped;
+  }
+
+  updateTaskAttachment(input: UpdateTaskArtifactAttachmentInput): TaskArtifactRecord | null {
+    this.db.prepare(`
+      UPDATE task_artifacts
+      SET run_id = COALESCE(?, run_id),
+          status = COALESCE(?, status),
+          title_override = COALESCE(?, title_override),
+          role = COALESCE(?, role),
+          metadata_json = COALESCE(?, metadata_json)
+      WHERE task_id = ? AND artifact_id = ?
+    `).run(
+      input.runId ?? null,
+      input.status ?? null,
+      input.titleOverride ?? null,
+      input.role ?? null,
+      stringifyJson(input.metadata),
+      input.taskId,
+      input.artifactId,
+    );
+    const row = this.db.prepare(`
+      SELECT a.id, a.type, a.title, a.media_type, a.version, a.status, a.representations_json, a.provenance_json, a.metadata_json, a.created_at, a.updated_at,
+             ta.task_id, ta.run_id, ta.source_session_id, ta.attached_at, ta.status, ta.title_override, ta.role,
+             ta.provenance_json AS task_provenance_json, ta.metadata_json AS task_metadata_json
+      FROM task_artifacts ta
+      JOIN artifacts a ON a.id = ta.artifact_id
+      WHERE ta.task_id = ? AND ta.artifact_id = ?
+    `).get(input.taskId, input.artifactId) as TaskArtifactRow | undefined;
+    return row ? mapTaskArtifact(row) : null;
   }
 
   archive(id: ArtifactId, updatedAt: string): Artifact | null {

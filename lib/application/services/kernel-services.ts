@@ -1,30 +1,36 @@
-import { SqliteUnitOfWork } from "@/lib/persistence";
+import type { UnitOfWork } from "@/lib/application/ports/unit-of-work";
 import { ArtifactService } from "./artifact-service";
+import { CapabilityService } from "./capability-service";
+import { ContextCompilerService } from "./context-compiler-service";
+import { EvaluationService } from "./evaluation-service";
 import { EventService } from "./event-service";
 import { PiSessionReconciler } from "./pi-session-reconciler";
 import { RunService } from "./run-service";
 import { TaskService } from "./task-service";
+import type { RuntimeRegistry } from "./runtime-registry";
 
-declare global {
-  var __piWebKernelServices: KernelServices | undefined;
+interface KernelServicesOptions {
+  runtimeRegistry: RuntimeRegistry;
 }
 
 export class KernelServices {
-  readonly uow = new SqliteUnitOfWork();
-  readonly taskService = new TaskService(this.uow);
-  readonly runService = new RunService(this.uow);
-  readonly artifactService = new ArtifactService(this.uow);
-  readonly eventService = new EventService(this.uow.events);
-  readonly piSessionReconciler = new PiSessionReconciler(this.uow, this.runService);
-}
+  readonly taskService: TaskService;
+  readonly runService: RunService;
+  readonly artifactService: ArtifactService;
+  readonly capabilityService: CapabilityService;
+  readonly contextCompilerService: ContextCompilerService;
+  readonly evaluationService: EvaluationService;
+  readonly eventService: EventService;
+  readonly piSessionReconciler: PiSessionReconciler;
 
-export function getKernelServices(): KernelServices {
-  if (!globalThis.__piWebKernelServices) {
-    globalThis.__piWebKernelServices = new KernelServices();
+  constructor(readonly uow: UnitOfWork, options: KernelServicesOptions) {
+    this.taskService = new TaskService(this.uow);
+    this.runService = new RunService(this.uow);
+    this.artifactService = new ArtifactService(this.uow);
+    this.contextCompilerService = new ContextCompilerService(this.uow);
+    this.evaluationService = new EvaluationService(this.uow);
+    this.capabilityService = new CapabilityService(this.uow, options.runtimeRegistry, this.contextCompilerService);
+    this.eventService = new EventService(this.uow.events);
+    this.piSessionReconciler = new PiSessionReconciler(this.uow, this.runService);
   }
-  return globalThis.__piWebKernelServices;
-}
-
-export function resetKernelServicesForTests(): void {
-  globalThis.__piWebKernelServices = undefined;
 }

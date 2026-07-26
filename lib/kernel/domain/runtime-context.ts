@@ -1,6 +1,6 @@
 import type { RunId, TaskId } from "./ids";
 
-export type RuntimeKind = "pi";
+export type RuntimeKind = "pi" | (string & {});
 
 export interface RuntimeContext {
   taskId: TaskId;

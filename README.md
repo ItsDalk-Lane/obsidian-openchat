@@ -77,12 +77,16 @@ npm run dev
 
 - **Data directory**: Pi Web reads `~/.pi/agent/sessions` by default. Set `PI_CODING_AGENT_DIR` to point at another pi agent directory.
 - **Task runtime database**: Pi Web stores durable task/run/artifact/event state in `PI_WEB_DATA_DIR`, or by default in `<PI_CODING_AGENT_DIR or ~/.pi/agent>/pi-web/kernel.sqlite`.
+- **LAN API token (optional)**: set `PI_WEB_LAN_API_TOKEN` to require `Authorization: Bearer <token>` or `x-pi-web-token` on non-loopback API requests.
 - **Session files**: files are stored as `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`.
 - **Model config**: the Models panel reads and writes `models.json` in the pi agent directory. Model lists and defaults come from pi's config.
 - **File access**: file browsing and preview are scoped to the selected project directory and working directories that appear in sessions.
 - **Git worktrees**: see [Worktrees in Pi Web](./docs/worktrees.md) for when the switcher appears, how new worktrees are created, and what removal does.
 - **Forks vs in-session branches**: Fork creates a new `.jsonl` file. "Edit from here" creates another branch inside the same session file.
 - **Durable runtime details**: see [Durable Task Runtime - Phase 3](./docs/durable-task-runtime-phase-3.md).
+- **General runtime APIs**: runtime/capability/evaluation primitives are now exposed via `/api/runtimes`, `/api/capabilities`, `/api/tasks/:id/capabilities`, `/api/tasks/:id/compiled-context`, `/api/tasks/:id/evaluate`, `/api/tasks/:id/complete`, and `/api/doctor`.
+- **Maintenance APIs**: kernel maintenance endpoints are available at `POST /api/kernel/backup` (SQLite snapshot backup) and `POST /api/kernel/retention` (event retention pruning with per-task keep floor).
+- **Mutation guardrails**: task-runtime mutating APIs now enforce same-origin checks (baseline CSRF mitigation for browser calls).
 
 ## Development
 

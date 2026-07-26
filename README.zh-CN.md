@@ -73,12 +73,16 @@ npm run dev
 
 - **数据目录**：默认读取 `~/.pi/agent/sessions` 下的会话文件。可通过环境变量 `PI_CODING_AGENT_DIR` 指定其他 pi agent 目录。
 - **任务运行时数据库**：持久化的 Task/Run/Artifact/Event 状态保存在 `PI_WEB_DATA_DIR` 指向的位置；未设置时默认使用 `<PI_CODING_AGENT_DIR 或 ~/.pi/agent>/pi-web/kernel.sqlite`。
+- **LAN API Token（可选）**：设置 `PI_WEB_LAN_API_TOKEN` 后，非 loopback 的 API 请求必须携带 `Authorization: Bearer <token>` 或 `x-pi-web-token`。
 - **会话文件**：路径形如 `~/.pi/agent/sessions/<编码后的工作目录>/<时间戳>_<uuid>.jsonl`。
 - **模型配置**：Models 面板读写 pi agent 目录下的 `models.json`，模型列表和默认模型由 pi 的配置解析得到。
 - **文件访问**：文件浏览和预览面向当前选择的项目目录，以及会话中已出现过的工作目录。
 - **Git worktree**：什么时候显示切换器、新建目录在哪里、删除会影响什么，见 [Pi Web 里的 Worktree](./docs/worktrees.zh-CN.md)。
 - **Fork 与会话内分支不同**：Fork 会创建新的 `.jsonl` 文件；“Edit from here” 是同一会话文件里的分支。
 - **持久运行时说明**：见 [第三阶段 Durable Task Runtime](./docs/durable-task-runtime-phase-3.md)。
+- **通用 Runtime API**：新增 `/api/runtimes`、`/api/capabilities`、`/api/tasks/:id/capabilities`、`/api/tasks/:id/compiled-context`、`/api/tasks/:id/evaluate`、`/api/tasks/:id/complete`、`/api/doctor`，作为能力发现、评估与工作台扩展的基础接口。
+- **维护接口**：新增 `POST /api/kernel/backup`（SQLite 快照备份）与 `POST /api/kernel/retention`（按保留策略清理旧事件并保留每任务最近事件底线）。
+- **变更请求防护**：任务运行时相关写接口新增 same-origin 校验，提供浏览器场景下的基础 CSRF 防护。
 
 ## 开发
 
