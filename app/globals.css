@@ -258,6 +258,21 @@ pre, code {
   white-space: pre-wrap;
 }
 
+.directory-picker-entry:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text) !important;
+}
+
+.directory-picker-action:hover:not(:disabled),
+.directory-picker-back:hover:not(:disabled) {
+  filter: brightness(0.98);
+}
+
+.directory-picker-path:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
 .markdown-custom-message {
   line-height: 1.32;
 }
