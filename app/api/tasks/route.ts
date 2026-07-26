@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getKernelServices } from "@/lib/application/services";
+import { getKernelServices } from "@/lib/server/kernel-services";
 import { getRunningRpcSessionIds } from "@/lib/rpc-manager";
-import { badRequest, isTaskStatus, summarizeTask } from "./task-route-helpers";
+import type { TaskContractAcceptanceCriterion, TaskContractArtifactExpectation } from "@/lib/kernel";
+import { badRequest, enforceSameOrigin, isTaskStatus, summarizeTask } from "./task-route-helpers";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const forbidden = enforceSameOrigin(req);
+  if (forbidden) return forbidden;
   try {
     const body = await req.json() as {
       title?: string;
@@ -41,6 +44,8 @@ export async function POST(req: Request) {
       context?: string;
       constraints?: string[];
       nonGoals?: string[];
+      expectedArtifacts?: TaskContractArtifactExpectation[];
+      acceptanceCriteria?: TaskContractAcceptanceCriterion[];
       scope?: { cwd?: string; projectRoot?: string; worktreeBranch?: string };
     };
     if (!body.title || typeof body.title !== "string") {
@@ -53,6 +58,8 @@ export async function POST(req: Request) {
       context: body.context,
       constraints: body.constraints,
       nonGoals: body.nonGoals,
+      expectedArtifacts: body.expectedArtifacts,
+      acceptanceCriteria: body.acceptanceCriteria,
       scope: body.scope,
     });
     return NextResponse.json(summarizeTask(task), { status: 201 });

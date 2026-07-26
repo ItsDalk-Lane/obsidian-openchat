@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { KernelEvent, Run, RunId, Task, TaskId, TaskStatus } from "@/lib/kernel";
-import { getKernelServices } from "@/lib/application/services";
+import { getKernelServices } from "@/lib/server/kernel-services";
 
 const TASK_STATUSES = new Set<TaskStatus>(["draft", "idle", "active", "waiting", "completed", "failed", "archived"]);
 const ARTIFACT_STATUSES = new Set(["draft", "ready", "archived"] as const);
@@ -86,6 +86,23 @@ export function parsePositiveInt(value: string | null, fallback: number, max: nu
   const parsed = value ? Number.parseInt(value, 10) : fallback;
   if (!Number.isFinite(parsed) || parsed < 1) return fallback;
   return Math.min(parsed, max);
+}
+
+export function enforceSameOrigin(req: Request): Response | null {
+  const origin = req.headers.get("origin");
+  if (!origin) return null;
+  let originUrl: URL;
+  let requestUrl: URL;
+  try {
+    originUrl = new URL(origin);
+    requestUrl = new URL(req.url);
+  } catch {
+    return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
+  }
+  if (originUrl.protocol !== requestUrl.protocol || originUrl.host !== requestUrl.host) {
+    return NextResponse.json({ error: "Cross-origin request blocked" }, { status: 403 });
+  }
+  return null;
 }
 
 export function resolveDefaultRun(taskId: TaskId, runs: Run[]): Run | null {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getKernelServices } from "@/lib/application/services";
-import { badRequest, conflict, isTaskId, isTaskStatus, notFound, summarizeTask } from "../task-route-helpers";
+import { getKernelServices } from "@/lib/server/kernel-services";
+import type { TaskContractAcceptanceCriterion, TaskContractArtifactExpectation } from "@/lib/kernel";
+import { badRequest, conflict, enforceSameOrigin, isTaskId, isTaskStatus, notFound, summarizeTask } from "../task-route-helpers";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const forbidden = enforceSameOrigin(req);
+  if (forbidden) return forbidden;
   const { id } = await params;
   if (!isTaskId(id)) return badRequest("Invalid TaskId");
   try {
@@ -32,6 +35,8 @@ export async function PATCH(
       context?: string;
       constraints?: string[];
       nonGoals?: string[];
+      expectedArtifacts?: TaskContractArtifactExpectation[];
+      acceptanceCriteria?: TaskContractAcceptanceCriterion[];
       scope?: { cwd?: string; projectRoot?: string; worktreeBranch?: string };
       status?: string;
       expectedUpdatedAt?: string;
@@ -46,6 +51,8 @@ export async function PATCH(
       context: body.context,
       constraints: body.constraints,
       nonGoals: body.nonGoals,
+      expectedArtifacts: body.expectedArtifacts,
+      acceptanceCriteria: body.acceptanceCriteria,
       scope: body.scope,
       status: body.status,
       expectedUpdatedAt: body.expectedUpdatedAt,

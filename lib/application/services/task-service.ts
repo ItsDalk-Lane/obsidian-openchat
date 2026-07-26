@@ -5,6 +5,8 @@ import {
   createKernelEvent,
   createTaskId,
   type Task,
+  type TaskContractAcceptanceCriterion,
+  type TaskContractArtifactExpectation,
   type TaskContract,
   type TaskId,
   type TaskScope,
@@ -15,6 +17,10 @@ const TITLE_MAX_LENGTH = 240;
 const LONG_TEXT_MAX_LENGTH = 4_000;
 const ARRAY_MAX_ITEMS = 25;
 const ARRAY_ITEM_MAX_LENGTH = 500;
+const EXPECTATION_ID_MAX_LENGTH = 80;
+const EXPECTATION_TITLE_MAX_LENGTH = 240;
+const EXPECTATION_TYPE_MAX_LENGTH = 120;
+const CRITERION_ID_MAX_LENGTH = 80;
 
 export interface CreateTaskInput {
   title: string;
@@ -22,6 +28,8 @@ export interface CreateTaskInput {
   context?: string;
   constraints?: string[];
   nonGoals?: string[];
+  expectedArtifacts?: TaskContractArtifactExpectation[];
+  acceptanceCriteria?: TaskContractAcceptanceCriterion[];
   scope?: TaskScope;
 }
 
@@ -31,6 +39,8 @@ export interface UpdateTaskInput {
   context?: string;
   constraints?: string[];
   nonGoals?: string[];
+  expectedArtifacts?: TaskContractArtifactExpectation[];
+  acceptanceCriteria?: TaskContractAcceptanceCriterion[];
   scope?: TaskScope;
   status?: TaskStatus;
   expectedUpdatedAt?: string;
@@ -59,14 +69,74 @@ function validateStringArray(field: string, value: string[] | undefined): string
   return normalized;
 }
 
-function validateContract(input: Pick<CreateTaskInput, "goal" | "context" | "constraints" | "nonGoals">): TaskContract | undefined {
+function validateExpectedArtifacts(
+  expectedArtifacts: TaskContractArtifactExpectation[] | undefined,
+): TaskContractArtifactExpectation[] | undefined {
+  if (expectedArtifacts === undefined) return undefined;
+  if (!Array.isArray(expectedArtifacts)) throw new Error("expectedArtifacts must be an array");
+  if (expectedArtifacts.length > ARRAY_MAX_ITEMS) throw new Error("expectedArtifacts has too many items");
+  const seenIds = new Set<string>();
+  const normalized = expectedArtifacts.map((item, index) => {
+    if (!item || typeof item !== "object") throw new Error(`expectedArtifacts[${index}] must be an object`);
+    const id = validateString("expectedArtifacts.id", item.id, EXPECTATION_ID_MAX_LENGTH);
+    const title = validateString("expectedArtifacts.title", item.title, EXPECTATION_TITLE_MAX_LENGTH);
+    const artifactType = validateString("expectedArtifacts.artifactType", item.artifactType, EXPECTATION_TYPE_MAX_LENGTH);
+    if (!id) throw new Error(`expectedArtifacts[${index}] id is required`);
+    if (!title) throw new Error(`expectedArtifacts[${index}] title is required`);
+    if (seenIds.has(id)) throw new Error(`Duplicate expectedArtifacts id: ${id}`);
+    seenIds.add(id);
+    return {
+      id,
+      title,
+      ...(artifactType ? { artifactType } : {}),
+      ...(item.required !== undefined ? { required: item.required !== false } : {}),
+    };
+  });
+  return normalized;
+}
+
+function validateAcceptanceCriteria(
+  acceptanceCriteria: TaskContractAcceptanceCriterion[] | undefined,
+): TaskContractAcceptanceCriterion[] | undefined {
+  if (acceptanceCriteria === undefined) return undefined;
+  if (!Array.isArray(acceptanceCriteria)) throw new Error("acceptanceCriteria must be an array");
+  if (acceptanceCriteria.length > ARRAY_MAX_ITEMS) throw new Error("acceptanceCriteria has too many items");
+  const seenIds = new Set<string>();
+  const normalized = acceptanceCriteria.map((item, index) => {
+    if (!item || typeof item !== "object") throw new Error(`acceptanceCriteria[${index}] must be an object`);
+    const id = validateString("acceptanceCriteria.id", item.id, CRITERION_ID_MAX_LENGTH);
+    const description = validateString("acceptanceCriteria.description", item.description, LONG_TEXT_MAX_LENGTH);
+    if (!id) throw new Error(`acceptanceCriteria[${index}] id is required`);
+    if (!description) throw new Error(`acceptanceCriteria[${index}] description is required`);
+    if (seenIds.has(id)) throw new Error(`Duplicate acceptanceCriteria id: ${id}`);
+    seenIds.add(id);
+    return {
+      id,
+      description,
+    };
+  });
+  return normalized;
+}
+
+function validateContract(
+  input: Pick<CreateTaskInput, "goal" | "context" | "constraints" | "nonGoals" | "expectedArtifacts" | "acceptanceCriteria">,
+): TaskContract | undefined {
   const contract: TaskContract = {
     goal: validateString("goal", input.goal, LONG_TEXT_MAX_LENGTH),
     context: validateString("context", input.context, LONG_TEXT_MAX_LENGTH),
     constraints: validateStringArray("constraints", input.constraints),
     nonGoals: validateStringArray("nonGoals", input.nonGoals),
+    expectedArtifacts: validateExpectedArtifacts(input.expectedArtifacts),
+    acceptanceCriteria: validateAcceptanceCriteria(input.acceptanceCriteria),
   };
-  if (!contract.goal && !contract.context && !contract.constraints?.length && !contract.nonGoals?.length) {
+  if (
+    !contract.goal
+    && !contract.context
+    && !contract.constraints?.length
+    && !contract.nonGoals?.length
+    && !contract.expectedArtifacts?.length
+    && !contract.acceptanceCriteria?.length
+  ) {
     return undefined;
   }
   return contract;
@@ -89,8 +159,21 @@ function mergeContract(existing: TaskContract | undefined, input: UpdateTaskInpu
   if ("nonGoals" in input) {
     next.nonGoals = validateStringArray("nonGoals", input.nonGoals);
   }
+  if ("expectedArtifacts" in input) {
+    next.expectedArtifacts = validateExpectedArtifacts(input.expectedArtifacts);
+  }
+  if ("acceptanceCriteria" in input) {
+    next.acceptanceCriteria = validateAcceptanceCriteria(input.acceptanceCriteria);
+  }
 
-  if (!next.goal && !next.context && !next.constraints?.length && !next.nonGoals?.length) {
+  if (
+    !next.goal
+    && !next.context
+    && !next.constraints?.length
+    && !next.nonGoals?.length
+    && !next.expectedArtifacts?.length
+    && !next.acceptanceCriteria?.length
+  ) {
     return undefined;
   }
   return next;

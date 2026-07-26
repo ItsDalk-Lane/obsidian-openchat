@@ -6,6 +6,10 @@ function canonicalOrigin(value: string): string | null {
   }
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
 function getRequestOrigin(request: Request): string | null {
   const requestUrl = new URL(request.url);
   const host = request.headers.get("host");
@@ -25,4 +29,22 @@ export function isApiRequestOriginAllowed(request: Request): boolean {
 
 export function shouldCheckApiRequestOrigin(request: Request): boolean {
   return request.headers.has("origin") || request.headers.has("sec-fetch-site");
+}
+
+export function shouldRequireLanApiToken(request: Request): boolean {
+  const token = process.env.PI_WEB_LAN_API_TOKEN?.trim();
+  if (!token) return false;
+  const requestUrl = new URL(request.url);
+  return !isLoopbackHostname(requestUrl.hostname);
+}
+
+export function isLanApiTokenAllowed(request: Request): boolean {
+  const token = process.env.PI_WEB_LAN_API_TOKEN?.trim();
+  if (!token) return true;
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ") && authHeader.slice("Bearer ".length).trim() === token) {
+    return true;
+  }
+  const headerToken = request.headers.get("x-pi-web-token")?.trim();
+  return headerToken === token;
 }

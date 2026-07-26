@@ -43,6 +43,11 @@ export class SqliteRunRepository implements RunRepository {
     return rows.map((row) => mapRow(row)).filter((run): run is Run => run !== null);
   }
 
+  listByRuntimeKind(runtimeKind: RuntimeKind): Run[] {
+    const rows = this.db.prepare("SELECT id, task_id, runtime_kind, native_runtime_id, status, metadata_json, created_at, updated_at, last_seen_at FROM runs WHERE runtime_kind = ? ORDER BY updated_at DESC").all(runtimeKind) as RunRow[];
+    return rows.map((row) => mapRow(row)).filter((run): run is Run => run !== null);
+  }
+
   findByNativeRuntime(runtimeKind: RuntimeKind, nativeRuntimeId: string): Run | null {
     const row = this.db.prepare("SELECT id, task_id, runtime_kind, native_runtime_id, status, metadata_json, created_at, updated_at, last_seen_at FROM runs WHERE runtime_kind = ? AND native_runtime_id = ?").get(runtimeKind, nativeRuntimeId) as RunRow | undefined;
     return mapRow(row);

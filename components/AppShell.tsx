@@ -37,6 +37,49 @@ type ResolvedTaskState =
   | { status: "ready"; task: Task; run: Run | null; runCount: number; artifactCount: number; error: null }
   | { status: "error"; task: null; run: null; runCount: 0; artifactCount: 0; error: string };
 
+function parseDraftItems(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseExpectedArtifactsDraft(value: string): Array<{ id: string; title: string }> {
+  return parseDraftItems(value).map((item, index) => {
+    const [idPart, ...titleParts] = item.split("|");
+    const id = idPart?.trim();
+    const title = titleParts.join("|").trim();
+    return {
+      id: id || `artifact-${index + 1}`,
+      title: title || id || `Artifact ${index + 1}`,
+    };
+  });
+}
+
+function parseAcceptanceCriteriaDraft(value: string): Array<{ id: string; description: string }> {
+  return parseDraftItems(value).map((item, index) => {
+    const [idPart, ...descriptionParts] = item.split("|");
+    const id = idPart?.trim();
+    const description = descriptionParts.join("|").trim();
+    return {
+      id: id || `criterion-${index + 1}`,
+      description: description || id || `Criterion ${index + 1}`,
+    };
+  });
+}
+
+function formatExpectedArtifactsDraft(task: Task): string {
+  return (task.contract?.expectedArtifacts ?? [])
+    .map((item) => `${item.id} | ${item.title}`)
+    .join("\n");
+}
+
+function formatAcceptanceCriteriaDraft(task: Task): string {
+  return (task.contract?.acceptanceCriteria ?? [])
+    .map((item) => `${item.id} | ${item.description}`)
+    .join("\n");
+}
+
 export function AppShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -57,6 +100,8 @@ export function AppShell() {
     goal: "",
     constraints: "",
     nonGoals: "",
+    expectedArtifacts: "",
+    acceptanceCriteria: "",
     updatedAt: "",
   });
   const [taskSaving, setTaskSaving] = useState(false);
@@ -483,14 +528,10 @@ export function AppShell() {
         body: JSON.stringify({
           title: taskDraft.title,
           goal: taskDraft.goal,
-          constraints: taskDraft.constraints
-            .split(/\r?\n/)
-            .map((item) => item.trim())
-            .filter(Boolean),
-          nonGoals: taskDraft.nonGoals
-            .split(/\r?\n/)
-            .map((item) => item.trim())
-            .filter(Boolean),
+          constraints: parseDraftItems(taskDraft.constraints),
+          nonGoals: parseDraftItems(taskDraft.nonGoals),
+          expectedArtifacts: parseExpectedArtifactsDraft(taskDraft.expectedArtifacts),
+          acceptanceCriteria: parseAcceptanceCriteriaDraft(taskDraft.acceptanceCriteria),
           expectedUpdatedAt: taskDraft.updatedAt,
         }),
       });
@@ -591,7 +632,15 @@ export function AppShell() {
 
   useEffect(() => {
     if (resolvedTaskState.status !== "ready") {
-      setTaskDraft({ title: "", goal: "", constraints: "", nonGoals: "", updatedAt: "" });
+      setTaskDraft({
+        title: "",
+        goal: "",
+        constraints: "",
+        nonGoals: "",
+        expectedArtifacts: "",
+        acceptanceCriteria: "",
+        updatedAt: "",
+      });
       setTaskSaveError(null);
       return;
     }
@@ -600,6 +649,8 @@ export function AppShell() {
       goal: resolvedTaskState.task.contract?.goal ?? "",
       constraints: (resolvedTaskState.task.contract?.constraints ?? []).join("\n"),
       nonGoals: (resolvedTaskState.task.contract?.nonGoals ?? []).join("\n"),
+      expectedArtifacts: formatExpectedArtifactsDraft(resolvedTaskState.task),
+      acceptanceCriteria: formatAcceptanceCriteriaDraft(resolvedTaskState.task),
       updatedAt: resolvedTaskState.task.updatedAt,
     });
     setTaskSaveError(null);
@@ -1365,6 +1416,24 @@ export function AppShell() {
                               <textarea
                                 value={taskDraft.nonGoals}
                                 onChange={(e) => setTaskDraft((current) => ({ ...current, nonGoals: e.target.value }))}
+                                rows={3}
+                                style={{ width: "100%", minWidth: 0, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)", font: "inherit", resize: "vertical" }}
+                              />
+                            </label>
+                            <label style={{ display: "grid", gap: 4 }}>
+                              <span style={{ color: "var(--text-dim)" }}>期望产物（每行 `id | 标题`）</span>
+                              <textarea
+                                value={taskDraft.expectedArtifacts}
+                                onChange={(e) => setTaskDraft((current) => ({ ...current, expectedArtifacts: e.target.value }))}
+                                rows={3}
+                                style={{ width: "100%", minWidth: 0, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)", font: "inherit", resize: "vertical" }}
+                              />
+                            </label>
+                            <label style={{ display: "grid", gap: 4 }}>
+                              <span style={{ color: "var(--text-dim)" }}>验收标准（每行 `id | 描述`）</span>
+                              <textarea
+                                value={taskDraft.acceptanceCriteria}
+                                onChange={(e) => setTaskDraft((current) => ({ ...current, acceptanceCriteria: e.target.value }))}
                                 rows={3}
                                 style={{ width: "100%", minWidth: 0, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)", font: "inherit", resize: "vertical" }}
                               />

@@ -2,8 +2,17 @@ import { existsSync, mkdirSync, rmSync } from "fs";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
 import { resolveKernelDatabasePath } from "./data-directory";
+import { migration001Initial } from "./migrations/001_initial";
+import { migration002TaskArtifactAttachmentMetadata } from "./migrations/002_task_artifact_attachment_metadata";
+import { migration003CapabilityPolicyEvaluationWorkspace } from "./migrations/003_capability_policy_evaluation_workspace";
 
-const SCHEMA_VERSION = 1;
+const MIGRATIONS = [
+  migration001Initial,
+  migration002TaskArtifactAttachmentMetadata,
+  migration003CapabilityPolicyEvaluationWorkspace,
+] as const;
+
+const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 
 declare global {
   var __piWebKernelDb: KernelDatabase | undefined;
@@ -14,109 +23,40 @@ function applyMigrations(db: DatabaseSync): void {
     PRAGMA foreign_keys = ON;
     PRAGMA journal_mode = WAL;
     PRAGMA busy_timeout = 5000;
-
+  `);
+  db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,
       applied_at TEXT NOT NULL
     );
-
-    CREATE TABLE IF NOT EXISTS tasks (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      status TEXT NOT NULL,
-      contract_json TEXT,
-      scope_json TEXT,
-      origin_kind TEXT NOT NULL,
-      origin_external_id TEXT,
-      parent_task_id TEXT,
-      default_run_id TEXT,
-      title_source TEXT,
-      metadata_json TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      archived_at TEXT
-    );
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_origin
-      ON tasks(origin_kind, origin_external_id)
-      WHERE origin_external_id IS NOT NULL;
-
-    CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-    CREATE INDEX IF NOT EXISTS idx_tasks_project_root
-      ON tasks(json_extract(scope_json, '$.projectRoot'));
-
-    CREATE TABLE IF NOT EXISTS runs (
-      id TEXT PRIMARY KEY,
-      task_id TEXT NOT NULL,
-      runtime_kind TEXT NOT NULL,
-      native_runtime_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      metadata_json TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      last_seen_at TEXT,
-      FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE RESTRICT
-    );
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_runtime
-      ON runs(runtime_kind, native_runtime_id);
-    CREATE INDEX IF NOT EXISTS idx_runs_task_id ON runs(task_id);
-    CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
-
-    CREATE TABLE IF NOT EXISTS artifacts (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL,
-      title TEXT NOT NULL,
-      media_type TEXT,
-      version INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      representations_json TEXT NOT NULL,
-      provenance_json TEXT,
-      metadata_json TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS task_artifacts (
-      task_id TEXT NOT NULL,
-      artifact_id TEXT NOT NULL,
-      run_id TEXT,
-      source_session_id TEXT,
-      attached_at TEXT NOT NULL,
-      PRIMARY KEY(task_id, artifact_id),
-      FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE RESTRICT,
-      FOREIGN KEY(artifact_id) REFERENCES artifacts(id) ON DELETE RESTRICT,
-      FOREIGN KEY(run_id) REFERENCES runs(id) ON DELETE SET NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS kernel_events (
-      sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-      event_id TEXT NOT NULL UNIQUE,
-      task_id TEXT NOT NULL,
-      run_id TEXT,
-      operation_id TEXT,
-      type TEXT NOT NULL,
-      occurred_at TEXT NOT NULL,
-      source_json TEXT NOT NULL,
-      payload_json TEXT NOT NULL,
-      durability TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_kernel_events_task_sequence
-      ON kernel_events(task_id, sequence);
-    CREATE INDEX IF NOT EXISTS idx_kernel_events_run_sequence
-      ON kernel_events(run_id, sequence);
-    CREATE INDEX IF NOT EXISTS idx_kernel_events_type_sequence
-      ON kernel_events(type, sequence);
   `);
 
   const row = db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get() as { version?: number } | undefined;
   const currentVersion = typeof row?.version === "number" ? row.version : 0;
-  if (currentVersion >= SCHEMA_VERSION) return;
+
+  if (currentVersion > SCHEMA_VERSION) {
+    throw new Error(
+      `Kernel database schema ${currentVersion} is newer than supported ${SCHEMA_VERSION}. `
+      + "Please upgrade pi-web or restore from a compatible backup.",
+    );
+  }
+  if (currentVersion === SCHEMA_VERSION) return;
 
   const insert = db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)");
-  for (let version = currentVersion + 1; version <= SCHEMA_VERSION; version += 1) {
-    insert.run(version, new Date().toISOString());
+  for (const migration of MIGRATIONS) {
+    if (migration.version <= currentVersion) continue;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      migration.apply(db);
+      insert.run(migration.version, new Date().toISOString());
+      db.exec("COMMIT");
+    } catch {
+      db.exec("ROLLBACK");
+      throw new Error(
+        `Failed to apply kernel migration ${migration.version} (${migration.description}). `
+        + "Database was not modified. Restore from backup if this persists.",
+      );
+    }
   }
 }
 
@@ -130,7 +70,12 @@ export class KernelDatabase {
     this.path = path;
     mkdirSync(dirname(path), { recursive: true });
     this.connection = new DatabaseSync(path);
-    applyMigrations(this.connection);
+    try {
+      applyMigrations(this.connection);
+    } catch (error) {
+      this.connection.close();
+      throw error;
+    }
   }
 
   transaction<T>(work: () => T): T {

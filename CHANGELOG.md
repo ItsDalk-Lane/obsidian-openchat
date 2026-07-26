@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-07-26 - 最终架构阶段推进：Capability/Policy/Evaluation/Context/Workspace 基线
+
+- 新增 Runtime/Capability 基础接口：
+  - `GET /api/runtimes`
+  - `GET /api/capabilities`
+  - `GET|PUT /api/tasks/:id/capabilities`
+  - `POST /api/tasks/:id/capabilities/:capabilityId/invoke`
+- 新增 Effect/Policy/Approval 流程基线：
+  - `GET /api/tasks/:id/approvals`
+  - `POST /api/tasks/:id/approvals/:approvalId`
+  - 能力调用支持 `blocked / approval_required / completed` 三态返回
+- 新增 Evidence/Evaluation/Completion Gate：
+  - `GET /api/tasks/:id/evidence`
+  - `GET|POST /api/tasks/:id/evaluate`
+  - `POST /api/tasks/:id/complete`（要求最近评估通过）
+- 新增 Context Compiler 与动态 Workspace 贡献接口：
+  - `GET /api/tasks/:id/compiled-context`
+  - `GET /api/tasks/:id/workspace`
+- 新增持久化迁移 `003_capability_policy_evaluation_workspace`，引入能力描述、任务能力绑定、审批、证据、评估、工作台贡献表。
+- 新增 `GET /api/doctor` 运行诊断接口（schema/runtime/task 计数与基础告警）。
+- 新增维护接口：`POST /api/kernel/backup`（SQLite 备份）与 `POST /api/kernel/retention`（事件保留清理，含每任务最近事件保留底线）。
+- 安全加固：新增可选 `PI_WEB_LAN_API_TOKEN`（非 loopback API 必须带 token）并保留 same-origin 校验，作为浏览器调用链路的基础 CSRF 防护。
+
 ## 2026-07-26 - 补同步:输入历史回填 + 缓存写用量显示
 
  cherry-pick 自上游:`f66347f`(feat: add input history recall)、`105c4fc`(Show cache write usage in messages)。

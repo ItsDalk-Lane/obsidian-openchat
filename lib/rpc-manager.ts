@@ -26,7 +26,7 @@ import {
   type RuntimeContext,
   type RuntimeCommand,
 } from "./kernel";
-import { getKernelServices } from "./application/services";
+import { ensureKernelStartupRecovery, getKernelServices } from "./application/services";
 
 // ============================================================================
 // Types
@@ -1125,7 +1125,7 @@ declare global {
 function getRegistry(): Map<string, AgentSessionWrapper> {
   if (!globalThis.__piSessions) {
     globalThis.__piSessions = new Map();
-    getKernelServices().piSessionReconciler.interruptStaleRuns(new Set());
+    ensureKernelStartupRecovery();
     const cleanup = () => globalThis.__piSessions?.forEach((s) => s.destroy());
     process.once("exit", cleanup);
     process.once("SIGINT", cleanup);

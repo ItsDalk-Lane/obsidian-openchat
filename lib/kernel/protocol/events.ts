@@ -1,4 +1,5 @@
 import type { RunId, TaskId } from "../domain";
+import type { RuntimeKind } from "../domain/runtime-context";
 import type { AgentMessage, ExtensionUiRequest } from "./interactions";
 
 export const KERNEL_EVENT_SCHEMA_VERSION = 1 as const;
@@ -8,7 +9,7 @@ export type KernelEventSourceKind = "runtime" | "system" | "extension" | "transp
 
 export interface KernelEventSource {
   kind: KernelEventSourceKind;
-  adapter?: "pi";
+  adapter?: RuntimeKind;
   nativeType?: string;
 }
 

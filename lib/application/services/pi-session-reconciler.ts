@@ -66,10 +66,18 @@ export class PiSessionReconciler {
     private readonly runService: RunService,
   ) {}
 
+  private resolveParentTaskId(session: SessionInfo, runs: UnitOfWork["runs"], tasks: UnitOfWork["tasks"]): TaskId | undefined {
+    if (!session.parentSessionId) return undefined;
+    const parentRun = runs.findByNativeRuntime("pi", session.parentSessionId);
+    if (parentRun) return parentRun.taskId;
+    const parentTask = tasks.findByOrigin({ kind: "pi-session", externalId: session.parentSessionId });
+    return parentTask?.id;
+  }
+
   private upsertImportedTask(session: SessionInfo, running: boolean): RuntimeContext {
     return this.uow.transaction(({ tasks, runs, events }) => {
       const runId = getPiRunId(session.id);
-      const parentTaskId = session.parentSessionId ? getPiTaskId(session.parentSessionId) : undefined;
+      const parentTaskId = this.resolveParentTaskId(session, runs, tasks);
       const imported = createImportedTaskSnapshot(session, running, parentTaskId);
       const existingRun = runs.findByNativeRuntime("pi", session.id);
       const existingTask = existingRun
@@ -150,7 +158,7 @@ export class PiSessionReconciler {
         });
       }
 
-      if (task.defaultRunId !== runId) {
+      if (task.origin.kind === "pi-session" && !task.defaultRunId) {
         tasks.update({ ...task, defaultRunId: runId, updatedAt: session.modified });
       }
 
@@ -165,17 +173,15 @@ export class PiSessionReconciler {
 
   private markMissingSessions(seenSessionIds: Set<string>): void {
     this.uow.transaction(({ tasks, runs }) => {
-      const importedTasks = tasks.list({ originKind: "pi-session", includeArchived: true });
-      for (const task of importedTasks) {
-        const sessionId = task.origin.externalId;
-        if (!sessionId || seenSessionIds.has(sessionId)) continue;
-        const taskRuns = runs.listByTask(task.id);
+      const piRuns = runs.listByRuntimeKind("pi");
+      for (const run of piRuns) {
+        if (seenSessionIds.has(run.nativeRuntimeId)) continue;
         const updatedAt = new Date().toISOString();
-        for (const run of taskRuns) {
-          if (run.runtimeKind === "pi" && run.status !== "closed") {
-            runs.update({ ...run, status: "closed", updatedAt });
-          }
+        if (run.status !== "closed") {
+          runs.update({ ...run, status: "closed", updatedAt });
         }
+        const task = tasks.getById(run.taskId);
+        if (!task) continue;
         tasks.update({
           ...task,
           metadata: { ...task.metadata, sourceSessionMissing: true },
@@ -220,6 +226,7 @@ export class PiSessionReconciler {
         createdAt: input.createdAt,
         updatedAt: input.updatedAt,
         metadata: { cwd: input.cwd },
+        allowTaskRebind: false,
       });
     }
 
@@ -260,6 +267,7 @@ export class PiSessionReconciler {
         createdAt: input.createdAt,
         updatedAt: input.updatedAt,
         metadata: { cwd: input.cwd, projectRoot: input.cwd },
+        allowTaskRebind: false,
       });
     });
   }

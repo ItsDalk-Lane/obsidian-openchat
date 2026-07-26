@@ -1,11 +1,7 @@
-import { existsSync } from "fs";
-import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { allowFileRoot } from "@/lib/file-access";
-import { invalidateSessionListCache } from "@/lib/session-reader";
-import { startRpcSession } from "@/lib/rpc-manager";
-import { getKernelServices } from "@/lib/application/services";
-import { badRequest, isTaskId, notFound } from "../../task-route-helpers";
+import { getKernelServices } from "@/lib/server/kernel-services";
+import { getRuntimeRegistry } from "@/lib/server/runtime-registry";
+import { badRequest, enforceSameOrigin, isTaskId, notFound } from "../../task-route-helpers";
 
 export const runtime = "nodejs";
 
@@ -25,6 +21,8 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const forbidden = enforceSameOrigin(req);
+  if (forbidden) return forbidden;
   const { id } = await params;
   if (!isTaskId(id)) return badRequest("Invalid TaskId");
 
@@ -41,34 +39,33 @@ export async function POST(
       toolNames?: string[];
       thinkingLevel?: string;
     };
-    if (body.runtimeKind !== "pi") return badRequest("Only runtimeKind=pi is supported");
+    if (!body.runtimeKind || typeof body.runtimeKind !== "string") {
+      return badRequest("runtimeKind is required");
+    }
     if (!body.cwd || typeof body.cwd !== "string") return badRequest("cwd is required");
-    if (!existsSync(body.cwd)) return badRequest(`Directory does not exist: ${body.cwd}`);
-
-    const tempKey = `__new__${randomUUID()}`;
-    const { session, realSessionId, runtimeContext } = await startRpcSession(
-      tempKey,
-      "",
-      body.cwd,
-      Array.isArray(body.toolNames) ? body.toolNames : undefined,
-      { taskId: id },
-    );
-
-    allowFileRoot(body.cwd);
-    invalidateSessionListCache();
+    const adapter = getRuntimeRegistry().get(body.runtimeKind);
+    if (!adapter) return badRequest(`Unsupported runtimeKind: ${body.runtimeKind}`);
+    const runtimeContext = await adapter.createRun({
+      taskId: id,
+      cwd: body.cwd,
+      metadata: {
+        toolNames: Array.isArray(body.toolNames) ? body.toolNames : undefined,
+      },
+    });
 
     if (body.provider && body.modelId) {
-      await session.send({ type: "set_model", provider: body.provider, modelId: body.modelId });
+      await adapter.send(runtimeContext, { type: "set_model", provider: body.provider, modelId: body.modelId });
     }
     if (body.thinkingLevel) {
-      await session.send({ type: "set_thinking_level", level: body.thinkingLevel });
+      await adapter.send(runtimeContext, { type: "set_thinking_level", level: body.thinkingLevel });
     }
 
+    const run = services.runService.listByTask(id).find((item) => item.id === runtimeContext.runId) ?? null;
     return NextResponse.json({
-      sessionId: realSessionId,
+      sessionId: runtimeContext.nativeRuntimeId,
       taskId: runtimeContext.taskId,
       runId: runtimeContext.runId,
-      run: services.runService.listByTask(id).find((item) => item.id === runtimeContext.runId) ?? null,
+      run,
     }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });

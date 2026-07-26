@@ -1,4 +1,5 @@
 import type { UnitOfWork } from "@/lib/application/ports/unit-of-work";
+import type { TaskArtifactAttachmentStatus, TaskArtifactRecord } from "@/lib/application/ports/artifact-repository";
 import { createKernelEvent, type Artifact, type ArtifactId, type RunId, type TaskId } from "@/lib/kernel";
 
 export interface RegisterArtifactInput {
@@ -6,14 +7,20 @@ export interface RegisterArtifactInput {
   artifact: Artifact;
   runId?: RunId;
   sourceSessionId?: string;
+  attachmentStatus?: TaskArtifactAttachmentStatus;
+  titleOverride?: string;
+  role?: string;
+  attachmentMetadata?: Record<string, unknown>;
 }
 
 export interface UpdateArtifactInput {
   taskId: TaskId;
   artifactId: ArtifactId;
-  title?: string;
-  status?: Artifact["status"];
+  titleOverride?: string;
+  status?: TaskArtifactAttachmentStatus;
+  role?: string;
   runId?: RunId;
+  metadata?: Record<string, unknown>;
 }
 
 export class ArtifactService {
@@ -41,6 +48,10 @@ export class ArtifactService {
         runId: input.runId,
         sourceSessionId: input.sourceSessionId,
         attachedAt: input.artifact.updatedAt,
+        status: input.attachmentStatus ?? "ready",
+        titleOverride: input.titleOverride,
+        role: input.role,
+        metadata: input.attachmentMetadata,
       });
       events.append(createKernelEvent(
         existing ? "artifact.updated" : "artifact.registered",
@@ -55,7 +66,7 @@ export class ArtifactService {
     });
   }
 
-  updateArtifact(input: UpdateArtifactInput): Artifact {
+  updateArtifact(input: UpdateArtifactInput): TaskArtifactRecord {
     return this.uow.transaction(({ runs, artifacts, events }) => {
       const attached = artifacts.listByTask(input.taskId).find((record) => record.artifact.id === input.artifactId);
       if (!attached) throw new Error("Artifact not found");
@@ -65,26 +76,26 @@ export class ArtifactService {
           throw new Error("Run not found for task");
         }
       }
-      const existing = artifacts.getById(input.artifactId);
-      if (!existing) throw new Error("Artifact not found");
-      const updatedAt = new Date().toISOString();
-      const next: Artifact = {
-        ...existing,
-        title: input.title?.trim() ? input.title.trim() : existing.title,
-        status: input.status ?? existing.status,
-        updatedAt,
-      };
-      artifacts.upsert(next);
+      const updatedAttachment = artifacts.updateTaskAttachment({
+        taskId: input.taskId,
+        artifactId: input.artifactId,
+        runId: input.runId,
+        status: input.status,
+        titleOverride: input.titleOverride?.trim() ? input.titleOverride.trim() : undefined,
+        role: input.role?.trim() ? input.role.trim() : undefined,
+        metadata: input.metadata,
+      });
+      if (!updatedAttachment) throw new Error("Artifact not found");
       events.append(createKernelEvent(
-        next.status === "archived" ? "artifact.archived" : "artifact.updated",
+        input.status === "archived" ? "artifact.archived" : "artifact.updated",
         input.taskId,
         input.runId,
-        next.status === "archived"
-          ? { artifactId: next.id }
-          : { artifactId: next.id, changedFields: ["title", "status"] },
+        input.status === "archived"
+          ? { artifactId: updatedAttachment.artifact.id }
+          : { artifactId: updatedAttachment.artifact.id, changedFields: ["taskAttachment"] },
         { kind: "system" },
       ), "durable");
-      return next;
+      return updatedAttachment;
     });
   }
 }
