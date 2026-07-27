@@ -22,7 +22,23 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Next.js's file tracer (@vercel/nft) globs the user profile during
+      # "Creating an optimized production build" when the checkout lives on a
+      # different drive than the home dir. On windows-latest the repo is on D:
+      # and home is on C:, so nft recurses into the deny-ACL junction
+      # "C:\Users\runneradmin\Application Data" and the webpack compile dies
+      # with EPERM. Building on the same drive as home avoids the walk
+      # entirely (outputFileTracingRoot does NOT help — nft globs home
+      # regardless). Robocopy exit codes 0-7 are success.
+      - name: Move project to C: drive
+        shell: pwsh
+        run: |
+          robocopy "$env:GITHUB_WORKSPACE" C:\piweb-build /MIR /XD .git node_modules .next dist-electron /NFL /NDL /NJH /NJS
+          if ($LASTEXITCODE -gt 7) { exit $LASTEXITCODE }
+          exit 0
+
       - name: Verify tag matches package.json version
+        working-directory: C:\piweb-build
         shell: pwsh
         run: |
           $tag = "$env:GITHUB_REF_NAME".TrimStart("v")
@@ -32,12 +48,15 @@ jobs:
             exit 1
           }
 
-      - run: npm ci
+      - name: Install dependencies
+        working-directory: C:\piweb-build
+        run: npm ci
 
       # Builds .next, then packages the NSIS installer and publishes it to the
       # GitHub Release for this tag (electron-builder reads the "publish"
       # config in package.json).
       - name: Build and publish installer
+        working-directory: C:\piweb-build
         run: npm run release:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
