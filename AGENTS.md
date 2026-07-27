@@ -18,8 +18,12 @@ Lint: `npm run lint`
   2. `git tag v<version> && git push origin v<version>`
   3. `.github/workflows/release.yml` builds the NSIS installer on `windows-latest` and publishes it to GitHub Releases (uses the built-in `GITHUB_TOKEN`, no secrets to configure).
 - Packaged clients check GitHub Releases ~15s after startup, download in the background, and prompt to restart when ready. 帮助 → 检查更新 triggers a manual check with feedback dialogs.
-- Local fallback: `GH_TOKEN=<token> npm run release:win` publishes from your machine.
+- Local fallback: `GH_TOKEN=<token> npm run release:win` (or `release:mac` on macOS) publishes from your machine.
 - The app is unsigned, so Windows SmartScreen will warn on install/update — expected.
+- macOS: the workflow's `build-macos` job produces a universal (arm64 + x64) DMG. It is intentionally **unsigned** (`identity: null`), so:
+  - first launch requires right-click → 打开 (or `xattr -dr com.apple.quarantine /Applications/Pi\ Web\ Desktop.app`);
+  - **macOS auto-update does not work without a code signature** (Squirrel.Mac requirement) — Mac users update by downloading the new DMG from Releases manually. Windows clients auto-update normally. Enabling Mac auto-update later requires an Apple Developer account ($99/yr) + signing/notarization secrets in CI.
+- The macOS job runs after the Windows job (`needs:`) because concurrent electron-builder publishes to the same Release can create duplicate draft releases.
 
 ---
 

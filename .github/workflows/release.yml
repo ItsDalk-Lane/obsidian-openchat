@@ -1,7 +1,8 @@
 name: Release Desktop App
 
-# Push a version tag to build the Windows installer and publish it to GitHub
-# Releases. The tag must match the "version" field in package.json:
+# Push a version tag to build the Windows installer and macOS DMG, publishing
+# both to GitHub Releases. The tag must match the "version" field in
+# package.json:
 #   git tag v0.8.2 && git push origin v0.8.2
 on:
   push:
@@ -60,3 +61,40 @@ jobs:
         run: npm run release:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # macOS DMG can only be built on a Mac runner. This job runs AFTER the
+  # Windows job on purpose: both jobs publish to the same GitHub Release, and
+  # electron-builder is known to create duplicate draft releases when two jobs
+  # create the release concurrently.
+  build-macos:
+    needs: build-windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify tag matches package.json version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          if [ "$tag" != "$pkg" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $pkg" >&2
+            exit 1
+          fi
+
+      - run: npm ci
+
+      # Universal (arm64 + x64) DMG so both Apple Silicon and Intel Macs work.
+      # The app is intentionally unsigned (identity: null in package.json):
+      # users bypass Gatekeeper once via right-click -> Open, and macOS
+      # auto-update is unavailable without a signature — Mac users update by
+      # downloading the new DMG manually.
+      - name: Build and publish DMG
+        run: npm run release:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"

@@ -60,6 +60,7 @@
     "update:pi": "npm install --save-exact @earendil-works/pi-agent-core@latest @earendil-works/pi-ai@latest @earendil-works/pi-coding-agent@latest @earendil-works/pi-tui@latest && npm run typecheck && npm run lint",
     "electron:build": "npm run build && electron-builder",
     "release:win": "npm run build && electron-builder --win nsis --publish always",
+    "release:mac": "npm run build && electron-builder --mac dmg --universal --publish always",
     "electron:dev": "npm run build && node electron/launcher.js",
     "electron:start": "node electron/launcher.js"
   },
