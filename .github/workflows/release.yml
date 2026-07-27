@@ -30,7 +30,7 @@ jobs:
       # with EPERM. Building on the same drive as home avoids the walk
       # entirely (outputFileTracingRoot does NOT help — nft globs home
       # regardless). Robocopy exit codes 0-7 are success.
-      - name: Move project to C: drive
+      - name: "Move project to C: drive"
         shell: pwsh
         run: |
           robocopy "$env:GITHUB_WORKSPACE" C:\piweb-build /MIR /XD .git node_modules .next dist-electron /NFL /NDL /NJH /NJS
