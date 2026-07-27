@@ -10,6 +10,17 @@ Typecheck: `node_modules/.bin/tsc --noEmit`
 Lint: `npm run lint`  
 **Never run `next build` during dev** — pollutes `.next/` and breaks `npm run dev`.
 
+## Releasing the Desktop App
+
+- Version numbers must be **plain semver** (`0.8.2`, not `0.8.1-fork.0`) — prerelease-style versions make electron-updater derive a bogus update channel.
+- Release flow:
+  1. Bump `"version"` in `package.json` and commit.
+  2. `git tag v<version> && git push origin v<version>`
+  3. `.github/workflows/release.yml` builds the NSIS installer on `windows-latest` and publishes it to GitHub Releases (uses the built-in `GITHUB_TOKEN`, no secrets to configure).
+- Packaged clients check GitHub Releases ~15s after startup, download in the background, and prompt to restart when ready. 帮助 → 检查更新 triggers a manual check with feedback dialogs.
+- Local fallback: `GH_TOKEN=<token> npm run release:win` publishes from your machine.
+- The app is unsigned, so Windows SmartScreen will warn on install/update — expected.
+
 ---
 
 ## Architecture

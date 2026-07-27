@@ -1,6 +1,6 @@
 {
   "name": "@itsdalk-lane/pi-web",
-  "version": "0.8.1-fork.0",
+  "version": "0.8.2",
   "description": "Fork of Pi Web: a web UI for the pi coding agent",
   "private": true,
   "homepage": "https://github.com/ItsDalk-Lane/pi-web#readme",
@@ -59,12 +59,14 @@
     "release": "npm run prepublishOnly && echo \"Publishing is disabled in this fork. Confirm package ownership before enabling npm publish.\"",
     "update:pi": "npm install --save-exact @earendil-works/pi-agent-core@latest @earendil-works/pi-ai@latest @earendil-works/pi-coding-agent@latest @earendil-works/pi-tui@latest && npm run typecheck && npm run lint",
     "electron:build": "npm run build && electron-builder",
+    "release:win": "npm run build && electron-builder --win nsis --publish always",
     "electron:dev": "npm run build && node electron/launcher.js",
     "electron:start": "node electron/launcher.js"
   },
   "build": {
     "appId": "com.agegr.pi-web-desktop",
     "productName": "Pi Web Desktop",
+    "asar": false,
     "directories": {
       "output": "dist-electron"
     },
@@ -99,13 +101,21 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ItsDalk-Lane",
+        "repo": "pi-web"
+      }
+    ]
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.82.1",
     "@earendil-works/pi-ai": "0.82.1",
     "@earendil-works/pi-coding-agent": "0.82.1",
     "@earendil-works/pi-tui": "0.82.1",
+    "electron-updater": "^6.8.9",
     "next": "16.2.9",
     "pi-mcp-adapter": "^2.13.0",
     "react": "^19.2.4",

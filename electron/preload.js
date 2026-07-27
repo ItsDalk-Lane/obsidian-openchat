@@ -9,4 +9,7 @@ contextBridge.exposeInMainWorld("piDesktop", {
     }
   },
   selectDirectory: () => ipcRenderer.invoke("pi-web:select-directory"),
+  // Used by the loading page's error state (see loading.html).
+  retryStartup: () => ipcRenderer.send("pi-web:retry-startup"),
+  openAnyway: () => ipcRenderer.send("pi-web:open-anyway"),
 });

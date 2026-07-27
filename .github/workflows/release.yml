@@ -1,0 +1,43 @@
+name: Release Desktop App
+
+# Push a version tag to build the Windows installer and publish it to GitHub
+# Releases. The tag must match the "version" field in package.json:
+#   git tag v0.8.2 && git push origin v0.8.2
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # upload installer + latest.yml to the Release
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify tag matches package.json version
+        shell: pwsh
+        run: |
+          $tag = "${GITHUB_REF_NAME}".TrimStart("v")
+          $pkg = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($tag -ne $pkg) {
+            Write-Error "Tag ${GITHUB_REF_NAME} does not match package.json version $pkg"
+            exit 1
+          }
+
+      - run: npm ci
+
+      # Builds .next, then packages the NSIS installer and publishes it to the
+      # GitHub Release for this tag (electron-builder reads the "publish"
+      # config in package.json).
+      - name: Build and publish installer
+        run: npm run release:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
