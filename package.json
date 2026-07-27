@@ -106,7 +106,8 @@
       {
         "provider": "github",
         "owner": "ItsDalk-Lane",
-        "repo": "pi-web"
+        "repo": "pi-web",
+        "releaseType": "release"
       }
     ]
   },
