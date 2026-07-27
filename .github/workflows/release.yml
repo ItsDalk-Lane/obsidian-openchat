@@ -25,10 +25,10 @@ jobs:
       - name: Verify tag matches package.json version
         shell: pwsh
         run: |
-          $tag = "${GITHUB_REF_NAME}".TrimStart("v")
+          $tag = "$env:GITHUB_REF_NAME".TrimStart("v")
           $pkg = (Get-Content package.json -Raw | ConvertFrom-Json).version
           if ($tag -ne $pkg) {
-            Write-Error "Tag ${GITHUB_REF_NAME} does not match package.json version $pkg"
+            Write-Error "Tag $env:GITHUB_REF_NAME does not match package.json version $pkg"
             exit 1
           }
 
