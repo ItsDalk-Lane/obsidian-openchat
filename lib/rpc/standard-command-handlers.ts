@@ -18,6 +18,7 @@ type StandardCommandContext = {
   waitForExtensionsBound: () => Promise<void>;
   setForceEmptySystemPrompt: (force: boolean) => void;
   applyForcedEmptySystemPrompt: () => void;
+  syncProjectTrust: () => void;
 };
 
 type StandardCommandHandler = (
@@ -144,6 +145,7 @@ const STANDARD_COMMAND_HANDLERS: Partial<Record<RuntimeCommand["type"], Standard
 
   reload: async (_command, context) => {
     await context.waitForExtensionsBound();
+    context.syncProjectTrust();
     context.extensionUi.clearDecorations();
     await context.inner.reload();
     if (typeof context.inner.bindExtensions !== "function") {

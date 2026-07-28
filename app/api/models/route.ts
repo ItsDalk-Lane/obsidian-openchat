@@ -4,6 +4,7 @@ import { createAgentSessionServices, getAgentDir, type SettingsManager } from "@
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { loadModelsWithCache, withModelRuntimeError, type ModelsData } from "@/lib/models-cache";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
+import { projectTrustReloadOptions } from "@/lib/project-trust";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,11 @@ async function loadModels(cwd: string): Promise<ModelsData> {
   const thinkingLevelMaps: Record<string, Record<string, string | null>> = {};
 
   const agentDir = getAgentDir();
-  const services = await createAgentSessionServices({ cwd, agentDir });
+  const services = await createAgentSessionServices({
+    cwd,
+    agentDir,
+    resourceLoaderReloadOptions: projectTrustReloadOptions(cwd, agentDir),
+  });
   const available = await services.modelRuntime.getAvailable();
   const modelError = services.modelRuntime.getError();
   const settings: SettingsManager = services.settingsManager;

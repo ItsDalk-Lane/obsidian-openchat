@@ -9,6 +9,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { MCP_STATUS_EVENT, isMcpAdapterInstalledAsPackage, resolveBundledMcpAdapterDir, type McpStatusSnapshot } from "../../mcp-extension";
 import type { AgentSessionLike } from "../../pi-types";
+import { getProjectTrustStatus, projectTrustReloadOptions } from "../../project-trust";
 
 export interface CreatePiSessionInput {
   cwd: string;
@@ -39,7 +40,10 @@ export async function createPiSession(input: CreatePiSessionInput): Promise<PiSe
 
   let mcpAdapterDir: string | null = null;
   try {
-    const settingsProbe = SettingsManager.create(input.cwd, agentDir);
+    const trustStatus = getProjectTrustStatus(input.cwd, agentDir);
+    const settingsProbe = SettingsManager.create(input.cwd, agentDir, {
+      projectTrusted: trustStatus.trusted,
+    });
     mcpAdapterDir = isMcpAdapterInstalledAsPackage(settingsProbe) ? null : resolveBundledMcpAdapterDir();
   } catch (err) {
     console.warn("[pi-web] failed to check installed packages for pi-mcp-adapter:", err instanceof Error ? err.message : err);
@@ -62,6 +66,7 @@ export async function createPiSession(input: CreatePiSessionInput): Promise<PiSe
       eventBus: mcpEventBus,
       ...(mcpAdapterDir ? { additionalExtensionPaths: [mcpAdapterDir] } : {}),
     },
+    resourceLoaderReloadOptions: projectTrustReloadOptions(input.cwd, agentDir),
   });
   const toolsOption = resolveToolOption(input.toolNames);
   const { session } = await createAgentSessionFromServices({

@@ -9,6 +9,7 @@ import type {
   SuccessResponse,
 } from "@/lib/api-types";
 import { Field, SecretTextInput, SectionTitle } from "./ModelsConfigFields";
+import { useI18n } from "@/hooks/useI18n";
 
 type OAuthLoginState =
   | { phase: "idle" }
@@ -28,6 +29,7 @@ export function OAuthDetail({
   provider: OAuthProviderInfo;
   onRefresh: () => void;
 }) {
+  const { t } = useI18n();
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
   const [inputValue, setInputValue] = useState("");
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -106,9 +108,9 @@ export function OAuthDetail({
       eventSource.close();
       setLoginState((current) => current.phase === "success"
         ? current
-        : { phase: "error", message: "连接已断开" });
+        : { phase: "error", message: t("i18n.notConnected") });
     };
-  }, [provider.id, onRefresh]);
+  }, [provider.id, onRefresh, t]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -119,13 +121,13 @@ export function OAuthDetail({
       setLoginState({ phase: "idle" });
       onRefresh();
     } catch (error) {
-      setLoginState({ phase: "error", message: error instanceof Error ? error.message : "网络错误" });
+      setLoginState({ phase: "error", message: error instanceof Error ? error.message : t("i18n.networkError") });
     }
-  }, [provider.id, onRefresh]);
+  }, [provider.id, onRefresh, t]);
 
   const submitCode = useCallback(async (token: string, code: string) => {
     if (!code.trim()) return;
-    setLoginState({ phase: "progress", message: "验证中…" });
+    setLoginState({ phase: "progress", message: t("i18n.checking") });
     try {
       await requestJson<AuthActionResponse>(`/api/auth/login/${encodeURIComponent(provider.id)}`, {
         method: "POST",
@@ -133,21 +135,21 @@ export function OAuthDetail({
       });
       setInputValue("");
     } catch (error) {
-      setLoginState({ phase: "error", message: error instanceof Error ? error.message : "网络错误" });
+      setLoginState({ phase: "error", message: error instanceof Error ? error.message : t("i18n.networkError") });
     }
-  }, [provider.id]);
+  }, [provider.id, t]);
 
   const submitSelection = useCallback(async (token: string, value: string) => {
-    setLoginState({ phase: "progress", message: "继续中…" });
+    setLoginState({ phase: "progress", message: t("i18n.continuing") });
     try {
       await requestJson<AuthActionResponse>(`/api/auth/login/${encodeURIComponent(provider.id)}`, {
         method: "POST",
         json: { token, code: value },
       });
     } catch (error) {
-      setLoginState({ phase: "error", message: error instanceof Error ? error.message : "网络错误" });
+      setLoginState({ phase: "error", message: error instanceof Error ? error.message : t("i18n.networkError") });
     }
-  }, [provider.id]);
+  }, [provider.id, t]);
 
   const isWorking = loginState.phase === "connecting"
     || loginState.phase === "progress"
@@ -159,11 +161,11 @@ export function OAuthDetail({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <SectionTitle>订阅</SectionTitle>
+        <SectionTitle>{t("i18n.subscription")}</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.loggedIn ? "#4ade80" : "var(--border)", display: "inline-block" }} />
           <span style={{ fontSize: 11, color: provider.loggedIn ? "#4ade80" : "var(--text-dim)" }}>
-            {provider.loggedIn ? "已连接" : "未连接"}
+            {provider.loggedIn ? t("i18n.connected") : t("i18n.notConnected")}
           </span>
         </div>
       </div>
@@ -175,7 +177,7 @@ export function OAuthDetail({
           </p>
         )}
         {loginState.phase === "connecting" && (
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>正在打开浏览器…</p>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{t("i18n.openingBrowser")}</p>
         )}
         {loginState.phase === "select" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -229,7 +231,7 @@ export function OAuthDetail({
                 disabled={!inputValue.trim()}
                 style={{ padding: "6px 12px", background: inputValue.trim() ? "var(--accent)" : "var(--bg-panel)", border: "none", borderRadius: 5, color: inputValue.trim() ? "#fff" : "var(--text-dim)", cursor: inputValue.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, flexShrink: 0 }}
               >
-                提交
+                {t("i18n.submit")}
               </button>
             </div>
           </div>
@@ -254,7 +256,7 @@ export function OAuthDetail({
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{loginState.message}</p>
         )}
         {loginState.phase === "success" && (
-          <p style={{ margin: 0, fontSize: 12, color: "#4ade80" }}>连接成功。</p>
+          <p style={{ margin: 0, fontSize: 12, color: "#4ade80" }}>{t("i18n.connectedSuccessfully")}</p>
         )}
         {loginState.phase === "error" && (
           <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{loginState.message}</p>
@@ -270,7 +272,7 @@ export function OAuthDetail({
             }}
             style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
           >
-            取消
+            {t("i18n.cancel")}
           </button>
         ) : (
           <>
@@ -278,14 +280,14 @@ export function OAuthDetail({
               onClick={handleLogin}
               style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
             >
-              {provider.loggedIn ? "重新登录" : "登录"}
+              {provider.loggedIn ? t("i18n.relogin") : t("i18n.login")}
             </button>
             {provider.loggedIn && (
               <button
                 onClick={handleLogout}
                 style={{ padding: "5px 12px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 5, color: "#ef4444", cursor: "pointer", fontSize: 12 }}
               >
-                断开连接
+                {t("i18n.disconnect")}
               </button>
             )}
           </>
@@ -302,6 +304,7 @@ export function ApiKeyDetail({
   provider: ApiKeyProviderInfo;
   onRefresh: () => void;
 }) {
+  const { t } = useI18n();
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -354,11 +357,11 @@ export function ApiKeyDetail({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <SectionTitle>API 密钥</SectionTitle>
+        <SectionTitle>API Key</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.configured ? "#4ade80" : "var(--border)", display: "inline-block" }} />
           <span style={{ fontSize: 11, color: provider.configured ? "#4ade80" : "var(--text-dim)" }}>
-            {provider.configured ? "已配置" : "未配置"}
+            {provider.configured ? t("i18n.configured") : t("i18n.notConfigured")}
           </span>
         </div>
       </div>
@@ -369,7 +372,7 @@ export function ApiKeyDetail({
           : `输入您的 ${provider.displayName} API 密钥以启用 ${provider.modelCount} 个模型。`}
       </p>
 
-      <Field label="API 密钥">
+      <Field label="API Key">
         <div style={{ display: "flex", gap: 6 }}>
           <SecretTextInput
             value={apiKey}
@@ -406,7 +409,7 @@ export function ApiKeyDetail({
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             )}
-            {savedOk ? "已保存" : saving ? "保存中…" : "保存"}
+            {savedOk ? t("i18n.saved") : saving ? t("i18n.saving") : t("i18n.save")}
           </button>
         </div>
       </Field>
@@ -428,7 +431,7 @@ export function ApiKeyDetail({
             fontSize: 12,
           }}
         >
-          {removing ? "移除中…" : "断开连接"}
+          {removing ? t("i18n.removing") : t("i18n.disconnect")}
         </button>
       )}
     </div>

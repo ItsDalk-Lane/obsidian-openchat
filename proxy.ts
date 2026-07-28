@@ -1,14 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  isApiRequestOriginAllowed,
+  isApiRequestAllowed,
   isLanApiTokenAllowed,
-  shouldCheckApiRequestOrigin,
   shouldRequireLanApiToken,
 } from "@/lib/request-security";
 
 export function proxy(request: NextRequest) {
-  if (shouldCheckApiRequestOrigin(request) && !isApiRequestOriginAllowed(request)) {
-    return NextResponse.json({ error: "Cross-origin API requests are not allowed" }, { status: 403 });
+  if (!isApiRequestAllowed(request)) {
+    return NextResponse.json({ error: "Untrusted API request" }, { status: 403 });
   }
   if (shouldRequireLanApiToken(request) && !isLanApiTokenAllowed(request)) {
     return NextResponse.json({ error: "Missing or invalid LAN API token" }, { status: 401 });

@@ -1,3 +1,4 @@
+import type { ResourceDiagnostic } from "@earendil-works/pi-coding-agent";
 import type { SessionInfo } from "./types";
 
 export interface SuccessResponse {
@@ -103,6 +104,13 @@ export interface SkillInstallResponse extends SuccessResponse {
 
 export interface SkillsResponse {
   skills: SkillInfo[];
+  diagnostics: ResourceDiagnostic[];
+  projectResourcesLoaded: boolean;
+}
+
+export interface ProjectTrustStatus {
+  requiresTrust: boolean;
+  trusted: boolean;
 }
 
 export interface SkillCheckResponse {
@@ -192,4 +200,5 @@ export interface PluginsResponse {
   packages: PluginPackageInfo[];
   totals: PluginResourceCounts;
   diagnostics: PluginDiagnostic[];
+  projectResourcesLoaded: boolean;
 }

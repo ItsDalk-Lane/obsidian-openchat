@@ -1,8 +1,11 @@
 import type { RuntimeContext } from "../kernel";
 import { ensureKernelStartupRecovery } from "../application/services";
+import { realpathSync } from "fs";
+import { resolve } from "path";
 
 export interface RegisteredRpcSession {
   readonly sessionId: string;
+  readonly cwd: string;
   destroy(): void;
   getRuntimeContext(): RuntimeContext;
   isAlive(): boolean;
@@ -21,6 +24,16 @@ declare global {
   var __piSessions: Map<string, RegisteredRpcSession> | undefined;
   var __piStartLocks: Map<string, Promise<RpcSessionStartResult>> | undefined;
   var __piRunningListeners: Set<RunningListener> | undefined;
+  var __piStartingSessionCwds: Map<string, number> | undefined;
+}
+
+function normalizeCwd(cwd: string): string {
+  const absolute = resolve(cwd);
+  try {
+    return realpathSync(absolute);
+  } catch {
+    return absolute;
+  }
 }
 
 export function getSessionRegistry<TSession extends RegisteredRpcSession>(): Map<string, TSession> {
@@ -44,6 +57,44 @@ export function getRegisteredSession<TSession extends RegisteredRpcSession>(
   sessionId: string,
 ): TSession | undefined {
   return getSessionRegistry<TSession>().get(sessionId);
+}
+
+function getStartingSessionCwds(): Map<string, number> {
+  if (!globalThis.__piStartingSessionCwds) {
+    globalThis.__piStartingSessionCwds = new Map();
+  }
+  return globalThis.__piStartingSessionCwds;
+}
+
+export function trackStartingSessionCwd(cwd: string): () => void {
+  const normalized = normalizeCwd(cwd);
+  const starting = getStartingSessionCwds();
+  starting.set(normalized, (starting.get(normalized) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const remaining = (starting.get(normalized) ?? 1) - 1;
+    if (remaining > 0) starting.set(normalized, remaining);
+    else starting.delete(normalized);
+  };
+}
+
+export function hasBusySessionForCwd(cwd: string): boolean {
+  const normalized = normalizeCwd(cwd);
+  if ((getStartingSessionCwds().get(normalized) ?? 0) > 0) return true;
+  return [...getSessionRegistry().values()].some(
+    (session) => normalizeCwd(session.cwd) === normalized && session.isRunning(),
+  );
+}
+
+export function destroySessionsForCwd(cwd: string): number {
+  const normalized = normalizeCwd(cwd);
+  const matches = [...getSessionRegistry().values()].filter(
+    (session) => normalizeCwd(session.cwd) === normalized,
+  );
+  for (const session of matches) session.destroy();
+  return matches.length;
 }
 
 export function getRunningSessionIds(): string[] {

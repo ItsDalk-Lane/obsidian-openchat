@@ -20,6 +20,8 @@ import type {
 } from "@/lib/api-types";
 import { runNpm } from "@/lib/npx";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
+import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
+import { getProjectTrustStatus } from "@/lib/project-trust";
 
 export const dynamic = "force-dynamic";
 
@@ -243,10 +245,14 @@ function collectResources(paths: ResolvedPaths): {
 }
 
 async function readPlugins(cwd: string): Promise<PluginsResponse> {
-  const settingsManager = SettingsManager.create(cwd, getAgentDir());
+  const agentDir = getAgentDir();
+  const trustStatus = getProjectTrustStatus(cwd, agentDir);
+  const settingsManager = SettingsManager.create(cwd, agentDir, {
+    projectTrusted: trustStatus.trusted,
+  });
   const packageManager = new DefaultPackageManager({
     cwd,
-    agentDir: getAgentDir(),
+    agentDir,
     settingsManager,
   });
 
@@ -303,7 +309,12 @@ async function readPlugins(cwd: string): Promise<PluginsResponse> {
     } satisfies PluginPackageInfo;
   });
 
-  return { packages, totals, diagnostics };
+  return {
+    packages,
+    totals,
+    diagnostics,
+    projectResourcesLoaded: trustStatus.trusted,
+  };
 }
 
 function readScope(scope: unknown): PluginScope {
@@ -328,6 +339,13 @@ export async function GET(req: Request) {
 
 // POST /api/plugins body: { action, source?, scope?, cwd }
 export async function POST(req: Request) {
+  if (!isApiRequestAllowed(req)) {
+    return NextResponse.json({ error: "Untrusted API request" }, { status: 403 });
+  }
+  if (!hasJsonContentType(req)) {
+    return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 415 });
+  }
+
   try {
     const body = await req.json() as {
       action?: PluginAction;
@@ -342,14 +360,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    const settingsManager = SettingsManager.create(body.cwd, getAgentDir());
+    const scope = readScope(body.scope);
+    const agentDir = getAgentDir();
+    const trustStatus = getProjectTrustStatus(body.cwd, agentDir);
+    if (scope === "project" && !trustStatus.trusted) {
+      return NextResponse.json(
+        { error: "请先信任这个项目，再修改项目级插件" },
+        { status: 403 },
+      );
+    }
+    const settingsManager = SettingsManager.create(body.cwd, agentDir, {
+      projectTrusted: trustStatus.trusted,
+    });
     const packageManager = new DefaultPackageManager({
       cwd: body.cwd,
-      agentDir: getAgentDir(),
+      agentDir,
       settingsManager,
     });
     const source = body.source?.trim();
-    const local = readScope(body.scope) === "project";
+    const local = scope === "project";
 
     if (body.action === "install") {
       if (!source) return NextResponse.json({ error: "source required" }, { status: 400 });
@@ -367,11 +396,11 @@ export async function POST(req: Request) {
       await packageManager.update(source);
     } else if (body.action === "disable") {
       if (!source) return NextResponse.json({ error: "source required" }, { status: 400 });
-      setPackageDisabled(settingsManager, source, readScope(body.scope), true);
+      setPackageDisabled(settingsManager, source, scope, true);
       await settingsManager.flush();
     } else if (body.action === "enable") {
       if (!source) return NextResponse.json({ error: "source required" }, { status: 400 });
-      setPackageDisabled(settingsManager, source, readScope(body.scope), false);
+      setPackageDisabled(settingsManager, source, scope, false);
       await settingsManager.flush();
     } else {
       return NextResponse.json({ error: `Unsupported action: ${body.action}` }, { status: 400 });

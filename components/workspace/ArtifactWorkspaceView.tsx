@@ -7,6 +7,7 @@ interface Props {
   artifact: Artifact;
   cwd?: string;
   sourceSessionId?: string | null;
+  initialDisplayMode?: "diff";
   onOpenFile?: (filePath: string) => void;
   onMentionLines?: (relativePath: string, startLine: number, endLine: number) => void;
   gitRefreshKey?: number;

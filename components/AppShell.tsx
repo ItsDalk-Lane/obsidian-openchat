@@ -11,6 +11,7 @@ import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
 import { PluginsConfig } from "./PluginsConfig";
 import { McpConfig } from "./McpConfig";
+import { ProjectTrustDialog } from "./ProjectTrustDialog";
 import { BranchNavigator } from "./BranchNavigator";
 import { useTheme } from "@/hooks/useTheme";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -24,8 +25,12 @@ import type { SessionStatsInfo } from "@/lib/pi-types";
 import { createFileArtifact } from "@/lib/artifacts";
 import type { Run, Task } from "@/lib/kernel";
 import { useWorkspaceStore } from "@/lib/workspace-store";
+import type { ProjectTrustStatus } from "@/lib/api-types";
+import type { OpenFileOptions } from "./FileExplorer";
+import { useI18n } from "@/hooks/useI18n";
 
 type SessionCopyField = "file" | "id";
+type TopPanel = "branches" | "system" | "session" | "language";
 type AutoNameStatus =
   | { kind: "idle" }
   | { kind: "naming" }
@@ -86,6 +91,7 @@ export function AppShell() {
   const searchParams = useSearchParams();
   const [initialNavigation] = useState(() => getInitialNavigation(searchParams));
   const { isDark, toggleTheme } = useTheme();
+  const { locale, setLocale, t, supportedLocales } = useI18n();
   const isMobile = useIsMobile();
   const selectedSession = useWorkspaceStore((state) => state.selectedSession);
   const newSessionCwd = useWorkspaceStore((state) => state.newSessionCwd);
@@ -127,6 +133,10 @@ export function AppShell() {
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [pluginsConfigOpen, setPluginsConfigOpen] = useState(false);
   const [mcpConfigOpen, setMcpConfigOpen] = useState(false);
+  const [projectTrust, setProjectTrust] = useState<ProjectTrustStatus | null>(null);
+  const [projectTrustDialogOpen, setProjectTrustDialogOpen] = useState(false);
+  const [projectTrustBusy, setProjectTrustBusy] = useState(false);
+  const [projectTrustError, setProjectTrustError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarReady, setMobileSidebarReady] = useState(false);
   // On mobile the sidebar is an overlay drawer; hide it by default so the chat
@@ -139,6 +149,7 @@ export function AppShell() {
   }, []);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
+  const languageBtnRef = useRef<HTMLButtonElement>(null);
 
   // Branch navigator state — populated by ChatWindow via onBranchDataChange
   const [branchTree, setBranchTree] = useState<SessionTreeNode[]>([]);
@@ -195,10 +206,10 @@ export function AppShell() {
   }, []);
 
   // Single active panel — only one dropdown open at a time
-  const [activeTopPanel, setActiveTopPanel] = useState<"branches" | "system" | "session" | null>(null);
+  const [activeTopPanel, setActiveTopPanel] = useState<TopPanel | null>(null);
   const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
-  const toggleTopPanel = useCallback((panel: "branches" | "system" | "session") => {
+  const toggleTopPanel = useCallback((panel: TopPanel) => {
     if (isMobile) setSidebarOpen(false);
     setActiveTopPanel((cur) => cur === panel ? null : panel);
   }, [isMobile]);
@@ -216,14 +227,33 @@ export function AppShell() {
   useEffect(() => {
     if (!activeTopPanel || !topBarRef.current) return;
     const update = () => {
-      const rect = topBarRef.current!.getBoundingClientRect();
-      setTopPanelPos({ top: rect.bottom, left: rect.left, width: rect.width });
+      const topBarRect = topBarRef.current!.getBoundingClientRect();
+      if (
+        activeTopPanel === "language"
+        && !isMobile
+        && languageBtnRef.current
+      ) {
+        const buttonRect = languageBtnRef.current.getBoundingClientRect();
+        const width = Math.min(176, topBarRect.width);
+        const left = Math.min(
+          buttonRect.left - 1,
+          Math.max(topBarRect.left, topBarRect.right - width),
+        );
+        setTopPanelPos({ top: topBarRect.bottom, left, width });
+        return;
+      }
+      setTopPanelPos({
+        top: topBarRect.bottom,
+        left: topBarRect.left,
+        width: topBarRect.width,
+      });
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(topBarRef.current);
+    if (languageBtnRef.current) ro.observe(languageBtnRef.current);
     return () => ro.disconnect();
-  }, [activeTopPanel]);
+  }, [activeTopPanel, isMobile]);
 
   // Right panel — file tabs only
   const [fileTabs, setFileTabs] = useState<Tab[]>([]);
@@ -288,7 +318,11 @@ export function AppShell() {
     return () => controller.abort();
   }, [initialNavigation, startNewSession]);
 
-  const handleWorkspaceChange = useCallback((cwd: string | null, projectRoot?: string | null) => {
+  const handleWorkspaceChange = useCallback((
+    cwd: string | null,
+    projectRoot?: string | null,
+    previousProjectRoot?: string | null,
+  ) => {
     // Skip if cwd is null (initial mount) or during the initial URL restore.
     if (!cwd) return;
     if (suppressCwdBumpRef.current) {
@@ -299,7 +333,9 @@ export function AppShell() {
     // within the same project (e.g. switching worktree, or clicking a session
     // that lives in another worktree) must not close the open session.
     const newProject = projectRoot ?? cwd;
-    if (selectedSession && (selectedSession.projectRoot ?? selectedSession.cwd) === newProject) {
+    const currentProject = previousProjectRoot
+      ?? (selectedSession ? (selectedSession.projectRoot ?? selectedSession.cwd) : null);
+    if (currentProject === newProject) {
       return;
     }
     // 后台补全同一目录的项目根信息时，不要重置尚未发送消息的新会话。
@@ -318,6 +354,11 @@ export function AppShell() {
     setBranchActiveLeafId(null);
     setSystemPrompt(null);
     setActiveTopPanel(null);
+    // 文件标签使用绝对路径。真正切换项目时要清空，避免旧项目文件继续显示；
+    // 同一仓库的不同工作树会在上面的同项目判断中提前返回，因此标签会保留。
+    setFileTabs([]);
+    setActiveFileTabId(null);
+    setRightPanelOpen(false);
     router.replace("/", { scroll: false });
   }, [newSessionCwd, router, selectedSession, setNewSessionCwd, setSelectedSession]);
 
@@ -325,7 +366,7 @@ export function AppShell() {
     const previous = lastHandledWorkspaceRef.current;
     if (previous.cwd === activeCwd && previous.projectRoot === activeProjectRoot) return;
     lastHandledWorkspaceRef.current = { cwd: activeCwd, projectRoot: activeProjectRoot };
-    handleWorkspaceChange(activeCwd, activeProjectRoot);
+    handleWorkspaceChange(activeCwd, activeProjectRoot, previous.projectRoot);
   }, [activeCwd, activeProjectRoot, handleWorkspaceChange]);
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false) => {
@@ -467,7 +508,13 @@ export function AppShell() {
     }
   }, [selectedSession, router, activeProjectRoot, setNewSessionCwd, setSelectedSession, startNewSession]);
 
-  const handleOpenFile = useCallback((filePath: string, fileName: string, sourceSessionId?: string | null) => {
+  const handleOpenFile = useCallback((
+    filePath: string,
+    fileName: string,
+    options?: OpenFileOptions,
+  ) => {
+    const sourceSessionId = options?.sourceSessionId;
+    const modeHint = options?.modeHint;
     const tabId = `file:${filePath}`;
     setFileTabs((prev) => {
       const existing = prev.find((t) => t.id === tabId);
@@ -478,12 +525,27 @@ export function AppShell() {
           label: fileName,
           artifact: createFileArtifact(filePath, { sourceSessionId, cwd: activeCwd ?? undefined, title: fileName }),
           sourceSessionId,
+          initialDisplayMode: modeHint,
         }];
       }
       if (existing.kind !== "artifact") return prev;
       const nextSourceSessionId = sourceSessionId ?? existing.sourceSessionId;
-      if (existing.sourceSessionId === nextSourceSessionId) return prev;
-      return prev.map((t) => t.id === tabId && t.kind === "artifact" ? { ...t, sourceSessionId: nextSourceSessionId } : t);
+      const nextMode = modeHint ?? existing.initialDisplayMode;
+      if (
+        existing.sourceSessionId === nextSourceSessionId
+        && existing.initialDisplayMode === nextMode
+      ) {
+        return prev;
+      }
+      return prev.map((tab) =>
+        tab.id === tabId && tab.kind === "artifact"
+          ? {
+              ...tab,
+              sourceSessionId: nextSourceSessionId,
+              initialDisplayMode: nextMode,
+            }
+          : tab
+      );
     });
     setActiveFileTabId(tabId);
     setRightPanelOpen(true);
@@ -511,7 +573,9 @@ export function AppShell() {
   }, [activeCwd, isMobile, resolvedTaskState, selectedSession?.id]);
 
   const handleOpenLinkedFile = useCallback((filePath: string) => {
-    handleOpenFile(filePath, getFileName(filePath), selectedSession?.id ?? null);
+    handleOpenFile(filePath, getFileName(filePath), {
+      sourceSessionId: selectedSession?.id ?? null,
+    });
   }, [handleOpenFile, selectedSession?.id]);
 
   const handleCloseFileTab = useCallback((tabId: string) => {
@@ -576,8 +640,58 @@ export function AppShell() {
   // Show chat area if a session is selected, or if we have a cwd to start a new session in
   const effectiveNewSessionCwd = newSessionCwd ?? (selectedSession === null && activeCwd ? activeCwd : null);
   const showChat = selectedSession !== null || effectiveNewSessionCwd !== null;
+  const projectTrustCwd = activeCwd ?? selectedSession?.cwd ?? effectiveNewSessionCwd;
   // While restoring initial session from URL, don't show the placeholder
   const showPlaceholder = initialSessionRestored && !showChat;
+
+  useEffect(() => {
+    setProjectTrust(null);
+    setProjectTrustDialogOpen(false);
+    setProjectTrustError(null);
+    if (!projectTrustCwd) return;
+
+    const controller = new AbortController();
+    fetch(`/api/project-trust?cwd=${encodeURIComponent(projectTrustCwd)}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const data = await response.json() as ProjectTrustStatus & { error?: string };
+        if (!response.ok || data.error) {
+          throw new Error(data.error ?? `HTTP ${response.status}`);
+        }
+        setProjectTrust(data);
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("读取项目信任状态失败：", error);
+      });
+    return () => controller.abort();
+  }, [projectTrustCwd]);
+
+  const handleTrustProject = useCallback(async () => {
+    if (!projectTrustCwd || projectTrustBusy) return;
+    setProjectTrustBusy(true);
+    setProjectTrustError(null);
+    try {
+      const response = await fetch("/api/project-trust", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cwd: projectTrustCwd }),
+      });
+      const data = await response.json() as ProjectTrustStatus & { error?: string };
+      if (!response.ok || data.error) {
+        throw new Error(data.error ?? `HTTP ${response.status}`);
+      }
+      setProjectTrust(data);
+      setProjectTrustDialogOpen(false);
+      setModelsRefreshKey((key) => key + 1);
+      setSessionKey((key) => key + 1);
+    } catch (error) {
+      setProjectTrustError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setProjectTrustBusy(false);
+    }
+  }, [projectTrustBusy, projectTrustCwd]);
 
   const activeFileTab = fileTabs.find((t) => t.id === activeFileTabId) ?? null;
   const activeTaskRun = useMemo(() => (
@@ -705,7 +819,7 @@ export function AppShell() {
       <div style={{ padding: "8px", flexShrink: 0, display: "flex", justifyContent: "space-between", gap: 4 }}>
         {([
           {
-            label: "模型",
+            label: t("common.models"),
             onClick: () => setModelsConfigOpen(true),
             disabled: false,
             icon: (
@@ -719,7 +833,7 @@ export function AppShell() {
             ),
           },
           {
-            label: "技能",
+            label: t("common.skills"),
             onClick: () => setSkillsConfigOpen(true),
             disabled: !activeCwd && !selectedSession?.cwd && !newSessionCwd,
             icon: (
@@ -731,7 +845,7 @@ export function AppShell() {
             ),
           },
           {
-            label: "插件",
+            label: t("common.plugins"),
             onClick: () => setPluginsConfigOpen(true),
             disabled: !activeCwd && !selectedSession?.cwd && !newSessionCwd,
             icon: (
@@ -891,8 +1005,8 @@ export function AppShell() {
         <div ref={topBarRef} style={{ display: "flex", alignItems: "center", flexShrink: 0, borderBottom: "1px solid var(--border)", height: 36, background: "var(--bg-panel)" }}>
           <button
             onClick={handleSidebarToggle}
-            title={sidebarOpen ? "隐藏侧边栏" : "显示侧边栏"}
-            aria-label={sidebarOpen ? "隐藏侧边栏" : "显示侧边栏"}
+            title={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
+            aria-label={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 36, height: 36, padding: 0,
@@ -917,8 +1031,8 @@ export function AppShell() {
               const rect = e.currentTarget.getBoundingClientRect();
               toggleTheme({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
             }}
-            title={isDark ? "切换到浅色模式" : "切换到深色模式"}
-            aria-label={isDark ? "切换到浅色模式" : "切换到深色模式"}
+            title={isDark ? t("theme.light") : t("theme.dark")}
+            aria-label={isDark ? t("theme.light") : t("theme.dark")}
             aria-pressed={isDark}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -943,13 +1057,108 @@ export function AppShell() {
               </svg>
             )}
           </button>
+          <button
+            ref={languageBtnRef}
+            type="button"
+            onClick={() => toggleTopPanel("language")}
+            title={t("common.language")}
+            aria-label={t("common.language")}
+            aria-haspopup="menu"
+            aria-expanded={activeTopPanel === "language"}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 36,
+              height: 36,
+              padding: 0,
+              background:
+                activeTopPanel === "language"
+                  ? "var(--bg-selected)"
+                  : "none",
+              border: "none",
+              borderRight: "1px solid var(--border)",
+              color:
+                activeTopPanel === "language"
+                  ? "var(--text)"
+                  : "var(--text-muted)",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m5 8 6 6" />
+              <path d="m4 14 6-6 2-3" />
+              <path d="M2 5h12" />
+              <path d="M7 2h1" />
+              <path d="m22 22-5-10-5 10" />
+              <path d="M14 18h6" />
+            </svg>
+          </button>
+          {projectTrust?.requiresTrust && !projectTrust.trusted && projectTrustCwd && (
+            <button
+              type="button"
+              onClick={() => {
+                setProjectTrustError(null);
+                setProjectTrustDialogOpen(true);
+              }}
+              title={t("trust.resourcesNotLoaded")}
+              aria-label={t("trust.resourcesNotLoaded")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                height: "100%",
+                padding: isMobile ? "0 10px" : "0 12px",
+                border: "none",
+                borderRight: "1px solid var(--border)",
+                background: "rgba(245,158,11,0.08)",
+                color: "#d97706",
+                cursor: "pointer",
+                flexShrink: 0,
+                fontSize: 11,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+                <path d="M12 8v4" />
+                <path d="M12 16h.01" />
+              </svg>
+              {!isMobile && <span>{t("trust.resourcesNotLoaded")}</span>}
+            </button>
+          )}
           {showChat && (
             <div style={{ display: "flex", alignItems: "stretch", height: "100%" }}>
               <button
                 onClick={handleViewFullHistory}
                 disabled={!selectedSession}
-                title={selectedSession ? "查看完整历史" : "会话保存后可查看完整历史"}
-                aria-label="查看完整历史"
+                title={
+                  selectedSession
+                    ? t("history.full")
+                    : t("history.unsaved")
+                }
+                aria-label={t("history.full")}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -996,7 +1205,7 @@ export function AppShell() {
                   <path d="M3 3v5h5" />
                   <path d="M12 7v5l3 2" />
                 </svg>
-                {!isMobile && <span>完整历史</span>}
+                {!isMobile && <span>{t("history.full")}</span>}
               </button>
               {(() => {
                 const hasMessages = Boolean(
@@ -1007,19 +1216,19 @@ export function AppShell() {
                 const isSuccess = autoNameStatus.kind === "success";
                 const isError = autoNameStatus.kind === "error";
                 const label = autoNameStatus.kind === "naming"
-                  ? "生成中..."
+                  ? t("title.generating")
                   : isSuccess
-                    ? "标题已更新"
+                    ? t("title.updated")
                     : isError
-                      ? "生成失败"
-                      : "生成标题";
+                      ? t("title.failed")
+                      : t("title.generate");
                 const title = !selectedSession
-                  ? "会话保存后可生成标题"
+                  ? t("title.unsaved")
                   : !hasMessages
-                    ? "请先发送消息再为此会话命名"
+                    ? t("title.noMessages")
                     : isError
                       ? autoNameStatus.message
-                      : "生成会话标题";
+                      : t("title.generateSession");
 
                 return (
                   <button
@@ -1084,8 +1293,8 @@ export function AppShell() {
               <button
                 ref={systemBtnRef}
                 onClick={() => toggleTopPanel("system")}
-                title="系统提示词"
-                aria-label="系统提示词"
+                title={t("system.prompt")}
+                aria-label={t("system.prompt")}
                 aria-pressed={activeTopPanel === "system"}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
@@ -1107,13 +1316,13 @@ export function AppShell() {
                   <line x1="8" y1="13" x2="16" y2="13" />
                   <line x1="8" y1="17" x2="13" y2="17" />
                 </svg>
-                {!isMobile && <span>系统</span>}
+                {!isMobile && <span>{t("system.label")}</span>}
               </button>
             </div>
           )}
           {/* Session stats — right-aligned in top bar */}
           {showChat && (sessionStats || contextUsage) && (() => {
-            const t = sessionStats?.tokens;
+            const tokenStats = sessionStats?.tokens;
             const c = sessionStats?.cost ?? 0;
             const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
             const costStr = c > 0 ? (c >= 0.01 ? `$${c.toFixed(2)}` : `<$0.01`) : null;
@@ -1128,16 +1337,16 @@ export function AppShell() {
             }
 
             const tooltipParts: string[] = [];
-            if (t) {
-              tooltipParts.push(`输入: ${t.input.toLocaleString()}`);
-              tooltipParts.push(`输出: ${t.output.toLocaleString()}`);
-              tooltipParts.push(`缓存读取: ${t.cacheRead.toLocaleString()}`);
-              tooltipParts.push(`缓存写入: ${t.cacheWrite.toLocaleString()}`);
-              if (c > 0) tooltipParts.push(`费用: $${c.toFixed(4)}`);
+            if (tokenStats) {
+              tooltipParts.push(`${t("session.input")}: ${tokenStats.input.toLocaleString()}`);
+              tooltipParts.push(`${t("session.output")}: ${tokenStats.output.toLocaleString()}`);
+              tooltipParts.push(`${t("session.cacheRead")}: ${tokenStats.cacheRead.toLocaleString()}`);
+              tooltipParts.push(`${t("session.cacheWrite")}: ${tokenStats.cacheWrite.toLocaleString()}`);
+              if (c > 0) tooltipParts.push(`${t("session.cost")}: $${c.toFixed(4)}`);
             }
             if (contextUsage?.contextWindow) {
               const pct = contextUsage.percent;
-              tooltipParts.push(`上下文: ${pct !== null ? pct.toFixed(1) + "%" : "未知"} / ${contextUsage.contextWindow.toLocaleString()} tokens`);
+              tooltipParts.push(`${t("session.context")}: ${pct !== null ? pct.toFixed(1) + "%" : "?"} / ${contextUsage.contextWindow.toLocaleString()} tokens`);
             }
             const tooltip = tooltipParts.join("  |  ");
 
@@ -1145,8 +1354,8 @@ export function AppShell() {
               <button
                 type="button"
                 onClick={() => toggleTopPanel("session")}
-                title={tooltip || "会话信息"}
-                aria-label="会话信息"
+                title={tooltip || t("session.info")}
+                aria-label={t("session.info")}
                 aria-pressed={activeTopPanel === "session"}
                 style={{
                   marginLeft: "auto",
@@ -1170,28 +1379,28 @@ export function AppShell() {
                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                   </svg>
                 )}
-                {!isMobile && t && t.input > 0 && (
+                {!isMobile && tokenStats && tokenStats.input > 0 && (
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="5" y1="8.5" x2="5" y2="1.5" /><polyline points="2 4 5 1.5 8 4" />
                     </svg>
-                    {fmt(t.input)}
+                    {fmt(tokenStats.input)}
                   </span>
                 )}
-                {!isMobile && t && t.output > 0 && (
+                {!isMobile && tokenStats && tokenStats.output > 0 && (
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="5" y1="1.5" x2="5" y2="8.5" /><polyline points="2 6 5 8.5 8 6" />
                     </svg>
-                    {fmt(t.output)}
+                    {fmt(tokenStats.output)}
                   </span>
                 )}
-                {!isMobile && t && t.cacheRead > 0 && (
+                {!isMobile && tokenStats && tokenStats.cacheRead > 0 && (
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M8.5 5a3.5 3.5 0 1 1-1-2.45" /><polyline points="6.5 1.5 8.5 2.5 7.5 4.5" />
                     </svg>
-                    {fmt(t.cacheRead)}
+                    {fmt(tokenStats.cacheRead)}
                   </span>
                 )}
                 {!isMobile && costStr && (
@@ -1221,6 +1430,50 @@ export function AppShell() {
               overflowY: "auto",
               zIndex: 500,
             }}>
+              {activeTopPanel === "language" && (
+                <div
+                  role="menu"
+                  aria-label={t("common.language")}
+                  style={{
+                    background: "var(--bg-panel)",
+                    border: "1px solid var(--border)",
+                    borderTop: "none",
+                    padding: 4,
+                  }}
+                >
+                  {supportedLocales.map((plugin) => (
+                    <button
+                      key={plugin.id}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={locale === plugin.id}
+                      onClick={() => {
+                        setLocale(plugin.id as typeof locale);
+                        setActiveTopPanel(null);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        width: "100%",
+                        height: 34,
+                        padding: "0 10px",
+                        border: "none",
+                        borderRadius: 4,
+                        background:
+                          locale === plugin.id
+                            ? "var(--bg-selected)"
+                            : "transparent",
+                        color: "var(--text)",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        fontSize: 12,
+                      }}
+                    >
+                      {plugin.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {activeTopPanel === "system" && (
                 <div style={{
                   background: "var(--bg-panel)",
@@ -1241,11 +1494,11 @@ export function AppShell() {
                     </div>
                   ) : systemPrompt === "" ? (
                     <div style={{ padding: "10px 16px", fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
-                      系统提示词为空（工具已禁用）
+                      {t("system.empty")}
                     </div>
                   ) : (
                     <div style={{ padding: "10px 16px", fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
-                      发送消息以加载系统提示词
+                      {t("system.load")}
                     </div>
                   )}
                 </div>
@@ -1259,29 +1512,29 @@ export function AppShell() {
                 }}>
                   {sessionStats ? (() => {
                     const sessionRows = [
-                      ...(sessionStats.sessionName ? [{ label: "名称", value: sessionStats.sessionName, copyField: null }] : []),
-                      { label: "文件", value: sessionStats.sessionFile ?? "内存中", copyField: "file" as const },
-                      { label: "ID", value: sessionStats.sessionId, copyField: "id" as const },
+                      ...(sessionStats.sessionName ? [{ label: t("session.name"), value: sessionStats.sessionName, copyField: null }] : []),
+                      { label: t("session.file"), value: sessionStats.sessionFile ?? t("session.inMemory"), copyField: "file" as const },
+                      { label: t("session.id"), value: sessionStats.sessionId, copyField: "id" as const },
                     ];
                     const messageRows = [
-                      ["用户", sessionStats.userMessages.toLocaleString()],
-                      ["助手", sessionStats.assistantMessages.toLocaleString()],
-                      ["工具调用", sessionStats.toolCalls.toLocaleString()],
-                      ["工具结果", sessionStats.toolResults.toLocaleString()],
-                      ["总计", sessionStats.totalMessages.toLocaleString()],
+                      [t("session.user"), sessionStats.userMessages.toLocaleString()],
+                      [t("session.assistant"), sessionStats.assistantMessages.toLocaleString()],
+                      [t("session.toolCalls"), sessionStats.toolCalls.toLocaleString()],
+                      [t("session.toolResults"), sessionStats.toolResults.toLocaleString()],
+                      [t("session.total"), sessionStats.totalMessages.toLocaleString()],
                     ];
                     const tokenRows = [
-                      ["输入", sessionStats.tokens.input.toLocaleString()],
-                      ["输出", sessionStats.tokens.output.toLocaleString()],
-                      ...(sessionStats.tokens.cacheRead > 0 ? [["缓存读取", sessionStats.tokens.cacheRead.toLocaleString()]] : []),
-                      ...(sessionStats.tokens.cacheWrite > 0 ? [["缓存写入", sessionStats.tokens.cacheWrite.toLocaleString()]] : []),
-                      ["总计", sessionStats.tokens.total.toLocaleString()],
+                      [t("session.input"), sessionStats.tokens.input.toLocaleString()],
+                      [t("session.output"), sessionStats.tokens.output.toLocaleString()],
+                      ...(sessionStats.tokens.cacheRead > 0 ? [[t("session.cacheRead"), sessionStats.tokens.cacheRead.toLocaleString()]] : []),
+                      ...(sessionStats.tokens.cacheWrite > 0 ? [[t("session.cacheWrite"), sessionStats.tokens.cacheWrite.toLocaleString()]] : []),
+                      [t("session.total"), sessionStats.tokens.total.toLocaleString()],
                     ];
                     const ctx = contextUsage ?? sessionStats.contextUsage;
                     const formatCompact = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
                     const extraTokenRows = [
-                      ...(sessionStats.cost > 0 ? [["费用", `$${sessionStats.cost.toFixed(4)}`]] : []),
-                      ...(ctx?.contextWindow ? [["上下文", `${ctx.percent !== null ? `${ctx.percent.toFixed(1)}%` : "?"} / ${formatCompact(ctx.contextWindow)}`]] : []),
+                      ...(sessionStats.cost > 0 ? [[t("session.cost"), `$${sessionStats.cost.toFixed(4)}`]] : []),
+                      ...(ctx?.contextWindow ? [[t("session.context"), `${ctx.percent !== null ? `${ctx.percent.toFixed(1)}%` : "?"} / ${formatCompact(ctx.contextWindow)}`]] : []),
                     ];
                     const section = (
                       title: string,
@@ -1318,7 +1571,7 @@ export function AppShell() {
                       return (
                         <button
                           type="button"
-                          title={copied ? "已复制" : `复制${field === "file" ? "文件路径" : "会话 ID"}`}
+                          title={copied ? t("session.copied") : t(field === "file" ? "session.copyFile" : "session.copyId")}
                           onClick={() => handleCopySessionField(field, value)}
                           style={{
                             alignSelf: "start",
@@ -1362,7 +1615,7 @@ export function AppShell() {
                     };
                     const sessionInfoSection = (
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>会话信息</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>{t("session.infoSection")}</div>
                         <div style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr) auto", columnGap: 12, rowGap: 8, alignItems: "start" }}>
                           {sessionRows.map((row) => (
                             <div key={`session-info:${row.label}`} style={{ display: "contents" }}>
@@ -1487,13 +1740,13 @@ export function AppShell() {
                       }}>
                         {sessionInfoSection}
                         {taskInfoSection}
-                        {section("消息", messageRows)}
-                        {section("Token", [...tokenRows, ...extraTokenRows], "right", true)}
+                        {section(t("session.messages"), messageRows)}
+                        {section(t("session.tokens"), [...tokenRows, ...extraTokenRows], "right", true)}
                       </div>
                     );
                   })() : (
                     <div style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
-                      发送消息或运行 /session 以加载会话信息
+                      {t("session.load")}
                     </div>
                   )}
                 </div>
@@ -1527,7 +1780,7 @@ export function AppShell() {
               role="status"
               style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 24, color: "var(--text-muted)", textAlign: "center" }}
             >
-              <div style={{ fontSize: 14, color: "var(--text)" }}>正在打开工作区...</div>
+              <div style={{ fontSize: 14, color: "var(--text)" }}>{t("workspace.opening")}</div>
               <div style={{ maxWidth: "min(720px, 100%)", overflowWrap: "anywhere", fontFamily: "var(--font-mono)", fontSize: 12 }}>
                 {initialNavigation.requestedCwd}
               </div>
@@ -1537,7 +1790,7 @@ export function AppShell() {
               role="alert"
               style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 24, color: "var(--text-muted)", textAlign: "center" }}
             >
-              <div style={{ fontSize: 14, color: "#dc2626" }}>无法打开工作区</div>
+              <div style={{ fontSize: 14, color: "#dc2626" }}>{t("workspace.unable")}</div>
               <div style={{ maxWidth: "min(720px, 100%)", overflowWrap: "anywhere", fontFamily: "var(--font-mono)", fontSize: 12 }}>
                 {initialNavigation.requestedCwd}
               </div>
@@ -1546,7 +1799,7 @@ export function AppShell() {
           ) : showPlaceholder ? (
             activeCwd ? (
               <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 15 }}>
-                请从侧边栏选择一个会话
+                {t("workspace.selectSession")}
               </div>
             ) : (
               <div style={{ position: "absolute", top: 12, left: 12, display: "flex", alignItems: "flex-start", gap: 8, userSelect: "none", pointerEvents: "none" }}>
@@ -1554,10 +1807,10 @@ export function AppShell() {
                   <line x1="20" y1="12" x2="4" y2="12" /><polyline points="10 6 4 12 10 18" />
                 </svg>
                 <div>
-                  <div style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>开始使用</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>{t("workspace.getStarted")}</div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.8 }}>
-                    <span style={{ color: "var(--text-dim)", marginRight: 6 }}>1.</span>从侧边栏选择一个项目目录<br />
-                    <span style={{ color: "var(--text-dim)", marginRight: 6 }}>2.</span>通过底部的 <strong style={{ color: "var(--text)" }}>模型</strong> 按钮添加模型
+                    <span style={{ color: "var(--text-dim)", marginRight: 6 }}>1.</span>{t("workspace.selectProject")}<br />
+                    <span style={{ color: "var(--text-dim)", marginRight: 6 }}>2.</span>{t("workspace.addModels")}
                   </div>
                 </div>
               </div>
@@ -1596,17 +1849,18 @@ export function AppShell() {
               artifact={activeFileTab.artifact}
               cwd={activeCwd ?? undefined}
               sourceSessionId={activeFileTab.sourceSessionId}
+              initialDisplayMode={activeFileTab.initialDisplayMode}
               gitRefreshKey={explorerRefreshKey}
               onMentionLines={rightPanelOpen ? handleFileLineMention : undefined}
               onOpenFile={(filePath) => handleOpenFile(
                 filePath,
                 getFileName(filePath),
-                activeFileTab.sourceSessionId,
+                { sourceSessionId: activeFileTab.sourceSessionId },
               )}
             />
           ) : (
             <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 12 }}>
-              未打开文件
+              {t("files.noneOpen")}
             </div>
           )}
         </div>
@@ -1615,8 +1869,8 @@ export function AppShell() {
     {/* File panel toggle — always visible at top-right */}
     <button
       onClick={() => setRightPanelOpen((v) => !v)}
-      title={rightPanelOpen ? "隐藏文件面板" : "显示文件面板"}
-      aria-label={rightPanelOpen ? "隐藏文件面板" : "显示文件面板"}
+      title={rightPanelOpen ? t("files.hidePanel") : t("files.showPanel")}
+      aria-label={rightPanelOpen ? t("files.hidePanel") : t("files.showPanel")}
       style={{
         position: "fixed", top: 0, right: 0, zIndex: 300,
         display: "flex", alignItems: "center", justifyContent: "center",
@@ -1633,20 +1887,31 @@ export function AppShell() {
       </svg>
     </button>
     {modelsConfigOpen && <ModelsConfig onClose={() => { setModelsConfigOpen(false); setModelsRefreshKey((k) => k + 1); }} />}
-    {skillsConfigOpen && (activeCwd ?? selectedSession?.cwd ?? newSessionCwd) && (
-      <SkillsConfig cwd={(activeCwd ?? selectedSession?.cwd ?? newSessionCwd)!} onClose={() => setSkillsConfigOpen(false)} />
+    {projectTrustDialogOpen && projectTrustCwd && (
+      <ProjectTrustDialog
+        cwd={projectTrustCwd}
+        busy={projectTrustBusy}
+        error={projectTrustError}
+        onCancel={() => {
+          if (!projectTrustBusy) setProjectTrustDialogOpen(false);
+        }}
+        onConfirm={() => void handleTrustProject()}
+      />
     )}
-    {pluginsConfigOpen && (activeCwd ?? selectedSession?.cwd ?? newSessionCwd) && (
+    {skillsConfigOpen && projectTrustCwd && (
+      <SkillsConfig cwd={projectTrustCwd} onClose={() => setSkillsConfigOpen(false)} />
+    )}
+    {pluginsConfigOpen && projectTrustCwd && (
       <PluginsConfig
-        cwd={(activeCwd ?? selectedSession?.cwd ?? newSessionCwd)!}
+        cwd={projectTrustCwd}
         sessionId={selectedSession?.id ?? null}
         onClose={() => setPluginsConfigOpen(false)}
         onReloaded={() => setSessionKey((k) => k + 1)}
       />
     )}
-    {mcpConfigOpen && (activeCwd ?? selectedSession?.cwd ?? newSessionCwd) && (
+    {mcpConfigOpen && projectTrustCwd && (
       <McpConfig
-        cwd={(activeCwd ?? selectedSession?.cwd ?? newSessionCwd)!}
+        cwd={projectTrustCwd}
         sessionId={selectedSession?.id ?? null}
         onClose={() => setMcpConfigOpen(false)}
         onReloaded={() => setSessionKey((k) => k + 1)}

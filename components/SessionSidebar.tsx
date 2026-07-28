@@ -12,7 +12,11 @@ import type {
 } from "@/lib/api-types";
 import { buildSessionTree, type SessionListTreeNode } from "@/lib/session-list-tree";
 import { DirectoryPicker } from "./DirectoryPicker";
-import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
+import {
+  FileExplorer,
+  type FileExplorerHandle,
+  type OpenFileOptions,
+} from "./FileExplorer";
 import {
   AnimatedDropdown,
   displayCwd,
@@ -23,6 +27,9 @@ import {
   type WorktreeState,
 } from "./session-sidebar/WorktreeSwitcher";
 import { useWorkspaceStore } from "@/lib/workspace-store";
+import { useI18n } from "@/hooks/useI18n";
+import { formatRelativeTime as formatLocaleRelativeTime } from "@/lib/i18n/format";
+import type { Locale } from "@/lib/i18n/types";
 
 interface Props {
   onSelectSession: (session: SessionInfo, isRestore?: boolean) => void;
@@ -32,7 +39,11 @@ interface Props {
   onInitialRestoreDone?: () => void;
   refreshKey?: number;
   onSessionDeleted?: (sessionId: string) => void;
-  onOpenFile?: (filePath: string, fileName: string) => void;
+  onOpenFile?: (
+    filePath: string,
+    fileName: string,
+    options?: OpenFileOptions,
+  ) => void;
   explorerRefreshKey?: number;
   onExplorerRefresh?: () => void;
   onAtMention?: (relativePath: string, isDir: boolean) => void;
@@ -64,18 +75,8 @@ function saveUnreadSessionIds(ids: Set<string>): void {
   }
 }
 
-function formatRelativeTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const mins = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  if (mins < 1) return "刚刚";
-  if (mins < 60) return `${mins}分钟前`;
-  if (hours < 24) return `${hours}小时前`;
-  if (days < 7) return `${days}天前`;
-  return date.toLocaleDateString();
+function formatRelativeTime(dateStr: string, locale: Locale): string {
+  return formatLocaleRelativeTime(dateStr, locale);
 }
 
 /**
@@ -186,6 +187,7 @@ function PiWebTitle() {
 }
 
 export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, onOpenFile, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions }: Props) {
+  const { t } = useI18n();
   const selectedSessionId = useWorkspaceStore((state) => state.selectedSession?.id ?? null);
   const selectedCwd = useWorkspaceStore((state) => state.activeCwd);
   const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
@@ -204,6 +206,8 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [explorerKey, setExplorerKey] = useState(0);
   const [explorerUploadBusy, setExplorerUploadBusy] = useState(false);
+  const [changesCount, setChangesCount] = useState(0);
+  const [changesCollapsed, setChangesCollapsed] = useState(true);
   const [sessionRefreshDone, setSessionRefreshDone] = useState(false);
   const [explorerRefreshDone, setExplorerRefreshDone] = useState(false);
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
@@ -507,20 +511,20 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
     && !showWorktreeSwitcher
     ? (worktreeState.isGit
         ? {
-            label: "打开仓库根目录",
-            title: "打开仓库根目录以管理 worktree。",
+            label: t("sidebar.openRepoRoot"),
+            title: t("sidebar.openRepoRootTitle"),
           }
         : {
-            label: "仅 Git 仓库根目录",
-            title: "Worktree 仅在 Git 仓库根目录可用。",
+            label: t("sidebar.gitRepoRootOnly"),
+            title: t("sidebar.gitRepoRootOnlyTitle"),
           })
     : null;
   const worktreeLoading = Boolean(selectedCwd && worktreeLoadingCwd === selectedCwd);
   const inactiveWorktreeSelector = worktreeGuide
     ?? (worktreeLoading && !showWorktreeSwitcher
       ? {
-          label: "Worktree...",
-          title: "正在检查此目录的 worktree。",
+          label: t("sidebar.worktrees"),
+          title: t("sidebar.checkingWorktrees"),
         }
       : null);
 
@@ -570,7 +574,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                 flexShrink: 0,
                 transition: "background 0.12s, color 0.12s, border-color 0.12s",
               }}
-              title={selectedCwd ? `在 ${selectedCwd} 新建会话` : "请先选择一个项目"}
+              title={selectedCwd ? t("sidebar.newSessionTitle", { path: selectedCwd }) : t("sidebar.selectProject")}
               onMouseEnter={(e) => {
                 if (!selectedCwd) return;
                 e.currentTarget.style.background = "var(--bg-selected)";
@@ -587,7 +591,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                 <line x1="6" y1="1" x2="6" y2="11" />
                 <line x1="1" y1="6" x2="11" y2="6" />
               </svg>
-              新建
+              {t("sidebar.new")}
             </button>
             <button
               onClick={() => loadSessions(false)}
@@ -615,7 +619,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                 e.currentTarget.style.color = "var(--text-muted)";
                 e.currentTarget.style.borderColor = "var(--border)";
               }}
-              title="刷新"
+              title={t("sidebar.refresh")}
             >
               {sessionRefreshDone ? (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -673,7 +677,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                   color: "var(--text-dim)",
                 }}
               >
-                {initialSessionId && !restoredRef.current ? "" : "选择项目…"}
+                {initialSessionId && !restoredRef.current ? "" : t("sidebar.selectProject")}
               </span>
             )}
           </button>
@@ -704,7 +708,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                         setDropdownOpen(false);
                       }
                     }}
-                    placeholder="过滤项目…"
+                    placeholder={t("sidebar.filterProjects")}
                     autoFocus
                     style={{
                       width: "100%",
@@ -762,7 +766,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                   </button>
                 ))}
                 {visibleProjects.length === 0 && projectFilter.trim() && (
-                  <div style={{ padding: "8px 10px", fontSize: 11, color: "var(--text-dim)" }}>没有匹配的项目</div>
+                  <div style={{ padding: "8px 10px", fontSize: 11, color: "var(--text-dim)" }}>{t("sidebar.noMatchingProjects")}</div>
                 )}
               </div>
 
@@ -788,7 +792,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                     <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
                   </svg>
-                  <span>使用默认目录</span>
+                  <span>{t("sidebar.useDefaultDirectory")}</span>
                 </button>
               )}
 
@@ -816,7 +820,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                   <line x1="5" y1="1" x2="5" y2="9" />
                   <line x1="1" y1="5" x2="9" y2="5" />
                 </svg>
-                <span>自定义路径…</span>
+                <span>{t("sidebar.customPath")}</span>
               </button>
           </AnimatedDropdown>
         </div>
@@ -907,14 +911,75 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
               >
                 <polyline points="3 2 7 5 3 8" />
               </svg>
-              资源管理器
+              {t("files.explorer")}
             </button>
+            {explorerOpen && changesCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setChangesCollapsed((value) => !value)}
+                title={t("sidebar.changedFiles", { count: changesCount })}
+                aria-label={t("sidebar.changedFiles", { count: changesCount })}
+                aria-pressed={!changesCollapsed}
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 26,
+                  height: 26,
+                  padding: 0,
+                  border: "none",
+                  borderRadius: 5,
+                  background: changesCollapsed ? "none" : "var(--bg-hover)",
+                  color: changesCollapsed ? "var(--text-dim)" : "var(--accent)",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M3 12h6" />
+                  <path d="M15 12h6" />
+                </svg>
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -3,
+                    right: -3,
+                    minWidth: 13,
+                    height: 13,
+                    padding: "0 3px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 7,
+                    background: "var(--accent)",
+                    color: "var(--bg)",
+                    fontSize: 9,
+                    fontWeight: 700,
+                    lineHeight: 1,
+                  }}
+                >
+                  {changesCount}
+                </span>
+              </button>
+            )}
             {explorerOpen && (
               <button
                 onClick={() => fileExplorerRef.current?.openUploadPicker()}
                 disabled={explorerUploadBusy}
-                title="上传文件到项目根目录"
-                aria-label="上传文件"
+                title={t("sidebar.uploadFiles")}
+                aria-label={t("sidebar.uploadFiles")}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: 26, height: 26, padding: 0,
@@ -945,7 +1010,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                 if (explorerRefreshTimerRef.current) clearTimeout(explorerRefreshTimerRef.current);
                 explorerRefreshTimerRef.current = setTimeout(() => setExplorerRefreshDone(false), 2000);
               }}
-              title="刷新资源管理器"
+              title={t("sidebar.refreshExplorer")}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 26, height: 26, padding: 0, marginRight: 6,
@@ -982,6 +1047,8 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                 onAtMention={onAtMention}
                 onAtMentions={onAtMentions}
                 onUploadBusyChange={setExplorerUploadBusy}
+                changesCollapsed={changesCollapsed}
+                onChangesCountChange={setChangesCount}
               />
             </div>
           )}
@@ -1063,10 +1130,11 @@ function SessionTreeItem({
 }
 
 function RunningSessionIndicator() {
+  const { t } = useI18n();
   return (
     <span
-      title="Agent 运行中…"
-      aria-label="Agent 运行中"
+      title={t("sidebar.agentRunning")}
+      aria-label={t("sidebar.agentRunning")}
       style={{
         width: 14,
         height: 14,
@@ -1100,10 +1168,11 @@ function RunningSessionIndicator() {
 }
 
 function UnreadSessionIndicator() {
+  const { t } = useI18n();
   return (
     <span
-      title="新活动"
-      aria-label="新会话活动"
+      title={t("sidebar.newActivity")}
+      aria-label={t("sidebar.newActivity")}
       style={{
         width: 14,
         height: 14,
@@ -1150,6 +1219,7 @@ function SessionItem({
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
+  const { locale, t } = useI18n();
   const [hovered, setHovered] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -1181,13 +1251,7 @@ function SessionItem({
     }
   }, [renameValue, session.id, session.name, onRenamed]);
 
-  const handleDeleteClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setConfirmDelete(true);
-  }, []);
-
-  const handleDeleteConfirm = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const performDelete = useCallback(async () => {
     setConfirmDelete(false);
     setDeleting(true);
     try {
@@ -1200,6 +1264,20 @@ function SessionItem({
       setDeleting(false);
     }
   }, [session.id, onDeleted]);
+
+  const handleDeleteClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (e.shiftKey) {
+      void performDelete();
+    } else {
+      setConfirmDelete(true);
+    }
+  }, [performDelete]);
+
+  const handleDeleteConfirm = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    void performDelete();
+  }, [performDelete]);
 
   const handleDeleteCancel = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1237,7 +1315,9 @@ function SessionItem({
         /* ── Delete confirmation: same height, two flat buttons ── */
         <>
           <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            删除 <span style={{ fontWeight: 600 }}>&ldquo;{title.slice(0, 22)}{title.length > 22 ? "…" : ""}&rdquo;</span>？
+            {t("sidebar.deleteSession", {
+              title: `${title.slice(0, 22)}${title.length > 22 ? "…" : ""}`,
+            })}
           </div>
           <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
             <button
@@ -1257,7 +1337,7 @@ function SessionItem({
                 <path d="M10 11v6M14 11v6" />
                 <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
               </svg>
-              删除
+              {t("sidebar.delete")}
             </button>
             <button
               onClick={handleDeleteCancel}
@@ -1270,7 +1350,7 @@ function SessionItem({
                 whiteSpace: "nowrap",
               }}
             >
-              取消
+              {t("sidebar.cancel")}
             </button>
           </div>
         </>
@@ -1334,7 +1414,7 @@ function SessionItem({
               ) : isUnread ? (
                 <UnreadSessionIndicator />
               ) : (
-                <span title={session.modified}>{formatRelativeTime(session.modified)}</span>
+                <span title={session.modified}>{formatRelativeTime(session.modified, locale)}</span>
               )}
               <span>{session.messageCount} 条消息</span>
               {session.worktreeBranch && (
@@ -1358,7 +1438,7 @@ function SessionItem({
           {hasChildren && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleCollapse?.(); }}
-              title={collapsed ? "展开分叉" : "折叠分叉"}
+              title={collapsed ? t("sidebar.expandForks") : t("sidebar.collapseForks")}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 20, height: 20, padding: 0, flexShrink: 0,
@@ -1379,7 +1459,7 @@ function SessionItem({
             <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
               <button
                 onClick={startRename}
-                title="重命名"
+                title={t("sidebar.rename")}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: 32, height: 32, padding: 0,
@@ -1405,7 +1485,7 @@ function SessionItem({
               </button>
               <button
                 onClick={handleDeleteClick}
-                title="删除"
+                title={t("sidebar.deleteWithShiftClick")}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: 32, height: 32, padding: 0,

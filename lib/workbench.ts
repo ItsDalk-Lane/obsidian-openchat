@@ -6,6 +6,7 @@ export interface ArtifactWorkbenchTab {
   label: string;
   artifact: Artifact;
   sourceSessionId?: string | null;
+  initialDisplayMode?: "diff";
   iconKey?: string;
 }
 

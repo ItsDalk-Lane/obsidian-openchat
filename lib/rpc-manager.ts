@@ -1,4 +1,4 @@
-import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, SessionManager } from "@earendil-works/pi-coding-agent";
 import { existsSync, writeFileSync } from "fs";
 import type { McpStatusSnapshot } from "./mcp-extension";
 import { cacheSessionPath, invalidateSessionListCache } from "./session-reader";
@@ -30,9 +30,13 @@ import {
   getRunningSessionIds,
   getSessionRegistry,
   getSessionStartLocks,
+  destroySessionsForCwd,
+  hasBusySessionForCwd,
   notifyRunningSessionsChanged,
   subscribeToRunningSessions,
+  trackStartingSessionCwd,
 } from "./rpc/session-registry";
+import { getProjectTrustStatus } from "./project-trust";
 import {
   dispatchStandardCommand,
   STANDARD_COMMAND_NOT_HANDLED,
@@ -80,11 +84,16 @@ export class AgentSessionWrapper {
       getOperationId: () => this.getCurrentOperationId(),
       emit: (event) => this.emit(event),
       applyForcedEmptySystemPrompt: () => this.applyForcedEmptySystemPrompt(),
+      prepareReload: () => this.syncProjectTrust(),
     });
   }
 
   get sessionId(): string {
     return this.inner.sessionId;
+  }
+
+  get cwd(): string {
+    return this.inner.sessionManager.getCwd();
   }
 
   get sessionFile(): string {
@@ -308,6 +317,7 @@ export class AgentSessionWrapper {
       waitForExtensionsBound: () => this.waitForExtensionsBound(),
       setForceEmptySystemPrompt: (force) => this.setForceEmptySystemPrompt(force),
       applyForcedEmptySystemPrompt: () => this.applyForcedEmptySystemPrompt(),
+      syncProjectTrust: () => this.syncProjectTrust(),
     });
     if (standardResult !== STANDARD_COMMAND_NOT_HANDLED) return standardResult;
 
@@ -559,6 +569,11 @@ export class AgentSessionWrapper {
     }
   }
 
+  private syncProjectTrust(): void {
+    const status = getProjectTrustStatus(this.cwd, getAgentDir());
+    this.inner.settingsManager.setProjectTrusted(status.trusted);
+  }
+
   destroy(): void {
     if (!this._alive) return;
     this._alive = false;
@@ -588,6 +603,14 @@ export function notifyRunningChange(): void {
   notifyRunningSessionsChanged();
 }
 
+export function hasBusyRpcSessionForCwd(cwd: string): boolean {
+  return hasBusySessionForCwd(cwd);
+}
+
+export function destroyRpcSessionsForCwd(cwd: string): number {
+  return destroySessionsForCwd(cwd);
+}
+
 /**
  * Get or create an AgentSession for the given session.
  * For new sessions (sessionFile === ""), pi generates its own id.
@@ -612,6 +635,7 @@ export async function startRpcSession(
   const inflight = locks.get(sessionId);
   if (inflight) return inflight;
 
+  const releaseStartingCwd = trackStartingSessionCwd(cwd);
   const starting = (async () => {
     let runtimeContext = sessionFile
       ? await kernelServices.piSessionReconciler.reconcileSession(sessionId)
@@ -652,7 +676,10 @@ export async function startRpcSession(
     runtime.subscribeMcpStatus((snapshot) => wrapper.setMcpStatus(snapshot));
 
     return { session: wrapper, realSessionId, runtimeContext };
-  })().finally(() => locks.delete(sessionId));
+  })().finally(() => {
+    releaseStartingCwd();
+    locks.delete(sessionId);
+  });
 
   locks.set(sessionId, starting);
   return starting;

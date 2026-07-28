@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { existsSync, readFileSync, writeFileSync } from "fs";
+import { homedir } from "os";
+import path from "path";
 import { getAgentDir, parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import { loadSkillsWithInstallInfo } from "@/lib/skills-service";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
+import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +30,37 @@ export async function GET(req: Request) {
 
 // PATCH /api/skills — toggle disable-model-invocation on a SKILL.md file
 export async function PATCH(req: Request) {
+  if (!isApiRequestAllowed(req)) {
+    return NextResponse.json({ error: "Untrusted API request" }, { status: 403 });
+  }
+  if (!hasJsonContentType(req)) {
+    return NextResponse.json(
+      { error: "Content-Type must be application/json" },
+      { status: 415 },
+    );
+  }
+
   try {
-    const body = await req.json() as { filePath: string; disableModelInvocation: boolean };
+    const body = await req.json() as {
+      filePath?: unknown;
+      disableModelInvocation?: unknown;
+    };
     const { filePath, disableModelInvocation } = body;
-    if (!filePath) return NextResponse.json({ error: "filePath required" }, { status: 400 });
+    if (typeof filePath !== "string" || !filePath) {
+      return NextResponse.json({ error: "filePath required" }, { status: 400 });
+    }
+    if (typeof disableModelInvocation !== "boolean") {
+      return NextResponse.json(
+        { error: "disableModelInvocation must be boolean" },
+        { status: 400 },
+      );
+    }
     if (!existsSync(filePath)) return NextResponse.json({ error: "file not found" }, { status: 404 });
     const allowedRoots = new Set(await getAllowedFileRoots());
     allowedRoots.add(getAgentDir());
+    // 全局安装的技能可能通过符号链接出现在代理目录里，真实文件位于这个固定目录。
+    const globalSkillsDir = path.join(homedir(), ".agents", "skills");
+    if (existsSync(globalSkillsDir)) allowedRoots.add(globalSkillsDir);
     if (!isExistingFilePathAllowed(filePath, allowedRoots)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }

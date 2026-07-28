@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiRequestError, requestJson } from "@/lib/api-client";
 import type { ModelTestResponse } from "@/lib/api-types";
 import type { ModelEntry, ProviderEntry } from "@/lib/model-config";
+import { useI18n } from "@/hooks/useI18n";
 
 type ModelTestState =
   | { phase: "idle" }
@@ -20,19 +21,20 @@ export function ModelConnectionTest({
   provider: ProviderEntry;
   model: ModelEntry;
 }) {
+  const { t } = useI18n();
   const [testState, setTestState] = useState<ModelTestState>({ phase: "idle" });
 
   const testSummary = (() => {
     if (testState.phase === "idle") return null;
-    if (testState.phase === "testing") return "正在测试模型连接...";
+    if (testState.phase === "testing") return t("i18n.testingModel");
     const meta = [
       testState.latencyMs !== undefined ? `${testState.latencyMs}ms` : null,
       testState.status !== undefined ? `HTTP ${testState.status}` : null,
     ].filter(Boolean);
     if (testState.phase === "success") {
-      return ["已连接", ...meta, testState.responseText || null].filter(Boolean).join(" · ");
+      return [t("i18n.connected"), ...meta, testState.responseText || null].filter(Boolean).join(" · ");
     }
-    return ["失败", ...meta, testState.message].filter(Boolean).join(" · ");
+    return [t("i18n.failed"), ...meta, testState.message].filter(Boolean).join(" · ");
   })();
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export function ModelConnectionTest({
       if (!data.ok) {
         setTestState({
           phase: "error",
-          message: data.error ?? "模型连接测试未返回成功状态",
+          message: data.error ?? t("i18n.failed"),
           latencyMs: data.latencyMs,
           status: data.status,
         });
@@ -73,7 +75,7 @@ export function ModelConnectionTest({
         status: detail?.status,
       });
     }
-  }, [model, provider, providerName, testState.phase]);
+  }, [model, provider, providerName, testState.phase, t]);
 
   return (
     <>
@@ -103,7 +105,7 @@ export function ModelConnectionTest({
       <button
         onClick={handleTest}
         disabled={!model.id.trim() || testState.phase === "testing"}
-        title="测试模型连接"
+        title={t("i18n.testConnection")}
         style={{
           height: 24,
           padding: "0 8px",
@@ -125,7 +127,7 @@ export function ModelConnectionTest({
             <polyline points="20 6 9 17 4 12" />
           </svg>
         )}
-        {testState.phase === "testing" ? "测试中…" : testState.phase === "success" ? "成功" : "测试"}
+        {testState.phase === "testing" ? t("i18n.checking") : testState.phase === "success" ? t("common.ok") : t("i18n.test")}
       </button>
     </>
   );

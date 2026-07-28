@@ -26,6 +26,7 @@ import { CodeBlock, MermaidBlock } from "./MermaidBlock";
 import { createFileArtifact } from "@/lib/artifacts";
 import { ArtifactViewer } from "./artifacts/ArtifactViewer";
 import type { ArtifactRenderer } from "./artifacts/artifact-renderer-registry";
+import { useI18n } from "@/hooks/useI18n";
 
 interface Props {
   filePath: string;
@@ -34,6 +35,7 @@ interface Props {
   onOpenFile?: (filePath: string) => void;
   onMentionLines?: (relativePath: string, startLine: number, endLine: number) => void;
   gitRefreshKey?: number;
+  initialDisplayMode?: DisplayMode;
 }
 
 function getArtifactFilePath(filePath: string) {
@@ -47,12 +49,6 @@ interface FileData {
 }
 
 type DisplayMode = "source" | "preview" | "diff";
-
-const DISPLAY_MODE_LABELS: Record<DisplayMode, string> = {
-  source: "源码",
-  preview: "预览",
-  diff: "差异",
-};
 
 const FILE_CODE_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
@@ -210,12 +206,13 @@ function getFileApiUrl(
 }
 
 function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceSessionId?: string | null }) {
+  const { t } = useI18n();
   return (
     <a
       href={getFileApiUrl(filePath, "download", sourceSessionId)}
       download={getFileName(filePath)}
-      title="下载文件"
-      aria-label="下载文件"
+      title={t("i18n.downloadFile")}
+      aria-label={t("i18n.downloadFile")}
       className="file-viewer-icon-button"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -411,6 +408,7 @@ function DiffView({ patch }: { patch: string }) {
 }
 
 function ImageViewer({ filePath, cwd, sourceSessionId }: Props) {
+  const { t } = useI18n();
   const [watching, setWatching] = useState(false);
   const [bust, setBust] = useState(0);
   const [size, setSize] = useState<number | null>(null);
@@ -474,11 +472,11 @@ function ImageViewer({ filePath, cwd, sourceSessionId }: Props) {
         <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
           {getRelativeFilePath(filePath, cwd)}
         </span>
-        <span style={{ marginLeft: "auto" }}>{ext || "图片"}</span>
+        <span style={{ marginLeft: "auto" }}>{ext || t("files.image")}</span>
         {naturalSize && <span>{naturalSize.w} × {naturalSize.h}</span>}
         {formatSizeStr && <span>{formatSizeStr}</span>}
         <span
-          title={watching ? "实时同步已激活" : "未监视"}
+          title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
           style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
         >
           <span
@@ -491,7 +489,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId }: Props) {
               boxShadow: watching ? "0 0 4px #4ade80" : "none",
             }}
           />
-          {watching ? "实时" : "静态"}
+          {watching ? t("files.live") : t("files.static")}
         </span>
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
       </div>
@@ -521,7 +519,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId }: Props) {
               const img = e.currentTarget;
               setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
             }}
-            onError={() => setError("加载图片失败")}
+            onError={() => setError(t("files.imageLoadFailed"))}
             style={{
               maxWidth: "100%",
               maxHeight: "100%",
@@ -544,6 +542,7 @@ function formatDuration(seconds: number): string {
 }
 
 function AudioViewer({ filePath, cwd, sourceSessionId }: Props) {
+  const { t } = useI18n();
   const [watching, setWatching] = useState(false);
   const [bust, setBust] = useState(0);
   const [size, setSize] = useState<number | null>(null);
@@ -607,11 +606,11 @@ function AudioViewer({ filePath, cwd, sourceSessionId }: Props) {
         <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
           {getRelativeFilePath(filePath, cwd)}
         </span>
-        <span style={{ marginLeft: "auto" }}>{ext || "音频"}</span>
+        <span style={{ marginLeft: "auto" }}>{ext || t("files.audio")}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
         {size != null && <span>{formatSize(size)}</span>}
         <span
-          title={watching ? "实时同步已激活" : "未监视"}
+          title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
           style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
         >
           <span
@@ -624,7 +623,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId }: Props) {
               boxShadow: watching ? "0 0 4px #4ade80" : "none",
             }}
           />
-          {watching ? "实时" : "静态"}
+          {watching ? t("files.live") : t("files.static")}
         </span>
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
       </div>
@@ -650,7 +649,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId }: Props) {
             preload="metadata"
             src={src}
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-            onError={() => setError("加载音频失败")}
+            onError={() => setError(t("files.audioLoadFailed"))}
             style={{ width: "100%" }}
           />
         </div>
@@ -660,6 +659,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId }: Props) {
 }
 
 function DocumentViewer({ filePath, cwd, sourceSessionId }: Props) {
+  const { t } = useI18n();
   const [watching, setWatching] = useState(false);
   const [bust, setBust] = useState(0);
   const [size, setSize] = useState<number | null>(null);
@@ -741,11 +741,11 @@ function DocumentViewer({ filePath, cwd, sourceSessionId }: Props) {
         <span style={{ fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={filePath}>
           {getRelativeFilePath(filePath, cwd)}
         </span>
-        <span style={{ marginLeft: "auto" }}>{ext === "docx" ? "docx 预览" : "pdf"}</span>
+        <span style={{ marginLeft: "auto" }}>{ext === "docx" ? t("files.docxPreview") : "PDF"}</span>
         {size != null && <span>{formatSize(size)}</span>}
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
         <span
-          title={watching ? "实时同步已激活" : "未监视"}
+          title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
           style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)", flexShrink: 0 }}
         >
           <span
@@ -758,7 +758,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId }: Props) {
               boxShadow: watching ? "0 0 4px #4ade80" : "none",
             }}
           />
-          {watching ? "实时" : "静态"}
+          {watching ? t("files.live") : t("files.static")}
         </span>
       </div>
       <div style={{ flex: 1, minHeight: 0, background: "var(--bg-panel)" }}>
@@ -771,7 +771,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId }: Props) {
             key={previewUrl}
             src={previewUrl}
             sandbox={isPdf ? undefined : ""}
-            title={`预览 ${getFileName(filePath)}`}
+            title={t("i18n.previewFile", { file: getFileName(filePath) })}
             style={{ width: "100%", height: "100%", border: "none", background: isPdf ? "var(--bg)" : "#eef1f5" }}
           />
         )}
@@ -822,17 +822,34 @@ const FILE_ARTIFACT_RENDERERS: ArtifactRenderer<FileArtifactContext>[] = [
         onOpenFile={context.onOpenFile}
         onMentionLines={context.onMentionLines}
         gitRefreshKey={context.gitRefreshKey}
+        initialDisplayMode={context.initialDisplayMode}
       />
     ),
   },
 ];
 
-export function FileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionLines, gitRefreshKey }: Props) {
+export function FileViewer({
+  filePath,
+  cwd,
+  sourceSessionId,
+  onOpenFile,
+  onMentionLines,
+  gitRefreshKey,
+  initialDisplayMode,
+}: Props) {
   const artifact = getArtifactFilePath(filePath);
   return (
     <ArtifactViewer
       artifact={artifact}
-      context={{ filePath, cwd, sourceSessionId, onOpenFile, onMentionLines, gitRefreshKey }}
+      context={{
+        filePath,
+        cwd,
+        sourceSessionId,
+        onOpenFile,
+        onMentionLines,
+        gitRefreshKey,
+        initialDisplayMode,
+      }}
       renderers={FILE_ARTIFACT_RENDERERS}
       fallback={(_, context) => (
         <TextFileViewer
@@ -842,16 +859,27 @@ export function FileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMenti
           onOpenFile={context.onOpenFile}
           onMentionLines={context.onMentionLines}
           gitRefreshKey={context.gitRefreshKey}
+          initialDisplayMode={context.initialDisplayMode}
         />
       )}
     />
   );
 }
 
-function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionLines, gitRefreshKey }: Props) {
+function TextFileViewer({
+  filePath,
+  cwd,
+  sourceSessionId,
+  onOpenFile,
+  onMentionLines,
+  gitRefreshKey,
+  initialDisplayMode,
+}: Props) {
   const { isDark } = useTheme();
+  const { t } = useI18n();
   const [data, setData] = useState<FileData | null>(null);
   const [gitDiff, setGitDiff] = useState<GitFileDiffResponse | null>(null);
+  const [gitDiffLoading, setGitDiffLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [displayMode, setDisplayMode] = useState<DisplayMode>("source");
@@ -882,8 +910,10 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
 
   const fetchGitDiff = useCallback(async (targetPath: string) => {
     const requestId = ++gitDiffRequestRef.current;
+    setGitDiffLoading(true);
     if (!cwd) {
       setGitDiff(null);
+      setGitDiffLoading(false);
       return;
     }
 
@@ -895,6 +925,8 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
       setGitDiff(response.ok && next.supported && typeof next.patch === "string" ? next : null);
     } catch {
       if (requestId === gitDiffRequestRef.current) setGitDiff(null);
+    } finally {
+      if (requestId === gitDiffRequestRef.current) setGitDiffLoading(false);
     }
   }, [cwd]);
 
@@ -913,9 +945,7 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
       esRef.current = null;
     }
 
-    fetchContent(filePath).then((d) => {
-      if (d?.language === "markdown") setDisplayMode("preview");
-    }).finally(() => setLoading(false));
+    fetchContent(filePath).finally(() => setLoading(false));
 
     // Set up SSE watch
     const es = new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
@@ -948,11 +978,40 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
     void fetchGitDiff(filePath);
   }, [fetchGitDiff, filePath, gitRefreshKey]);
 
+  useEffect(() => {
+    if (data?.language === "markdown" && initialDisplayMode !== "diff") {
+      setDisplayMode("preview");
+    }
+  }, [data?.language, initialDisplayMode]);
+
   const hasGitDiff = gitDiff?.supported === true && typeof gitDiff.patch === "string";
+  const isDeletedDiff = hasGitDiff && gitDiff.status === "deleted";
 
   useEffect(() => {
     if (!hasGitDiff && displayMode === "diff") setDisplayMode("source");
   }, [displayMode, hasGitDiff]);
+
+  useEffect(() => {
+    if (!isDeletedDiff || !esRef.current) return;
+    esRef.current.close();
+    esRef.current = null;
+    setWatching(false);
+  }, [isDeletedDiff]);
+
+  const autoDiffAppliedRef = useRef(false);
+  useEffect(() => {
+    autoDiffAppliedRef.current = false;
+  }, [filePath]);
+  useEffect(() => {
+    if (
+      initialDisplayMode === "diff"
+      && hasGitDiff
+      && !autoDiffAppliedRef.current
+    ) {
+      autoDiffAppliedRef.current = true;
+      setDisplayMode("diff");
+    }
+  }, [hasGitDiff, initialDisplayMode]);
 
   const markdownPreview = useMemo(
     () => (data?.language === "markdown" ? normalizeDisplayMath(data.content) : ""),
@@ -1010,7 +1069,7 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [displayMode, mentionLineRange, onMentionLines]);
 
-  if (loading) {
+  if (loading || (initialDisplayMode === "diff" && gitDiffLoading && !data)) {
     return (
       <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
         加载中...
@@ -1018,7 +1077,7 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
     );
   }
 
-  if (error) {
+  if (error && !isDeletedDiff) {
     return (
       <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#f87171", fontSize: 13 }}>
         {error}
@@ -1026,19 +1085,26 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
     );
   }
 
-  if (!data) return null;
+  if (!data && !isDeletedDiff) return null;
 
-  const isHtml = data.language === "html";
-  const isMarkdown = data.language === "markdown";
+  const language = data?.language ?? "text";
+  const content = data?.content ?? "";
+  const isHtml = language === "html";
+  const isMarkdown = language === "markdown";
   const hasPreview = isHtml || isMarkdown;
   const markdownDirectory = getFileDirectory(filePath);
-  const lines = data.content.split("\n");
-  const displayModes: DisplayMode[] = [
-    "source",
-    ...(hasPreview ? ["preview" as const] : []),
-    ...(hasGitDiff ? ["diff" as const] : []),
-  ];
-  const metadata = `${data.language} · ${lines.length} 行 · ${formatSize(data.size)}`;
+  const lines = content.split("\n");
+  const effectiveDisplayMode = isDeletedDiff ? "diff" : displayMode;
+  const displayModes: DisplayMode[] = isDeletedDiff
+    ? ["diff"]
+    : [
+        "source",
+        ...(hasPreview ? ["preview" as const] : []),
+        ...(hasGitDiff ? ["diff" as const] : []),
+      ];
+  const metadata = isDeletedDiff
+    ? t("files.deleted")
+    : `${language} · ${lines.length} 行 · ${formatSize(data!.size)}`;
 
   return (
     <div className="file-viewer-shell" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
@@ -1061,27 +1127,29 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
         </span>
 
         <span className="file-viewer-meta" title={metadata}>{metadata}</span>
-        <span
-          title={watching ? "实时同步已激活" : "未监视"}
-          aria-label={watching ? "实时同步已激活" : "未监视"}
-          className="file-viewer-live-indicator"
-          style={{
-            background: watching ? "#4ade80" : "var(--border)",
-            boxShadow: watching ? "0 0 4px #4ade80" : "none",
-          }}
-        />
+        {!isDeletedDiff && (
+          <span
+            title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
+            aria-label={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
+            className="file-viewer-live-indicator"
+            style={{
+              background: watching ? "#4ade80" : "var(--border)",
+              boxShadow: watching ? "0 0 4px #4ade80" : "none",
+            }}
+          />
+        )}
 
         <div className="file-viewer-controls">
           {displayModes.length > 1 && (
-            <div className="file-viewer-mode-switch" aria-label="文件查看模式">
+            <div className="file-viewer-mode-switch" aria-label={t("i18n.fileViewMode")}>
               {displayModes.map((mode) => {
-                const active = displayMode === mode;
+                const active = effectiveDisplayMode === mode;
                 return (
                   <button
                     key={mode}
                     type="button"
                     onClick={() => setDisplayMode(mode)}
-                    title={mode === "diff" ? "比较工作树与 HEAD" : undefined}
+                    title={mode === "diff" ? t("i18n.compareHead") : undefined}
                     aria-pressed={active}
                     className="file-viewer-mode-button"
                     style={{
@@ -1089,7 +1157,7 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
                       color: active ? "var(--text)" : "var(--text-muted)",
                     }}
                   >
-                    {DISPLAY_MODE_LABELS[mode]}
+                    {t(`i18n.${mode}`)}
                   </button>
                 );
               })}
@@ -1097,14 +1165,14 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
           )}
 
           <div className="file-viewer-actions">
-            {displayMode === "source" && (
+            {effectiveDisplayMode === "source" && (
               <>
                 <button
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={handleMentionSelectedLines}
-                  title="引用所选行"
-                  aria-label="引用所选行"
+                  title={t("i18n.mentionSelectedLines")}
+                  aria-label={t("i18n.mentionSelectedLines")}
                   disabled={!selectedLineRange}
                   className="file-viewer-icon-button"
                 >
@@ -1113,8 +1181,8 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
                 <button
                   type="button"
                   onClick={() => setWrapLines((value) => !value)}
-                  title={wrapLines ? "禁用自动换行" : "启用自动换行"}
-                  aria-label={wrapLines ? "禁用自动换行" : "启用自动换行"}
+                  title={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
+                  aria-label={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
                   aria-pressed={wrapLines}
                   className="file-viewer-icon-button"
                   style={{
@@ -1133,22 +1201,27 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
             )}
           </div>
 
-          <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
+          {!isDeletedDiff && (
+            <DownloadLink
+              filePath={filePath}
+              sourceSessionId={sourceSessionId}
+            />
+          )}
         </div>
       </div>
 
       {/* Content area */}
       <div ref={contentRef} className="file-viewer-content" style={{ flex: 1, overflow: "auto", background: "var(--bg)" }}>
-        {displayMode === "diff" && hasGitDiff ? (
+        {effectiveDisplayMode === "diff" && hasGitDiff ? (
           <DiffView patch={gitDiff.patch!} />
-        ) : isHtml && displayMode === "preview" ? (
+        ) : isHtml && effectiveDisplayMode === "preview" ? (
           <iframe
-            srcDoc={data.content}
+            srcDoc={content}
             sandbox="allow-scripts"
             style={{ width: "100%", height: "100%", border: "none", background: "var(--bg)" }}
-            title="HTML 预览"
+            title={t("i18n.htmlPreview")}
           />
-        ) : isMarkdown && displayMode === "preview" ? (
+        ) : isMarkdown && effectiveDisplayMode === "preview" ? (
           <div
             className="markdown-body markdown-file-preview"
             style={{ padding: "24px 32px" }}
@@ -1213,7 +1286,7 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
         ) : (
           <SyntaxHighlighter
             className={wrapLines ? "file-source-view is-wrapped" : "file-source-view"}
-            language={data.language === "text" ? "plaintext" : data.language}
+            language={language === "text" ? "plaintext" : language}
             style={isDark ? vscDarkPlus : vs}
             showLineNumbers
             lineNumberStyle={{
@@ -1241,7 +1314,7 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
             )}
             wrapLongLines={wrapLines}
           >
-            {data.content}
+            {content}
           </SyntaxHighlighter>
         )}
       </div>

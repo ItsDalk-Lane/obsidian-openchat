@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties, type KeyboardEventHandler, type ReactNode } from "react";
+import { useI18n } from "@/hooks/useI18n";
 
 const inputStyle = {
   padding: "6px 9px",
@@ -64,6 +65,7 @@ export function SecretTextInput({
   style?: CSSProperties;
 }) {
   const [visible, setVisible] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!value) setVisible(false);
@@ -88,8 +90,8 @@ export function SecretTextInput({
       <button
         type="button"
         onClick={() => setVisible((current) => !current)}
-        aria-label={visible ? "隐藏 API 密钥" : "显示 API 密钥"}
-        title={visible ? "隐藏 API 密钥" : "显示 API 密钥"}
+        aria-label={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
+        title={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
         style={{
           position: "absolute",
           right: 5,
@@ -156,13 +158,14 @@ export function Select({
   options: readonly string[];
   required?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
       style={{ ...inputStyle, color: value ? "var(--text)" : "var(--text-dim)" }}
     >
-      {!required && <option value="">— 继承 / 无 —</option>}
+      {!required && <option value="">— {t("i18n.default")} / none —</option>}
       {options.map((option) => <option key={option} value={option}>{option}</option>)}
     </select>
   );

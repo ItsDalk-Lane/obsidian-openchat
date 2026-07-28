@@ -49,6 +49,7 @@ interface ExtensionUiBridgeOptions {
   getOperationId: () => string | undefined;
   emit: (event: KernelEvent) => void;
   applyForcedEmptySystemPrompt: () => void;
+  prepareReload: () => void;
 }
 
 export class ExtensionUiBridge {
@@ -250,6 +251,7 @@ export class ExtensionUiBridge {
       },
       switchSession: async () => ({ cancelled: true }),
       reload: async () => {
+        this.options.prepareReload();
         this.clearDecorations();
         await inner.reload({
           beforeSessionStart: () => {

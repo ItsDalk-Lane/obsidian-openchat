@@ -68,7 +68,9 @@ export function extensionUiReducer(
       const rest = state.statuses.filter((item) => item.key !== action.key);
       return {
         ...state,
-        statuses: action.text ? [...rest, { key: action.key, text: action.text }] : rest,
+        statuses: action.text !== undefined
+          ? [...rest, { key: action.key, text: action.text }]
+          : rest,
       };
     }
     case "set_widget": {
