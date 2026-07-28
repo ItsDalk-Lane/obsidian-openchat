@@ -14,6 +14,7 @@ import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import type { Run, Task } from "@/lib/kernel";
+import { useWorkspaceStore } from "@/lib/workspace-store";
 import {
   captureScrollDistance,
   getNextVisibleCount,
@@ -25,8 +26,6 @@ import {
 interface Props {
   task?: Task | null;
   run?: Run | null;
-  session: SessionInfo | null;
-  newSessionCwd: string | null;
   onAgentEnd?: () => void;
   onSessionCreated?: (session: SessionInfo) => void;
   onSessionForked?: (newSessionId: string) => void;
@@ -171,7 +170,11 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, children }: { messag
   );
 }
 
-export function ChatWindow({ task, run, session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile }: Props) {
+export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile }: Props) {
+  const session = useWorkspaceStore((state) => state.selectedSession);
+  const storedNewSessionCwd = useWorkspaceStore((state) => state.newSessionCwd);
+  const activeCwd = useWorkspaceStore((state) => state.activeCwd);
+  const newSessionCwd = storedNewSessionCwd ?? (session === null ? activeCwd : null);
   const { soundEnabled, onSoundToggle, playDoneSound, unlockAudio } = useAudio();
   const isMobile = useIsMobile();
 

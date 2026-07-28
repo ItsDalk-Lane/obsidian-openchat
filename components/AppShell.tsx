@@ -23,6 +23,7 @@ import type { ChatInputHandle } from "./ChatInput";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import { createFileArtifact } from "@/lib/artifacts";
 import type { Run, Task } from "@/lib/kernel";
+import { useWorkspaceStore } from "@/lib/workspace-store";
 
 type SessionCopyField = "file" | "id";
 type AutoNameStatus =
@@ -86,7 +87,15 @@ export function AppShell() {
   const [initialNavigation] = useState(() => getInitialNavigation(searchParams));
   const { isDark, toggleTheme } = useTheme();
   const isMobile = useIsMobile();
-  const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
+  const selectedSession = useWorkspaceStore((state) => state.selectedSession);
+  const newSessionCwd = useWorkspaceStore((state) => state.newSessionCwd);
+  const activeCwd = useWorkspaceStore((state) => state.activeCwd);
+  const activeProjectRoot = useWorkspaceStore((state) => state.activeProjectRoot);
+  const setSelectedSession = useWorkspaceStore((state) => state.setSelectedSession);
+  const setNewSessionCwd = useWorkspaceStore((state) => state.setNewSessionCwd);
+  const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
+  const selectSession = useWorkspaceStore((state) => state.selectSession);
+  const startNewSession = useWorkspaceStore((state) => state.startNewSession);
   const [resolvedTaskState, setResolvedTaskState] = useState<ResolvedTaskState>({
     status: "idle",
     task: null,
@@ -106,8 +115,6 @@ export function AppShell() {
   });
   const [taskSaving, setTaskSaving] = useState(false);
   const [taskSaveError, setTaskSaveError] = useState<string | null>(null);
-  // When user clicks +, we only store the cwd — no fake session id
-  const [newSessionCwd, setNewSessionCwd] = useState<string | null>(null);
   const [initialCwdStatus, setInitialCwdStatus] = useState<"idle" | "validating" | "ready" | "error">(
     () => initialNavigation.requestedCwd ? "validating" : "idle",
   );
@@ -239,11 +246,14 @@ export function AppShell() {
   }, []);
 
   const initialSessionId = initialNavigation.sessionId;
-  const [activeCwd, setActiveCwd] = useState<string | null>(null);
   // True once the initial ?session= URL param has been resolved (or confirmed absent)
   const [initialSessionRestored, setInitialSessionRestored] = useState<boolean>(() => !initialSessionId);
   // Suppresses sessionKey bump in handleCwdChange during the initial URL restore
   const suppressCwdBumpRef = useRef(false);
+  const lastHandledWorkspaceRef = useRef<{ cwd: string | null; projectRoot: string | null }>({
+    cwd: null,
+    projectRoot: null,
+  });
 
   useEffect(() => {
     const requestedCwd = initialNavigation.requestedCwd;
@@ -265,10 +275,8 @@ export function AppShell() {
           throw new Error(data.error ?? `HTTP ${response.status}`);
         }
 
-        // The sidebar will notify us when it adopts this cwd. Avoid remounting
-        // the just-created empty chat during that initial synchronization.
         suppressCwdBumpRef.current = true;
-        setNewSessionCwd(data.cwd);
+        startNewSession(data.cwd);
         setInitialCwdStatus("ready");
       })
       .catch((error: unknown) => {
@@ -278,10 +286,9 @@ export function AppShell() {
       });
 
     return () => controller.abort();
-  }, [initialNavigation]);
+  }, [initialNavigation, startNewSession]);
 
-  const handleCwdChange = useCallback((cwd: string | null, projectRoot?: string | null) => {
-    setActiveCwd(cwd);
+  const handleWorkspaceChange = useCallback((cwd: string | null, projectRoot?: string | null) => {
     // Skip if cwd is null (initial mount) or during the initial URL restore.
     if (!cwd) return;
     if (suppressCwdBumpRef.current) {
@@ -293,6 +300,10 @@ export function AppShell() {
     // that lives in another worktree) must not close the open session.
     const newProject = projectRoot ?? cwd;
     if (selectedSession && (selectedSession.projectRoot ?? selectedSession.cwd) === newProject) {
+      return;
+    }
+    // 后台补全同一目录的项目根信息时，不要重置尚未发送消息的新会话。
+    if (!selectedSession && newSessionCwd === cwd) {
       return;
     }
     // Close any session that belongs to a different project — it no longer
@@ -308,19 +319,24 @@ export function AppShell() {
     setSystemPrompt(null);
     setActiveTopPanel(null);
     router.replace("/", { scroll: false });
-  }, [router, selectedSession]);
+  }, [newSessionCwd, router, selectedSession, setNewSessionCwd, setSelectedSession]);
+
+  useEffect(() => {
+    const previous = lastHandledWorkspaceRef.current;
+    if (previous.cwd === activeCwd && previous.projectRoot === activeProjectRoot) return;
+    lastHandledWorkspaceRef.current = { cwd: activeCwd, projectRoot: activeProjectRoot };
+    handleWorkspaceChange(activeCwd, activeProjectRoot);
+  }, [activeCwd, activeProjectRoot, handleWorkspaceChange]);
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false) => {
-    setNewSessionCwd(null);
-    setSelectedSession(session);
+    selectSession(session);
     setSessionKey((k) => k + 1);
     setSystemPrompt(null);
     setInitialSessionRestored(true);
     // On mobile, collapse the overlay drawer so the chat is revealed after pick.
     if (isMobile && !isRestore) setSidebarOpen(false);
     if (isRestore) {
-      // Suppress the redundant sessionKey bump that would come from the
-      // onCwdChange effect firing after setSelectedCwd in the sidebar
+      // 避免 URL 恢复时工作区同步造成重复重挂载
       suppressCwdBumpRef.current = true;
     }
     // Skip router.replace when restoring from URL — the param is already correct
@@ -328,11 +344,10 @@ export function AppShell() {
     if (!isRestore) {
       router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
     }
-  }, [router, isMobile]);
+  }, [router, isMobile, selectSession]);
 
   const handleNewSession = useCallback((_sessionId: string, cwd: string) => {
-    setSelectedSession(null);
-    setNewSessionCwd(cwd);
+    startNewSession(cwd, activeProjectRoot ?? cwd);
     setSessionKey((k) => k + 1);
     setBranchTree([]);
     setBranchActiveLeafId(null);
@@ -340,7 +355,7 @@ export function AppShell() {
     setActiveTopPanel(null);
     if (isMobile) setSidebarOpen(false);
     router.replace("/", { scroll: false });
-  }, [router, isMobile]);
+  }, [router, isMobile, startNewSession, activeProjectRoot]);
 
   // Global keyboard shortcuts (handles Esc, Ctrl+Alt+N etc.)
   useGlobalKeyboardShortcuts({
@@ -358,19 +373,20 @@ export function AppShell() {
       .then((d) => {
         const full = d?.sessions.find((s) => s.id === sessionId);
         if (!full) return;
+        if (useWorkspaceStore.getState().selectedSession?.id !== sessionId) return;
         setSelectedSession((prev) => (prev && prev.id === sessionId && !prev.projectRoot ? full : prev));
+        setActiveWorkspace(full.cwd, full.projectRoot ?? full.cwd);
       })
       .catch(() => {});
-  }, []);
+  }, [setActiveWorkspace, setSelectedSession]);
 
   // Called by ChatWindow when a new session gets its real id from pi
   const handleSessionCreated = useCallback((session: SessionInfo) => {
-    setNewSessionCwd(null);
-    setSelectedSession(session);
+    selectSession(session);
     setRefreshKey((k) => k + 1);
     hydrateSelectedSession(session.id);
     router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
-  }, [router, hydrateSelectedSession]);
+  }, [router, hydrateSelectedSession, selectSession]);
 
   const handleAgentEnd = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -406,7 +422,7 @@ export function AppShell() {
       setAutoNameStatus({ kind: "error", message });
       autoNameTimerRef.current = setTimeout(() => setAutoNameStatus({ kind: "idle" }), 5000);
     }
-  }, [autoNameStatus.kind, selectedSession?.id]);
+  }, [autoNameStatus.kind, selectedSession?.id, setSelectedSession]);
 
   useEffect(() => {
     if (autoNameTimerRef.current) clearTimeout(autoNameTimerRef.current);
@@ -427,7 +443,7 @@ export function AppShell() {
     }));
     hydrateSelectedSession(newSessionId);
     router.replace(`?session=${encodeURIComponent(newSessionId)}`, { scroll: false });
-  }, [router, hydrateSelectedSession]);
+  }, [router, hydrateSelectedSession, setNewSessionCwd, setSelectedSession]);
 
   const handleInitialRestoreDone = useCallback(() => {
     setInitialSessionRestored(true);
@@ -437,8 +453,11 @@ export function AppShell() {
     setRefreshKey((k) => k + 1);
     if (selectedSession?.id === sessionId) {
       const cwd = selectedSession.cwd;
-      setSelectedSession(null);
-      setNewSessionCwd(cwd ?? null);
+      if (cwd) startNewSession(cwd, selectedSession.projectRoot ?? activeProjectRoot ?? cwd);
+      else {
+        setSelectedSession(null);
+        setNewSessionCwd(null);
+      }
       setSessionKey((k) => k + 1);
       setBranchTree([]);
       setBranchActiveLeafId(null);
@@ -446,7 +465,7 @@ export function AppShell() {
       setActiveTopPanel(null);
       router.replace("/", { scroll: false });
     }
-  }, [selectedSession, router]);
+  }, [selectedSession, router, activeProjectRoot, setNewSessionCwd, setSelectedSession, startNewSession]);
 
   const handleOpenFile = useCallback((filePath: string, fileName: string, sourceSessionId?: string | null) => {
     const tabId = `file:${filePath}`;
@@ -670,7 +689,6 @@ export function AppShell() {
   const sidebarContent = (
     <>
       <SessionSidebar
-        selectedSessionId={selectedSession?.id ?? null}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
         initialSessionId={initialSessionId}
@@ -678,8 +696,6 @@ export function AppShell() {
         onInitialRestoreDone={handleInitialRestoreDone}
         refreshKey={refreshKey}
         onSessionDeleted={handleSessionDeleted}
-        selectedCwd={selectedSession?.cwd ?? newSessionCwd ?? null}
-        onCwdChange={handleCwdChange}
         onOpenFile={handleOpenFile}
         explorerRefreshKey={explorerRefreshKey}
         onExplorerRefresh={handleExplorerRefresh}
@@ -1494,8 +1510,6 @@ export function AppShell() {
               task={activeTaskRun?.task ?? null}
               run={activeTaskRun?.run ?? null}
               key={sessionKey}
-              session={selectedSession}
-              newSessionCwd={effectiveNewSessionCwd}
               onAgentEnd={handleAgentEnd}
               onSessionCreated={handleSessionCreated}
               onSessionForked={handleSessionForked}

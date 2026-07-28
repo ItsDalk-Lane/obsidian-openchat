@@ -131,7 +131,9 @@ app/api/
 
 lib/
   adapters/pi/        Pi runtime boundary (session/event/message/compat adapters)
-  agent-client.ts      typed fetch helper for /api/agent commands
+  agent-client.ts      typed command helper for /api/agent commands
+  api-client.ts        shared JSON request/error handling for browser API calls
+  api-types.ts         shared browser/server API response contracts
   draft-store.ts       local draft persistence helpers
   file-access.ts       allowed file roots for /api/files and worktrees
   file-paths.ts        client/server path encoding helpers
@@ -140,8 +142,10 @@ lib/
   mcp-extension.ts     bundled pi-mcp-adapter path resolution + status event constants/types
   npx.ts               npx runner used by skill install
   pi-types.ts          local structural types for pi SDK objects
-  rpc-manager.ts      AgentSessionWrapper + registry + startRpcSession
+  rpc-manager.ts      AgentSessionWrapper facade + complex runtime commands + startRpcSession
+  rpc/                session registry/start locks + operation lifecycle + extension UI + standard command handlers
   session-reader.ts   SessionManager wrappers + path cache + buildSessionContext adapter
+  workspace-store.ts  Zustand store for shared session/workspace navigation state
   tool-presets.ts     PRESET_NONE/DEFAULT/FULL + getPresetFromTools()
   types.ts            shared TypeScript types
   normalize.ts        normalizeToolCalls() thin wrapper over PiMessageAdapter
@@ -149,14 +153,17 @@ lib/
 
 components/
   AppShell.tsx        layout + URL state + tab management
-  SessionSidebar.tsx  session tree + FileExplorer
+  SessionSidebar.tsx  session tree + project/worktree loading + FileExplorer orchestration
+  session-sidebar/    worktree interaction + shared sidebar UI primitives
   ChatWindow.tsx      chat composition + completion sound wrapper
-  ChatInput.tsx       input bar + model/thinking/tools/compact controls
+  ChatInput.tsx       input draft/send + keyboard/file completion orchestration
+  chat-input/         attachment, slash-command, and model-selector panels
   MessageView.tsx     renders one message (user/assistant/toolCall/toolResult)
   BranchNavigator.tsx in-session branch switcher
   ChatMinimap.tsx     scroll minimap alongside the message list
   MarkdownBody.tsx    markdown renderer
-  ModelsConfig.tsx    modal for editing models.json (opened from sidebar bottom)
+  ModelsConfig.tsx    models.json loading, selection, and save orchestration
+  models-config/      model form, connection test, and auth/key panels
   PluginsConfig.tsx   modal for installed package plugins
   SkillsConfig.tsx    modal for loaded/search/installable skills
   McpConfig.tsx       modal for MCP servers (list/status/toggle/add/edit/remove)
@@ -166,7 +173,10 @@ components/
   TabBar.tsx          tab bar (Chat + open file tabs)
 
 hooks/
-  useAgentSession.ts  messages + streaming + SSE + fork/navigate/reconciliation logic
+  useAgentSession.ts  session/message/SSE/fork/navigate/reconciliation coordinator
+  useAgentConfiguration.ts model/tool/thinking state and commands
+  useExtensionUi.ts   extension dialog/custom UI/status/widget state
+  useNoticeQueue.ts   timed notice queue
   useAudio.ts         completion sound + browser AudioContext unlock
   useDragDrop.ts      shared drag/drop state
   useIsMobile.ts      responsive breakpoint hook
@@ -177,11 +187,34 @@ hooks/
 
 ## Key Design Decisions & Traps
 
+### Browser JSON requests
+- Ordinary JSON endpoints should go through `requestJson()` in `lib/api-client.ts` so serialization, HTTP errors, `{ error }` responses, and empty bodies have one behavior.
+- `ApiRequestError` preserves the HTTP status and parsed response body for flows such as dirty-worktree confirmation.
+- Keep streaming and non-JSON transports specialized: OAuth `EventSource`, SSE, uploads, and downloads should not be forced through this helper.
+
+### Frontend session hook boundaries
+- `useAgentSession` owns session/message state, SSE connection, reconciliation polling, monotonic prompt run ids, and late-event guards.
+- Model/tool/thinking state, extension UI state, and timed notices live in their dedicated hooks; keep them independent from the SSE state machine.
+- Refactors must preserve the existing reconnect protections unless the event transport itself gains durable replay.
+
+### Frontend panel boundaries
+- `ModelsConfig`, `ChatInput`, and `SessionSidebar` keep cross-panel orchestration; self-contained form, popover, auth, attachment, and worktree interaction state lives in their named subdirectories.
+- Worktree loading remains in `SessionSidebar` because project grouping depends on the loaded project root; create/remove/confirmation UI belongs to `session-sidebar/WorktreeSwitcher`.
+- Moving panels must preserve focus, outside-click, keyboard, and dirty-worktree confirmation behavior.
+
+### Frontend shared workspace state
+- `lib/workspace-store.ts` owns only shared navigation/workspace state: selected session, new-session cwd, active cwd, and active project root.
+- Components should subscribe with focused selectors. Session selection and new-session transitions must use the atomic store actions so session/cwd/project state cannot temporarily disagree.
+- Keep worktree response snapshots, unread session ids, form drafts, modal visibility, and message/stream state local to their current owners.
+- `AppShell` still owns URL updates, mobile drawer behavior, chat remount/reset, and other orchestration side effects; do not move those effects into the store.
+
 ### AgentSession lifecycle (`lib/rpc-manager.ts`)
 - One `AgentSessionWrapper` per session id, keyed in `globalThis.__piSessions`
 - `globalThis` survives Next.js hot-reload; plain module-level Map does not
 - Idle timeout: 10 minutes. Concurrent `startRpcSession()` calls share a single start Promise (`globalThis.__piStartLocks`)
-- Pi SDK startup / event / compatibility details are routed through `lib/adapters/pi/*`; `rpc-manager` remains the registry + API coordinator.
+- `lib/rpc/session-registry.ts` owns the global registry, start locks, and running-session broadcasts.
+- `lib/rpc/extension-ui-bridge.ts` owns extension UI requests and decorations; `lib/rpc/standard-command-handlers.ts` owns ordinary query/config commands.
+- Pi SDK startup / event / compatibility details remain routed through `lib/adapters/pi/*`; `rpc-manager` is the compatibility facade and complex runtime lifecycle coordinator.
 
 ### Fork must destroy the wrapper immediately
 `AgentSession.fork()` **mutates the wrapper's inner state in-place** — after fork, `inner.sessionId` is the *new* session's id. If the wrapper stays alive in the registry under the old id, the next request gets the already-forked state and subsequent forks produce a corrupt `parentSession` chain.
@@ -207,12 +240,17 @@ Tool names are passed at session creation (`POST /api/agent/new` → `toolNames[
 ### SSE reconnect on page refresh mid-stream
 On `ChatWindow` mount, `GET /api/agent/[id]` is called. If `state.isStreaming === true`, SSE is reconnected automatically. `thinkingLevel` and `isCompacting` are also synced from this response.
 
+- Durable runtime events carry the journal sequence as the SSE `id`.
+- Automatic reconnect uses `Last-Event-ID`; manually recreated streams use `?since=<sequence>`.
+- Replay is scoped to the active Task/Run and includes only durable journal events. Streaming token/message bodies still recover from the current session snapshot and are not persisted by default.
+
 ### Compaction SSE events
 Newer pi emits `compaction_start` / `compaction_end`; older versions emitted `auto_compaction_start` / `auto_compaction_end`. `PiEventAdapter` normalizes both variants into `compaction_start` / `compaction_end` before they reach React hooks. Manual compact is a blocking POST — the button stays disabled until the response returns.
 
 ### Running state SSE + reconciliation
 - The sidebar listens to `/api/agent/running/events`, backed by `subscribeRunningSessions()` in `lib/rpc-manager.ts`, so running badges update without polling.
 - `useAgentSession` still treats per-session SSE as primary for chat events, but while a run is active it periodically calls `GET /api/agent/[id]` and also reconciles on `visibilitychange`/`online`. This fixes missed `agent_end` events from background tabs or half-open connections.
+- Keep the 15-second reconciliation poll until browser disconnect/background-tab evidence proves durable replay is sufficient for operation completion and snapshot recovery.
 - Prompt runs use a monotonic run id; late SSE or slow reconciliation responses from an old run must be ignored so they cannot resurrect stale streaming bubbles.
 
 ### Worktrees and project grouping

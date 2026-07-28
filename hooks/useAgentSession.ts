@@ -4,14 +4,13 @@ import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from "r
 import type {
   AgentMessage,
   ExtensionStatusItem,
-  ExtensionUiRequest,
   ExtensionWidgetItem,
   SessionInfo,
   SessionTreeNode,
 } from "@/lib/types";
 import { normalizeToolCalls } from "@/lib/normalize";
 import { sendAgentCommand } from "@/lib/agent-client";
-import { getToolNamesForPreset, type ToolEntry } from "@/lib/tool-presets";
+import { getToolNamesForPreset, type ToolPreset } from "@/lib/tool-presets";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import {
   createRunId,
@@ -19,6 +18,12 @@ import {
   decodeKernelEvent,
   type KernelEvent,
 } from "@/lib/kernel";
+import { useAgentConfiguration } from "./useAgentConfiguration";
+import { useExtensionUi } from "./useExtensionUi";
+import { useNoticeQueue } from "./useNoticeQueue";
+
+export type { ThinkingLevelOption } from "./useAgentConfiguration";
+export type { NoticeItem, NoticeType } from "./useNoticeQueue";
 
 export interface SessionData {
   sessionId: string;
@@ -89,27 +94,6 @@ function normalizeQueuedMessages(q?: { steering?: string[]; followUp?: string[] 
   return { steering: q?.steering ?? [], followUp: q?.followUp ?? [] };
 }
 
-type ExtensionUiDialogRequest = Extract<ExtensionUiRequest, { method: "select" | "confirm" | "input" | "editor" }>;
-type ExtensionUiCustomRequest = Extract<ExtensionUiRequest, { method: "custom" }>;
-export type NoticeType = "info" | "success" | "warning" | "error";
-
-export type NoticeItem = {
-  id: string;
-  message: string;
-  type: NoticeType;
-  exiting?: boolean;
-};
-
-type NoticeState = {
-  visible: NoticeItem[];
-  pending: NoticeItem[];
-};
-
-type NoticeAction =
-  | { type: "add"; notice: NoticeItem }
-  | { type: "mark_oldest_exiting" }
-  | { type: "remove"; id: string };
-
 export type AgentPhase =
   | { kind: "waiting_model" }
   | { kind: "running_command" }
@@ -150,10 +134,8 @@ export interface UseAgentSessionOptions {
   onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => void;
   onSystemPromptChange?: (prompt: string | null) => void;
   onSessionStatsPanelOpen?: () => void;
-  setToolPreset?: (preset: "none" | "default" | "full") => void;
+  setToolPreset?: (preset: ToolPreset) => void;
 }
-
-export type ThinkingLevelOption = "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 const PROGRAMMATIC_SCROLL_IGNORE_MS = 700;
 const USER_SCROLL_INTENT_MS = 1200;
@@ -163,9 +145,6 @@ const PROMPT_SETTLE_MAX_MS = 20_000;
 const AGENT_STATE_RECONCILE_MS = 15_000;
 const BASH_STATE_RECONCILE_MS = 1_000;
 const EVENT_STREAM_CONNECT_TIMEOUT_MS = 5_000;
-const MAX_NOTICES = 5;
-const NOTICE_VISIBLE_MS = 5000;
-const NOTICE_EXIT_ANIMATION_MS = 180;
 const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "Space", "Spacebar"]);
 
 type EventStreamConnectionStatus = "connected" | "timeout" | "closed";
@@ -184,61 +163,8 @@ class EventStreamConnectionError extends Error {
   }
 }
 
-function createNoticeId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function markOldestNoticeExiting(notices: NoticeItem[]): NoticeItem[] {
-  const index = notices.findIndex((notice) => !notice.exiting);
-  if (index === -1) return notices;
-  return notices.map((notice, i) => (
-    i === index ? { ...notice, exiting: true } : notice
-  ));
-}
-
-function fillPendingNotices(visible: NoticeItem[], pending: NoticeItem[]): NoticeState {
-  let nextVisible = visible;
-  let nextPending = pending;
-  while (nextPending.length > 0 && nextVisible.length < MAX_NOTICES) {
-    const [next, ...rest] = nextPending;
-    nextVisible = [...nextVisible, next];
-    nextPending = rest;
-  }
-  if (nextPending.length > 0 && !nextVisible.some((notice) => notice.exiting)) {
-    nextVisible = markOldestNoticeExiting(nextVisible);
-  }
-  return { visible: nextVisible, pending: nextPending };
-}
-
-function noticeReducer(state: NoticeState, action: NoticeAction): NoticeState {
-  switch (action.type) {
-    case "add": {
-      if (state.visible.some((notice) => notice.exiting) || state.visible.length >= MAX_NOTICES) {
-        return {
-          visible: state.visible.some((notice) => notice.exiting)
-            ? state.visible
-            : markOldestNoticeExiting(state.visible),
-          pending: [...state.pending, action.notice],
-        };
-      }
-      return { ...state, visible: [...state.visible, action.notice] };
-    }
-    case "mark_oldest_exiting":
-      return { ...state, visible: markOldestNoticeExiting(state.visible) };
-    case "remove": {
-      const visible = state.visible.filter((notice) => notice.id !== action.id);
-      return fillPendingNotices(visible, state.pending);
-    }
-    default:
-      return state;
-  }
 }
 
 function extractMessageText(message: Partial<AgentMessage>): string {
@@ -307,17 +233,6 @@ export interface AttachedImage {
   previewUrl: string;
 }
 
-type SelectedModel = { provider: string; modelId: string };
-type ModelEntry = { id: string; name: string; provider: string };
-type ModelsResponse = {
-  models: Record<string, string>;
-  modelList?: ModelEntry[];
-  defaultModel?: SelectedModel | null;
-  thinkingLevels?: Record<string, string[]>;
-  thinkingLevelMaps?: Record<string, Record<string, string | null>>;
-  modelError?: string;
-};
-
 type SlashCommandsResponse = {
   commands?: SlashCommandInfo[];
 };
@@ -340,36 +255,21 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [agentRunning, setAgentRunning] = useState(false);
   const [bashRunning, setBashRunning] = useState(false);
   const [pendingBash, setPendingBash] = useState<{ command: string; excludeFromContext: boolean } | null>(null);
-  const [modelNames, setModelNames] = useState<Record<string, string>>({});
-  const [modelList, setModelList] = useState<ModelEntry[]>([]);
-  const [modelError, setModelError] = useState<string | null>(null);
-  const [modelThinkingLevels, setModelThinkingLevels] = useState<Record<string, string[]>>({});
-  const [modelThinkingLevelMaps, setModelThinkingLevelMaps] = useState<Record<string, Record<string, string | null>>>({});
-  const [newSessionModel, setNewSessionModel] = useState<SelectedModel | null>(null);
-  const [newSessionDefaultModel, setNewSessionDefaultModel] = useState<SelectedModel | null>(null);
-  const [toolPreset, setToolPreset] = useState<"none" | "default" | "full">("default");
-  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevelOption>("auto");
   const [retryInfo, setRetryInfo] = useState<{ attempt: number; maxAttempts: number; errorMessage?: string } | null>(null);
   const [contextUsage, setContextUsage] = useState<{ percent: number | null; contextWindow: number; tokens: number | null } | null>(null);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [forkingEntryId, setForkingEntryId] = useState<string | null>(null);
-  const [currentModelOverride, setCurrentModelOverride] = useState<{ provider: string; modelId: string } | null>(null);
-  const [pendingModel, setPendingModel] = useState<{ provider: string; modelId: string } | null>(null);
   const [isCompacting, setIsCompacting] = useState(false);
   const [compactError, setCompactError] = useState<string | null>(null);
   const [compactResult, setCompactResult] = useState<CompactResultInfo | null>(null);
   const [agentPhase, setAgentPhase] = useState<AgentPhase>(null);
   const [slashCommands, setSlashCommands] = useState<SlashCommandInfo[]>([]);
   const [slashCommandsLoading, setSlashCommandsLoading] = useState(false);
-  const [noticeState, dispatchNotice] = useReducer(noticeReducer, { visible: [], pending: [] });
   const [sessionStatsOverride, setSessionStatsOverride] = useState<SessionStatsInfo | null>(null);
-  const [extensionDialog, setExtensionDialog] = useState<ExtensionUiDialogRequest | null>(null);
-  const [extensionCustomUi, setExtensionCustomUi] = useState<ExtensionUiCustomRequest | null>(null);
-  const [extensionStatuses, setExtensionStatuses] = useState<ExtensionStatusItem[]>([]);
-  const [extensionWidgets, setExtensionWidgets] = useState<ExtensionWidgetItem[]>([]);
   const [queuedMessages, setQueuedMessages] = useState<QueuedMessages>({ steering: [], followUp: [] });
 
   const eventSourceRef = useRef<EventSource | null>(null);
+  const eventCursorRef = useRef<{ sessionId: string; sequence: number } | null>(null);
   const sessionIdRef = useRef<string | null>(session?.id ?? null);
   const agentRunningRef = useRef(false);
   const bashRunningRef = useRef(false);
@@ -389,10 +289,49 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const promptRunIdRef = useRef(0);
   const optimisticUserMessageKeyRef = useRef<string | null>(null);
 
-  const setToolPresetState = opts.setToolPreset ?? setToolPreset;
-
-  const currentModel = currentModelOverride ?? data?.context.model ?? pendingModel ?? null;
-  const displayModel = isNew ? (newSessionModel ?? newSessionDefaultModel) : currentModel;
+  const { notices, addNotice } = useNoticeQueue();
+  const {
+    extensionDialog,
+    extensionCustomUi,
+    extensionStatuses,
+    extensionWidgets,
+    syncExtensionUiSnapshot,
+    handleExtensionUiRequest,
+    respondToExtensionUi,
+    sendExtensionCustomInput,
+  } = useExtensionUi({
+    sessionIdRef,
+    chatInputRef: opts.chatInputRef,
+    addNotice,
+  });
+  const {
+    modelNames,
+    modelList,
+    modelError,
+    modelThinkingLevels,
+    modelThinkingLevelMaps,
+    newSessionModel,
+    newSessionDefaultModel,
+    toolPreset,
+    thinkingLevel,
+    currentModel,
+    displayModel,
+    loadTools,
+    loadModels,
+    handleModelChange,
+    handleThinkingLevelChange,
+    handleToolPresetChange,
+    syncThinkingLevel,
+    resetCurrentModelOverride,
+    rememberPendingModel,
+  } = useAgentConfiguration({
+    isNew,
+    modelCwd: newSessionCwd ?? session?.cwd ?? "",
+    currentSessionModel: data?.context.model ?? null,
+    sessionIdRef,
+    ensuringNewSessionRef,
+    setToolPreset: opts.setToolPreset,
+  });
 
   const sessionStats = useMemo(() => {
     if (sessionStatsOverride) return sessionStatsOverride;
@@ -455,10 +394,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setActiveLeafId(d.leafId);
       setMessages(d.context.messages);
       setEntryIds(d.context.entryIds ?? []);
-      setCurrentModelOverride(null);
+      resetCurrentModelOverride();
       setError(null);
       if (d.context.thinkingLevel && d.context.thinkingLevel !== "off") {
-        setThinkingLevel(d.context.thinkingLevel as ThinkingLevelOption);
+        syncThinkingLevel(d.context.thinkingLevel);
       }
 
       messagesLoaded = true;
@@ -475,9 +414,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         if (liveState) {
           if (liveState.contextUsage !== undefined) setContextUsage(liveState.contextUsage ?? null);
           if (liveState.systemPrompt !== undefined) setSystemPrompt(liveState.systemPrompt ?? null);
-          if (liveState.thinkingLevel !== undefined) setThinkingLevel((liveState.thinkingLevel as ThinkingLevelOption) ?? "auto");
-          if (liveState.extensionStatuses !== undefined) setExtensionStatuses(liveState.extensionStatuses ?? []);
-          if (liveState.extensionWidgets !== undefined) setExtensionWidgets(liveState.extensionWidgets ?? []);
+          syncThinkingLevel(liveState.thinkingLevel);
+          syncExtensionUiSnapshot({
+            statuses: liveState.extensionStatuses,
+            widgets: liveState.extensionWidgets,
+          });
           if (liveState.queuedMessages !== undefined) setQueuedMessages(normalizeQueuedMessages(liveState.queuedMessages));
         } else if (!agentState.running) {
           setQueuedMessages({ steering: [], followUp: [] });
@@ -493,7 +434,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     } finally {
       if (showLoading && !messagesLoaded) setLoading(false);
     }
-  }, []);
+  }, [resetCurrentModelOverride, syncExtensionUiSnapshot, syncThinkingLevel]);
 
   const loadContext = useCallback(async (sid: string, leafId: string | null) => {
     try {
@@ -509,18 +450,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       console.error("Failed to load context:", e);
     }
   }, []);
-
-  const loadTools = useCallback(async (sid: string) => {
-    try {
-      const tools = await sendAgentCommand(sid, { type: "get_tools" }) as unknown as ToolEntry[];
-      if (tools) {
-        const { getPresetFromTools } = await import("@/lib/tool-presets");
-        setToolPresetState(getPresetFromTools(tools));
-      }
-    } catch (e) {
-      console.error("Failed to load tools:", e);
-    }
-  }, [setToolPresetState]);
 
   const promoteNewSession = useCallback((messageCount = 0, firstMessage = "(no messages)") => {
     const sid = sessionIdRef.current;
@@ -545,7 +474,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
     const promise = (async () => {
       const selectedModel = newSessionModel ?? newSessionDefaultModel;
-      if (selectedModel) setPendingModel(selectedModel);
+      if (selectedModel) rememberPendingModel(selectedModel);
       const toolNames = getToolNamesForPreset(toolPreset);
       const res = await fetch("/api/agent/new", {
         method: "POST",
@@ -571,7 +500,15 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     } finally {
       ensuringNewSessionRef.current = null;
     }
-  }, [isNew, newSessionCwd, newSessionModel, newSessionDefaultModel, toolPreset, thinkingLevel]);
+  }, [
+    isNew,
+    newSessionCwd,
+    newSessionModel,
+    newSessionDefaultModel,
+    toolPreset,
+    thinkingLevel,
+    rememberPendingModel,
+  ]);
 
   const loadSlashCommands = useCallback(async () => {
     const sid = sessionIdRef.current ?? await ensureNewSession();
@@ -599,7 +536,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
-    const es = new EventSource(`/api/agent/${encodeURIComponent(sid)}/events`);
+    const cursor = eventCursorRef.current?.sessionId === sid
+      ? eventCursorRef.current.sequence
+      : undefined;
+    const eventUrl = `/api/agent/${encodeURIComponent(sid)}/events${cursor === undefined ? "" : `?since=${cursor}`}`;
+    const es = new EventSource(eventUrl);
     eventSourceRef.current = es;
 
     return new Promise((resolve) => {
@@ -613,6 +554,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       const timeout = setTimeout(() => settle("timeout"), EVENT_STREAM_CONNECT_TIMEOUT_MS);
 
       es.onmessage = (e) => {
+        if (eventSourceRef.current !== es) return;
         try {
           const rawEvent = JSON.parse(e.data);
           const event = decodeKernelEvent(rawEvent, {
@@ -621,6 +563,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             sessionId: sid,
           });
           if (!event) return;
+          if (/^\d+$/.test(e.lastEventId)) {
+            const sequence = Number(e.lastEventId);
+            if (Number.isSafeInteger(sequence)) {
+              eventCursorRef.current = { sessionId: sid, sequence };
+            }
+          }
           if (event.type === "transport.connected") settle("connected");
           handleAgentEventRef.current?.(event);
         } catch {
@@ -654,100 +602,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     result.source.close();
     throw new EventStreamConnectionError(result.status);
   }, [connectEvents]);
-
-  const respondToExtensionUi = useCallback(async (
-    request: ExtensionUiDialogRequest,
-    response: { value: string } | { confirmed: boolean } | { cancelled: true },
-  ) => {
-    const sid = sessionIdRef.current;
-    setExtensionDialog((current) => current?.id === request.id ? null : current);
-    if (!sid) return;
-    try {
-      await sendAgentCommand(sid, {
-        type: "extension_ui_response",
-        id: request.id,
-        ...response,
-      });
-    } catch (e) {
-      console.error("Failed to send extension UI response:", e);
-    }
-  }, []);
-
-  const sendExtensionCustomInput = useCallback(async (request: ExtensionUiCustomRequest, data: string) => {
-    const sid = sessionIdRef.current;
-    if (!sid) return;
-    try {
-      await sendAgentCommand(sid, {
-        type: "extension_ui_input",
-        id: request.id,
-        data,
-      });
-    } catch (e) {
-      console.error("Failed to send extension custom UI input:", e);
-    }
-  }, []);
-
-  const addNotice = useCallback((notice: { id?: string; message: string; type?: NoticeType }) => {
-    const message = notice.message.trim();
-    if (!message) return;
-    dispatchNotice({
-      type: "add",
-      notice: {
-        id: notice.id ?? createNoticeId(),
-        message,
-        type: notice.type ?? "info",
-      },
-    });
-  }, []);
-
-  const handleExtensionUiRequest = useCallback((request: ExtensionUiRequest) => {
-    switch (request.method) {
-      case "select":
-      case "confirm":
-      case "input":
-      case "editor":
-        setExtensionDialog(request);
-        break;
-      case "notify": {
-        addNotice({
-          id: request.id,
-          message: request.message,
-          type: request.notifyType ?? "info",
-        });
-        break;
-      }
-      case "setStatus":
-        setExtensionStatuses((prev) => {
-          const rest = prev.filter((item) => item.key !== request.statusKey);
-          return request.statusText ? [...rest, { key: request.statusKey, text: request.statusText }] : rest;
-        });
-        break;
-      case "setWidget":
-        setExtensionWidgets((prev) => {
-          const rest = prev.filter((item) => item.key !== request.widgetKey);
-          return request.widgetLines
-            ? [...rest, {
-                key: request.widgetKey,
-                lines: request.widgetLines,
-                placement: request.widgetPlacement ?? "aboveEditor",
-              }]
-            : rest;
-        });
-        break;
-      case "setTitle":
-        if (request.title) document.title = request.title;
-        break;
-      case "set_editor_text":
-        opts.chatInputRef?.current?.insertText(request.text);
-        break;
-      case "custom":
-        setExtensionCustomUi((current) => {
-          if (request.closed) return current?.id === request.id ? null : current;
-          return request;
-        });
-        break;
-    }
-  }, [addNotice, opts.chatInputRef]);
 
   const finishPromptWithoutStream = useCallback(async (sid: string | null = sessionIdRef.current, runId?: number) => {
     // Bail out before loadSession too: a stale finish for a previous run
@@ -847,14 +701,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (state) {
         if (state.contextUsage !== undefined) setContextUsage(state.contextUsage ?? null);
         if (state.systemPrompt !== undefined) setSystemPrompt(state.systemPrompt ?? null);
-        if (state.extensionStatuses !== undefined) setExtensionStatuses(state.extensionStatuses ?? []);
-        if (state.extensionWidgets !== undefined) setExtensionWidgets(state.extensionWidgets ?? []);
+        syncExtensionUiSnapshot({
+          statuses: state.extensionStatuses,
+          widgets: state.extensionWidgets,
+        });
       }
       await finishPromptWithoutStream(sid, runId);
     } catch {
       // Network still down — the next poll / visibility / online tick retries.
     }
-  }, [finishPromptWithoutStream]);
+  }, [finishPromptWithoutStream, syncExtensionUiSnapshot]);
 
   // Recovery net for missed SSE events: while the agent is running, verify
   // against the server periodically and whenever the tab returns to the
@@ -910,8 +766,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             .then((d: { state?: AgentStateResponse }) => {
               if (d.state?.contextUsage !== undefined) setContextUsage(d.state.contextUsage ?? null);
               if (d.state?.systemPrompt !== undefined) setSystemPrompt(d.state.systemPrompt ?? null);
-              if (d.state?.extensionStatuses !== undefined) setExtensionStatuses(d.state.extensionStatuses ?? []);
-              if (d.state?.extensionWidgets !== undefined) setExtensionWidgets(d.state.extensionWidgets ?? []);
+              syncExtensionUiSnapshot({
+                statuses: d.state?.extensionStatuses,
+                widgets: d.state?.extensionWidgets,
+              });
               // Aborted turns can leave messages queued in pi (delivered with the
               // next turn); dead wrapper (no state) means the queue is gone.
               setQueuedMessages(normalizeQueuedMessages(d.state?.queuedMessages));
@@ -1028,7 +886,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         handleExtensionUiRequest(event.payload.request);
         break;
     }
-  }, [addNotice, handleExtensionUiRequest, loadSession, onAgentEnd]);
+  }, [addNotice, handleExtensionUiRequest, loadSession, onAgentEnd, syncExtensionUiSnapshot]);
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {
@@ -1078,7 +936,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         if (sid) {
           sentSessionId = sid;
           if (selectedModel) {
-            setPendingModel(selectedModel);
+            rememberPendingModel(selectedModel);
             if (existingSid) {
               await sendAgentCommand(sid, { type: "set_model", provider: selectedModel.provider, modelId: selectedModel.modelId });
             }
@@ -1123,7 +981,18 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setAgentPhase(null);
       dispatch({ type: "end" });
     }
-  }, [isNew, newSessionCwd, newSessionModel, session, ensureNewSession, ensureEventsConnected, promoteNewSession, waitForPromptSettlement, addNotice]);
+  }, [
+    isNew,
+    newSessionCwd,
+    newSessionModel,
+    session,
+    ensureNewSession,
+    ensureEventsConnected,
+    promoteNewSession,
+    waitForPromptSettlement,
+    addNotice,
+    rememberPendingModel,
+  ]);
 
   const executeBash = useCallback(async (command: string, excludeFromContext: boolean) => {
     if (agentRunningRef.current || bashRunningRef.current) return;
@@ -1212,29 +1081,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, [loadContext]);
 
-  const handleModelChange = useCallback(async (provider: string, modelId: string) => {
-    if (isNew) {
-      setNewSessionModel({ provider, modelId });
-      setPendingModel({ provider, modelId });
-      const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
-      if (!sid) return;
-      try {
-        await sendAgentCommand(sid, { type: "set_model", provider, modelId });
-      } catch (e) {
-        console.error("Failed to set model:", e);
-      }
-      return;
-    }
-    const sid = sessionIdRef.current;
-    if (!sid) return;
-    try {
-      await sendAgentCommand(sid, { type: "set_model", provider, modelId });
-      setCurrentModelOverride({ provider, modelId });
-    } catch (e) {
-      console.error("Failed to set model:", e);
-    }
-  }, [isNew, setNewSessionModel]);
-
   const handleCompact = useCallback(async () => {
     const sid = sessionIdRef.current;
     if (!sid || isCompacting) return;
@@ -1252,27 +1098,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setIsCompacting(false);
     }
   }, [isCompacting, loadSession]);
-
-  const loadModels = useCallback(async (signal?: AbortSignal) => {
-    const modelCwd = newSessionCwd ?? session?.cwd ?? "";
-    const modelsUrl = modelCwd ? `/api/models?cwd=${encodeURIComponent(modelCwd)}` : "/api/models";
-    const res = await fetch(modelsUrl, signal ? { signal } : undefined);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const d = await res.json() as ModelsResponse;
-    setModelNames(d.models);
-    setModelError(d.modelError ?? null);
-    setModelThinkingLevels(d.thinkingLevels ?? {});
-    setModelThinkingLevelMaps(d.thinkingLevelMaps ?? {});
-    const nextModelList = d.modelList ?? [];
-    setModelList(nextModelList);
-    if (isNew) {
-      const match = d.defaultModel
-        ? nextModelList.find((m) => m.id === d.defaultModel?.modelId && m.provider === d.defaultModel?.provider)
-        : undefined;
-      const displayModel = match ?? nextModelList[0];
-      setNewSessionDefaultModel(displayModel ? { provider: displayModel.provider, modelId: displayModel.id } : null);
-    }
-  }, [isNew, newSessionCwd, session?.cwd]);
 
   const handleBuiltinSlashCommand = useCallback(async (text: string): Promise<BuiltinSlashCommandResult> => {
     if (!text.startsWith("/")) return { handled: false };
@@ -1439,30 +1264,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, [opts.chatInputRef, addNotice]);
 
-  const handleThinkingLevelChange = useCallback(async (level: ThinkingLevelOption) => {
-    setThinkingLevel(level);
-    if (level === "auto") return; // "auto" leaves pi's current setting untouched
-    const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
-    if (!sid) return;
-    try {
-      await sendAgentCommand(sid, { type: "set_thinking_level", level });
-    } catch (e) {
-      console.error("Failed to set thinking level:", e);
-    }
-  }, []);
-
-  const handleToolPresetChange = useCallback(async (preset: "none" | "default" | "full") => {
-    const toolNames = getToolNamesForPreset(preset);
-    setToolPresetState(preset);
-    const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
-    if (!sid) return;
-    try {
-      await sendAgentCommand(sid, { type: "set_tools", toolNames });
-    } catch (e) {
-      console.error("Failed to set tools:", e);
-    }
-  }, [setToolPresetState]);
-
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     ignoreProgrammaticScrollUntilRef.current = Date.now() + PROGRAMMATIC_SCROLL_IGNORE_MS;
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -1519,9 +1320,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           if (agentState.state.isCompacting !== undefined) setIsCompacting(agentState.state.isCompacting);
           if (agentState.state.contextUsage !== undefined) setContextUsage(agentState.state.contextUsage ?? null);
           if (agentState.state.systemPrompt !== undefined) setSystemPrompt(agentState.state.systemPrompt ?? null);
-          if (agentState.state.thinkingLevel !== undefined) setThinkingLevel((agentState.state.thinkingLevel as ThinkingLevelOption) ?? "auto");
-          if (agentState.state.extensionStatuses !== undefined) setExtensionStatuses(agentState.state.extensionStatuses ?? []);
-          if (agentState.state.extensionWidgets !== undefined) setExtensionWidgets(agentState.state.extensionWidgets ?? []);
+          syncThinkingLevel(agentState.state.thinkingLevel);
+          syncExtensionUiSnapshot({
+            statuses: agentState.state.extensionStatuses,
+            widgets: agentState.state.extensionWidgets,
+          });
           if (agentState.state.queuedMessages !== undefined) setQueuedMessages(normalizeQueuedMessages(agentState.state.queuedMessages));
         }
       });
@@ -1603,23 +1406,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, [compactResult]);
 
   useEffect(() => {
-    if (noticeState.visible.length === 0) return;
-    const exiting = noticeState.visible.find((notice) => notice.exiting);
-    if (exiting) {
-      const t = setTimeout(() => {
-        dispatchNotice({ type: "remove", id: exiting.id });
-      }, NOTICE_EXIT_ANIMATION_MS);
-      return () => clearTimeout(t);
-    }
-    const oldest = noticeState.visible[0];
-    if (!oldest) return;
-    const t = setTimeout(() => {
-      dispatchNotice({ type: "mark_oldest_exiting" });
-    }, NOTICE_VISIBLE_MS);
-    return () => clearTimeout(t);
-  }, [noticeState.visible]);
-
-  useEffect(() => {
     setSessionStatsOverride(null);
   }, [messages.length, contextUsage?.tokens, contextUsage?.percent, contextUsage?.contextWindow]);
 
@@ -1630,7 +1416,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     retryInfo, contextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, compactResult, currentModel, displayModel, sessionStats,
     slashCommands, slashCommandsLoading, queuedMessages,
-    notices: noticeState.visible, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput,
+    notices, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput,
     isAutoModelSelection: isNew && newSessionModel === null,
     agentPhase,
     isNew,

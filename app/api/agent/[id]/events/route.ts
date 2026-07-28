@@ -1,6 +1,12 @@
 import { getSessionCwd, resolveSessionPath } from "@/lib/session-reader";
 import { getRpcSession, startRpcSession } from "@/lib/rpc-manager";
 import { createKernelEvent } from "@/lib/kernel";
+import { getKernelServices } from "@/lib/server/kernel-services";
+import {
+  encodeKernelEventSse,
+  replayDurableRuntimeEvents,
+  resolveEventCursor,
+} from "@/lib/server/runtime-event-stream";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +16,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const cursorResult = resolveEventCursor(req);
+  if (!cursorResult.ok) {
+    return new Response(cursorResult.error, { status: 400 });
+  }
 
   // Fast path: already-running session
   let session = getRpcSession(id);
@@ -26,45 +36,81 @@ export async function GET(
       return new Response(`Failed to start agent: ${error}`, { status: 500 });
     }
   }
+  const context = runtimeContext ?? session.getRuntimeContext();
+  const journal = getKernelServices().uow.events;
 
   const stream = new ReadableStream({
     start(controller) {
-      const encode = (data: unknown) => {
-        const text = `data: ${JSON.stringify(data)}\n\n`;
-        controller.enqueue(new TextEncoder().encode(text));
+      const encoder = new TextEncoder();
+      const encode = (event: Parameters<typeof encodeKernelEventSse>[0], sequence?: number) => {
+        controller.enqueue(encoder.encode(encodeKernelEventSse(event, sequence)));
       };
-
-      // Send initial connected event
-      encode(createKernelEvent(
-        "transport.connected",
-        runtimeContext?.taskId ?? session.getRuntimeContext().taskId,
-        runtimeContext?.runId ?? session.getRuntimeContext().runId,
-        { sessionId: id },
-        { kind: "transport", adapter: "pi", nativeType: "connected" },
-      ));
-
-      const unsubscribe = session.onEvent((event) => {
-        encode(event);
+      let replaying = true;
+      let deliveredCursor = -1;
+      const buffered: Array<{ event: Parameters<typeof encode>[0]; sequence?: number }> = [];
+      const deliverLive = (event: Parameters<typeof encode>[0], sequence?: number) => {
+        if (sequence !== undefined) {
+          if (sequence <= deliveredCursor) return;
+          deliveredCursor = sequence;
+        }
+        encode(event, sequence);
+      };
+      const unsubscribe = session.onEvent((event, sequence) => {
+        if (replaying) {
+          buffered.push({ event, sequence });
+          return;
+        }
+        deliverLive(event, sequence);
       });
 
-      // Heartbeat every 30s to prevent server/proxy timeout (Next.js default ~120-150s)
+      const latestSequence = journal.getLatestSequence();
+      const replayFrom = cursorResult.cursor !== undefined && cursorResult.cursor <= latestSequence
+        ? cursorResult.cursor
+        : undefined;
+      const initialCursor = replayFrom ?? latestSequence;
+      deliveredCursor = initialCursor;
+      encode(createKernelEvent(
+        "transport.connected",
+        context.taskId,
+        context.runId,
+        { sessionId: id },
+        { kind: "transport", adapter: "pi", nativeType: "connected" },
+      ), initialCursor);
+
+      if (replayFrom !== undefined) {
+        replayDurableRuntimeEvents(
+          journal,
+          context,
+          replayFrom,
+          (entry) => {
+            encode(entry.event, entry.sequence);
+            deliveredCursor = entry.sequence;
+          },
+        );
+      }
+      replaying = false;
+      for (const delivery of buffered) {
+        deliverLive(delivery.event, delivery.sequence);
+      }
+
       const heartbeat = setInterval(() => {
         try {
-          controller.enqueue(new TextEncoder().encode(":\n\n"));
+          controller.enqueue(encoder.encode(":\n\n"));
         } catch {
-          // controller already closed
+          // 连接已经关闭
         }
       }, 30_000);
 
-      // Cleanup when client disconnects
+      let cleaned = false;
       const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
         clearInterval(heartbeat);
         unsubscribe();
         controller.close();
       };
 
-      // Detect client disconnect via abort signal
-      req.signal?.addEventListener("abort", cleanup);
+      req.signal?.addEventListener("abort", cleanup, { once: true });
     },
   });
 

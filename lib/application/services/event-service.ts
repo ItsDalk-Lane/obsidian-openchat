@@ -44,11 +44,12 @@ export class EventService {
     return this.journal.appendMany(entries);
   }
 
-  tryAppendRuntimeEvent(event: KernelEvent): void {
+  tryAppendRuntimeEvent(event: KernelEvent): StoredKernelEvent | null {
     try {
-      this.appendIfDurable(event);
+      return this.appendIfDurable(event);
     } catch (error) {
       console.error("[pi-web] failed to persist kernel event:", error instanceof Error ? error.message : error);
+      return null;
     }
   }
 }

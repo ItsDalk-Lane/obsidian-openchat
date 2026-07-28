@@ -1,3 +1,50 @@
+import type { SessionInfo } from "./types";
+
+export interface SuccessResponse {
+  success: boolean;
+}
+
+export interface SessionsResponse {
+  sessions: SessionInfo[];
+  runningSessionIds?: string[];
+}
+
+export interface HomeResponse {
+  home: string;
+}
+
+export interface CwdValidateResponse {
+  success: boolean;
+  cwd: string;
+}
+
+export interface DefaultCwdResponse {
+  cwd: string;
+}
+
+export interface WorktreeEntry {
+  path: string;
+  branch: string | null;
+  isMain: boolean;
+}
+
+export interface WorktreesResponse {
+  projectRoot: string;
+  isGit: boolean;
+  isTopLevel: boolean;
+  worktrees: WorktreeEntry[];
+}
+
+export interface CreateWorktreeResponse {
+  path: string;
+  branch: string | null;
+}
+
+export interface WorktreeDeleteErrorResponse {
+  error?: string;
+  dirty?: boolean;
+}
+
 export interface SkillSearchResult {
   package: string;
   installs: string;
@@ -44,6 +91,63 @@ export interface SkillInfo {
     scope?: string;
   };
   install?: SkillInstallInfo;
+}
+
+export interface SkillSearchResponse {
+  results: SkillSearchResult[];
+}
+
+export interface SkillInstallResponse extends SuccessResponse {
+  output?: string;
+}
+
+export interface SkillsResponse {
+  skills: SkillInfo[];
+}
+
+export interface SkillCheckResponse {
+  updates: SkillUpdateResult[];
+}
+
+export interface SkillUpdateResponse extends SuccessResponse {
+  skill?: SkillInfo;
+}
+
+export interface OAuthProviderInfo {
+  id: string;
+  name: string;
+  usesCallbackServer: boolean;
+  loggedIn: boolean;
+}
+
+export interface ApiKeyProviderInfo {
+  id: string;
+  displayName: string;
+  configured: boolean;
+  source?: string;
+  modelCount: number;
+}
+
+export interface OAuthProvidersResponse {
+  providers: OAuthProviderInfo[];
+}
+
+export interface ApiKeyProvidersResponse {
+  providers: ApiKeyProviderInfo[];
+}
+
+export interface AuthActionResponse {
+  ok?: boolean;
+  success?: boolean;
+  provider?: string;
+}
+
+export interface ModelTestResponse {
+  ok?: boolean;
+  error?: string;
+  latencyMs?: number;
+  status?: number;
+  responseText?: string;
 }
 
 export type PluginScope = "global" | "project";

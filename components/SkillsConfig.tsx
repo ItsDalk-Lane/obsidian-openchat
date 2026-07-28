@@ -2,11 +2,18 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { requestJson } from "@/lib/api-client";
 import type {
+  SkillCheckResponse,
   SkillInfo as Skill,
+  SkillInstallResponse,
   SkillInstallScope,
   SkillSearchResult,
+  SkillSearchResponse,
+  SkillsResponse,
   SkillUpdateResult,
+  SkillUpdateResponse,
+  SuccessResponse,
 } from "@/lib/api-types";
 
 function shortenPath(p: string): string {
@@ -365,19 +372,10 @@ function AddSkillPanel({
     setSearchError(null);
     setResults([]);
     try {
-      const res = await fetch("/api/skills/search", {
+      const d = await requestJson<SkillSearchResponse>("/api/skills/search", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q.trim() }),
+        json: { query: q.trim() },
       });
-      const d = (await res.json()) as {
-        results?: SkillSearchResult[];
-        error?: string;
-      };
-      if (d.error) {
-        setSearchError(d.error);
-        return;
-      }
       setResults(d.results ?? []);
       if ((d.results ?? []).length === 0) setSearchError("未找到技能");
     } catch (e) {
@@ -392,16 +390,10 @@ function AddSkillPanel({
       setInstalling(pkg);
       setInstallError(null);
       try {
-        const res = await fetch("/api/skills/install", {
+        await requestJson<SkillInstallResponse>("/api/skills/install", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ package: pkg, scope, cwd }),
+          json: { package: pkg, scope, cwd },
         });
-        const d = (await res.json()) as { success?: boolean; error?: string };
-        if (!res.ok || d.error) {
-          setInstallError(d.error ?? `HTTP ${res.status}`);
-          return;
-        }
         setNewlyInstalledPkgs((prev) =>
           new Set(prev).add(`${scope}:${pkg}`),
         );
@@ -694,9 +686,7 @@ export function SkillsConfig({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/skills?cwd=${encodeURIComponent(cwd)}`);
-      const d = (await res.json()) as { skills?: Skill[]; error?: string };
-      if (!res.ok || d.error) throw new Error(d.error ?? `HTTP ${res.status}`);
+      const d = await requestJson<SkillsResponse>(`/api/skills?cwd=${encodeURIComponent(cwd)}`);
       const list = d.skills ?? [];
       setSkills(list);
       if (list.length > 0 && !selected) setSelected(list[0].filePath);
@@ -728,20 +718,14 @@ export function SkillsConfig({
     setCheckingUpdates((current) => new Set([...current, ...keys]));
     if (!skill) setCheckingAll(true);
     try {
-      const res = await fetch("/api/skills/check", {
+      const data = await requestJson<SkillCheckResponse>("/api/skills/check", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        json: {
           cwd,
           package: skill?.install?.package,
           scope: skill?.install?.scope,
-        }),
+        },
       });
-      const data = (await res.json()) as {
-        updates?: SkillUpdateResult[];
-        error?: string;
-      };
-      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
       setUpdateStatuses((current) => {
         const next = { ...current };
         for (const update of data.updates ?? []) {
@@ -767,23 +751,15 @@ export function SkillsConfig({
     setUpdatingSkill(key);
     setUpdateError(null);
     try {
-      const res = await fetch("/api/skills/update", {
+      const data = await requestJson<SkillUpdateResponse>("/api/skills/update", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        json: {
           cwd,
           package: skill.install.package,
           scope: skill.install.scope,
-        }),
+        },
       });
-      const data = (await res.json()) as {
-        success?: boolean;
-        skill?: Skill;
-        error?: string;
-      };
-      if (!res.ok || data.error || !data.success) {
-        throw new Error(data.error ?? `HTTP ${res.status}`);
-      }
+      if (!data.success) throw new Error("技能更新未返回成功状态");
       await loadSkills();
       const versionHash = data.skill?.install?.versionHash;
       setUpdateStatuses((current) => ({
@@ -808,19 +784,13 @@ export function SkillsConfig({
     setToggling((s) => new Set(s).add(skill.filePath));
     setSaveError(null);
     try {
-      const res = await fetch("/api/skills", {
+      await requestJson<SuccessResponse>("/api/skills", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        json: {
           filePath: skill.filePath,
           disableModelInvocation: next,
-        }),
+        },
       });
-      const d = (await res.json()) as { success?: boolean; error?: string };
-      if (!res.ok || d.error) {
-        setSaveError(d.error ?? `HTTP ${res.status}`);
-        return;
-      }
       setSkills((prev) =>
         prev.map((s) =>
           s.filePath === skill.filePath

@@ -1,4 +1,5 @@
 import type { RuntimeCommand, RuntimeCommandResult } from "./kernel";
+import { requestJson } from "./api-client";
 
 // Client-side helper for POST /api/agent/[id].
 //
@@ -13,18 +14,12 @@ export async function sendAgentCommand<C extends RuntimeCommand>(
   sessionId: string,
   command: C,
 ): Promise<RuntimeCommandResult<C>> {
-  const res = await fetch(`/api/agent/${encodeURIComponent(sessionId)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(command),
-  });
-  const body = (await res.json().catch(() => ({}))) as {
+  const body = await requestJson<{
     success?: boolean;
     data?: RuntimeCommandResult<C>;
-    error?: string;
-  };
-  if (!res.ok || body.error) {
-    throw new Error(body.error ?? `HTTP ${res.status}`);
-  }
+  }>(`/api/agent/${encodeURIComponent(sessionId)}`, {
+    method: "POST",
+    json: command,
+  });
   return body.data as RuntimeCommandResult<C>;
 }
