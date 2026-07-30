@@ -11,6 +11,7 @@ import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
 import { PluginsConfig } from "./PluginsConfig";
 import { McpConfig } from "./McpConfig";
+import { WebAccessConfig } from "./WebAccessConfig";
 import { ProjectTrustDialog } from "./ProjectTrustDialog";
 import { BranchNavigator } from "./BranchNavigator";
 import { useTheme } from "@/hooks/useTheme";
@@ -133,6 +134,7 @@ export function AppShell() {
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [pluginsConfigOpen, setPluginsConfigOpen] = useState(false);
   const [mcpConfigOpen, setMcpConfigOpen] = useState(false);
+  const [webAccessConfigOpen, setWebAccessConfigOpen] = useState(false);
   const [projectTrust, setProjectTrust] = useState<ProjectTrustStatus | null>(null);
   const [projectTrustDialogOpen, setProjectTrustDialogOpen] = useState(false);
   const [projectTrustBusy, setProjectTrustBusy] = useState(false);
@@ -868,6 +870,19 @@ export function AppShell() {
                 <line x1="5.6" y1="7.2" x2="9.8" y2="10.6" />
                 <line x1="18.4" y1="7.2" x2="14.2" y2="10.6" />
                 <line x1="12" y1="15" x2="12" y2="18" />
+              </svg>
+            ),
+          },
+          {
+            label: "联网",
+            onClick: () => setWebAccessConfigOpen(true),
+            disabled: false,
+            icon: (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18" />
+                <path d="M12 3a15 15 0 0 1 0 18" />
+                <path d="M12 3a15 15 0 0 0 0 18" />
               </svg>
             ),
           },
@@ -1914,6 +1929,13 @@ export function AppShell() {
         cwd={projectTrustCwd}
         sessionId={selectedSession?.id ?? null}
         onClose={() => setMcpConfigOpen(false)}
+        onReloaded={() => setSessionKey((k) => k + 1)}
+      />
+    )}
+    {webAccessConfigOpen && (
+      <WebAccessConfig
+        sessionId={selectedSession?.id ?? null}
+        onClose={() => setWebAccessConfigOpen(false)}
         onReloaded={() => setSessionKey((k) => k + 1)}
       />
     )}
