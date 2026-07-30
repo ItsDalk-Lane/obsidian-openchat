@@ -203,3 +203,42 @@
 - [x] 浏览器验收：使用独立临时数据目录和本机 Chrome 验证语言来回切换、快速变更入口及页面脚本错误，全部通过；临时服务、数据目录和脚本已清理。
 - [environment-note] Python Playwright 包缺少自带 Chromium，首次脚本未进入页面；随后复用本机 Chrome 完成同一检查，没有下载依赖或修改项目。
 - [out-of-scope] 未提交、未推送、未发布，也未改版本号。
+
+## 内置扩展通用注入层（2026-07-30）
+
+### 当前理解（任务 0，≤10 行）
+
+1. 目标：把内置扩展解析、去重、注入改为注册表驱动，本次注册表仍只包含 MCP。
+2. 顺序：基线核对 → 安装依赖 → 通用化与单测 → 红绿反向验证 → 全量检查 → MCP 冒烟 → 范围核验 → 提交。
+3. 最大风险：MCP 去重或状态订阅被无意改变；优先保持现有行为。
+4. 任务书写 99 行、实测 98 行；机制与版本一致，证据已写入 `BLOCKED.md`。
+5. 另有大小写路径冲突；已恢复既有进度内容，本任务记录追加在同一逻辑文件。
+
+### 执行记录
+
+- [x] 创建分支 `feat/bundled-extensions`。
+- [x] 基线 `npm run check` 退出码 0；主测试 tests 248 / pass 248 / fail 0 / skipped 0；适配器测试 11 / 11。
+- [x] 版本核对：`pi-subagents` 0.37.2，`pi-web-access` 0.15.0。
+- [x] 机制核对：运行时解析包目录、缺失返回 null、global/project 双层去重、会话工厂注入路径均与任务书一致。
+- [x] 安装并核验依赖：`npm ls pi-subagents pi-web-access` 退出码 0，分别为 0.37.2 / 0.15.0；`package.json` 只增加两行直系依赖。
+- [x] 实现注册表驱动的通用注入层：注册表仅含 MCP；解析缓存按包名区分；去重按包名查 global/project；工厂遍历注册表组装路径并在成功注入时调用 setup。
+- [x] 针对性验证：新增测试 6/6，类型检查和目标文件 lint 均退出码 0。
+- [x] 新增规定单测并完成红→绿反向验证：临时把字符串去重断言改为 false 后 tests 6 / pass 5 / fail 1（退出码 1）；还原后 tests 6 / pass 6 / fail 0 / skipped 0（退出码 0）。
+- [x] 最终 `npm run check` 退出码 0：主测试 tests 254 / pass 254 / fail 0 / skipped 0（基线 248，增加 6）；适配器测试 11 / 11。
+- [x] MCP 冒烟测试：开发服务 30141 启动成功；创建会话返回 200 与 sessionId `019fb052-d801-7077-ada2-e1e1d4d775b7`；`get_state` 返回 `mcpStatus`（version 1、servers 空数组）；开发服务已用 Ctrl-C 关闭。
+- [x] 范围核验：暂存后 `git diff main --stat` 共 9 个文件；除大小写冲突下显示为 `progress.md` 外，全部属于白名单；`package.json` 只增加两行指定依赖；`git diff --cached --check` 无输出。
+- [x] 提交：`feat: generalize bundled extension injection`。
+
+### 错误与偏差
+
+- `lib/mcp-extension.ts` 行数描述偏差；详见 `BLOCKED.md`。
+- `PROGRESS.md` 与既有 `progress.md` 在大小写不敏感文件系统冲突；详见 `BLOCKED.md`。
+- `npm install` 出现既有 React peer 覆盖警告与审计报告（32 项漏洞），安装成功；不做越界依赖升级或修复。
+- 查阅测试风格时误用了不存在的 `lib/rpc-manager-boundary.test.mjs` 路径（退出码 2）；未重复执行，改从已确认存在的 `lib/project-trust.test.mjs` 获取测试约定。
+- 冒烟前读取动态路由时未给方括号路径加引号，zsh 将其当成通配符（退出码 1）；不影响代码，后续使用带引号路径。
+- 首次 `git diff main --stat` 不包含尚未暂存的新文件，这是 Git 的正常行为；最终范围证据须在暂存后重跑，不能拿该次输出充当完整验收。
+
+### 实现决策
+
+- 沿用任务书指定接缝：`lib/bundled/index.ts` 放注册表与类型，`lib/bundled/pi-mcp-adapter.ts` 放唯一 MCP spec。
+- 通用解析与去重留在 `lib/mcp-extension.ts` 并按包名参数化，避免越界新增第三个公共工具文件；会话工厂遍历注册表。

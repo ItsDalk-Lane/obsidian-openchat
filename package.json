@@ -120,6 +120,8 @@
     "electron-updater": "^6.8.9",
     "next": "16.2.12",
     "pi-mcp-adapter": "^2.13.0",
+    "pi-subagents": "^0.37.2",
+    "pi-web-access": "^0.15.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "strip-json-comments": "^5.0.3",

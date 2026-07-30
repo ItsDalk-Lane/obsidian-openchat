@@ -7,7 +7,8 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { MCP_STATUS_EVENT, isMcpAdapterInstalledAsPackage, resolveBundledMcpAdapterDir, type McpStatusSnapshot } from "../../mcp-extension";
+import { bundledExtensionSpecs } from "../../bundled";
+import { MCP_STATUS_EVENT, isExtensionInstalledAsPackage, resolveBundledExtensionDir, type McpStatusSnapshot } from "../../mcp-extension";
 import type { AgentSessionLike } from "../../pi-types";
 import { getProjectTrustStatus, projectTrustReloadOptions } from "../../project-trust";
 
@@ -38,16 +39,34 @@ export async function createPiSession(input: CreatePiSessionInput): Promise<PiSe
     ? SessionManager.open(input.sessionFile, undefined)
     : SessionManager.create(input.cwd, undefined);
 
-  let mcpAdapterDir: string | null = null;
+  let settingsProbe: SettingsManager | null = null;
+  let settingsProbeError: unknown;
   try {
     const trustStatus = getProjectTrustStatus(input.cwd, agentDir);
-    const settingsProbe = SettingsManager.create(input.cwd, agentDir, {
+    settingsProbe = SettingsManager.create(input.cwd, agentDir, {
       projectTrusted: trustStatus.trusted,
     });
-    mcpAdapterDir = isMcpAdapterInstalledAsPackage(settingsProbe) ? null : resolveBundledMcpAdapterDir();
   } catch (err) {
-    console.warn("[pi-web] failed to check installed packages for pi-mcp-adapter:", err instanceof Error ? err.message : err);
-    mcpAdapterDir = resolveBundledMcpAdapterDir();
+    settingsProbeError = err;
+  }
+
+  const bundledExtensionPaths: string[] = [];
+  for (const spec of bundledExtensionSpecs) {
+    let installedAsPackage = false;
+    try {
+      if (settingsProbeError) throw settingsProbeError;
+      installedAsPackage = settingsProbe
+        ? isExtensionInstalledAsPackage(settingsProbe, spec.packageName)
+        : false;
+    } catch (err) {
+      console.warn(`[pi-web] failed to check installed packages for ${spec.packageName}:`, err instanceof Error ? err.message : err);
+    }
+    if (installedAsPackage) continue;
+
+    const extensionDir = resolveBundledExtensionDir(spec.packageName);
+    if (!extensionDir) continue;
+    spec.setup?.({ cwd: input.cwd });
+    bundledExtensionPaths.push(extensionDir);
   }
 
   const mcpEventBus = createEventBus();
@@ -64,7 +83,9 @@ export async function createPiSession(input: CreatePiSessionInput): Promise<PiSe
     agentDir,
     resourceLoaderOptions: {
       eventBus: mcpEventBus,
-      ...(mcpAdapterDir ? { additionalExtensionPaths: [mcpAdapterDir] } : {}),
+      ...(bundledExtensionPaths.length > 0
+        ? { additionalExtensionPaths: bundledExtensionPaths }
+        : {}),
     },
     resourceLoaderReloadOptions: projectTrustReloadOptions(input.cwd, agentDir),
   });
