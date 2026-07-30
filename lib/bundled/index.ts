@@ -1,4 +1,5 @@
 import { piMcpAdapterSpec } from "./pi-mcp-adapter";
+import { webAccessSpec } from "./web-access";
 
 export interface BundledExtensionSpec {
   packageName: string;
@@ -7,4 +8,5 @@ export interface BundledExtensionSpec {
 
 export const bundledExtensionSpecs: readonly BundledExtensionSpec[] = [
   piMcpAdapterSpec,
+  webAccessSpec,
 ];
