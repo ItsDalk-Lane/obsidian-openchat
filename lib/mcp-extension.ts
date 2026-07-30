@@ -88,7 +88,9 @@ type PackageSourceLike = string | { source: string };
 function packageSourceMatchesExtension(entry: PackageSourceLike, packageName: string): boolean {
   const source = typeof entry === "string" ? entry : entry.source;
   const escapedPackageName = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const packagePattern = new RegExp(`(^|[/:@\\\\])${escapedPackageName}(@|$|[/\\\\])?`);
+  // The trailing boundary group is mandatory: without it, a package named
+  // "pi-web-access-pro" would falsely match a bundled "pi-web-access".
+  const packagePattern = new RegExp(`(^|[/:@\\\\])${escapedPackageName}(@|$|[/\\\\])`);
   return packagePattern.test(source) || source === packageName;
 }
 
