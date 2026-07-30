@@ -12,6 +12,7 @@ import { SkillsConfig } from "./SkillsConfig";
 import { PluginsConfig } from "./PluginsConfig";
 import { McpConfig } from "./McpConfig";
 import { WebAccessConfig } from "./WebAccessConfig";
+import { SubagentsConfig } from "./SubagentsConfig";
 import { ProjectTrustDialog } from "./ProjectTrustDialog";
 import { BranchNavigator } from "./BranchNavigator";
 import { useTheme } from "@/hooks/useTheme";
@@ -135,6 +136,7 @@ export function AppShell() {
   const [pluginsConfigOpen, setPluginsConfigOpen] = useState(false);
   const [mcpConfigOpen, setMcpConfigOpen] = useState(false);
   const [webAccessConfigOpen, setWebAccessConfigOpen] = useState(false);
+  const [subagentsConfigOpen, setSubagentsConfigOpen] = useState(false);
   const [projectTrust, setProjectTrust] = useState<ProjectTrustStatus | null>(null);
   const [projectTrustDialogOpen, setProjectTrustDialogOpen] = useState(false);
   const [projectTrustBusy, setProjectTrustBusy] = useState(false);
@@ -883,6 +885,19 @@ export function AppShell() {
                 <path d="M3 12h18" />
                 <path d="M12 3a15 15 0 0 1 0 18" />
                 <path d="M12 3a15 15 0 0 0 0 18" />
+              </svg>
+            ),
+          },
+          {
+            label: "Agents",
+            onClick: () => setSubagentsConfigOpen(true),
+            disabled: !activeCwd && !selectedSession?.cwd && !newSessionCwd,
+            icon: (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="7" r="4" />
+                <path d="M2 21v-2a7 7 0 0 1 14 0v2" />
+                <path d="M16 3.5a4 4 0 0 1 0 7.5" />
+                <path d="M18 14a6 6 0 0 1 4 5.7V21" />
               </svg>
             ),
           },
@@ -1936,6 +1951,14 @@ export function AppShell() {
       <WebAccessConfig
         sessionId={selectedSession?.id ?? null}
         onClose={() => setWebAccessConfigOpen(false)}
+        onReloaded={() => setSessionKey((k) => k + 1)}
+      />
+    )}
+    {subagentsConfigOpen && projectTrustCwd && (
+      <SubagentsConfig
+        cwd={projectTrustCwd}
+        sessionId={selectedSession?.id ?? null}
+        onClose={() => setSubagentsConfigOpen(false)}
         onReloaded={() => setSessionKey((k) => k + 1)}
       />
     )}
