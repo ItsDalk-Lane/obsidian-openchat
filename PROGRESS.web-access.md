@@ -39,3 +39,9 @@
 - `npm run check`：typecheck 通过、lint 通过；主测试 tests 259 / pass 259，Pi adapter tests 11 / pass 11；合计 270 / pass 270 / fail 0 / skipped 0。
 - 相比基线新增 4 个测试（270 ≥ 266），没有跳过或搁置测试，没有放宽断言、伪造被测对象、删除测试或强行吞掉失败。
 - 首页真实开发编译：`curl http://127.0.0.1:30151/` → `http_status=200`，响应 32196 字节；服务日志为 `GET / 200`，无客户端引入服务端文件系统错误。
+
+## 交付前最终验收
+- `git rebase main` 输出：`Current branch feat/builtin-web-access is up to date.`。
+- rebase 后新进程重跑任务 1：`get_tools` 输出 `["read","bash","edit","write","grep","find","ls","mcp","web_search","source_check","fetch_content","get_search_content"]`。
+- rebase 后 `npm run check` 再次通过：合计 tests 270 / pass 270 / fail 0 / skipped 0。
+- `BLOCKED.web-access.md` 为“无”；包清单、锁文件和 pi-subagents 文件零改动。
