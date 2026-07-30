@@ -41,58 +41,70 @@ export interface McpStatusSnapshot {
   readonly disabledCount: number;
 }
 
-let cachedAdapterDir: string | null | undefined;
+const cachedExtensionDirs = new Map<string, string | null>();
 
 /**
- * Resolve the bundled pi-mcp-adapter package directory.
+ * Resolve a bundled extension package directory.
  * Returns null (with a one-time warning) when the package cannot be found so
  * session startup never fails because of the bundled extension.
  */
-export function resolveBundledMcpAdapterDir(): string | null {
-  if (cachedAdapterDir !== undefined) return cachedAdapterDir;
+export function resolveBundledExtensionDir(packageName: string): string | null {
+  if (cachedExtensionDirs.has(packageName)) {
+    return cachedExtensionDirs.get(packageName) ?? null;
+  }
 
   // Primary: Node resolution from the app root (handles hoisted node_modules,
   // e.g. npx installs). createRequire is used at runtime, so webpack does not
   // try to bundle the adapter's TypeScript sources.
   try {
     const req = createRequire(join(process.cwd(), "noop.js"));
-    const entry = req.resolve("pi-mcp-adapter");
-    cachedAdapterDir = dirname(entry);
-    return cachedAdapterDir;
+    const entry = req.resolve(packageName);
+    const extensionDir = dirname(entry);
+    cachedExtensionDirs.set(packageName, extensionDir);
+    return extensionDir;
   } catch { /* fall through to manual walk */ }
 
-  // Fallback: walk up from cwd looking for node_modules/pi-mcp-adapter.
+  // Fallback: walk up from cwd looking for the package under node_modules.
   let dir = process.cwd();
   for (;;) {
-    const candidate = join(dir, "node_modules", "pi-mcp-adapter");
+    const candidate = join(dir, "node_modules", packageName);
     if (existsSync(join(candidate, "package.json"))) {
-      cachedAdapterDir = candidate;
-      return cachedAdapterDir;
+      cachedExtensionDirs.set(packageName, candidate);
+      return candidate;
     }
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
 
-  console.warn("[pi-web] bundled pi-mcp-adapter not found; MCP support disabled for new sessions");
-  cachedAdapterDir = null;
-  return cachedAdapterDir;
+  const supportName = packageName === "pi-mcp-adapter" ? "MCP" : packageName;
+  console.warn(`[pi-web] bundled ${packageName} not found; ${supportName} support disabled for new sessions`);
+  cachedExtensionDirs.set(packageName, null);
+  return null;
 }
 
 type PackageSourceLike = string | { source: string };
 
-function packageSourceMatchesAdapter(entry: PackageSourceLike): boolean {
+function packageSourceMatchesExtension(entry: PackageSourceLike, packageName: string): boolean {
   const source = typeof entry === "string" ? entry : entry.source;
-  return /(^|[/:@\\])pi-mcp-adapter(@|$|[/\\])?/.test(source) || source === "pi-mcp-adapter";
+  const escapedPackageName = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // The trailing boundary group is mandatory: without it, a package named
+  // "pi-web-access-pro" would falsely match a bundled "pi-web-access".
+  const packagePattern = new RegExp(`(^|[/:@\\\\])${escapedPackageName}(@|$|[/\\\\])`);
+  return packagePattern.test(source) || source === packageName;
 }
 
 /**
- * True when the user already installed pi-mcp-adapter as a pi package
- * (global or project scope). The bundled copy is skipped in that case so the
- * extension is not loaded twice.
+ * True when the user already installed an extension as a pi package (global or
+ * project scope). The bundled copy is skipped so the extension is not loaded
+ * twice.
  */
-export function isMcpAdapterInstalledAsPackage(settingsManager: SettingsManager): boolean {
+export function isExtensionInstalledAsPackage(
+  settingsManager: SettingsManager,
+  packageName: string,
+): boolean {
   const globalPackages = (settingsManager.getGlobalSettings().packages ?? []) as PackageSourceLike[];
   const projectPackages = (settingsManager.getProjectSettings().packages ?? []) as PackageSourceLike[];
-  return [...globalPackages, ...projectPackages].some(packageSourceMatchesAdapter);
+  return [...globalPackages, ...projectPackages].some((entry) =>
+    packageSourceMatchesExtension(entry, packageName));
 }
