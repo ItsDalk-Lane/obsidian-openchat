@@ -9,6 +9,7 @@ import {
   invalidateSessionListCache,
   buildSessionContext,
   readSessionHeader,
+  listAllSessions,
 } from "@/lib/session-reader";
 import { sessionPathKey } from "@/lib/session-path";
 import { getRpcSession } from "@/lib/rpc-manager";
@@ -194,9 +195,10 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/sessions/[id]
+// DELETE /api/sessions/[id] — ?recursive=true also deletes every descendant
+// (forked branch sessions) instead of re-parenting them.
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -204,6 +206,49 @@ export async function DELETE(
     const filePath = await resolveSessionPath(id);
     if (!filePath) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    const recursive = new URL(req.url).searchParams.get("recursive") === "true";
+
+    if (recursive) {
+      // Collect the target plus all descendants via the global parentSessionId
+      // map — forks can live in other encoded cwd directories, so the
+      // same-directory scan used for re-parenting would miss them.
+      const all = await listAllSessions();
+      const childrenByParent = new Map<string, string[]>();
+      for (const session of all) {
+        if (!session.parentSessionId) continue;
+        const siblings = childrenByParent.get(session.parentSessionId) ?? [];
+        siblings.push(session.id);
+        childrenByParent.set(session.parentSessionId, siblings);
+      }
+      const pathById = new Map(all.map((session) => [session.id, session.path]));
+      pathById.set(id, filePath);
+
+      const deletedIds: string[] = [];
+      const queue = [id];
+      const queued = new Set(queue);
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        deletedIds.push(current);
+        for (const childId of childrenByParent.get(current) ?? []) {
+          if (!queued.has(childId)) {
+            queued.add(childId);
+            queue.push(childId);
+          }
+        }
+      }
+
+      for (const deleteId of deletedIds) {
+        try {
+          getRpcSession(deleteId)?.destroy();
+          const sessionFile = pathById.get(deleteId);
+          if (sessionFile) unlinkSync(sessionFile);
+        } catch { /* keep deleting the rest */ }
+        invalidateSessionPathCache(deleteId);
+      }
+      invalidateSessionListCache();
+      return NextResponse.json({ ok: true, deletedIds });
     }
 
     // Read only the bounded header before deleting.
@@ -241,7 +286,7 @@ export async function DELETE(
     unlinkSync(filePath);
     invalidateSessionPathCache(id);
     invalidateSessionListCache();
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, deletedIds: [id] });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }

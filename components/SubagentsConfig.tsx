@@ -246,10 +246,9 @@ export function SubagentsConfig({
   const isDisabled = useCallback((agent: SubagentAgent): boolean => {
     const projectOverride = settings.project.agentOverrides[agent.name];
     if (typeof projectOverride?.disabled === "boolean") return projectOverride.disabled;
-    if (agent.scope === "builtin" && settings.project.disableBuiltins === true) return true;
     const userOverride = settings.user.agentOverrides[agent.name];
     if (typeof userOverride?.disabled === "boolean") return userOverride.disabled;
-    return agent.scope === "builtin" && settings.user.disableBuiltins === true;
+    return false;
   }, [settings]);
 
   const writeSettings = useCallback(async (
@@ -386,7 +385,6 @@ export function SubagentsConfig({
       await writeSettings(settingsScope, {
         defaultModel: current.defaultModel ?? null,
         defaultThinking: current.defaultThinking ?? null,
-        disableBuiltins: current.disableBuiltins ?? false,
         agentOverrides,
       });
       await load();
@@ -595,9 +593,6 @@ export function SubagentsConfig({
                     {THINKING_LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}
                   </select>
                 </Field>
-              </div>
-              <div style={{ margin: "14px 0 18px" }}>
-                <Check label="禁用全部内置 agents" checked={currentSettings.disableBuiltins ?? false} onChange={(value) => updateScopedSettings(settingsScope, (current) => ({ ...current, disableBuiltins: value }))} />
               </div>
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>按 agent 覆盖</div>
               <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", maxWidth: 780 }}>

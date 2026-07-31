@@ -1,5 +1,23 @@
 # PROGRESS.md
 
+## 精简内置 pi-subagents（2026-07-31）
+
+- [x] 生成并更新 `patches/pi-subagents+0.37.2.patch`，核心改动 4 处全部包含：
+ 	- 删除 `node_modules/pi-subagents/package.json` 里 `pi.skills` / `pi.prompts` 清单引用。
+ 	- 删除 `src/extension/index.ts` 中 `registerSlashCommands(pi, state);`。
+ 	- 删除 `src/watchdog/register-main.ts` 中 `pi.registerCommand("subagents-watchdog", ...)` 命令注册块。
+ 	- 删除 `node_modules/pi-subagents/agents/` 下 9 个内置 agent 文件（advisor/context-builder/delegate/oracle/planner/researcher/reviewer/scout/worker）。
+- [x] pi-web 改动完成：
+ 	- `package.json` 将 `pi-subagents` 从 `^0.37.2` 锁定为 `0.37.2`。
+ 	- `components/SubagentsConfig.tsx` 移除「禁用全部内置 agents」设置项与对应禁用逻辑。
+- [x] 验证通过：`npx patch-package --reverse && npx patch-package`（两次均应用 `pi-subagents@0.37.2 ✔`）。
+- [x] 验证通过：`node_modules/.bin/tsc --noEmit`、`npm run lint`。
+- [x] API 验证（30141 端口现有服务）：
+ 	- `get_tools` 仍包含 `subagent`、`subagent_wait`、`subagent_supervisor`、`intercom`。
+ 	- `get_commands` 仅剩 6 个 `skill:*` 命令；`run/chain/parallel/subagents*/prompt-workflow/chain-prompts/subagents-watchdog` 全部不存在。
+ 	- `GET /api/subagents/agents?cwd=...` 返回 `{"agents":[],"diagnostics":[]}`，builtin 分组为空。
+ 	- 实测主智能体通过 `subagent` 工具完成 `action:list -> action:create -> SINGLE 运行`，子智能体返回 `TEMP_CORE_OK`；随后已执行 `action:delete` 清理临时 agent。
+
 > 注：本文件此前残存另一会话的 8 行规划记录（leader/planning-with-files），与本任务无关，已覆盖。
 
 ## 2026-07-28 上游版本差异调研
@@ -40,11 +58,13 @@
 - [进行中] S5：中英国际化和 Shift 点击直删。
 
 ## 理解（任务 0 后）
+
 - 目标：交付带证据的全栈架构评估报告 ARCHITECTURE_REVIEW.md（中文）＋P0/P1/P2 路线图，给领导抽查用。
 - 顺序：任务 2（服务端分层，判据现成）→ 任务 1（前端组件层）→ 任务 3（数据流/API 边界）→ 任务 4（汇总报告）。
 - 最大风险：证据不可复现被判作弊 → 每条结论必须附可复跑命令或 file:line，且命令输出已实际贴出。
 
 ## 任务 0 核对结果（2026-07-28 复跑）
+
 - [x] `node_modules/.bin/tsc --noEmit` 退出码 0 ✅
 - [x] `npm run lint` 无告警，退出码 0 ✅
 - [x] 最大 6 文件行数完全一致（ChatInput 2169 / SessionSidebar 1963 / useAgentSession 1651 / ModelsConfig 1648 / AppShell 1643 / MessageView 1451）✅
@@ -54,6 +74,7 @@
 - [x] 疑点复核：pi-session-reconciler.ts:5 确实 import `@/lib/adapters/pi/pi-task-projector` ✅；runtime-registry.ts 的 "adapters" 只是私有 Map 字段名，并非 import adapters 模块（疑点证伪）；app/api/doctor/route.ts:3 直接 import `@/lib/persistence` ✅；lib/subagent 确为空目录 ✅
 
 ## 进行状态
+
 - 任务 0：完成（基线全部核对，1 处表述不精确已注记）
 - 任务 2：完成。结论：reconciler→adapters 是 AGENTS.md 批准例外（但 boundary test 不覆盖 services，计问题 4）；runtime-registry「adapters」疑点证伪（字段名非 import）；doctor→persistence 合规（服务端代码）；rpc-manager 1259 行，send 393 行/25 case，11 个 route + 1 个 server bridge 依赖（计问题 3）；lib/subagent 证伪为本地空目录残留，列入 BLOCKED 但不计架构问题。
 - 任务 1：完成。结论：无 store/context/状态库（grep 双零），SessionSidebar/useAgentSession/AppShell 分别 38/37/34 个 useState，ModelsConfig 21 个，useAgentSession 返回 71 个成员、ChatInput Props 36 字段（计问题 1）；59 处 fetch 中有明确重复样板，agent-client 仅 2 文件使用（计问题 2）；buildSessionTree/slashMatchRank/模型兼容转换无测试（计问题 5）；MessageView 复用 lib/patch 为正面样板（亮点 2）。
@@ -61,12 +82,14 @@
 - 任务 4：完成。ARCHITECTURE_REVIEW.md 已交付（5 问题 + 3 亮点，每条附可复跑命令/行号 + 实测日期；P0/P1/P2 每步均含改动、收益、风险、预估代价；附 5 条证伪记录）。BLOCKED.md 5 项待裁决。
 
 ## 交付清单（2026-07-28）
+
 - ARCHITECTURE_REVIEW.md ✅
 - PROGRESS.md ✅（本文件）
 - BLOCKED.md ✅（5 项）
 - 未触碰任何其他文件；未装依赖、未跑 next build、未动配置。
 
 ## 断点续跑交付审计（2026-07-28）
+
 - [x] 已先读本文件，确认任务 0–4 已完成，不重做研究，仅复现交付证据。
 - [x] 任务 0 已复跑：tsc/lint 退出码均为 0；6 个大文件行数、状态密度、59 处 fetch 与既有记录一致。
 - [x] 分层基线已复跑：kernel 仅内部相对导入；components/hooks 无 persistence 导入；reconciler→adapter、doctor→persistence、空 subagent 目录与既有记录一致。
@@ -218,9 +241,9 @@
 
 - [x] 创建分支 `feat/bundled-extensions`。
 - [x] 基线 `npm run check` 退出码 0；主测试 tests 248 / pass 248 / fail 0 / skipped 0；适配器测试 11 / 11。
-- [x] 版本核对：`pi-subagents` 0.37.2，`pi-web-access` 0.15.0。
+- [x] 版本核对：`pi-subagents` 0.37.2。
 - [x] 机制核对：运行时解析包目录、缺失返回 null、global/project 双层去重、会话工厂注入路径均与任务书一致。
-- [x] 安装并核验依赖：`npm ls pi-subagents pi-web-access` 退出码 0，分别为 0.37.2 / 0.15.0；`package.json` 只增加两行直系依赖。
+- [x] 安装并核验依赖：`npm ls pi-subagents` 退出码 0，版本 0.37.2；`package.json` 只增加一行直系依赖。
 - [x] 实现注册表驱动的通用注入层：注册表仅含 MCP；解析缓存按包名区分；去重按包名查 global/project；工厂遍历注册表组装路径并在成功注入时调用 setup。
 - [x] 针对性验证：新增测试 6/6，类型检查和目标文件 lint 均退出码 0。
 - [x] 新增规定单测并完成红→绿反向验证：临时把字符串去重断言改为 false 后 tests 6 / pass 5 / fail 1（退出码 1）；还原后 tests 6 / pass 6 / fail 0 / skipped 0（退出码 0）。
@@ -242,3 +265,61 @@
 
 - 沿用任务书指定接缝：`lib/bundled/index.ts` 放注册表与类型，`lib/bundled/pi-mcp-adapter.ts` 放唯一 MCP spec。
 - 通用解析与去重留在 `lib/mcp-extension.ts` 并按包名参数化，避免越界新增第三个公共工具文件；会话工厂遍历注册表。
+
+## 移除 /mcp、/mcp-auth 命令并迁移运维操作至 MCP 设置页（2026-07-30）
+
+- [x] patch-package 固化 adapter 改动：`patches/pi-mcp-adapter+2.13.0.patch`（删 `registerCommand("mcp"/"mcp-auth")` + 物理删除 `mcp-panel.ts`/`mcp-setup-panel.ts`/`panel-keys.ts`，`commands.ts` 仅保留 reconnect/auth/logout 四个函数）；`package.json` 钉死 `pi-mcp-adapter@2.13.0`、新增 `postinstall: patch-package`、npm `files` 含 `patches`。
+- [x] 新增 event-bus 控制通道（`pi-mcp-adapter/control-request|result|notice|ready/v1`），per-bus owner-token（`Symbol.for`）防止 SDK reload 后旧工厂监听器重复应答；pi-web 侧经 `pi-session-factory`（requestId 关联 + 120s 超时）→ `rpc-manager` → kernel `mcp_action` 命令 → `POST /api/mcp/action`。
+- [x] `McpConfig` 设置页：头部「全部重连」、详情「重新连接」（非禁用服务器）、「OAuth 登录 / 清除认证」（http 服务器，替换原"请在 pi CLI 中运行 /mcp-auth"提示）；仅 live 会话可用。
+- [x] 干净 `npm ci` 验证补丁流：postinstall 应用成功，面板文件不存在，`registerCommand("mcp"` 计数为 0，jiti 冒烟 OK；typecheck/lint 通过；kernel 协议测试 9/9（含 `mcp_action` parser 用例）、pi-adapter 测试 11/11。
+- [x] 浏览器实测（dev 30141 + 临时 stdio demo 服务器 + 不可达 http 服务器 `fake-oauth`，测后均已清理）：① 斜杠面板仅 5 个内置命令，过滤 `mcp` 无 /mcp、/mcp-auth；② 「重新连接」内联返回 `Reconnected to demo`，「全部重连」返回 `Reconnect finished` 且状态 已缓存→已连接·1 工具；③ http 服务器显示 OAuth 按钮，登录返回 `started` 并展示提示文案，SSE 捕获 `Authenticating fake-oauth...` 与 `Failed to authenticate ...` 失败通知（bus→SSE→toast 管道闭环），「清除认证」confirm 后返回 `OAuth credentials cleared for "fake-oauth".`；④ `reload` 命令后控制通道仍正常（owner-token 去重生效）。
+- [x] 已知非问题：会话启动后再向配置文件新增服务器，adapter 运行时配置快照不会自动刷新（原 TUI 流程亦如此）；设置页保存流程本就调用 `onReloaded` 触发会话 reload，带外编辑文件需 `/reload`。
+
+### 错误与偏差
+
+- `npm run test` 全量有 1 个既有失败（SessionSidebar shift+click 删除确认），源自本次会话前已暂存的 SessionSidebar 重构，与 MCP 改动无关。
+- iCloud Desktop 同步导致 `npm ci`/`rm -rf node_modules` 多次 ENOTEMPTY，重试循环后成功。
+
+## 修复：新加 MCP 服务器后模型视角"未连接"不可用（2026-07-31）
+
+__问题__：添加 MCP 服务器（默认 `lazy` 生命周期）后若不手动点「重新连接」，模型拒绝调用 MCP 工具——从未连接过的服务器没有工具元数据缓存，`buildProxyDescription` 跳过它（`totalItems===0`），状态输出也不给连接引导（原文案还引用已被移除的 `/mcp reconnect`）。
+
+- [x] 修复①（产品侧，`components/McpConfig.tsx`）：设置页添加/编辑保存、启用（toggle 打开）后自动调用 `runMcpAction("reconnect", name)`——`/api/mcp` 路由在响应前已 `await reloadActiveSession`，控制通道此刻已就绪，故无竞态；编辑禁用中的服务器跳过。
+- [x] 修复②（模型侧，补丁固化进 `patches/pi-mcp-adapter+2.13.0.patch`，共 5 个文件 16 处文案）：清除全部面向模型的 `/mcp`、`/mcp-auth` 死引用——disabled 提示改为"可在 MCP 设置页启用"；OAuth 提示收敛为 `mcp({ action: "auth-start" })`；`mcp({})` 状态页脚追加 `mcp({ connect: "name" }) to connect`；`mcp({server})` 对未连接/无缓存服务器明确提示 `Use mcp({ connect: "..." })`。
+- [x] 验证：`npx patch-package` 重新生成补丁（10 个文件）；jiti 冒烟 OK；typecheck/lint 通过；kernel 协议测试 9/9。
+- [x] 浏览器实测自动重连（dev 30141，会话 `019fb17c`，临时 stdio 服务器 verify-demo，测后已删除清理）：第一次添加时因测试服务器脚本自身错误（`.mjs` 里用 `require`）连接 failed——但__自动重连在保存后 1s 内即触发__（无需手动点击，通道时序正确）；修好脚本后重新添加，保存后首次轮询（<0.5s）即 `connected · 1 工具`，面板显示「已连接 · 1 工具」与 `Reconnected to verify-demo` 内联确认。
+- [x] 环境清理：`~/.config/mcp/mcp.json` 恢复为用户原有 3 个服务器（web-search-prime/web-reader/zread），临时文件全部删除。
+
+## UI：MCP 状态移入模型选择器一行（2026-07-31）
+
+__需求__：消息区左下方独立一行的「🔌 MCP: N servers enabled」扩展状态栏改为与模型选择器同一行展示，不再单独占行。
+
+- [x] `components/ExtensionStatusBar.tsx`：拆出内联组件 `ExtensionStatusText`（role=status 的 span，ANSI 分段渲染、ellipsis）；原 `ExtensionStatusBar`（36px 行）改为组合它，样式与行为不变，3 个单测原样通过。
+- [x] `components/ChatInput.tsx`：新增可选 prop `extensionStatuses?: ExtensionStatusItem[]`，在底栏左侧 ModelSelector 之后渲染 `ExtensionStatusText`（maxWidth 移动端 140 / 桌面 260，flexShrink 1 + ellipsis 防撑破布局）。
+- [x] `components/ChatWindow.tsx`：ChatInput 传入 `extensionStatuses`；删除原独立行 `<ExtensionStatusBar>` 及其 import（原 L749，全仓唯一使用点）。附带效果：新会话空态布局（isEmptyNew）此前无状态栏，现在同样有了一致的展示位置。
+- [x] 验证：typecheck/lint 通过；`ExtensionStatusBar.test.mjs` 3/3；浏览器实测（dev 30141，会话 019fb17c，`get_state` 唤醒 RPC）：全页 role=status 元素唯一，aria-label「🔌 MCP: 3 servers enabled」，与模型选择器同一行且垂直居中（中心 y 均为 696），独立状态行已消失。
+
+## i18n：MCP 扩展状态文案中文化（2026-07-31）
+
+__问题__：状态文案由 pi-mcp-adapter 生成（`init.ts updateStatusBar` 等），adapter 无 locale 概念、永远输出英文，中文界面下「MCP: 3 servers enabled」突兀。
+
+- [x] 新增 `lib/extension-status-i18n.ts`：展示层重写——识别 adapter 的 4 类已知文案（enabled 汇总含 connected/disabled 后缀、connecting N、connecting name、Authenticating name），经 pi-web i18n 重建；stripAnsi 后匹配，未知文案原样透传；相对导入保持 plain-node 可测。
+- [x] i18n key（`extension.mcp.*`，en + zh-CN 各 7 条）：zh「🔌 MCP：{count} 个服务器已启用（{count} 个已连接）（{count} 个已禁用）」「正在连接…」「正在认证…」；en 重建后与 adapter 原文逐字一致（含单复数 server/servers）。
+- [x] `ChatInput` 渲染前 `localizeExtensionStatuses(extensionStatuses, t)`；`ExtensionStatusBar`/`ExtensionStatusText` 保持纯净不感知 locale。
+- [x] 新增 `lib/extension-status-i18n.test.mjs` 7 例（zh 汇总/后缀、en 单数、瞬态、ANSI 穿透、未知透传、列表映射恒等）全绿；typecheck/lint 通过；全量 269 测试 268 过，唯一失败仍为既有 SessionSidebar shift+click 用例（源自会话前已暂存重构，与本次无关）。
+- [x] 浏览器实测语言切换：zh-CN → 「🔌 MCP：3 个服务器已启用」；en → 「🔌 MCP: 3 servers enabled」；切换即时生效无需刷新。
+
+## MCP 设置页：粘贴 JSON 识别添加服务器（2026-07-31）
+
+__需求__：手动一项项填表单太慢，要求直接粘贴 `{"mcpServers": {"zai-mcp-server": {"type":"stdio","command":"npx","args":[...],"env":{...}}}}` 这类配置自动识别添加。
+
+- [x] 新增 `lib/mcp-import.ts`：`parseMcpImport(text)` 支持三种形态——`mcpServers` 包装（标准 Claude/Cursor 格式）、裸 name→entry map、单条 entry（无名称时只填充表单）；自动剥离 ```` ```json ```` 代码围栏；Claude 风格 `type: "stdio"|"http"` 键丢弃（pi 由 command/url 推导传输方式）；env/headers 校验为 string→string，args 校验为 string[]，lifecycle 校验为 4 个合法值；错误文案中文并带服务器名定位。type-only 引用 `McpServerEntry`，保持 plain-node 可测。
+- [x] 新增 `lib/mcp-import.test.mjs` 11 例全绿（标准包装/围栏/多服务器/裸 map/单条目/http auth+lifecycle/非法 JSON/缺 command 与 url/args 非数组/非法 lifecycle/空对象）。
+- [x] `components/McpConfig.tsx` 添加表单顶部新增「从 JSON 导入（可选）」面板：textarea 粘贴 →「识别 JSON」；识别出 1 个服务器直接填充表单（含名称）并提示确认后保存，未含名称则仅填充字段提示补名；识别出多个则出现批量面板「识别到 N 个服务器」→「全部添加 N 个」逐个 POST upsert（同名冲突先 confirm 列出名单），完成后自动选中第一个并对每个 `autoReconnect`；保存/取消/新建表单时 `resetImport()` 清理导入态。抽出 `formFromEntry` 作为 `entryFromForm` 的精确逆变换，`formFromServer` 改为委托它。
+- [x] 验证：typecheck/lint 通过；全量 280 测试 279 过（唯一失败仍为既有 SessionSidebar shift+click 用例，源自会话前已暂存的重构，与本次无关）。
+- [x] 浏览器实测（dev 30141，会话 019fb17c，项目 `~/Desktop/存档`）：① 粘贴用户给出的 zai-mcp-server 原文 → 表单自动填充（type 键丢弃、args/env 转多行），保存写入项目 `.mcp.json`，详情页密钥正确掩码 `***`，保存后自动重连触发（假服务器报 `Failed to reconnect to zai-mcp-server`，证明流程闭环），状态行变「4 个服务器已启用」；② 带围栏的双服务器 JSON → 批量面板 →「全部添加 2 个」一次写入，状态行变「6 个服务器已启用」。
+- [x] 环境清理：3 个测试服务器经 `POST /api/mcp` remove 删除（均 `removed:true`），`.mcp.json` 清空后按设计自动删除；重开面板列表恢复为原有 3 个全局服务器（web-reader/web-search-prime/zread），刷新页面后状态行恢复「🔌 MCP：3 个服务器已启用」。
+
+### 错误与偏差
+
+- 清理带外删除后，仍打开的模态框列表与状态行保留旧值（模态框列表为组件本地状态、状态行来自 adapter setStatus 的 SSE 推送）：属预期，重开面板/刷新页面后即一致；非数据错误。

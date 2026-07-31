@@ -10,6 +10,11 @@ export interface SessionsResponse {
   runningSessionIds?: string[];
 }
 
+export interface DeleteSessionsResponse {
+  ok: boolean;
+  deletedIds: string[];
+}
+
 export interface HomeResponse {
   home: string;
 }
@@ -21,6 +26,29 @@ export interface CwdValidateResponse {
 
 export interface DefaultCwdResponse {
   cwd: string;
+}
+
+export interface AppSettingsResponse {
+  defaultCwd: string | null;
+}
+
+export interface CwdQuickLink {
+  name: string;
+  path: string;
+}
+
+export interface CwdQuickLinksResponse {
+  places: CwdQuickLink[];
+  recents: string[];
+}
+
+export interface CwdMkdirResponse {
+  cwd: string;
+}
+
+export interface CwdSystemPickResponse {
+  cancelled: boolean;
+  cwd: string | null;
 }
 
 export interface WorktreeEntry {

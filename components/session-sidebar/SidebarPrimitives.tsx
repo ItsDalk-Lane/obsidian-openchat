@@ -40,10 +40,13 @@ export function AnimatedDropdown({
   open,
   children,
   style,
+  from = "top",
 }: {
   open: boolean;
   children: ReactNode;
   style: CSSProperties;
+  /** Anchor edge the dropdown grows from; "bottom" for menus opening upward. */
+  from?: "top" | "bottom";
 }) {
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(open);
@@ -76,8 +79,10 @@ export function AnimatedDropdown({
       style={{
         ...style,
         opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0) scale(1)" : "translateY(-8px) scale(0.96)",
-        transformOrigin: "top center",
+        transform: visible
+          ? "translateY(0) scale(1)"
+          : `translateY(${from === "top" ? "-8px" : "8px"}) scale(0.96)`,
+        transformOrigin: from === "top" ? "top center" : "bottom center",
         transition: `opacity ${DROPDOWN_ANIMATION_MS}ms ease, transform ${DROPDOWN_ANIMATION_MS}ms ease`,
         pointerEvents: open ? "auto" : "none",
       }}

@@ -8,7 +8,6 @@ import { countToolCallBlocks, getDisplayableAssistantBlocks, splitFinalAssistant
 import { MessageView } from "./MessageView";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
-import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { useI18n } from "@/hooks/useI18n";
 import { useAgentSession, type AgentPhase, type NoticeItem } from "@/hooks/useAgentSession";
 import { useAudio } from "@/hooks/useAudio";
@@ -375,6 +374,7 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
       onAudioUnlock={unlockAudio}
       draftKey={session?.id ?? (newSessionCwd ? `new:${newSessionCwd}` : undefined)}
       cwd={session?.cwd ?? newSessionCwd}
+      extensionStatuses={extensionStatuses}
     />
   );
 
@@ -746,7 +746,6 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
         </div>
         {chatInputElement}
       </div>
-      <ExtensionStatusBar statuses={extensionStatuses} />
       </>
       )}
     </div>

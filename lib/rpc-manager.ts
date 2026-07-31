@@ -1,6 +1,6 @@
 import { getAgentDir, SessionManager } from "@earendil-works/pi-coding-agent";
 import { existsSync, writeFileSync } from "fs";
-import type { McpStatusSnapshot } from "./mcp-extension";
+import type { McpControlAction, McpControlNotice, McpControlResult, McpStatusSnapshot } from "./mcp-extension";
 import { cacheSessionPath, invalidateSessionListCache } from "./session-reader";
 import type { AgentSessionLike, ExtensionUiContextLike } from "./pi-types";
 import {
@@ -65,6 +65,10 @@ export class AgentSessionWrapper {
   private extensionBindingError: unknown = null;
   private forceEmptySystemPrompt = false;
   private mcpStatus: McpStatusSnapshot | null = null;
+  private mcpControlChannel: {
+    isReady: () => boolean;
+    send: (request: { action: McpControlAction; server?: string }) => Promise<McpControlResult>;
+  } | null = null;
   private unsubscribe: (() => void) | null = null;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private onDestroyCallback: (() => void) | null = null;
@@ -152,6 +156,27 @@ export class AgentSessionWrapper {
       { kind: "runtime", adapter: "pi", nativeType: "mcp_status" },
       this.getCurrentOperationId(),
     ));
+  }
+
+  /** Wire the per-session MCP control channel provided by the pi session factory. */
+  setMcpControlChannel(channel: AgentSessionWrapper["mcpControlChannel"]): void {
+    this.mcpControlChannel = channel;
+  }
+
+  isMcpControlReady(): boolean {
+    return this.mcpControlChannel?.isReady() ?? false;
+  }
+
+  async sendMcpControl(request: { action: McpControlAction; server?: string }): Promise<McpControlResult> {
+    if (!this.mcpControlChannel) {
+      return { requestId: "", ok: false, message: "MCP control channel unavailable" };
+    }
+    return this.mcpControlChannel.send(request);
+  }
+
+  /** Adapter-originated progress messages (OAuth URLs, reconnect outcomes, …). */
+  emitMcpControlNotice(notice: McpControlNotice): void {
+    this.extensionUi.emitNotification(notice.text, notice.level);
   }
 
   beginExtensionBinding(options: ExtensionBindingOptions = {}): void {
@@ -271,7 +296,7 @@ export class AgentSessionWrapper {
     }, 10 * 60 * 1000);
   }
 
-  private persistBashOnlySession(): void {
+  private persistUnflushedSession(): void {
     const manager = this.inner.sessionManager;
     const sessionFile = manager.getSessionFile();
     if (!sessionFile || existsSync(sessionFile)) return;
@@ -285,8 +310,9 @@ export class AgentSessionWrapper {
     writeFileSync(sessionFile, content, { encoding: "utf8", flag: "wx" });
 
     // Pi normally delays the first flush until an assistant message exists.
-    // A leading shell command has no assistant message, so mark this SDK
-    // manager as flushed after writing its own generated entries.
+    // A leading shell command or a freshly started prompt has no assistant
+    // message yet, so mark this SDK manager as flushed after writing its own
+    // generated entries — later entries then append incrementally.
     applySessionManagerFlushedPatch(this.inner);
     cacheSessionPath(this.inner.sessionId, sessionFile);
   }
@@ -314,6 +340,8 @@ export class AgentSessionWrapper {
       extensionUi: this.extensionUi,
       isPromptRunning: () => this.promptRunning,
       getMcpStatus: () => this.mcpStatus,
+      isMcpControlReady: () => this.isMcpControlReady(),
+      sendMcpControl: (request) => this.sendMcpControl(request),
       waitForExtensionsBound: () => this.waitForExtensionsBound(),
       setForceEmptySystemPrompt: (force) => this.setForceEmptySystemPrompt(force),
       applyForcedEmptySystemPrompt: () => this.applyForcedEmptySystemPrompt(),
@@ -340,6 +368,14 @@ export class AgentSessionWrapper {
           operationId,
         ));
         this.promptRunning = true;
+        // Flush the session header + pending entries to disk before anyone
+        // can observe the running state, so the sidebar picks the new
+        // session up immediately instead of waiting for the first assistant
+        // message (pi delays the initial flush until then).
+        try {
+          this.persistUnflushedSession();
+          invalidateSessionListCache();
+        } catch { /* persistence failure must not break the prompt */ }
         notifyRunningChange();
         this.inner.prompt(command.message, {
           ...(promptImages?.length ? { images: promptImages } : {}),
@@ -518,7 +554,7 @@ export class AgentSessionWrapper {
         notifyRunningChange();
         try {
           const result = await execution;
-          this.persistBashOnlySession();
+          this.persistUnflushedSession();
           if (this.operationLifecycle.finish("bash", operationId)) {
             this.emit(createKernelEvent(
               "operation.completed",
@@ -674,6 +710,8 @@ export async function startRpcSession(
     registry.set(realSessionId, wrapper);
     wrapper.beginExtensionBinding({ forceEmptySystemPrompt: runtime.forceEmptySystemPrompt });
     runtime.subscribeMcpStatus((snapshot) => wrapper.setMcpStatus(snapshot));
+    wrapper.setMcpControlChannel({ isReady: runtime.isMcpControlReady, send: runtime.sendMcpControl });
+    runtime.subscribeMcpControlNotices((notice) => wrapper.emitMcpControlNotice(notice));
 
     return { session: wrapper, realSessionId, runtimeContext };
   })().finally(() => {

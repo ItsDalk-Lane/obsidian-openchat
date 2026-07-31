@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
 import type { SessionInfo } from "@/lib/types";
 import { requestJson } from "@/lib/api-client";
 import type {
   CwdValidateResponse,
   DefaultCwdResponse,
+  DeleteSessionsResponse,
   HomeResponse,
   SessionsResponse,
   WorktreesResponse,
 } from "@/lib/api-types";
 import { buildSessionTree, type SessionListTreeNode } from "@/lib/session-list-tree";
-import { DirectoryPicker } from "./DirectoryPicker";
+import { pickNativeDirectory } from "@/lib/native-directory-picker";
 import {
   FileExplorer,
   type FileExplorerHandle,
@@ -26,6 +27,8 @@ import {
   WorktreeSwitcher,
   type WorktreeState,
 } from "./session-sidebar/WorktreeSwitcher";
+import { DeleteSessionDialog } from "./session-sidebar/DeleteSessionDialog";
+import { ProjectRow } from "./session-sidebar/ProjectRow";
 import { useWorkspaceStore } from "@/lib/workspace-store";
 import { useI18n } from "@/hooks/useI18n";
 import { formatRelativeTime as formatLocaleRelativeTime } from "@/lib/i18n/format";
@@ -38,7 +41,8 @@ interface Props {
   skipInitialProjectSelection?: boolean;
   onInitialRestoreDone?: () => void;
   refreshKey?: number;
-  onSessionDeleted?: (sessionId: string) => void;
+  onSessionDeleted?: (sessionId: string, deletedIds?: string[]) => void;
+  onProjectDeleted?: (projectRoot: string, deletedIds: string[]) => void;
   onOpenFile?: (
     filePath: string,
     fileName: string,
@@ -186,7 +190,7 @@ function PiWebTitle() {
   );
 }
 
-export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, onOpenFile, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions }: Props) {
+export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, onProjectDeleted, onOpenFile, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions }: Props) {
   const { t } = useI18n();
   const selectedSessionId = useWorkspaceStore((state) => state.selectedSession?.id ?? null);
   const selectedCwd = useWorkspaceStore((state) => state.activeCwd);
@@ -197,7 +201,6 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
   const [homeDir, setHomeDir] = useState<string>("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [projectFilter, setProjectFilter] = useState("");
-  const [customPathOpen, setCustomPathOpen] = useState(false);
   const [customPathError, setCustomPathError] = useState<string | null>(null);
   const [customPathValidating, setCustomPathValidating] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -213,6 +216,9 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(() => loadUnreadSessionIds());
   const previousRunningSessionIdsRef = useRef<Set<string>>(new Set());
+  // Latest known session ids, mirrored into a ref so the running-sessions
+  // effect can detect unknown ids without depending on allSessions.
+  const allSessionIdsRef = useRef<Set<string>>(new Set());
   // Once the SSE stream has delivered a frame it is the source of truth for
   // running state; late /api/sessions responses must not overwrite it.
   const sseAuthoritativeRef = useRef(false);
@@ -232,6 +238,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
       }
       // Drop unread markers for sessions that no longer exist (e.g. deleted).
       const existingIds = new Set(data.sessions.map((s) => s.id));
+      allSessionIdsRef.current = existingIds;
       setUnreadSessionIds((prev) => {
         if (prev.size === 0) return prev;
         const next = new Set([...prev].filter((id) => existingIds.has(id)));
@@ -297,7 +304,11 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
         return next;
       });
     }
-    if (completedInBackground.length > 0) {
+    // A running id we have never seen is a session created elsewhere (another
+    // client, or a brand-new session whose refresh raced this event) — reload
+    // so its row appears without waiting for the run to finish.
+    const unknownRunning = newlyRunning.filter((id) => !allSessionIdsRef.current.has(id));
+    if (completedInBackground.length > 0 || unknownRunning.length > 0) {
       loadSessions(false);
     }
 
@@ -411,7 +422,6 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
         json: { cwd: path },
       });
       selectCwd(data.cwd ?? path);
-      setCustomPathOpen(false);
       setDropdownOpen(false);
     } catch (e) {
       setCustomPathError(e instanceof Error ? e.message : String(e));
@@ -420,25 +430,43 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
     }
   }, [customPathValidating, selectCwd]);
 
-  const handleCustomPathClick = useCallback(() => {
-    setCustomPathOpen(true);
+  const handleCustomPathClick = useCallback(async () => {
     setCustomPathError(null);
     setDropdownOpen(false);
+
+    const result = await pickNativeDirectory();
+    if (result.status === "cancelled") return;
+    if (result.status === "unavailable") {
+      setCustomPathError(t("directoryPicker.nativeUnavailable"));
+      return;
+    }
+    if (result.status === "error") {
+      setCustomPathError(t("directoryPicker.nativeFailed"));
+      return;
+    }
+
+    await commitCustomPath(result.path);
+  }, [commitCustomPath, t]);
+
+  const requestDefaultCwd = useCallback(async (): Promise<string | null> => {
+    try {
+      const data = await requestJson<DefaultCwdResponse>("/api/default-cwd", { method: "POST" });
+      return data.cwd ?? null;
+    } catch {
+      return null;
+    }
   }, []);
 
   const handleDefaultCwd = useCallback(async () => {
-    try {
-      const data = await requestJson<DefaultCwdResponse>("/api/default-cwd", { method: "POST" });
-      if (data.cwd) {
-        selectCwd(data.cwd);
-        setCustomPathOpen(false);
-        setCustomPathError(null);
-        setDropdownOpen(false);
-      }
-    } catch {
-      // ignore
+    const cwd = await requestDefaultCwd();
+    if (cwd) {
+      selectCwd(cwd);
+      setCustomPathError(null);
+      setDropdownOpen(false);
+      return;
     }
-  }, [selectCwd]);
+    setCustomPathError(t("sidebar.defaultDirectoryFailed"));
+  }, [requestDefaultCwd, selectCwd, t]);
 
   const handleWorktreeCreated = useCallback((path: string, branch: string) => {
     setWorktreeState((current) => current ? {
@@ -528,22 +556,76 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
         }
       : null);
 
+  // Total fork-descendant count per session, computed from the unfiltered
+  // list so project filtering never hides branches from the delete dialog.
+  const descendantCountById = useMemo(() => {
+    const childrenByParent = new Map<string, string[]>();
+    for (const session of allSessions) {
+      if (!session.parentSessionId) continue;
+      const siblings = childrenByParent.get(session.parentSessionId) ?? [];
+      siblings.push(session.id);
+      childrenByParent.set(session.parentSessionId, siblings);
+    }
+    const counts = new Map<string, number>();
+    for (const session of allSessions) {
+      let count = 0;
+      const queue = [...(childrenByParent.get(session.id) ?? [])];
+      const seen = new Set(queue);
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        count += 1;
+        for (const childId of childrenByParent.get(current) ?? []) {
+          if (!seen.has(childId)) {
+            seen.add(childId);
+            queue.push(childId);
+          }
+        }
+      }
+      if (count > 0) counts.set(session.id, count);
+    }
+    return counts;
+  }, [allSessions]);
+
   // Build parent-child tree within the filtered set
   const sessionTree = buildSessionTree(filteredSessions);
 
+  // Session count per project, shown in the dropdown delete confirmation.
+  const sessionCountByProject = new Map<string, number>();
+  for (const session of allSessions) {
+    const key = session.projectRoot ?? session.cwd;
+    sessionCountByProject.set(key, (sessionCountByProject.get(key) ?? 0) + 1);
+  }
+
+  const handleDeleteProject = async (project: string) => {
+    const data = await requestJson<DeleteSessionsResponse>(
+      `/api/sessions?projectRoot=${encodeURIComponent(project)}`,
+      { method: "DELETE" },
+    );
+    // When the deleted project was the one on screen, leave it for good:
+    // jump into the default scratch directory so the header cannot keep
+    // showing a path that no longer has any sessions. The extra cwd checks
+    // cover worktree selections where the row key differs from selectedCwd.
+    const wasDisplayed = project === selectedProject
+      || project === selectedCwd
+      || (selectedCwd !== null && allSessions.some(
+        (s) => s.cwd === selectedCwd && data.deletedIds.includes(s.id)));
+    if (wasDisplayed) {
+      let target = await requestDefaultCwd();
+      // Deleting today's default directory itself: re-selecting it would just
+      // resurrect the same path, so fall back to the next remaining project.
+      if (!target || target === project) {
+        target = recentProjects.filter((entry) => entry !== project)[0] ?? null;
+      }
+      selectCwd(target);
+      setCustomPathError(null);
+      setDropdownOpen(false);
+    }
+    onProjectDeleted?.(project, data.deletedIds);
+    await loadSessions();
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      {customPathOpen && (
-        <DirectoryPicker
-          busy={customPathValidating}
-          error={customPathError}
-          onCancel={() => {
-            setCustomPathOpen(false);
-            setCustomPathError(null);
-          }}
-          onSelect={(selectedPath) => void commitCustomPath(selectedPath)}
-        />
-      )}
       {/* Header */}
       <div
         style={{
@@ -727,43 +809,20 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
               )}
               <div style={{ maxHeight: "min(50vh, 380px)", overflowY: "auto" }}>
                 {visibleProjects.map((project) => (
-                  <button
+                  <ProjectRow
                     key={project}
-                    onClick={() => {
+                    project={project}
+                    label={displayCwd(project, homeDir)}
+                    selected={project === selectedProject}
+                    sessionCount={sessionCountByProject.get(project) ?? 0}
+                    onSelect={() => {
                       setActiveWorkspace(project, project);
                       setProjectFilter("");
-                      setCustomPathOpen(false);
                       setCustomPathError(null);
                       setDropdownOpen(false);
                     }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 7,
-                      width: "100%",
-                      padding: "8px 10px",
-                      background: "var(--bg)",
-                      border: "none",
-                      borderBottom: "1px solid var(--border)",
-                      color: project === selectedProject ? "var(--text)" : "var(--text-muted)",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      fontSize: 11,
-                      fontFamily: "var(--font-mono)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                    title={project}
-                  >
-                    {project === selectedProject && (
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                        <polyline points="1.5 5 4 7.5 8.5 2.5" />
-                      </svg>
-                    )}
-                    {project !== selectedProject && <span style={{ width: 10, flexShrink: 0 }} />}
-                    <PathLabel text={displayCwd(project, homeDir)} style={{ flex: 1 }} />
-                  </button>
+                    onDelete={() => handleDeleteProject(project)}
+                  />
                 ))}
                 {visibleProjects.length === 0 && projectFilter.trim() && (
                   <div style={{ padding: "8px 10px", fontSize: 11, color: "var(--text-dim)" }}>{t("sidebar.noMatchingProjects")}</div>
@@ -771,36 +830,34 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
               </div>
 
               {/* Default cwd shortcut */}
-              {!customPathOpen && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDefaultCwd(); }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 7,
-                    width: "100%",
-                    padding: "8px 10px",
-                    background: "none",
-                    border: "none",
-                    borderTop: visibleProjects.length > 0 ? "1px solid var(--border)" : "none",
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: 11,
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                    <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
-                  </svg>
-                  <span>{t("sidebar.useDefaultDirectory")}</span>
-                </button>
-              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); void handleDefaultCwd(); }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 7,
+                  width: "100%",
+                  padding: "8px 10px",
+                  background: "none",
+                  border: "none",
+                  borderTop: visibleProjects.length > 0 ? "1px solid var(--border)" : "none",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontSize: 11,
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
+                </svg>
+                <span>{t("sidebar.useDefaultDirectory")}</span>
+              </button>
 
               {/* Custom path directory picker */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleCustomPathClick();
+                  void handleCustomPathClick();
                 }}
                 style={{
                   display: "flex",
@@ -824,6 +881,11 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
               </button>
           </AnimatedDropdown>
         </div>
+        {customPathError && (
+          <div style={{ marginTop: 6, fontSize: 11, color: "#ef4444", lineHeight: 1.5 }}>
+            {customPathError}
+          </div>
+        )}
 
         <WorktreeSwitcher
           state={worktreeState}
@@ -861,10 +923,11 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
             selectedSessionId={selectedSessionId}
             runningSessionIds={runningSessionIds}
             unreadSessionIds={unreadSessionIds}
+            descendantCountById={descendantCountById}
             onSelectSession={handleSelectSessionFromList}
             onRenamed={loadSessions}
-            onSessionDeleted={(id) => {
-              onSessionDeleted?.(id);
+            onSessionDeleted={(id, deletedIds) => {
+              onSessionDeleted?.(id, deletedIds);
               loadSessions();
             }}
             depth={0}
@@ -1063,6 +1126,7 @@ function SessionTreeItem({
   selectedSessionId,
   runningSessionIds,
   unreadSessionIds,
+  descendantCountById,
   onSelectSession,
   onRenamed,
   onSessionDeleted,
@@ -1072,9 +1136,10 @@ function SessionTreeItem({
   selectedSessionId: string | null;
   runningSessionIds: Set<string>;
   unreadSessionIds: Set<string>;
+  descendantCountById: Map<string, number>;
   onSelectSession: (s: SessionInfo) => void;
   onRenamed?: () => void;
-  onSessionDeleted?: (id: string) => void;
+  onSessionDeleted?: (id: string, deletedIds?: string[]) => void;
   depth: number;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -1101,11 +1166,12 @@ function SessionTreeItem({
           isUnread={unreadSessionIds.has(node.session.id)}
           onClick={() => onSelectSession(node.session)}
           onRenamed={onRenamed}
-          onDeleted={(id) => onSessionDeleted?.(id)}
+          onDeleted={(id, deletedIds) => onSessionDeleted?.(id, deletedIds)}
           depth={depth}
           hasChildren={hasChildren}
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((v) => !v)}
+          descendantCount={descendantCountById.get(node.session.id) ?? 0}
         />
       </div>
       {hasChildren && !collapsed && (
@@ -1117,6 +1183,7 @@ function SessionTreeItem({
               selectedSessionId={selectedSessionId}
               runningSessionIds={runningSessionIds}
               unreadSessionIds={unreadSessionIds}
+              descendantCountById={descendantCountById}
               onSelectSession={onSelectSession}
               onRenamed={onRenamed}
               onSessionDeleted={onSessionDeleted}
@@ -1206,6 +1273,7 @@ function SessionItem({
   hasChildren = false,
   collapsed = false,
   onToggleCollapse,
+  descendantCount = 0,
 }: {
   session: SessionInfo;
   isSelected: boolean;
@@ -1213,17 +1281,19 @@ function SessionItem({
   isUnread?: boolean;
   onClick: () => void;
   onRenamed?: () => void;
-  onDeleted?: (id: string) => void;
+  onDeleted?: (id: string, deletedIds?: string[]) => void;
   depth?: number;
   hasChildren?: boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  descendantCount?: number;
 }) {
   const { locale, t } = useI18n();
   const [hovered, setHovered] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [branchDialogOpen, setBranchDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -1251,15 +1321,16 @@ function SessionItem({
     }
   }, [renameValue, session.id, session.name, onRenamed]);
 
-  const performDelete = useCallback(async () => {
+  const performDelete = useCallback(async (recursive = false) => {
     setConfirmDelete(false);
+    setBranchDialogOpen(false);
     setDeleting(true);
     try {
-      await requestJson<unknown>(
-        `/api/sessions/${encodeURIComponent(session.id)}`,
+      const data = await requestJson<{ deletedIds?: string[] }>(
+        `/api/sessions/${encodeURIComponent(session.id)}${recursive ? "?recursive=true" : ""}`,
         { method: "DELETE" },
       );
-      onDeleted?.(session.id);
+      onDeleted?.(session.id, data.deletedIds ?? [session.id]);
     } catch {
       setDeleting(false);
     }
@@ -1268,15 +1339,19 @@ function SessionItem({
   const handleDeleteClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (e.shiftKey) {
-      void performDelete();
+      void performDelete(false);
+    } else if (descendantCount > 0) {
+      // Sessions with forked branches get a dialog choosing between deleting
+      // only this session or the whole branch subtree.
+      setBranchDialogOpen(true);
     } else {
       setConfirmDelete(true);
     }
-  }, [performDelete]);
+  }, [performDelete, descendantCount]);
 
   const handleDeleteConfirm = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    void performDelete();
+    void performDelete(false);
   }, [performDelete]);
 
   const handleDeleteCancel = useCallback((e: React.MouseEvent) => {
@@ -1288,7 +1363,18 @@ function SessionItem({
   const ITEM_HEIGHT = 54;
 
   return (
-    <div
+    <>
+      {branchDialogOpen && (
+        <DeleteSessionDialog
+          title={title}
+          branchCount={descendantCount}
+          busy={deleting}
+          onDeleteOnly={() => void performDelete(false)}
+          onDeleteAll={() => void performDelete(true)}
+          onCancel={() => setBranchDialogOpen(false)}
+        />
+      )}
+      <div
       onClick={confirmDelete || renaming ? undefined : onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); }}
@@ -1517,5 +1603,6 @@ function SessionItem({
         </>
       )}
     </div>
+    </>
   );
 }

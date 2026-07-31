@@ -1,0 +1,2593 @@
+diff --git a/node_modules/pi-mcp-adapter/commands.ts b/node_modules/pi-mcp-adapter/commands.ts
+index 6283e9a..1248ce1 100644
+--- a/node_modules/pi-mcp-adapter/commands.ts
++++ b/node_modules/pi-mcp-adapter/commands.ts
+@@ -1,132 +1,18 @@
+-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
++import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+ import type { McpExtensionState } from "./state.ts";
+-import { isServerDisabled, type McpAuthResult, type McpConfig, type McpPanelCallbacks, type McpPanelResult, type ImportKind } from "./types.ts";
+-import {
+-  ensureCompatibilityImports,
+-  getMcpDiscoverySummary,
+-  getServerProvenance,
+-  previewCompatibilityImports,
+-  previewSharedServerEntry,
+-  previewStarterProjectConfig,
+-  writeDirectToolsConfig,
+-  writeProjectServerDisabledOverride,
+-  writeSharedServerEntry,
+-  writeStarterProjectConfig,
+-} from "./config.ts";
+-import { markKeepAliveAfterConnect, notifyToolMetadataUpdated, updateMetadataCache, updateStatusBar, getFailureAgeSeconds, getFailureMessage, clearFailure, recordFailure } from "./init.ts";
+-import { loadMetadataCache, reconstructPromptMetadata } from "./metadata-cache.ts";
++import { isServerDisabled, type McpAuthResult, type McpConfig } from "./types.ts";
++import { markKeepAliveAfterConnect, notifyToolMetadataUpdated, updateMetadataCache, updateStatusBar, clearFailure, recordFailure } from "./init.ts";
++import { reconstructPromptMetadata } from "./metadata-cache.ts";
+ import { buildToolMetadata } from "./tool-metadata.ts";
+ import { supportsOAuth, authenticate, removeAuth, type McpOAuthRuntime } from "./mcp-auth-flow.ts";
+-import { getAuthForUrl, getAuthStorageOptions } from "./mcp-auth.ts";
+-import { loadOnboardingState, markSetupCompleted as persistSetupCompleted, markSharedConfigHintShown } from "./onboarding-state.ts";
+-import { openPath, resolveServerUrl, sanitizeTerminalText } from "./utils.ts";
++import { getAuthStorageOptions } from "./mcp-auth.ts";
++import { resolveServerUrl, sanitizeTerminalText } from "./utils.ts";
+ import { isAbortError } from "./runtime-owner.ts";
+ 
+-export async function showStatus(state: McpExtensionState, ctx: ExtensionContext): Promise<void> {
+-  if (!ctx.hasUI) return;
+-
+-  const lines: string[] = ["MCP Server Status:", ""];
+-
+-  for (const name of Object.keys(state.config.mcpServers)) {
+-    const definition = state.config.mcpServers[name];
+-    if (isServerDisabled(definition)) {
+-      lines.push(`⊘ ${name}: disabled (run /mcp enable ${name}, then /reload)`);
+-      continue;
+-    }
+-    const connection = state.manager.getConnection(name);
+-    const metadata = state.toolMetadata.get(name);
+-    const toolCount = metadata?.length ?? 0;
+-    const failedAgo = getFailureAgeSeconds(state, name);
+-    let status = "not connected";
+-    let statusIcon = "○";
+-    let failed = false;
+-
+-    if (connection?.status === "connected") {
+-      status = "connected";
+-      statusIcon = "✓";
+-    } else if (connection?.status === "needs-auth") {
+-      status = "needs auth";
+-      statusIcon = "⚠";
+-    } else if (failedAgo !== null) {
+-      const reason = sanitizeTerminalText(getFailureMessage(state, name) ?? "");
+-      status = reason ? `failed ${failedAgo}s ago — ${reason}` : `failed ${failedAgo}s ago`;
+-      statusIcon = "✗";
+-      failed = true;
+-    } else if (metadata !== undefined) {
+-      status = "cached";
+-    }
+-
+-    const toolSuffix = failed ? "" : ` (${toolCount} tools${status === "cached" ? ", cached" : ""})`;
+-    lines.push(`${statusIcon} ${name}: ${status}${toolSuffix}`);
+-  }
+-
+-  if (Object.keys(state.config.mcpServers).length === 0) {
+-    lines.push("No MCP servers configured");
+-    lines.push("Run /mcp setup to adopt imports or scaffold a starter .mcp.json");
+-  }
+-
+-  ctx.ui.notify(lines.join("\n"), "info");
+-}
+-
+-export async function showPrompts(state: McpExtensionState, ctx: ExtensionContext): Promise<void> {
+-  if (!ctx.hasUI) return;
+-  const allPrompts = [...(state.promptMetadata?.values() ?? [])].flat();
+-  const failedPromptServers = [...(state.manager.getAllConnections?.() ?? [])]
+-    .filter(([, connection]) => connection.status === "connected" && connection.promptDiscoveryFailed)
+-    .map(([serverName]) => serverName)
+-    .sort();
+-  if (allPrompts.length === 0) {
+-    const failureNote = failedPromptServers.length > 0
+-      ? ` Prompt discovery failed for: ${failedPromptServers.join(", ")}.`
+-      : "";
+-    ctx.ui.notify(`No MCP prompts available. Prompts are discovered when servers with the \`prompts\` capability connect.${failureNote}`, "info");
+-    return;
+-  }
+-  const lines = ["MCP Prompts:", ""];
+-  const grouped = new Map<string, typeof allPrompts>();
+-  for (const prompt of allPrompts) {
+-    const list = grouped.get(prompt.serverName) ?? [];
+-    list.push(prompt);
+-    grouped.set(prompt.serverName, list);
+-  }
+-  for (const [serverName, prompts] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+-    lines.push(`${serverName}:`);
+-    for (const prompt of prompts.sort((a, b) => a.commandName.localeCompare(b.commandName))) {
+-      const args = prompt.arguments.map(argument => argument.required ? `<${argument.name}>` : `[${argument.name}]`).join(" ");
+-      lines.push(`  /${prompt.commandName}${args ? ` ${args}` : ""}`);
+-      if (prompt.description) lines.push(`      ${prompt.description}`);
+-    }
+-    lines.push("");
+-  }
+-  lines.push(`Total: ${allPrompts.length} prompt${allPrompts.length === 1 ? "" : "s"}`);
+-  if (failedPromptServers.length > 0) {
+-    lines.push(`Prompt discovery failed for: ${failedPromptServers.join(", ")}. Cached prompt metadata may be stale.`);
+-  }
+-  ctx.ui.notify(lines.join("\n"), "info");
+-}
+-
+-export async function showTools(state: McpExtensionState, ctx: ExtensionContext): Promise<void> {
+-  if (!ctx.hasUI) return;
+-
+-  const allTools = [...state.toolMetadata.entries()]
+-    .filter(([serverName]) => !isServerDisabled(state.config.mcpServers[serverName]))
+-    .flatMap(([, metadata]) => metadata.map(m => m.name));
+-
+-  if (allTools.length === 0) {
+-    ctx.ui.notify("No MCP tools available", "info");
+-    return;
+-  }
+-
+-  const lines = [
+-    "MCP Tools:",
+-    "",
+-    ...allTools.map(t => `  ${t}`),
+-    "",
+-    `Total: ${allTools.length} tools`,
+-  ];
+-
+-  ctx.ui.notify(lines.join("\n"), "info");
+-}
++// NOTE (pi-web build): the /mcp and /mcp-auth slash commands and their TUI
++// panels are removed in this build. Only the operational helpers below remain;
++// pi-web invokes them through the event-bus control channel registered in
++// index.ts. Status/tools/prompts inspection lives in the pi-web MCP settings UI.
+ 
+ export async function reconnectServer(
+   state: McpExtensionState,
+@@ -143,7 +29,7 @@ export async function reconnectServer(
+     return false;
+   }
+   if (isServerDisabled(definition)) {
+-    if (ui) ui.notify(`MCP: ${name} is disabled. Run /mcp enable ${name}, then /reload.`, "warning");
++    if (ui) ui.notify(`MCP: ${name} is disabled.`, "warning");
+     return false;
+   }
+ 
+@@ -156,7 +42,7 @@ export async function reconnectServer(
+     state.owner?.throwIfInactive();
+     if (connection.status === "needs-auth") {
+       if (ui) {
+-        ui.notify(`MCP: ${name} requires OAuth. Run /mcp-auth ${name} first.`, "warning");
++        ui.notify(`MCP: ${name} requires OAuth authentication.`, "warning");
+       }
+       updateStatusBar(state);
+       return false;
+@@ -241,7 +127,7 @@ export async function authenticateServer(
+     return { ok: false, message };
+   }
+   if (isServerDisabled(definition)) {
+-    const message = `Server "${serverName}" is disabled. Run /mcp enable ${serverName}, then /reload.`;
++    const message = `Server "${serverName}" is disabled.`;
+     ui.notify(message, "warning");
+     return { ok: false, message };
+   }
+@@ -318,248 +204,7 @@ export async function logoutServer(
+   state.owner?.throwIfInactive();
+   updateStatusBar(state);
+ 
+-  const message = `OAuth credentials cleared for "${serverName}". Run /mcp-auth ${serverName} to authenticate again.`;
++  const message = `OAuth credentials cleared for "${serverName}".`;
+   if (ui) ui.notify(message, "info");
+   return { ok: true, message };
+ }
+-
+-export interface PanelFlowResult {
+-  configChanged: boolean;
+-}
+-
+-function buildSharedConfigNoticeLines(configOverridePath: string | undefined, cwd: string): { lines: string[]; fingerprint: string | null } {
+-  const discovery = getMcpDiscoverySummary(configOverridePath, cwd);
+-  const onboardingState = loadOnboardingState();
+-  if (!discovery.hasSharedServers || onboardingState.sharedConfigHintShown) {
+-    return { lines: [], fingerprint: null };
+-  }
+-
+-  const sharedSources = discovery.sources.filter((source) => source.kind === "shared" && source.serverCount > 0);
+-  const sourceList = sharedSources.map((source) => source.path).join(", ");
+-  return {
+-    lines: [
+-      `Using standard MCP config from ${sourceList}.`,
+-      "Pi only writes compatibility imports and adapter-specific overrides into Pi-owned files when needed.",
+-    ],
+-    fingerprint: discovery.fingerprint,
+-  };
+-}
+-
+-export async function openMcpSetup(
+-  state: McpExtensionState,
+-  pi: ExtensionAPI,
+-  ctx: ExtensionContext,
+-  configOverridePath?: string,
+-  mode: "empty" | "setup" = "setup",
+-): Promise<PanelFlowResult> {
+-  if (!ctx.hasUI) return { configChanged: false };
+-  if (state.programmaticConfig) {
+-    ctx.ui.notify("MCP setup is unavailable when config is supplied by createMcpAdapter().", "info");
+-    return { configChanged: false };
+-  }
+-
+-  const discovery = getMcpDiscoverySummary(configOverridePath, ctx.cwd);
+-  const onboardingState = loadOnboardingState();
+-  const { createMcpSetupPanel } = await import("./mcp-setup-panel.ts");
+-  let configChanged = false;
+-
+-  const callbacks = {
+-    previewImports: (imports: ImportKind[]) => previewCompatibilityImports(imports, configOverridePath),
+-    previewStarterProject: () => previewStarterProjectConfig(ctx.cwd),
+-    previewRepoPrompt: () => {
+-      const repoPrompt = getMcpDiscoverySummary(configOverridePath, ctx.cwd).repoPrompt;
+-      if (!repoPrompt.entry || !repoPrompt.targetPath || !repoPrompt.serverName) return null;
+-      return previewSharedServerEntry(repoPrompt.targetPath, repoPrompt.serverName, repoPrompt.entry);
+-    },
+-    adoptImports: async (imports: ImportKind[]) => {
+-      const result = ensureCompatibilityImports(imports, configOverridePath);
+-      if (result.added.length > 0) configChanged = true;
+-      return result;
+-    },
+-    scaffoldProjectConfig: async () => {
+-      const path = writeStarterProjectConfig(ctx.cwd);
+-      configChanged = true;
+-      return { path };
+-    },
+-    addRepoPrompt: async () => {
+-      const repoPrompt = getMcpDiscoverySummary(configOverridePath, ctx.cwd).repoPrompt;
+-      if (!repoPrompt.entry || !repoPrompt.targetPath || !repoPrompt.serverName) {
+-        throw new Error("RepoPrompt is not available to add from this setup screen.");
+-      }
+-      const path = writeSharedServerEntry(repoPrompt.targetPath, repoPrompt.serverName, repoPrompt.entry);
+-      configChanged = true;
+-      return { path, serverName: repoPrompt.serverName };
+-    },
+-    openPath: async (targetPath: string) => {
+-      await openPath(pi, targetPath);
+-    },
+-    markSetupCompleted: () => {
+-      persistSetupCompleted(discovery.fingerprint);
+-    },
+-  };
+-
+-  return new Promise<PanelFlowResult>((resolve) => {
+-    ctx.ui.custom(
+-      (tui, _theme, keybindings, done) => {
+-        return createMcpSetupPanel(discovery, callbacks, { mode, onboardingState, keybindings }, tui, () => {
+-          done(undefined);
+-          resolve({ configChanged });
+-        });
+-      },
+-      { overlay: true, overlayOptions: { anchor: "center", width: 92 } },
+-    );
+-  });
+-}
+-
+-function buildMcpPanelCallbacks(
+-  state: McpExtensionState,
+-  config: McpConfig,
+-  ctx: ExtensionContext,
+-): McpPanelCallbacks {
+-  return {
+-    reconnect: (serverName: string) => reconnectServer(state, ctx, serverName),
+-    canAuthenticate: (serverName: string) => {
+-      const definition = config.mcpServers[serverName];
+-      return definition ? !isServerDisabled(definition) && supportsOAuth(definition) : false;
+-    },
+-    authenticate: (serverName: string) => authenticateServer(serverName, config, ctx, state.owner?.signal, state.oauthRuntime),
+-    getConnectionStatus: (serverName: string) => {
+-      const definition = config.mcpServers[serverName];
+-      if (isServerDisabled(definition)) return "disabled";
+-      const connection = state.manager.getConnection(serverName);
+-      if (connection?.status === "needs-auth") {
+-        return "needs-auth";
+-      }
+-      let serverUrl: string | undefined;
+-      try {
+-        serverUrl = definition ? resolveServerUrl(definition) : undefined;
+-      } catch {
+-        return "failed";
+-      }
+-      if (
+-        definition?.auth === "oauth"
+-        && serverUrl
+-        && definition.oauth !== false
+-        && definition.oauth?.grantType !== "client_credentials"
+-        && !getAuthForUrl(serverName, serverUrl, state.authStorageOptions)?.tokens
+-      ) {
+-        return "needs-auth";
+-      }
+-      if (connection?.status === "connected") return "connected";
+-      if (getFailureAgeSeconds(state, serverName) !== null) return "failed";
+-      return "idle";
+-    },
+-    getFailureMessage: (serverName: string) => getFailureMessage(state, serverName),
+-    refreshCacheAfterReconnect: (serverName: string) => {
+-      const freshCache = loadMetadataCache();
+-      return freshCache?.servers?.[serverName] ?? null;
+-    },
+-  };
+-}
+-
+-export async function openMcpPanel(
+-  state: McpExtensionState,
+-  pi: ExtensionAPI,
+-  ctx: ExtensionContext,
+-  configOverridePath?: string,
+-  onDirectToolsConfigChanged?: (changes: Map<string, true | string[] | false>) => void | Promise<void>,
+-): Promise<PanelFlowResult> {
+-  if (state.programmaticConfig) {
+-    if (ctx.hasUI) {
+-      ctx.ui.notify("MCP status is shown from the in-memory SDK config; configuration discovery is unavailable.", "info");
+-      await showStatus(state, ctx);
+-    }
+-    return { configChanged: false };
+-  }
+-  if (Object.keys(state.config.mcpServers).length === 0) {
+-    return openMcpSetup(state, pi, ctx, configOverridePath, "empty");
+-  }
+-
+-  const config = state.config;
+-  const cache = loadMetadataCache();
+-  const configPath = pi.getFlag("mcp-config") as string | undefined ?? configOverridePath;
+-  const provenanceMap = getServerProvenance(configPath, ctx.cwd);
+-  const { lines: noticeLines, fingerprint } = buildSharedConfigNoticeLines(configPath, ctx.cwd);
+-
+-  const callbacks = buildMcpPanelCallbacks(state, config, ctx);
+-
+-  const { createMcpPanel } = await import("./mcp-panel.ts");
+-  let configChanged = false;
+-
+-  await new Promise<void>((resolve) => {
+-    ctx.ui.custom(
+-      (tui, _theme, keybindings, done) => {
+-        return createMcpPanel(config, cache, provenanceMap, callbacks, tui, (result: McpPanelResult) => {
+-          void (async () => {
+-            if (!result.cancelled && result.changes.size > 0) {
+-              writeDirectToolsConfig(result.changes, provenanceMap, config);
+-              await onDirectToolsConfigChanged?.(result.changes);
+-              ctx.ui.notify("Direct tools updated for this session.", "info");
+-            }
+-            done(undefined);
+-            resolve();
+-          })().catch((error) => {
+-            const message = error instanceof Error ? error.message : String(error);
+-            ctx.ui.notify(`Direct tools updated, but live refresh failed: ${message}`, "error");
+-            configChanged = true;
+-            done(undefined);
+-            resolve();
+-          });
+-        }, { noticeLines, keybindings });
+-      },
+-      { overlay: true, overlayOptions: { anchor: "center", width: 82 } },
+-    );
+-  });
+-
+-  if (noticeLines.length > 0 && fingerprint) {
+-    markSharedConfigHintShown(fingerprint);
+-  }
+-
+-  return { configChanged };
+-}
+-
+-export async function openMcpAuthPanel(
+-  state: McpExtensionState,
+-  pi: ExtensionAPI,
+-  ctx: ExtensionContext,
+-  configOverridePath?: string,
+-): Promise<PanelFlowResult> {
+-  if (!ctx.hasUI) return { configChanged: false };
+-  if (state.programmaticConfig) {
+-    ctx.ui.notify("Use /mcp-auth <server> to authenticate a server from the in-memory SDK config.", "info");
+-    return { configChanged: false };
+-  }
+-
+-  const config = state.config;
+-  const oauthServers = Object.entries(config.mcpServers).filter(
+-    ([, definition]) => !isServerDisabled(definition) && supportsOAuth(definition),
+-  );
+-  if (oauthServers.length === 0) {
+-    ctx.ui.notify("No OAuth-capable MCP servers are configured.", "warning");
+-    return { configChanged: false };
+-  }
+-
+-  const cache = loadMetadataCache();
+-  const configPath = pi.getFlag("mcp-config") as string | undefined ?? configOverridePath;
+-  const provenanceMap = getServerProvenance(configPath, ctx.cwd);
+-  const callbacks = buildMcpPanelCallbacks(state, config, ctx);
+-  const { createMcpPanel } = await import("./mcp-panel.ts");
+-
+-  await new Promise<void>((resolve) => {
+-    ctx.ui.custom(
+-      (tui, _theme, keybindings, done) => {
+-        return createMcpPanel(config, cache, provenanceMap, callbacks, tui, () => {
+-          done(undefined);
+-          resolve();
+-        }, {
+-          authOnly: true,
+-          keybindings,
+-          noticeLines: ["Select an OAuth MCP server and press Enter or ctrl+a to authenticate."],
+-        });
+-      },
+-      { overlay: true, overlayOptions: { anchor: "center", width: 82 } },
+-    );
+-  });
+-
+-  return { configChanged: false };
+-}
+diff --git a/node_modules/pi-mcp-adapter/direct-tools.ts b/node_modules/pi-mcp-adapter/direct-tools.ts
+index 0c8f3bd..1535aca 100644
+--- a/node_modules/pi-mcp-adapter/direct-tools.ts
++++ b/node_modules/pi-mcp-adapter/direct-tools.ts
+@@ -29,7 +29,7 @@ type DirectAutoAuthResult =
+ function getDirectAuthRequiredMessage(
+   state: McpExtensionState,
+   serverName: string,
+-  defaultMessage = `MCP server "${serverName}" requires OAuth authentication. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL, or /mcp-auth ${serverName} in an interactive local session.`,
++  defaultMessage = `MCP server "${serverName}" requires OAuth authentication. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL.`,
+ ): string {
+   return formatAuthRequiredMessage(state.config, serverName, defaultMessage);
+ }
+@@ -39,7 +39,7 @@ function getDirectAuthFailedMessage(state: McpExtensionState, serverName: string
+   if (customGuidance) {
+     return `OAuth authentication failed for "${serverName}": ${message}. ${getDirectAuthRequiredMessage(state, serverName)}`;
+   }
+-  return `OAuth authentication failed for "${serverName}": ${message}. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL, or /mcp-auth ${serverName} in an interactive local session.`;
++  return `OAuth authentication failed for "${serverName}": ${message}. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL.`;
+ }
+ 
+ async function attemptDirectAutoAuth(
+@@ -74,7 +74,7 @@ async function attemptDirectAutoAuth(
+       message: getDirectAuthRequiredMessage(
+         state,
+         serverName,
+-        `MCP server "${serverName}" requires OAuth authentication. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL, or /mcp-auth ${serverName} in an interactive local session.`,
++        `MCP server "${serverName}" requires OAuth authentication. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL.`,
+       ),
+     };
+   }
+@@ -261,7 +261,7 @@ export function buildProxyDescription(
+     .filter(([, definition]) => isServerDisabled(definition))
+     .map(([serverName]) => serverName);
+   if (disabledServers.length > 0) {
+-    desc += `\nDisabled servers (enable with /mcp enable <server> and /reload): ${disabledServers.join(", ")}\n`;
++    desc += `\nDisabled servers (not available; can be enabled in MCP settings): ${disabledServers.join(", ")}\n`;
+   }
+ 
+   const instructionSummaries: string[] = [];
+@@ -330,7 +330,7 @@ export function createDirectToolExecutor(
+ 
+     const definition = state.config.mcpServers[spec.serverName];
+     if (isServerDisabled(definition)) {
+-      const message = `MCP server "${spec.serverName}" is disabled. Run /mcp enable ${spec.serverName} and /reload to enable it.`;
++      const message = `MCP server "${spec.serverName}" is disabled. It can be enabled in the MCP settings page.`;
+       return {
+         content: [{ type: "text" as const, text: message }],
+         details: { error: "server_disabled", server: spec.serverName, message },
+diff --git a/node_modules/pi-mcp-adapter/index.ts b/node_modules/pi-mcp-adapter/index.ts
+index 5a4a49b..c87794c 100644
+--- a/node_modules/pi-mcp-adapter/index.ts
++++ b/node_modules/pi-mcp-adapter/index.ts
+@@ -3,8 +3,8 @@ import type { McpExtensionState } from "./state.ts";
+ import type { DirectToolSpec, McpAdapterOptions, McpConfig, PromptMetadata } from "./types.ts";
+ import type { McpOAuthRuntime } from "./mcp-auth-flow.ts";
+ import { Type } from "typebox";
+-import { showStatus, showTools, showPrompts, reconnectServer, reconnectServers, authenticateServer, logoutServer, openMcpAuthPanel, openMcpPanel, openMcpSetup } from "./commands.ts";
+-import { cloneMcpConfig, loadMcpConfig, writeProjectServerDisabledOverride } from "./config.ts";
++import { reconnectServer, reconnectServers, authenticateServer, logoutServer } from "./commands.ts";
++import { cloneMcpConfig, loadMcpConfig } from "./config.ts";
+ import { buildProxyDescription, createDirectToolExecutor, getMissingConfiguredDirectToolServers, resolveDirectTools } from "./direct-tools.ts";
+ import { flushMetadataCache, initializeMcp, updateStatusBar } from "./init.ts";
+ import { loadMetadataCache, type MetadataCache } from "./metadata-cache.ts";
+@@ -15,7 +15,7 @@ import { formatTerminalError, getConfigPathFromArgv, normalizeDirectToolInputSch
+ import { createOAuthRuntime, shutdownOAuth } from "./mcp-auth-flow.ts";
+ import { createMcpDirectToolCallRenderer, renderMcpProxyToolCall, renderMcpToolResult } from "./tool-result-renderer.ts";
+ import { toolErrorOverride } from "./error-signal.ts";
+-import { createMcpRuntimeOwner, createOwnedUi, isAbortError, type McpRuntimeOwner } from "./runtime-owner.ts";
++import { createMcpRuntimeOwner, isAbortError, type McpRuntimeOwner } from "./runtime-owner.ts";
+ import { publishMcpStatusShutdown } from "./mcp-status.ts";
+ 
+ export type { McpAdapterOptions } from "./types.ts";
+@@ -53,6 +53,7 @@ function installMcpAdapter(pi: ExtensionAPI, options: McpAdapterOptions) {
+   let currentOwner: McpRuntimeOwner | null = null;
+   let currentOAuthRuntime: McpOAuthRuntime | null = null;
+   let lifecycleGeneration = 0;
++  let lastSessionCwd: string | undefined;
+ 
+   async function shutdownState(currentState: McpExtensionState | null, reason: string): Promise<void> {
+     if (!currentState) {
+@@ -205,15 +206,6 @@ function installMcpAdapter(pi: ExtensionAPI, options: McpAdapterOptions) {
+     return { specs, added, updated, deactivated };
+   }
+ 
+-  function applyDirectToolConfigChanges(changes: Map<string, true | string[] | false>): void {
+-    if (!state) return;
+-    for (const [serverName, value] of changes) {
+-      const definition = state.config.mcpServers[serverName];
+-      if (!definition) continue;
+-      state.config.mcpServers[serverName] = { ...definition, directTools: value };
+-    }
+-  }
+-
+   function syncToolSurface(ctx?: ExtensionContext): void {
+     const config = state?.config ?? earlyConfig;
+     const cache = loadMetadataCache();
+@@ -322,6 +314,7 @@ function installMcpAdapter(pi: ExtensionAPI, options: McpAdapterOptions) {
+ 
+   pi.on("session_start", async (_event, ctx) => {
+     const generation = ++lifecycleGeneration;
++    lastSessionCwd = ctx.cwd;
+     const previousState = state;
+     const previousOwner = currentOwner;
+     const previousOAuthRuntime = currentOAuthRuntime;
+@@ -377,204 +370,126 @@ function installMcpAdapter(pi: ExtensionAPI, options: McpAdapterOptions) {
+   // Re-flag returned MCP tool failures so pi registers them as errors (see toolErrorOverride).
+   pi.on("tool_result", (event) => toolErrorOverride(event.details));
+ 
+-  pi.registerCommand("mcp", {
+-    description: "Show MCP server status",
+-    getArgumentCompletions: (prefix: string) => {
+-      const normalized = prefix.trimStart();
+-      const argumentMatch = normalized.match(/^(\S+)\s+(.*)$/);
+-      if (!argumentMatch) {
+-        const subcommands = [
+-          { value: "reconnect", label: "reconnect — Reconnect servers" },
+-          { value: "tools", label: "tools — List all tools" },
+-          { value: "prompts", label: "prompts — List all MCP prompts" },
+-          { value: "setup", label: "setup — Configure MCP servers" },
+-          { value: "logout", label: "logout — Clear server credentials" },
+-          { value: "disable", label: "disable — Disable a server" },
+-          { value: "enable", label: "enable — Enable a server" },
+-          { value: "status", label: "status — Show server status" },
+-        ].filter(({ value }) => value.startsWith(normalized));
+-        return subcommands.length > 0 ? subcommands : null;
+-      }
++  // --------------------------------------------------------------------------
++  // pi-web control channel
++  //
++  // pi-web bundles this adapter and drives reconnect/OAuth from its MCP settings
++  // UI instead of slash commands (the /mcp and /mcp-auth registrations and their
++  // TUI panels are removed in this build). Requests arrive on the session event
++  // bus and are answered with a result correlated by requestId; progress and
++  // user-facing messages (including the OAuth authorization URL) are forwarded
++  // as notices on the same bus.
++  // --------------------------------------------------------------------------
++  const MCP_CONTROL_READY_EVENT = "pi-mcp-adapter/control-ready/v1";
++  const MCP_CONTROL_REQUEST_EVENT = "pi-mcp-adapter/control-request/v1";
++  const MCP_CONTROL_RESULT_EVENT = "pi-mcp-adapter/control-result/v1";
++  const MCP_CONTROL_NOTICE_EVENT = "pi-mcp-adapter/control-notice/v1";
++
++  // Extension reload re-runs this factory on the SAME event bus, so stale
++  // listeners from previous loads would otherwise also answer requests. Stamp
++  // an owner token onto the bus; only the latest install responds.
++  const MCP_CONTROL_OWNER_KEY = Symbol.for("pi-mcp-adapter/control-owner/v1");
++  const busWithOwner = pi.events as unknown as Record<symbol, unknown>;
++  const controlOwnerToken = {};
++  busWithOwner[MCP_CONTROL_OWNER_KEY] = controlOwnerToken;
++
++  pi.events.on(MCP_CONTROL_REQUEST_EVENT, async (data) => {
++    if (busWithOwner[MCP_CONTROL_OWNER_KEY] !== controlOwnerToken) return;
++    const request = (data ?? {}) as { requestId?: unknown; action?: unknown; server?: unknown };
++    const requestId = typeof request.requestId === "string" ? request.requestId : "";
++    const action = request.action;
++    const server = typeof request.server === "string" && request.server.trim().length > 0
++      ? request.server.trim()
++      : undefined;
++    const owner = currentOwner;
++    const ui = {
++      notify: (text: string, level?: "info" | "warning" | "error") => {
++        pi.events.emit(MCP_CONTROL_NOTICE_EVENT, { requestId, text, level: level ?? "info" });
++      },
++      setStatus: (_key: string, text?: string) => {
++        if (text) pi.events.emit(MCP_CONTROL_NOTICE_EVENT, { requestId, text, level: "info" });
++      },
++    };
++    const controlCtx = {
++      hasUI: true,
++      ui,
++      cwd: lastSessionCwd ?? process.cwd(),
++      mode: "rpc",
++      signal: owner?.signal,
++    } as unknown as ExtensionContext;
++    const respond = (result: Record<string, unknown>) => {
++      pi.events.emit(MCP_CONTROL_RESULT_EVENT, { requestId, ...result });
++    };
+ 
+-      const [, subcommand, argumentPrefix] = argumentMatch;
+-      if ((subcommand !== "reconnect" && subcommand !== "logout" && subcommand !== "disable" && subcommand !== "enable") || !state) return null;
+-
+-      const servers = Object.keys(state.config.mcpServers)
+-        .filter((serverName) => serverName.startsWith(argumentPrefix.trimStart()))
+-        .map((serverName) => ({ value: `${subcommand} ${serverName}`, label: serverName }));
+-      return servers.length > 0 ? servers : null;
+-    },
+-    handler: async (args, ctx) => {
+-      const commandOwner = currentOwner;
+-      const commandReload = typeof ctx.reload === "function" ? ctx.reload.bind(ctx) : async () => {};
+-      const commandHasUI = ctx.hasUI;
+-      const commandCtx = {
+-        hasUI: commandHasUI,
+-        ui: commandHasUI
+-          ? commandOwner ? createOwnedUi(ctx.ui, commandOwner) : ctx.ui
+-          : undefined,
+-        cwd: ctx.cwd,
+-        mode: ctx.mode,
+-        signal: commandOwner?.signal ?? ctx.signal,
+-      } as unknown as ExtensionContext;
++    try {
+       if (!state && initPromise) {
+         try {
+           const initialized = await initPromise;
+-          commandOwner?.throwIfInactive();
++          owner?.throwIfInactive();
+           state = initialized;
+         } catch (error) {
+-          const message = error instanceof Error ? error.message : String(error);
+-          if (commandCtx.hasUI) commandCtx.ui?.notify(`MCP initialization failed: ${message}`, "error");
++          respond({ ok: false, message: `MCP initialization failed: ${error instanceof Error ? error.message : String(error)}` });
+           return;
+         }
+       }
+-      if (!state) {
+-        if (commandCtx.hasUI) commandCtx.ui?.notify("MCP not initialized", "error");
++      const currentState = state;
++      if (!currentState) {
++        respond({ ok: false, message: "MCP not initialized" });
+         return;
+       }
+ 
+-      const parts = args?.trim()?.split(/\s+/) ?? [];
+-      const subcommand = parts[0] ?? "";
+-      const targetServer = parts[1];
+-      const rest = parts.slice(1).join(" ");
+-
+-      switch (subcommand) {
+-        case "reconnect":
+-          commandOwner?.throwIfInactive();
+-          await reconnectServers(state, commandCtx, targetServer);
+-          break;
+-        case "tools":
+-          await showTools(state, commandCtx);
+-          break;
+-        case "prompts":
+-          await showPrompts(state, commandCtx);
+-          break;
+-        case "setup": {
+-          commandOwner?.throwIfInactive();
+-          if (programmaticConfig) {
+-            commandCtx.ui?.notify("MCP setup is unavailable when config is supplied by createMcpAdapter().", "info");
+-            break;
+-          }
+-          const result = await openMcpSetup(state, pi, commandCtx, earlyConfigPath, "setup");
+-          if (result?.configChanged) {
+-            commandOwner?.throwIfInactive();
+-            await commandReload();
+-            return;
+-          }
+-          break;
+-        }
+-        case "logout": {
+-          const serverName = rest;
+-          if (!serverName) {
+-            if (commandCtx.hasUI) commandCtx.ui?.notify("Usage: /mcp logout <server>", "error");
+-            return;
+-          }
+-          commandOwner?.throwIfInactive();
+-          await logoutServer(serverName, state, commandCtx);
+-          break;
++      if (action === "reconnect") {
++        if (server && !currentState.config.mcpServers[server]) {
++          respond({ ok: false, message: `Server "${server}" not found in config` });
++          return;
+         }
+-        case "disable":
+-        case "enable": {
+-          const serverName = rest;
+-          if (programmaticConfig) {
+-            commandCtx.ui?.notify(`/mcp ${subcommand} is unavailable when config is supplied by createMcpAdapter().`, "info");
+-            break;
+-          }
+-          if (!serverName) {
+-            commandCtx.ui?.notify(`Usage: /mcp ${subcommand} <server>`, "error");
+-            break;
+-          }
+-          if (!state.config.mcpServers[serverName]) {
+-            commandCtx.ui?.notify(`Server "${serverName}" not found in effective config`, "error");
+-            break;
+-          }
+-          commandOwner?.throwIfInactive();
+-          const result = writeProjectServerDisabledOverride(earlyConfigPath, commandCtx.cwd, serverName, subcommand === "disable");
+-          if (result.changed) {
+-            commandCtx.ui?.notify(`${subcommand === "disable" ? "Disabled" : "Enabled"} server "${serverName}" in ${result.path} — run /reload to apply`, "info");
+-          } else {
+-            commandCtx.ui?.notify(`Server "${serverName}" is already ${subcommand === "disable" ? "disabled" : "enabled"}`, "info");
+-          }
+-          break;
++        owner?.throwIfInactive();
++        if (server) {
++          const ok = await reconnectServer(currentState, controlCtx, server);
++          respond({ ok, message: ok ? `Reconnected to ${server}` : `Failed to reconnect to ${server}` });
++        } else {
++          await reconnectServers(currentState, controlCtx);
++          respond({ ok: true, message: "Reconnect finished" });
+         }
+-        case "status":
+-        case "":
+-        default:
+-          if (commandCtx.hasUI) {
+-            commandOwner?.throwIfInactive();
+-            if (programmaticConfig) {
+-              commandCtx.ui?.notify("MCP status is shown from the in-memory SDK config; configuration discovery is unavailable.", "info");
+-              await showStatus(state, commandCtx);
+-              break;
+-            }
+-            const result = await openMcpPanel(state, pi, commandCtx, earlyConfigPath, (changes) => {
+-              applyDirectToolConfigChanges(changes);
+-              syncToolSurface(commandCtx);
+-            });
+-            if (result?.configChanged) {
+-              commandOwner?.throwIfInactive();
+-              await commandReload();
+-              return;
+-            }
+-          } else {
+-            await showStatus(state, commandCtx);
+-          }
+-          break;
+-      }
+-    },
+-  });
+-
+-  pi.registerCommand("mcp-auth", {
+-    description: "Authenticate with an MCP server (OAuth)",
+-    handler: async (args, ctx) => {
+-      const commandOwner = currentOwner;
+-      const commandHasUI = ctx.hasUI;
+-      const commandCtx = {
+-        hasUI: commandHasUI,
+-        ui: commandHasUI
+-          ? commandOwner ? createOwnedUi(ctx.ui, commandOwner) : ctx.ui
+-          : undefined,
+-        cwd: ctx.cwd,
+-        mode: ctx.mode,
+-        signal: commandOwner?.signal ?? ctx.signal,
+-      } as unknown as ExtensionContext;
+-      const serverName = args?.trim();
+-      if (!serverName && !commandCtx.hasUI) {
+         return;
+       }
+ 
+-      if (!state && initPromise) {
+-        try {
+-          const initialized = await initPromise;
+-          commandOwner?.throwIfInactive();
+-          state = initialized;
+-        } catch (error) {
+-          const message = error instanceof Error ? error.message : String(error);
+-          if (commandCtx.hasUI) commandCtx.ui?.notify(`MCP initialization failed: ${message}`, "error");
++      if (action === "logout") {
++        if (!server) {
++          respond({ ok: false, message: "server is required for logout" });
+           return;
+         }
+-      }
+-      if (!state) {
+-        if (commandCtx.hasUI) commandCtx.ui?.notify("MCP not initialized", "error");
++        owner?.throwIfInactive();
++        respond(await logoutServer(server, currentState, controlCtx));
+         return;
+       }
+ 
+-      if (!serverName) {
+-        if (programmaticConfig) {
+-          commandCtx.ui?.notify("Use /mcp-auth <server> to authenticate a server from the in-memory SDK config.", "info");
++      if (action === "auth") {
++        if (!server) {
++          respond({ ok: false, message: "server is required for auth" });
+           return;
+         }
+-        await openMcpAuthPanel(state, pi, commandCtx, earlyConfigPath);
++        // OAuth involves a browser round-trip; acknowledge immediately and
++        // report progress/completion through notices and status snapshots.
++        respond({ ok: true, started: true });
++        void (async () => {
++          const result = await authenticateServer(server, currentState.config, controlCtx, controlCtx.signal, currentState.oauthRuntime);
++          if (result.ok) {
++            owner?.throwIfInactive();
++            await reconnectServer(currentState, controlCtx, server);
++          }
++        })().catch((error) => {
++          ui.notify(`MCP: OAuth for "${server}" failed: ${error instanceof Error ? error.message : String(error)}`, "error");
++        });
+         return;
+       }
+ 
+-      const result = await authenticateServer(serverName, state.config, commandCtx, commandCtx.signal, state.oauthRuntime);
+-      if (result.ok) {
+-        commandOwner?.throwIfInactive();
+-        await reconnectServer(state, commandCtx, serverName);
+-      }
+-    },
++      respond({ ok: false, message: `Unknown MCP control action: ${String(action)}` });
++    } catch (error) {
++      respond({ ok: false, message: error instanceof Error ? error.message : String(error) });
++    }
+   });
++  pi.events.emit(MCP_CONTROL_READY_EVENT, {});
+ 
+   function registerProxyTool(description: string): void {
+     (pi.registerTool as (tool: unknown) => unknown)({
+diff --git a/node_modules/pi-mcp-adapter/init.ts b/node_modules/pi-mcp-adapter/init.ts
+index f6e6d93..2d769f5 100644
+--- a/node_modules/pi-mcp-adapter/init.ts
++++ b/node_modules/pi-mcp-adapter/init.ts
+@@ -268,7 +268,7 @@ export async function initializeMcp(
+     try {
+       const connection = await manager.connect(name, definition, runtimeSignal);
+       if (connection.status === "needs-auth") {
+-        return { name, definition, connection: null, error: `OAuth authentication required. Run /mcp-auth ${name}.` };
++        return { name, definition, connection: null, error: `OAuth authentication required. Authenticate via mcp({ action: "auth-start", server: "${name}" }) or the MCP settings page.` };
+       }
+       return { name, definition, connection, error: null };
+     } catch (error) {
+diff --git a/node_modules/pi-mcp-adapter/mcp-panel.ts b/node_modules/pi-mcp-adapter/mcp-panel.ts
+deleted file mode 100644
+index d221a96..0000000
+--- a/node_modules/pi-mcp-adapter/mcp-panel.ts
++++ /dev/null
+@@ -1,960 +0,0 @@
+-import { matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+-import { copyToClipboard } from "@earendil-works/pi-coding-agent";
+-import { createPanelKeys, type PanelKeybindings, type PanelKeys } from "./panel-keys.ts";
+-import { isServerDisabled, isToolAllowed } from "./types.ts";
+-import type { McpConfig, McpPanelCallbacks, McpPanelResult, ServerProvenance, ToolPrefix } from "./types.ts";
+-import { resourceNameToToolName } from "./resource-tools.ts";
+-import { sanitizeTerminalText, stripOscSequences } from "./utils.ts";
+-import type { MetadataCache, ServerCacheEntry, CachedTool } from "./metadata-cache.ts";
+-
+-interface PanelTheme {
+-  border: string;
+-  title: string;
+-  selected: string;
+-  direct: string;
+-  needsAuth: string;
+-  placeholder: string;
+-  description: string;
+-  hint: string;
+-  confirm: string;
+-  cancel: string;
+-}
+-
+-const DEFAULT_THEME: PanelTheme = {
+-  border: "2",
+-  title: "2",
+-  selected: "36",
+-  direct: "32",
+-  needsAuth: "33",
+-  placeholder: "2;3",
+-  description: "2",
+-  hint: "2",
+-  confirm: "32",
+-  cancel: "31",
+-};
+-
+-function fg(code: string, text: string): string {
+-  if (!code) return text;
+-  return `\x1b[${code}m${text}\x1b[0m`;
+-}
+-
+-const RAINBOW_COLORS = [
+-  "38;2;178;129;214",
+-  "38;2;215;135;175",
+-  "38;2;254;188;56",
+-  "38;2;228;192;15",
+-  "38;2;137;210;129",
+-  "38;2;0;175;175",
+-  "38;2;23;143;185",
+-];
+-
+-function rainbowProgress(filled: number, total: number): string {
+-  const dots: string[] = [];
+-  for (let i = 0; i < total; i++) {
+-    const color = RAINBOW_COLORS[i % RAINBOW_COLORS.length];
+-    dots.push(fg(color, i < filled ? "●" : "○"));
+-  }
+-  return dots.join(" ");
+-}
+-
+-function fuzzyScore(query: string, text: string): number {
+-  const lq = query.toLowerCase();
+-  const lt = text.toLowerCase();
+-  if (lt.includes(lq)) return 100 + (lq.length / lt.length) * 50;
+-  let score = 0;
+-  let qi = 0;
+-  let consecutive = 0;
+-  for (let i = 0; i < lt.length && qi < lq.length; i++) {
+-    if (lt[i] === lq[qi]) {
+-      score += 10 + consecutive;
+-      consecutive += 5;
+-      qi++;
+-    } else {
+-      consecutive = 0;
+-    }
+-  }
+-  return qi === lq.length ? score : 0;
+-}
+-
+-function sanitizeDisplayText(text: string | null | undefined): string {
+-  return sanitizeTerminalText(text ?? "");
+-}
+-
+-function sanitizeRowContent(content: string): string {
+-  const withoutOsc = stripOscSequences(content);
+-  let result = "";
+-  let pendingSpace = false;
+-  for (let i = 0; i < withoutOsc.length; i++) {
+-    const rest = withoutOsc.slice(i);
+-    const ansi = rest.match(/^(?:\x1b\[[0-?]*[ -/]*[@-~]|\x1b[@-Z\\-_])/);
+-    if (ansi) {
+-      result += ansi[0];
+-      i += ansi[0].length - 1;
+-      continue;
+-    }
+-
+-    const code = withoutOsc.charCodeAt(i);
+-    if (code <= 0x1f || code === 0x7f || (code >= 0x80 && code <= 0x9f)) {
+-      pendingSpace = true;
+-      continue;
+-    }
+-
+-    if (pendingSpace && result && !result.endsWith(" ")) {
+-      result += " ";
+-    }
+-    pendingSpace = false;
+-    result += withoutOsc[i];
+-  }
+-  return result;
+-}
+-
+-function estimateTokens(tool: CachedTool): number {
+-  const schemaLen = JSON.stringify(tool.inputSchema ?? {}).length;
+-  const descLen = tool.description?.length ?? 0;
+-  return Math.ceil((tool.name.length + descLen + schemaLen) / 4) + 10;
+-}
+-
+-type ConnectionStatus = "connected" | "idle" | "failed" | "needs-auth" | "connecting" | "disabled";
+-
+-interface ToolState {
+-  name: string;
+-  description: string;
+-  isDirect: boolean;
+-  wasDirect: boolean;
+-  estimatedTokens: number;
+-}
+-
+-interface ServerState {
+-  name: string;
+-  expanded: boolean;
+-  source: "user" | "project" | "import";
+-  importKind?: string;
+-  includeTools?: string[];
+-  excludeTools?: string[];
+-  exposeResources: boolean;
+-  connectionStatus: ConnectionStatus;
+-  failureMessage?: string | null;
+-  tools: ToolState[];
+-  hasCachedData: boolean;
+-}
+-
+-interface VisibleItem {
+-  type: "server" | "tool";
+-  serverIndex: number;
+-  toolIndex?: number;
+-}
+-
+-class McpPanel {
+-  private noticeLines: string[];
+-  private prefix: ToolPrefix;
+-  private servers: ServerState[] = [];
+-  private cursorIndex = 0;
+-  private nameQuery = "";
+-  private descSearchActive = false;
+-  private descQuery = "";
+-  private dirty = false;
+-  private confirmingDiscard = false;
+-  private discardSelected = 1;
+-  private importNotice: string | null = null;
+-  private authNotice: string | null = null;
+-  private authInFlight: string | null = null;
+-  private inactivityTimeout: ReturnType<typeof setTimeout> | null = null;
+-  private visibleItems: VisibleItem[] = [];
+-  private tui: { requestRender(): void };
+-  private t = DEFAULT_THEME;
+-  private authOnly: boolean;
+-  private keys: PanelKeys;
+-
+-  private static readonly MAX_VISIBLE = 12;
+-  private static readonly INACTIVITY_MS = 60_000;
+-
+-  constructor(
+-    config: McpConfig,
+-    cache: MetadataCache | null,
+-    provenance: Map<string, ServerProvenance>,
+-    private callbacks: McpPanelCallbacks,
+-    tui: { requestRender(): void },
+-    private done: (result: McpPanelResult) => void,
+-    options: { noticeLines?: string[]; authOnly?: boolean; keybindings?: PanelKeybindings } = {},
+-  ) {
+-    this.tui = tui;
+-    this.noticeLines = options.noticeLines ?? [];
+-    this.authOnly = options.authOnly === true;
+-    this.keys = createPanelKeys(options.keybindings);
+-    this.prefix = config.settings?.toolPrefix ?? "server";
+-
+-    for (const [serverName, definition] of Object.entries(config.mcpServers)) {
+-      if (this.authOnly && !callbacks.canAuthenticate(serverName)) continue;
+-      const prov = provenance.get(serverName);
+-      const serverCache = cache?.servers?.[serverName];
+-
+-      const globalDirect = config.settings?.directTools;
+-      let toolFilter: true | string[] | false = false;
+-      if (definition.directTools !== undefined) {
+-        toolFilter = definition.directTools;
+-      } else if (globalDirect) {
+-        toolFilter = globalDirect;
+-      }
+-
+-      const tools: ToolState[] = [];
+-      if (serverCache && !this.authOnly && !isServerDisabled(definition)) {
+-        for (const tool of serverCache.tools ?? []) {
+-          if (!isToolAllowed(tool.name, serverName, this.prefix, definition.includeTools, definition.excludeTools)) {
+-            continue;
+-          }
+-
+-          const isDirect = toolFilter === true || (Array.isArray(toolFilter) && toolFilter.includes(tool.name));
+-          tools.push({
+-            name: tool.name,
+-            description: tool.description ?? "",
+-            isDirect,
+-            wasDirect: isDirect,
+-            estimatedTokens: estimateTokens(tool),
+-          });
+-        }
+-        if (definition.exposeResources !== false) {
+-          for (const resource of serverCache.resources ?? []) {
+-            const baseName = `read_${resourceNameToToolName(resource.name)}`;
+-            if (!isToolAllowed(baseName, serverName, this.prefix, definition.includeTools, definition.excludeTools)) {
+-              continue;
+-            }
+-
+-            const isDirect = toolFilter === true || (Array.isArray(toolFilter) && toolFilter.includes(baseName));
+-            const ct: CachedTool = { name: baseName, description: resource.description };
+-            tools.push({
+-              name: baseName,
+-              description: resource.description ?? `Read resource: ${resource.uri}`,
+-              isDirect,
+-              wasDirect: isDirect,
+-              estimatedTokens: estimateTokens(ct),
+-            });
+-          }
+-        }
+-      }
+-
+-      const status = callbacks.getConnectionStatus(serverName);
+-      const failureMessage = callbacks.getFailureMessage?.(serverName) ?? null;
+-
+-      this.servers.push({
+-        name: serverName,
+-        expanded: false,
+-        source: prov?.kind ?? "user",
+-        importKind: prov?.importKind,
+-        includeTools: definition.includeTools,
+-        excludeTools: definition.excludeTools,
+-        exposeResources: definition.exposeResources !== false,
+-        connectionStatus: status,
+-        failureMessage,
+-        tools,
+-        hasCachedData: !!serverCache,
+-      });
+-    }
+-
+-    this.rebuildVisibleItems();
+-    this.resetInactivityTimeout();
+-  }
+-
+-  private resetInactivityTimeout(): void {
+-    if (this.inactivityTimeout) clearTimeout(this.inactivityTimeout);
+-    this.inactivityTimeout = setTimeout(() => {
+-      this.cleanup();
+-      this.done({ cancelled: true, changes: new Map() });
+-    }, McpPanel.INACTIVITY_MS);
+-  }
+-
+-  private cleanup(): void {
+-    if (this.inactivityTimeout) {
+-      clearTimeout(this.inactivityTimeout);
+-      this.inactivityTimeout = null;
+-    }
+-  }
+-
+-  private rebuildVisibleItems(): void {
+-    const query = this.descSearchActive ? this.descQuery : this.nameQuery;
+-    const mode = this.descSearchActive ? "desc" : "name";
+-
+-    this.visibleItems = [];
+-    for (let si = 0; si < this.servers.length; si++) {
+-      const server = this.servers[si];
+-      if (query && this.authOnly) {
+-        const score = mode === "name" ? fuzzyScore(query, server.name) : 0;
+-        if (score > 0) {
+-          this.visibleItems.push({ type: "server", serverIndex: si });
+-        }
+-        continue;
+-      }
+-
+-      this.visibleItems.push({ type: "server", serverIndex: si });
+-      if (server.expanded || query) {
+-        for (let ti = 0; ti < server.tools.length; ti++) {
+-          const tool = server.tools[ti];
+-          if (query) {
+-            const score = mode === "name"
+-              ? Math.max(
+-                  fuzzyScore(query, tool.name),
+-                  fuzzyScore(query, server.name) * 0.6,
+-                )
+-              : fuzzyScore(query, tool.description);
+-            if (score === 0) continue;
+-          }
+-          this.visibleItems.push({ type: "tool", serverIndex: si, toolIndex: ti });
+-        }
+-      }
+-    }
+-
+-    if (query && !this.authOnly) {
+-      this.visibleItems = this.visibleItems.filter((item) => {
+-        if (item.type === "server") {
+-          return this.visibleItems.some(
+-            (other) => other.type === "tool" && other.serverIndex === item.serverIndex,
+-          );
+-        }
+-        return true;
+-      });
+-    }
+-  }
+-
+-  private updateDirty(): void {
+-    this.dirty = this.servers.some((s) => s.tools.some((t) => t.isDirect !== t.wasDirect));
+-  }
+-
+-  private buildResult(): McpPanelResult {
+-    const changes = new Map<string, true | string[] | false>();
+-    for (const server of this.servers) {
+-      const changed = server.tools.some((t) => t.isDirect !== t.wasDirect);
+-      if (!changed) continue;
+-      const directTools = server.tools.filter((t) => t.isDirect);
+-      if (directTools.length === server.tools.length && server.tools.length > 0) {
+-        changes.set(server.name, true);
+-      } else if (directTools.length === 0) {
+-        changes.set(server.name, false);
+-      } else {
+-        changes.set(server.name, directTools.map((t) => t.name));
+-      }
+-    }
+-    return { changes, cancelled: false };
+-  }
+-
+-  handleInput(data: string): void {
+-    this.resetInactivityTimeout();
+-    this.importNotice = null;
+-    if (!this.authInFlight) this.authNotice = null;
+-
+-    if (this.confirmingDiscard) {
+-      this.handleDiscardInput(data);
+-      return;
+-    }
+-
+-    // Global shortcuts — always work, even during desc search
+-    if (matchesKey(data, "ctrl+c")) {
+-      this.cleanup();
+-      this.done({ cancelled: true, changes: new Map() });
+-      return;
+-    }
+-
+-    if (matchesKey(data, "ctrl+s")) {
+-      this.cleanup();
+-      this.done(this.buildResult());
+-      return;
+-    }
+-
+-    // Modal description search mode
+-    if (this.descSearchActive) {
+-      if (matchesKey(data, "escape") || this.keys.selectConfirm(data)) {
+-        this.descSearchActive = false;
+-        this.descQuery = "";
+-        this.rebuildVisibleItems();
+-        this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.visibleItems.length - 1));
+-        return;
+-      }
+-      if (matchesKey(data, "backspace")) {
+-        if (this.descQuery.length > 0) {
+-          this.descQuery = this.descQuery.slice(0, -1);
+-          this.rebuildVisibleItems();
+-          this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.visibleItems.length - 1));
+-        }
+-        return;
+-      }
+-      if (this.keys.selectUp(data)) { this.moveCursor(-1); return; }
+-      if (this.keys.selectDown(data)) { this.moveCursor(1); return; }
+-      if (matchesKey(data, "space")) {
+-        // Toggle even while in desc search
+-        const item = this.visibleItems[this.cursorIndex];
+-        if (item) this.toggleItem(item);
+-        return;
+-      }
+-      if (data.length === 1 && data.charCodeAt(0) >= 32) {
+-        this.descQuery += data;
+-        this.rebuildVisibleItems();
+-        this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.visibleItems.length - 1));
+-        return;
+-      }
+-      return;
+-    }
+-
+-    if (matchesKey(data, "escape")) {
+-      if (this.nameQuery) {
+-        this.nameQuery = "";
+-        this.rebuildVisibleItems();
+-        this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.visibleItems.length - 1));
+-        return;
+-      }
+-      if (this.dirty) {
+-        this.confirmingDiscard = true;
+-        this.discardSelected = 1;
+-        return;
+-      }
+-      this.cleanup();
+-      this.done({ cancelled: true, changes: new Map() });
+-      return;
+-    }
+-
+-    if (this.keys.selectUp(data)) { this.moveCursor(-1); return; }
+-    if (this.keys.selectDown(data)) { this.moveCursor(1); return; }
+-
+-    if (matchesKey(data, "space")) {
+-      const item = this.visibleItems[this.cursorIndex];
+-      if (item && !this.authOnly) this.toggleItem(item);
+-      return;
+-    }
+-
+-    if (this.keys.selectConfirm(data)) {
+-      const item = this.visibleItems[this.cursorIndex];
+-      if (!item) return;
+-      const server = this.servers[item.serverIndex];
+-      if (item.type === "server") {
+-        if (server.connectionStatus === "disabled") return;
+-        if (this.authOnly || server.connectionStatus === "needs-auth") {
+-          this.authenticateServer(server);
+-          return;
+-        }
+-        server.expanded = !server.expanded;
+-        this.rebuildVisibleItems();
+-        this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.visibleItems.length - 1));
+-      } else if (item.toolIndex !== undefined) {
+-        const tool = server.tools[item.toolIndex];
+-        tool.isDirect = !tool.isDirect;
+-        if (tool.isDirect && server.source === "import") {
+-          this.importNotice = `Imported from ${sanitizeDisplayText(server.importKind ?? "external")} — will copy to user config on save`;
+-        }
+-        this.updateDirty();
+-      }
+-      return;
+-    }
+-
+-    if (matchesKey(data, "ctrl+a")) {
+-      const item = this.visibleItems[this.cursorIndex];
+-      if (item) this.authenticateSelectedServer(item);
+-      return;
+-    }
+-
+-    if (matchesKey(data, "ctrl+r")) {
+-      const item = this.visibleItems[this.cursorIndex];
+-      if (!item) return;
+-      this.reconnectServer(this.servers[item.serverIndex]);
+-      return;
+-    }
+-
+-    if (matchesKey(data, "ctrl+y")) {
+-      const item = this.visibleItems[this.cursorIndex];
+-      if (!item) return;
+-      const server = this.servers[item.serverIndex];
+-      if (server.connectionStatus !== "failed" || !server.failureMessage) return;
+-      const serverName = sanitizeDisplayText(server.name);
+-      const failureMessage = sanitizeDisplayText(server.failureMessage);
+-      copyToClipboard(failureMessage).then(() => {
+-        this.authNotice = `Copied error for ${serverName} to clipboard`;
+-        this.tui.requestRender();
+-      }).catch((error) => {
+-        const message = sanitizeDisplayText(error instanceof Error ? error.message : String(error));
+-        this.authNotice = `Failed to copy error for ${serverName}: ${message}`;
+-        this.tui.requestRender();
+-      });
+-      return;
+-    }
+-
+-    if (data === "?") {
+-      if (this.authOnly) return;
+-      this.descSearchActive = true;
+-      this.descQuery = "";
+-      this.rebuildVisibleItems();
+-      this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.visibleItems.length - 1));
+-      return;
+-    }
+-
+-    // Backspace removes from name query
+-    if (matchesKey(data, "backspace")) {
+-      if (this.nameQuery.length > 0) {
+-        this.nameQuery = this.nameQuery.slice(0, -1);
+-        this.rebuildVisibleItems();
+-        this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.visibleItems.length - 1));
+-      }
+-      return;
+-    }
+-
+-    // All other printable chars → always-on name search
+-    if (data.length === 1 && data.charCodeAt(0) >= 32) {
+-      this.nameQuery += data;
+-      this.rebuildVisibleItems();
+-      this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.visibleItems.length - 1));
+-      return;
+-    }
+-  }
+-
+-  private authenticateSelectedServer(item: VisibleItem): void {
+-    this.authenticateServer(this.servers[item.serverIndex]);
+-  }
+-
+-  private authenticateServer(server: ServerState): void {
+-    if (this.authInFlight) return;
+-    if (server.connectionStatus === "connecting" || server.connectionStatus === "disabled") return;
+-    const serverName = sanitizeDisplayText(server.name);
+-    if (!this.callbacks.canAuthenticate(server.name)) {
+-      this.authNotice = `${serverName} does not use OAuth authentication.`;
+-      return;
+-    }
+-
+-    this.authInFlight = server.name;
+-    this.authNotice = `Authenticating ${serverName}...`;
+-    this.tui.requestRender();
+-
+-    this.callbacks.authenticate(server.name).then((result) => {
+-      server.connectionStatus = this.callbacks.getConnectionStatus(server.name);
+-      if (result.ok) {
+-        this.authNotice = `OAuth finished for ${serverName}. Reconnecting...`;
+-        this.authInFlight = null;
+-        this.tui.requestRender();
+-        this.reconnectServer(server, { afterAuth: true });
+-        return;
+-      }
+-
+-      const message = sanitizeDisplayText(result.message);
+-      this.authNotice = `OAuth failed for ${serverName}${message ? `: ${message}` : ". Check the notification for details."}`;
+-      this.authInFlight = null;
+-      this.tui.requestRender();
+-    }).catch((error) => {
+-      const message = sanitizeDisplayText(error instanceof Error ? error.message : String(error));
+-      server.connectionStatus = this.callbacks.getConnectionStatus(server.name);
+-      this.authNotice = `OAuth failed for ${serverName}: ${message}`;
+-      this.authInFlight = null;
+-      this.tui.requestRender();
+-    });
+-  }
+-
+-  private reconnectServer(server: ServerState, options: { afterAuth?: boolean } = {}): void {
+-    if (server.connectionStatus === "connecting" || server.connectionStatus === "disabled") return;
+-    const serverName = sanitizeDisplayText(server.name);
+-    server.connectionStatus = "connecting";
+-    this.tui.requestRender();
+-
+-    this.callbacks.reconnect(server.name).then((connected) => {
+-      server.connectionStatus = this.callbacks.getConnectionStatus(server.name);
+-      server.failureMessage = this.callbacks.getFailureMessage?.(server.name) ?? null;
+-      if (server.connectionStatus === "connected") {
+-        const entry = this.callbacks.refreshCacheAfterReconnect(server.name);
+-        if (entry) {
+-          this.rebuildServerTools(server, entry);
+-        }
+-        server.hasCachedData = true;
+-      }
+-      if (options.afterAuth) {
+-        this.authNotice = connected && server.connectionStatus === "connected"
+-          ? `OAuth finished for ${serverName}. Reconnected.`
+-          : `OAuth finished for ${serverName}, but reconnect did not complete. Press ctrl+r to retry.`;
+-      }
+-      this.tui.requestRender();
+-    }).catch((error) => {
+-      server.connectionStatus = "failed";
+-      const message = sanitizeDisplayText(error instanceof Error ? error.message : String(error));
+-      this.authNotice = `Reconnect failed for ${serverName}: ${message}`;
+-      this.tui.requestRender();
+-    });
+-  }
+-
+-  private toggleItem(item: VisibleItem): void {
+-    if (this.authOnly) return;
+-    const server = this.servers[item.serverIndex];
+-    if (item.type === "server") {
+-      const newState = !server.tools.every((t) => t.isDirect);
+-      if (server.source === "import" && newState) {
+-        this.importNotice = `Imported from ${sanitizeDisplayText(server.importKind ?? "external")} — will copy to user config on save`;
+-      }
+-      for (const t of server.tools) t.isDirect = newState;
+-    } else if (item.toolIndex !== undefined) {
+-      const tool = server.tools[item.toolIndex];
+-      tool.isDirect = !tool.isDirect;
+-      if (tool.isDirect && server.source === "import") {
+-        this.importNotice = `Imported from ${sanitizeDisplayText(server.importKind ?? "external")} — will copy to user config on save`;
+-      }
+-    }
+-    this.updateDirty();
+-  }
+-
+-  private handleDiscardInput(data: string): void {
+-    if (matchesKey(data, "ctrl+c")) {
+-      this.cleanup();
+-      this.done({ cancelled: true, changes: new Map() });
+-      return;
+-    }
+-    if (matchesKey(data, "escape") || data === "n" || data === "N") {
+-      this.confirmingDiscard = false;
+-      return;
+-    }
+-    if (this.keys.selectConfirm(data)) {
+-      this.cleanup();
+-      if (this.discardSelected === 0) {
+-        this.done({ cancelled: true, changes: new Map() });
+-      } else {
+-        this.done(this.buildResult());
+-      }
+-      return;
+-    }
+-    if (data === "y" || data === "Y") {
+-      this.cleanup();
+-      this.done({ cancelled: true, changes: new Map() });
+-      return;
+-    }
+-    if (matchesKey(data, "left") || matchesKey(data, "right") || matchesKey(data, "tab")) {
+-      this.discardSelected = this.discardSelected === 0 ? 1 : 0;
+-    }
+-  }
+-
+-  private moveCursor(delta: number): void {
+-    if (this.visibleItems.length === 0) return;
+-    this.cursorIndex = Math.max(0, Math.min(this.visibleItems.length - 1, this.cursorIndex + delta));
+-  }
+-
+-  private rebuildServerTools(server: ServerState, entry: ServerCacheEntry): void {
+-    const existingState = new Map<string, boolean>();
+-    for (const t of server.tools) existingState.set(t.name, t.isDirect);
+-
+-    const newTools: ToolState[] = [];
+-    for (const tool of entry.tools ?? []) {
+-      if (!isToolAllowed(tool.name, server.name, this.prefix, server.includeTools, server.excludeTools)) {
+-        continue;
+-      }
+-
+-      const prev = existingState.get(tool.name);
+-      const isDirect = prev !== undefined ? prev : false;
+-      newTools.push({
+-        name: tool.name,
+-        description: tool.description ?? "",
+-        isDirect,
+-        wasDirect: prev !== undefined ? server.tools.find((t) => t.name === tool.name)?.wasDirect ?? false : false,
+-        estimatedTokens: estimateTokens(tool),
+-      });
+-    }
+-
+-    if (server.exposeResources) {
+-      for (const resource of entry.resources ?? []) {
+-        const baseName = `read_${resourceNameToToolName(resource.name)}`;
+-        if (!isToolAllowed(baseName, server.name, this.prefix, server.includeTools, server.excludeTools)) {
+-          continue;
+-        }
+-
+-        const prev = existingState.get(baseName);
+-        const isDirect = prev !== undefined ? prev : false;
+-        const ct: CachedTool = { name: baseName, description: resource.description };
+-        newTools.push({
+-          name: baseName,
+-          description: resource.description ?? `Read resource: ${resource.uri}`,
+-          isDirect,
+-          wasDirect: prev !== undefined ? server.tools.find((t) => t.name === baseName)?.wasDirect ?? false : false,
+-          estimatedTokens: estimateTokens(ct),
+-        });
+-      }
+-    }
+-
+-    server.tools = newTools;
+-    this.rebuildVisibleItems();
+-    this.updateDirty();
+-  }
+-
+-  render(width: number): string[] {
+-    const innerW = width - 2;
+-    const lines: string[] = [];
+-    const t = this.t;
+-    const bold = (s: string) => `\x1b[1m${s}\x1b[22m`;
+-    const italic = (s: string) => `\x1b[3m${s}\x1b[23m`;
+-    const inverse = (s: string) => `\x1b[7m${s}\x1b[27m`;
+-
+-    const row = (content: string) =>
+-      fg(t.border, "│") + truncateToWidth(" " + sanitizeRowContent(content), innerW, "…", true) + fg(t.border, "│");
+-    const emptyRow = () => fg(t.border, "│") + " ".repeat(innerW) + fg(t.border, "│");
+-    const divider = () => fg(t.border, "├" + "─".repeat(innerW) + "┤");
+-
+-    const titleText = this.authOnly ? " MCP OAuth " : " MCP Servers ";
+-    const borderLen = innerW - visibleWidth(titleText);
+-    const leftB = Math.floor(borderLen / 2);
+-    const rightB = borderLen - leftB;
+-    lines.push(fg(t.border, "╭" + "─".repeat(leftB)) + fg(t.title, titleText) + fg(t.border, "─".repeat(rightB) + "╮"));
+-
+-    lines.push(emptyRow());
+-
+-    const cursor = fg(t.selected, "│");
+-    const searchIcon = fg(t.border, "◎");
+-    if (this.descSearchActive) {
+-      lines.push(row(`${searchIcon}  ${fg(t.needsAuth, "desc:")} ${this.descQuery}${cursor}`));
+-    } else if (this.nameQuery) {
+-      lines.push(row(`${searchIcon}  ${this.nameQuery}${cursor}`));
+-    } else {
+-      lines.push(row(`${searchIcon}  ${fg(t.placeholder, italic("search..."))}`));
+-    }
+-
+-    lines.push(emptyRow());
+-    if (this.noticeLines.length > 0) {
+-      for (const notice of this.noticeLines) {
+-        lines.push(row(fg(t.hint, italic(sanitizeDisplayText(notice)))));
+-      }
+-      lines.push(emptyRow());
+-    }
+-    lines.push(divider());
+-
+-    if (this.servers.length === 0) {
+-      lines.push(emptyRow());
+-      lines.push(row(fg(t.hint, italic(this.authOnly ? "No OAuth-capable MCP servers configured." : "No MCP servers configured."))));
+-      lines.push(emptyRow());
+-    } else {
+-      const maxVis = McpPanel.MAX_VISIBLE;
+-      const total = this.visibleItems.length;
+-      const startIdx = Math.max(0, Math.min(this.cursorIndex - Math.floor(maxVis / 2), total - maxVis));
+-      const endIdx = Math.min(startIdx + maxVis, total);
+-
+-      lines.push(emptyRow());
+-
+-      for (let i = startIdx; i < endIdx; i++) {
+-        const item = this.visibleItems[i];
+-        const isCursor = i === this.cursorIndex;
+-        const server = this.servers[item.serverIndex];
+-
+-        if (item.type === "server") {
+-          lines.push(row(this.renderServerRow(server, isCursor)));
+-          if (isCursor && server.connectionStatus === "failed" && server.failureMessage) {
+-            for (const line of this.wrapText(sanitizeDisplayText(server.failureMessage), innerW - 6)) {
+-              lines.push(row(`    ${fg(t.cancel, line)}`));
+-            }
+-          }
+-        } else if (item.toolIndex !== undefined) {
+-          lines.push(row(this.renderToolRow(server.tools[item.toolIndex], isCursor, innerW)));
+-        }
+-      }
+-
+-      lines.push(emptyRow());
+-
+-      if (total > maxVis) {
+-        const prog = Math.round(((this.cursorIndex + 1) / total) * 10);
+-        lines.push(row(`${rainbowProgress(prog, 10)}  ${fg(t.hint, `${this.cursorIndex + 1}/${total}`)}`));
+-        lines.push(emptyRow());
+-      }
+-
+-      if (this.importNotice) {
+-        lines.push(row(fg(t.needsAuth, italic(sanitizeDisplayText(this.importNotice)))));
+-        lines.push(emptyRow());
+-      }
+-      if (this.authNotice) {
+-        lines.push(row(fg(t.needsAuth, italic(sanitizeDisplayText(this.authNotice)))));
+-        lines.push(emptyRow());
+-      }
+-    }
+-
+-    lines.push(divider());
+-    lines.push(emptyRow());
+-
+-    if (this.confirmingDiscard) {
+-      const discardBtn = this.discardSelected === 0
+-        ? inverse(bold(fg(t.cancel, "  Discard  ")))
+-        : fg(t.hint, "  Discard  ");
+-      const keepBtn = this.discardSelected === 1
+-        ? inverse(bold(fg(t.confirm, "  Keep & Close  ")))
+-        : fg(t.hint, "  Keep & Close  ");
+-      lines.push(row(`Discard unsaved changes?  ${discardBtn}   ${keepBtn}`));
+-    } else {
+-      if (this.authOnly) {
+-        lines.push(row(fg(t.description, "select a server to authenticate")));
+-      } else {
+-        const directCount = this.servers.reduce((sum, s) => sum + s.tools.filter((t) => t.isDirect).length, 0);
+-        const totalTokens = this.servers.reduce(
+-          (sum, s) => sum + s.tools.filter((t) => t.isDirect).reduce((ts, t) => ts + t.estimatedTokens, 0),
+-          0,
+-        );
+-        const stats =
+-          directCount > 0 ? `${directCount} direct  ~${totalTokens.toLocaleString()} tokens` : "no direct tools";
+-        lines.push(row(fg(t.description, stats + (this.dirty ? fg(t.needsAuth, "  (unsaved)") : ""))));
+-      }
+-    }
+-
+-    lines.push(emptyRow());
+-    const hints = this.authOnly
+-      ? [
+-          italic("↑↓") + " navigate",
+-          italic("⏎") + " auth",
+-          italic("ctrl+a") + " auth",
+-          italic("esc") + " clear/close",
+-          italic("ctrl+c") + " quit",
+-        ]
+-      : [
+-          italic("↑↓") + " navigate",
+-          italic("space") + " toggle",
+-          italic("⏎") + " expand/auth",
+-          italic("ctrl+a") + " auth",
+-          italic("ctrl+r") + " reconnect",
+-          ...(this.selectedServerHasFailureMessage() ? [italic("ctrl+y") + " copy error"] : []),
+-          italic("?") + " desc search",
+-          italic("ctrl+s") + " save",
+-          italic("esc") + " clear/close",
+-          italic("ctrl+c") + " quit",
+-        ];
+-    const gap = "  ";
+-    const gapW = 2;
+-    const maxW = innerW - 2;
+-    let curLine = "";
+-    let curW = 0;
+-    for (const hint of hints) {
+-      const hw = visibleWidth(hint);
+-      const needed = curW === 0 ? hw : gapW + hw;
+-      if (curW > 0 && curW + needed > maxW) {
+-        lines.push(row(fg(t.hint, curLine)));
+-        curLine = hint;
+-        curW = hw;
+-      } else {
+-        curLine += (curW > 0 ? gap : "") + hint;
+-        curW += needed;
+-      }
+-    }
+-    if (curLine) lines.push(row(fg(t.hint, curLine)));
+-
+-    lines.push(fg(t.border, "╰" + "─".repeat(innerW) + "╯"));
+-
+-    return lines;
+-  }
+-
+-  private renderServerRow(server: ServerState, isCursor: boolean): string {
+-    const t = this.t;
+-    const bold = (s: string) => `\x1b[1m${s}\x1b[22m`;
+-
+-    const expandIcon = server.expanded ? "▾" : "▸";
+-    const prefix = isCursor ? fg(t.selected, expandIcon) : fg(t.border, server.expanded ? expandIcon : "·");
+-
+-    const serverName = sanitizeDisplayText(server.name);
+-    const importKind = sanitizeDisplayText(server.importKind ?? "import");
+-    const nameStr = isCursor ? bold(fg(t.selected, serverName)) : serverName;
+-    const importLabel = server.source === "import" ? fg(t.description, ` (${importKind})`) : "";
+-    const statusLabel = this.renderConnectionStatus(server);
+-
+-    if (!server.hasCachedData && !this.authOnly) {
+-      return `${prefix}   ${nameStr}${importLabel}  ${fg(t.description, "(not cached)")}${statusLabel}`;
+-    }
+-
+-    const directCount = server.tools.filter((t) => t.isDirect).length;
+-    const totalCount = server.tools.length;
+-    let toggleIcon = fg(t.description, "○");
+-    if (directCount === totalCount && totalCount > 0) {
+-      toggleIcon = fg(t.direct, "●");
+-    } else if (directCount > 0) {
+-      toggleIcon = fg(t.needsAuth, "◐");
+-    }
+-
+-    let toolInfo = "";
+-    if (totalCount > 0) {
+-      toolInfo = `${directCount}/${totalCount}`;
+-      if (directCount > 0) {
+-        const tokens = server.tools.filter((t) => t.isDirect).reduce((s, t) => s + t.estimatedTokens, 0);
+-        toolInfo += `  ~${tokens.toLocaleString()}`;
+-      }
+-      toolInfo = fg(t.description, toolInfo);
+-    }
+-
+-    return `${prefix} ${toggleIcon} ${nameStr}${importLabel}  ${toolInfo}${statusLabel}`;
+-  }
+-
+-  private selectedServerHasFailureMessage(): boolean {
+-    const item = this.visibleItems[this.cursorIndex];
+-    if (!item) return false;
+-    const server = this.servers[item.serverIndex];
+-    return server.connectionStatus === "failed" && !!server.failureMessage;
+-  }
+-
+-  private wrapText(text: string, width: number): string[] {
+-    const max = Math.max(8, width);
+-    const words = text.split(/\s+/).filter(Boolean);
+-    const lines: string[] = [];
+-    let current = "";
+-    const splitLongWord = (word: string): string => {
+-      let rest = word;
+-      while (visibleWidth(rest) > max) {
+-        let take = "";
+-        let index = 0;
+-        while (index < rest.length && visibleWidth(take + rest[index]) <= max) {
+-          take += rest[index];
+-          index++;
+-        }
+-        if (!take) take = rest[0];
+-        lines.push(take);
+-        rest = rest.slice(take.length);
+-      }
+-      return rest;
+-    };
+-
+-    for (const word of words) {
+-      const candidate = current ? `${current} ${word}` : word;
+-      if (visibleWidth(candidate) <= max) {
+-        current = candidate;
+-      } else {
+-        if (current) lines.push(current);
+-        current = splitLongWord(word);
+-      }
+-    }
+-    if (current) lines.push(current);
+-    return lines.length > 0 ? lines : [text];
+-  }
+-
+-  private renderConnectionStatus(server: ServerState): string {
+-    const t = this.t;
+-    if (this.authInFlight === server.name) return `  ${fg(t.needsAuth, "authenticating")}`;
+-    if (server.connectionStatus === "disabled") return `  ${fg(t.description, "disabled")}`;
+-    if (server.connectionStatus === "needs-auth") return `  ${fg(t.needsAuth, "needs auth")}`;
+-    if (server.connectionStatus === "connecting") return `  ${fg(t.needsAuth, "connecting")}`;
+-    if (server.connectionStatus === "failed") return `  ${fg(t.cancel, "failed")}`;
+-    if (this.authOnly && server.connectionStatus === "connected") return `  ${fg(t.direct, "connected")}`;
+-    if (this.authOnly) return `  ${fg(t.description, "idle")}`;
+-    return "";
+-  }
+-
+-  private renderToolRow(tool: ToolState, isCursor: boolean, innerW: number): string {
+-    const t = this.t;
+-    const bold = (s: string) => `\x1b[1m${s}\x1b[22m`;
+-
+-    const toggleIcon = tool.isDirect ? fg(t.direct, "●") : fg(t.description, "○");
+-    const cursor = isCursor ? fg(t.selected, "▸") : " ";
+-    const toolName = sanitizeDisplayText(tool.name);
+-    const description = sanitizeDisplayText(tool.description);
+-    const nameStr = isCursor ? bold(fg(t.selected, toolName)) : toolName;
+-
+-    const prefixLen = 7 + visibleWidth(toolName);
+-    const maxDescLen = Math.max(0, innerW - prefixLen - 8);
+-    const descStr =
+-      maxDescLen > 5 && description
+-        ? fg(t.description, "— " + truncateToWidth(description, maxDescLen, "…"))
+-        : "";
+-
+-    return `  ${cursor} ${toggleIcon} ${nameStr} ${descStr}`;
+-  }
+-
+-  invalidate(): void {}
+-
+-  dispose(): void {
+-    this.cleanup();
+-  }
+-}
+-
+-export function createMcpPanel(
+-  config: McpConfig,
+-  cache: MetadataCache | null,
+-  provenance: Map<string, ServerProvenance>,
+-  callbacks: McpPanelCallbacks,
+-  tui: { requestRender(): void },
+-  done: (result: McpPanelResult) => void,
+-  options?: { noticeLines?: string[]; authOnly?: boolean; keybindings?: PanelKeybindings },
+-): McpPanel & { dispose(): void } {
+-  return new McpPanel(config, cache, provenance, callbacks, tui, done, options ?? {});
+-}
+diff --git a/node_modules/pi-mcp-adapter/mcp-setup-panel.ts b/node_modules/pi-mcp-adapter/mcp-setup-panel.ts
+deleted file mode 100644
+index b120e93..0000000
+--- a/node_modules/pi-mcp-adapter/mcp-setup-panel.ts
++++ /dev/null
+@@ -1,593 +0,0 @@
+-import { matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+-import { createPanelKeys, type PanelKeybindings, type PanelKeys } from "./panel-keys.ts";
+-import type { ImportKind } from "./types.ts";
+-import type { ConfigWritePreview, McpDiscoverySummary } from "./config.ts";
+-import type { McpOnboardingState } from "./onboarding-state.ts";
+-
+-interface SetupTheme {
+-  border: string;
+-  title: string;
+-  selected: string;
+-  hint: string;
+-  success: string;
+-  warning: string;
+-  muted: string;
+-}
+-
+-const DEFAULT_THEME: SetupTheme = {
+-  border: "2",
+-  title: "36",
+-  selected: "32",
+-  hint: "2",
+-  success: "32",
+-  warning: "33",
+-  muted: "2;3",
+-};
+-
+-function fg(code: string, text: string): string {
+-  return code ? `\x1b[${code}m${text}\x1b[0m` : text;
+-}
+-
+-function wrapText(text: string, width: number): string[] {
+-  if (width <= 8) return [text];
+-  const words = text.split(/\s+/).filter(Boolean);
+-  const lines: string[] = [];
+-  let current = "";
+-  for (const word of words) {
+-    const candidate = current ? `${current} ${word}` : word;
+-    if (visibleWidth(candidate) <= width) {
+-      current = candidate;
+-      continue;
+-    }
+-    if (current) lines.push(current);
+-    current = word;
+-  }
+-  if (current) lines.push(current);
+-  return lines.length > 0 ? lines : [""];
+-}
+-
+-export interface SetupPanelCallbacks {
+-  previewImports: (imports: ImportKind[]) => ConfigWritePreview;
+-  previewStarterProject: () => ConfigWritePreview;
+-  previewRepoPrompt: () => ConfigWritePreview | null;
+-  adoptImports: (imports: ImportKind[]) => Promise<{ added: ImportKind[]; path: string }>;
+-  scaffoldProjectConfig: () => Promise<{ path: string }>;
+-  addRepoPrompt: () => Promise<{ path: string; serverName: string }>;
+-  openPath: (path: string) => Promise<void>;
+-  markSetupCompleted: () => void;
+-}
+-
+-export interface SetupPanelOptions {
+-  mode: "empty" | "setup";
+-  onboardingState: McpOnboardingState;
+-  keybindings?: PanelKeybindings;
+-}
+-
+-type Screen = "empty" | "setup" | "imports" | "paths";
+-
+-type ActionId =
+-  | "run-setup"
+-  | "adopt-imports"
+-  | "view-example"
+-  | "show-precedence"
+-  | "open-paths"
+-  | "add-repoprompt"
+-  | "scaffold-project"
+-  | "close";
+-
+-interface Action {
+-  id: ActionId;
+-  label: string;
+-  description: string;
+-}
+-
+-export class McpSetupPanel {
+-  private screen: Screen;
+-  private actionCursor = 0;
+-  private importCursor = 0;
+-  private pathCursor = 0;
+-  private selectedImports = new Set<ImportKind>();
+-  private busy = false;
+-  private notice: { text: string; tone: "success" | "warning" | "muted" } | null = null;
+-  private tui: { requestRender(): void };
+-  private t = DEFAULT_THEME;
+-  private keys: PanelKeys;
+-  private inactivityTimeout: ReturnType<typeof setTimeout> | null = null;
+-  private static readonly INACTIVITY_MS = 60_000;
+-
+-  constructor(
+-    private discovery: McpDiscoverySummary,
+-    private callbacks: SetupPanelCallbacks,
+-    private options: SetupPanelOptions,
+-    tui: { requestRender(): void },
+-    private done: () => void,
+-  ) {
+-    this.tui = tui;
+-    this.keys = createPanelKeys(options.keybindings);
+-    this.screen = options.mode;
+-    for (const entry of discovery.imports) {
+-      this.selectedImports.add(entry.kind);
+-    }
+-    this.resetInactivityTimeout();
+-  }
+-
+-  private resetInactivityTimeout(): void {
+-    if (this.inactivityTimeout) clearTimeout(this.inactivityTimeout);
+-    this.inactivityTimeout = setTimeout(() => {
+-      this.cleanup();
+-      this.done();
+-    }, McpSetupPanel.INACTIVITY_MS);
+-  }
+-
+-  private cleanup(): void {
+-    if (this.inactivityTimeout) {
+-      clearTimeout(this.inactivityTimeout);
+-      this.inactivityTimeout = null;
+-    }
+-  }
+-
+-  private getActions(): Action[] {
+-    const actions: Action[] = [];
+-    if (this.screen === "empty") {
+-      actions.push({ id: "run-setup", label: "Run setup", description: "Inspect detected configs, adopt imports, and scaffold a minimal `.mcp.json`." });
+-    }
+-    if (this.discovery.imports.length > 0) {
+-      actions.push({ id: "adopt-imports", label: "Adopt detected compatibility imports", description: `Choose which host-specific MCP configs Pi should import into its own override file. ${this.discovery.imports.length} source${this.discovery.imports.length === 1 ? "" : "s"} found.` });
+-    }
+-    actions.push({ id: "view-example", label: "View example `.mcp.json`", description: "Preview a working shared MCP config you can paste or adapt." });
+-    if (!this.discovery.sources.some((source) => source.id === "shared-project" && source.exists)) {
+-      actions.push({ id: "scaffold-project", label: "Scaffold project `.mcp.json`", description: "Write a minimal project config using the standard shared MCP file path, then reload Pi." });
+-    }
+-    actions.push({ id: "show-precedence", label: "Explain config precedence", description: "Show the read order and where Pi writes compatibility settings." });
+-    if (this.getDetectedPaths().length > 0) {
+-      actions.push({ id: "open-paths", label: "Open detected config paths", description: "Browse the actual config files that Pi discovered on this machine." });
+-    }
+-    if (!this.discovery.repoPrompt.configured && this.discovery.repoPrompt.executablePath && this.discovery.repoPrompt.targetPath && this.discovery.repoPrompt.entry && this.discovery.repoPrompt.serverName) {
+-      actions.push({ id: "add-repoprompt", label: "Add RepoPrompt to shared MCP config", description: "Write a standard MCP entry for RepoPrompt to the recommended shared target, then reload MCP in-session." });
+-    }
+-    actions.push({ id: "close", label: "Close", description: "Exit the onboarding flow." });
+-    return actions;
+-  }
+-
+-  private getDetectedPaths(): string[] {
+-    const paths = [
+-      ...this.discovery.sources.filter((source) => source.exists).map((source) => source.path),
+-      ...this.discovery.imports.map((entry) => entry.path),
+-    ];
+-    return [...new Set(paths)];
+-  }
+-
+-  private getSelectedAction(): Action | null {
+-    const actions = this.getActions();
+-    return actions[this.actionCursor] ?? null;
+-  }
+-
+-  handleInput(data: string): void {
+-    this.resetInactivityTimeout();
+-    if (!this.busy) this.notice = null;
+-
+-    if (matchesKey(data, "ctrl+c")) {
+-      this.cleanup();
+-      this.done();
+-      return;
+-    }
+-
+-    if (matchesKey(data, "escape")) {
+-      if (this.screen === "imports" || this.screen === "paths") {
+-        this.screen = this.discovery.hasAnyConfig ? "setup" : "empty";
+-        this.tui.requestRender();
+-        return;
+-      }
+-      this.cleanup();
+-      this.done();
+-      return;
+-    }
+-
+-    if (this.busy) return;
+-
+-    if (this.screen === "imports") {
+-      this.handleImportsInput(data);
+-      return;
+-    }
+-    if (this.screen === "paths") {
+-      this.handlePathsInput(data);
+-      return;
+-    }
+-
+-    const actions = this.getActions();
+-    if (this.keys.selectUp(data)) {
+-      this.actionCursor = Math.max(0, this.actionCursor - 1);
+-      this.tui.requestRender();
+-      return;
+-    }
+-    if (this.keys.selectDown(data)) {
+-      this.actionCursor = Math.min(actions.length - 1, this.actionCursor + 1);
+-      this.tui.requestRender();
+-      return;
+-    }
+-    if (this.keys.selectConfirm(data)) {
+-      const selected = this.getSelectedAction();
+-      if (selected) void this.runAction(selected.id);
+-    }
+-  }
+-
+-  private handleImportsInput(data: string): void {
+-    const imports = this.discovery.imports;
+-    if (this.keys.selectUp(data)) {
+-      this.importCursor = Math.max(0, this.importCursor - 1);
+-      this.tui.requestRender();
+-      return;
+-    }
+-    if (this.keys.selectDown(data)) {
+-      this.importCursor = Math.min(imports.length - 1, this.importCursor + 1);
+-      this.tui.requestRender();
+-      return;
+-    }
+-    if (matchesKey(data, "space")) {
+-      const current = imports[this.importCursor];
+-      if (!current) return;
+-      if (this.selectedImports.has(current.kind)) {
+-        this.selectedImports.delete(current.kind);
+-      } else {
+-        this.selectedImports.add(current.kind);
+-      }
+-      this.tui.requestRender();
+-      return;
+-    }
+-    if (this.keys.selectConfirm(data)) {
+-      void this.applySelectedImports();
+-    }
+-  }
+-
+-  private handlePathsInput(data: string): void {
+-    const paths = this.getDetectedPaths();
+-    if (this.keys.selectUp(data)) {
+-      this.pathCursor = Math.max(0, this.pathCursor - 1);
+-      this.tui.requestRender();
+-      return;
+-    }
+-    if (this.keys.selectDown(data)) {
+-      this.pathCursor = Math.min(paths.length - 1, this.pathCursor + 1);
+-      this.tui.requestRender();
+-      return;
+-    }
+-    if (this.keys.selectConfirm(data)) {
+-      const selected = paths[this.pathCursor];
+-      if (!selected) return;
+-      void this.runBusy(async () => {
+-        await this.callbacks.openPath(selected);
+-        this.notice = { text: `Opened ${selected}`, tone: "success" };
+-      });
+-    }
+-  }
+-
+-  private async runAction(action: ActionId): Promise<void> {
+-    if (action === "run-setup") {
+-      this.screen = "setup";
+-      this.actionCursor = 0;
+-      this.tui.requestRender();
+-      return;
+-    }
+-    if (action === "adopt-imports") {
+-      this.screen = "imports";
+-      this.importCursor = 0;
+-      this.tui.requestRender();
+-      return;
+-    }
+-    if (action === "open-paths") {
+-      this.screen = "paths";
+-      this.pathCursor = 0;
+-      this.tui.requestRender();
+-      return;
+-    }
+-    if (action === "scaffold-project") {
+-      await this.runBusy(async () => {
+-        const result = await this.callbacks.scaffoldProjectConfig();
+-        this.callbacks.markSetupCompleted();
+-        this.notice = { text: `Wrote starter config to ${result.path}. Pi will reload after this panel closes.`, tone: "success" };
+-      });
+-      return;
+-    }
+-    if (action === "add-repoprompt") {
+-      await this.runBusy(async () => {
+-        const result = await this.callbacks.addRepoPrompt();
+-        this.callbacks.markSetupCompleted();
+-        this.notice = { text: `Added ${result.serverName} to ${result.path}. Pi will reload after this panel closes.`, tone: "success" };
+-      });
+-      return;
+-    }
+-    if (action === "close") {
+-      this.cleanup();
+-      this.done();
+-      return;
+-    }
+-
+-    this.notice = { text: "Review the details below. Press Enter on an action with a side effect to apply it.", tone: "muted" };
+-    this.tui.requestRender();
+-  }
+-
+-  private async applySelectedImports(): Promise<void> {
+-    const selected = this.discovery.imports.filter((entry) => this.selectedImports.has(entry.kind)).map((entry) => entry.kind);
+-    if (selected.length === 0) {
+-      this.notice = { text: "Select at least one compatibility import first.", tone: "warning" };
+-      this.tui.requestRender();
+-      return;
+-    }
+-
+-    await this.runBusy(async () => {
+-      const result = await this.callbacks.adoptImports(selected);
+-      this.callbacks.markSetupCompleted();
+-      this.notice = result.added.length > 0
+-        ? { text: `Added ${result.added.join(", ")} to ${result.path}. Pi will reload after this panel closes.`, tone: "success" }
+-        : { text: `No changes needed in ${result.path}.`, tone: "muted" };
+-      this.screen = this.discovery.hasAnyConfig ? "setup" : "empty";
+-      this.actionCursor = 0;
+-    });
+-  }
+-
+-  private async runBusy(fn: () => Promise<void>): Promise<void> {
+-    this.busy = true;
+-    this.notice = { text: "Working...", tone: "muted" };
+-    this.tui.requestRender();
+-    try {
+-      await fn();
+-    } catch (error) {
+-      this.notice = {
+-        text: error instanceof Error ? error.message : String(error),
+-        tone: "warning",
+-      };
+-    } finally {
+-      this.busy = false;
+-      this.tui.requestRender();
+-    }
+-  }
+-
+-  render(width: number): string[] {
+-    const innerW = Math.max(40, width - 2);
+-    const lines: string[] = [];
+-    const border = fg(this.t.border, "─".repeat(innerW));
+-    lines.push(`┌${border}┐`);
+-    lines.push(this.padLine(fg(this.t.title, "MCP setup"), innerW));
+-    lines.push(this.padLine(this.discoverySummaryLine(), innerW));
+-    lines.push(this.padLine(fg(this.t.muted, this.secondarySummaryLine()), innerW));
+-    lines.push(this.padLine("", innerW));
+-
+-    if (this.notice) {
+-      const tone = this.notice.tone === "success" ? this.t.success : this.notice.tone === "warning" ? this.t.warning : this.t.hint;
+-      for (const line of wrapText(this.notice.text, innerW - 6)) {
+-        lines.push(this.padLine(fg(tone, line), innerW));
+-      }
+-      lines.push(this.padLine("", innerW));
+-    }
+-
+-    lines.push(`├${border}┤`);
+-
+-    if (this.screen === "imports") {
+-      lines.push(...this.renderImports(innerW));
+-    } else if (this.screen === "paths") {
+-      lines.push(...this.renderPaths(innerW));
+-    } else {
+-      lines.push(...this.renderActions(innerW));
+-    }
+-
+-    lines.push(`└${border}┘`);
+-    return lines;
+-  }
+-
+-  private renderActions(innerW: number): string[] {
+-    const lines: string[] = [];
+-    const actions = this.getActions();
+-    for (let index = 0; index < actions.length; index++) {
+-      const action = actions[index];
+-      const selected = index === this.actionCursor;
+-      const cursor = selected ? fg(this.t.selected, "›") : " ";
+-      lines.push(this.padLine(`${cursor} ${truncateToWidth(action.label, innerW - 4)}`, innerW));
+-    }
+-    lines.push(this.padLine("", innerW));
+-
+-    const preview = this.getActionPreview(this.getSelectedAction()?.id ?? "view-example");
+-    for (const line of preview) {
+-      lines.push(this.padLine(line, innerW));
+-    }
+-    lines.push(this.padLine("", innerW));
+-    lines.push(this.padLine(fg(this.t.muted, "Enter selects, Esc goes back, Ctrl+C closes."), innerW));
+-    return lines;
+-  }
+-
+-  private renderImports(innerW: number): string[] {
+-    const lines: string[] = [];
+-    lines.push(this.padLine("Select compatibility imports. Space toggles, Enter saves, Esc goes back.", innerW));
+-    lines.push(this.padLine("", innerW));
+-    for (let index = 0; index < this.discovery.imports.length; index++) {
+-      const entry = this.discovery.imports[index];
+-      const selected = this.selectedImports.has(entry.kind) ? "[x]" : "[ ]";
+-      const cursor = index === this.importCursor ? fg(this.t.selected, "›") : " ";
+-      lines.push(this.padLine(`${cursor} ${selected} ${entry.kind}  ${entry.path}`, innerW));
+-    }
+-    lines.push(this.padLine("", innerW));
+-    const selected = this.discovery.imports.filter((entry) => this.selectedImports.has(entry.kind)).map((entry) => entry.kind);
+-    const preview = this.callbacks.previewImports(selected);
+-    for (const line of this.formatWritePreview("Compatibility import write preview", preview)) {
+-      lines.push(this.padLine(line, innerW));
+-    }
+-    return lines;
+-  }
+-
+-  private renderPaths(innerW: number): string[] {
+-    const lines: string[] = [];
+-    lines.push(this.padLine("Select a detected config path to open. Enter opens it, Esc goes back.", innerW));
+-    lines.push(this.padLine("", innerW));
+-    const paths = this.getDetectedPaths();
+-    for (let index = 0; index < paths.length; index++) {
+-      const cursor = index === this.pathCursor ? fg(this.t.selected, "›") : " ";
+-      lines.push(this.padLine(`${cursor} ${paths[index]}`, innerW));
+-    }
+-    return lines;
+-  }
+-
+-  private discoverySummaryLine(): string {
+-    if (!this.discovery.hasAnyConfig) {
+-      return fg(this.t.warning, this.options.onboardingState.setupCompleted
+-        ? "No MCP servers are active right now."
+-        : "No MCP config is active yet.");
+-    }
+-
+-    if (this.discovery.totalServerCount === 0 && (this.discovery.imports.length > 0 || !!this.discovery.repoPrompt.executablePath)) {
+-      return fg(this.t.warning, "Pi found MCP-related setup options, but none are active in Pi yet.");
+-    }
+-
+-    const shared = this.discovery.sources.filter((source) => source.kind === "shared" && source.serverCount > 0).length;
+-    const piOwned = this.discovery.sources.filter((source) => source.kind === "pi" && source.serverCount > 0).length;
+-    return fg(this.t.hint, `Detected ${this.discovery.totalServerCount} configured servers across ${shared} shared and ${piOwned} Pi-owned source${shared + piOwned === 1 ? "" : "s"}.`);
+-  }
+-
+-  private secondarySummaryLine(): string {
+-    const hostNote = this.discovery.hostConfigs.length > 0
+-      ? ` Host discovery is ${this.discovery.hostConfigDiscovery}; ${this.discovery.hostConfigs.length} host source${this.discovery.hostConfigs.length === 1 ? "" : "s"} detected.`
+-      : "";
+-    const conflictNote = this.discovery.conflicts.length > 0
+-      ? ` ${this.discovery.conflicts.length} same-name conflict${this.discovery.conflicts.length === 1 ? "" : "s"} reported.`
+-      : "";
+-    if (!this.discovery.hasAnyConfig) {
+-      return `Create a shared .mcp.json, adopt host imports, or quick-add RepoPrompt from this screen.${hostNote}${conflictNote}`;
+-    }
+-    if (this.discovery.totalServerCount === 0 && this.discovery.imports.length > 0) {
+-      return `Detected ${this.discovery.imports.length} compatibility import source${this.discovery.imports.length === 1 ? "" : "s"}. Adopt them into Pi or inspect the underlying files.${hostNote}${conflictNote}`;
+-    }
+-    return `Shared MCP files are preferred. Pi-owned files are only for compatibility imports and adapter-specific overrides.${hostNote}${conflictNote}`;
+-  }
+-
+-  private getActionPreview(action: ActionId): string[] {
+-    switch (action) {
+-      case "run-setup":
+-        return this.formatPreview([
+-          "Run setup to adopt host-specific imports, inspect detected paths, and scaffold a minimal `.mcp.json` if needed.",
+-        ]);
+-      case "adopt-imports":
+-        return this.formatWritePreview(
+-          "Compatibility import write preview",
+-          this.callbacks.previewImports(this.discovery.imports.filter((entry) => this.selectedImports.has(entry.kind)).map((entry) => entry.kind)),
+-          [
+-            `Detected imports: ${this.discovery.imports.map((entry) => `${entry.kind} (${entry.serverCount} servers)`).join(", ")}`,
+-            "Selected imports are written into the Pi agent dir config as Pi-owned compatibility state.",
+-          ],
+-        );
+-      case "view-example":
+-        return this.formatPreview([
+-          "Example shared `.mcp.json`:",
+-          "{",
+-          '  "mcpServers": {',
+-          '    "chrome-devtools": {',
+-          '      "command": "npx",',
+-          '      "args": ["-y", "chrome-devtools-mcp@latest"]',
+-          "    }",
+-          "  }",
+-          "}",
+-          "",
+-          "Use Scaffold project `.mcp.json` when you want a safe empty shell instead of a live example server.",
+-        ]);
+-      case "show-precedence":
+-        return this.formatPreview([
+-          "Read order (later entries win):",
+-          "0. detected host configs (opt-in lowest-precedence fallback)",
+-          "1. ~/.config/mcp/mcp.json",
+-          "2. ~/.agents/mcp.json",
+-          "3. ~/.agents/mcp/mcp.json",
+-          "4. <Pi agent dir>/mcp.json",
+-          "5. .mcp.json",
+-          "6. .pi/mcp.json",
+-          `Host discovery: ${this.discovery.hostConfigDiscovery}. Conflicts reported: ${this.discovery.conflicts.length}.`,
+-          ...this.discovery.conflicts.slice(0, 8).map((conflict) =>
+-            `${conflict.serverName}: ${conflict.sources.map((source) => source.path).join(" -> ")} (winner: ${conflict.winner.path})`,
+-          ),
+-          "Pi writes compatibility imports and adapter-only overrides to Pi-owned files."
+-        ]);
+-      case "open-paths":
+-        return this.formatPreview(this.getDetectedPaths().length > 0
+-          ? ["Detected paths:", ...this.getDetectedPaths()]
+-          : ["No config paths were detected."]);
+-      case "add-repoprompt": {
+-        const repoPrompt = this.discovery.repoPrompt;
+-        const preview = this.callbacks.previewRepoPrompt();
+-        if (!preview) {
+-          return this.formatPreview(["RepoPrompt is not available to add from this setup screen."]);
+-        }
+-        return this.formatWritePreview(
+-          "RepoPrompt write preview",
+-          preview,
+-          [
+-            `Executable: ${repoPrompt.executablePath ?? "not found"}`,
+-            `Target: ${repoPrompt.targetPath ?? "n/a"}`,
+-            `Server name: ${repoPrompt.serverName ?? "repoprompt"}`,
+-          ],
+-        );
+-      }
+-      case "scaffold-project":
+-        return this.formatWritePreview(
+-          "Starter project `.mcp.json` write preview",
+-          this.callbacks.previewStarterProject(),
+-          [
+-            "This writes a minimal `.mcp.json` in the current project using the shared MCP layout.",
+-            "It intentionally avoids adding a fake placeholder server that would fail on first reload.",
+-          ],
+-        );
+-      case "close":
+-      default:
+-        return this.formatPreview(["Close the setup flow."]);
+-    }
+-  }
+-
+-  private formatPreview(lines: string[]): string[] {
+-    const preview: string[] = [];
+-    for (const line of lines) {
+-      preview.push(...wrapText(line, 74));
+-    }
+-    return preview;
+-  }
+-
+-  private formatWritePreview(title: string, preview: ConfigWritePreview, intro: string[] = []): string[] {
+-    const lines: string[] = [];
+-    for (const line of intro) {
+-      lines.push(...wrapText(line, 74));
+-    }
+-    if (intro.length > 0) lines.push("");
+-    lines.push(...wrapText(`${title}: ${preview.path}`, 74));
+-    lines.push(...wrapText(preview.existed ? "Existing file detected. Showing exact before/after diff." : "New file will be created. Showing exact content diff.", 74));
+-    lines.push("");
+-    const diffLines = preview.diffText.split("\n");
+-    const maxLines = 18;
+-    const shown = diffLines.slice(0, maxLines);
+-    for (const line of shown) {
+-      lines.push(...wrapText(line, 74));
+-    }
+-    if (diffLines.length > maxLines) {
+-      lines.push(...wrapText(`… ${diffLines.length - maxLines} more diff line${diffLines.length - maxLines === 1 ? "" : "s"}`, 74));
+-    }
+-    return lines;
+-  }
+-
+-  private padLine(text: string, innerW: number): string {
+-    const inset = 2;
+-    const contentW = Math.max(0, innerW - inset * 2);
+-    const fitted = truncateToWidth(text, contentW, "…", true);
+-    const plainWidth = visibleWidth(fitted);
+-    const padding = Math.max(0, contentW - plainWidth);
+-    return `│${" ".repeat(inset)}${fitted}${" ".repeat(padding)}${" ".repeat(inset)}│`;
+-  }
+-
+-  invalidate(): void {}
+-
+-  dispose(): void {
+-    this.cleanup();
+-  }
+-}
+-
+-export function createMcpSetupPanel(
+-  discovery: McpDiscoverySummary,
+-  callbacks: SetupPanelCallbacks,
+-  options: SetupPanelOptions,
+-  tui: { requestRender(): void },
+-  done: () => void,
+-): McpSetupPanel & { dispose(): void } {
+-  return new McpSetupPanel(discovery, callbacks, options, tui, done);
+-}
+diff --git a/node_modules/pi-mcp-adapter/panel-keys.ts b/node_modules/pi-mcp-adapter/panel-keys.ts
+deleted file mode 100644
+index a226cee..0000000
+--- a/node_modules/pi-mcp-adapter/panel-keys.ts
++++ /dev/null
+@@ -1,37 +0,0 @@
+-import { matchesKey } from "@earendil-works/pi-tui";
+-
+-/** The `tui.select.*` keybinding ids the adapter panels resolve. */
+-export type PanelSelectKeybinding =
+-  | "tui.select.up"
+-  | "tui.select.down"
+-  | "tui.select.confirm";
+-
+-/** Structural subset of pi-tui's `KeybindingsManager` (which satisfies it). */
+-export interface PanelKeybindings {
+-  matches(data: string, keybinding: PanelSelectKeybinding): boolean;
+-}
+-
+-/**
+- * Key matchers for list navigation: user's `tui.select.*` bindings when a
+- * manager is provided, otherwise the previous hardcoded defaults.
+- */
+-export interface PanelKeys {
+-  selectUp(data: string): boolean;
+-  selectDown(data: string): boolean;
+-  selectConfirm(data: string): boolean;
+-}
+-
+-export function createPanelKeys(keybindings?: PanelKeybindings): PanelKeys {
+-  if (keybindings) {
+-    return {
+-      selectUp: (data) => keybindings.matches(data, "tui.select.up"),
+-      selectDown: (data) => keybindings.matches(data, "tui.select.down"),
+-      selectConfirm: (data) => keybindings.matches(data, "tui.select.confirm"),
+-    };
+-  }
+-  return {
+-    selectUp: (data) => matchesKey(data, "up"),
+-    selectDown: (data) => matchesKey(data, "down"),
+-    selectConfirm: (data) => matchesKey(data, "return"),
+-  };
+-}
+diff --git a/node_modules/pi-mcp-adapter/prompts.ts b/node_modules/pi-mcp-adapter/prompts.ts
+index bec607a..e47ac88 100644
+--- a/node_modules/pi-mcp-adapter/prompts.ts
++++ b/node_modules/pi-mcp-adapter/prompts.ts
+@@ -246,7 +246,7 @@ export function createPromptCommand(
+       if (state.promptMetadataLive?.has(metadata.serverName) && !liveMetadata) {
+         if (ctx.hasUI) {
+           ctx.ui.notify(
+-            `MCP prompt "${metadata.originalName}" is no longer advertised by server "${metadata.serverName}". Run /mcp reconnect to refresh.`,
++            `MCP prompt "${metadata.originalName}" is no longer advertised by server "${metadata.serverName}". Run mcp({ connect: "${metadata.serverName}" }) to refresh.`,
+             "error",
+           );
+         }
+@@ -264,7 +264,7 @@ export function createPromptCommand(
+       if (!state.config.mcpServers[metadata.serverName]) {
+         if (ctx.hasUI) {
+           ctx.ui.notify(
+-            `MCP prompt "${live.originalName}" is no longer configured. Run /mcp reconnect to refresh.`,
++            `MCP prompt "${live.originalName}" is no longer configured. Run mcp({ connect: "${live.serverName}" }) to refresh.`,
+             "error",
+           );
+         }
+@@ -276,8 +276,8 @@ export function createPromptCommand(
+         if (ctx.hasUI) {
+           const conn = state.manager.getConnection(metadata.serverName);
+           const message = conn?.status === "needs-auth"
+-            ? `MCP server "${metadata.serverName}" needs authentication. Run /mcp-auth ${metadata.serverName}.`
+-            : `MCP server "${metadata.serverName}" is not available. Run /mcp reconnect ${metadata.serverName}.`;
++            ? `MCP server "${metadata.serverName}" needs authentication. Run mcp({ action: "auth-start", server: "${metadata.serverName}" }) to get a browser URL.`
++            : `MCP server "${metadata.serverName}" is not available. Run mcp({ connect: "${metadata.serverName}" }) to retry.`;
+           ctx.ui.notify(message, "error");
+         }
+         return;
+@@ -287,7 +287,7 @@ export function createPromptCommand(
+       if (state.promptMetadataLive?.has(metadata.serverName) && !refreshed) {
+         if (ctx.hasUI) {
+           ctx.ui.notify(
+-            `MCP prompt "${metadata.originalName}" is no longer advertised by server "${metadata.serverName}". Run /mcp reconnect to refresh.`,
++            `MCP prompt "${metadata.originalName}" is no longer advertised by server "${metadata.serverName}". Run mcp({ connect: "${metadata.serverName}" }) to refresh.`,
+             "error",
+           );
+         }
+@@ -338,8 +338,8 @@ function buildCommandDescription(metadata: PromptMetadata): string {
+ }
+ 
+ /**
+- * Public helper used by `/mcp prompts` to render the list of prompts known
+- * to the adapter, whether from a live connection or the metadata cache.
++ * Public helper that renders the list of prompts known to the adapter,
++ * whether from a live connection or the metadata cache.
+  */
+ export function listAllPromptMetadata(state: McpExtensionState): PromptMetadata[] {
+   const flat: PromptMetadata[] = [];
+diff --git a/node_modules/pi-mcp-adapter/proxy-modes.ts b/node_modules/pi-mcp-adapter/proxy-modes.ts
+index a1092b8..a6f5a1e 100644
+--- a/node_modules/pi-mcp-adapter/proxy-modes.ts
++++ b/node_modules/pi-mcp-adapter/proxy-modes.ts
+@@ -33,7 +33,7 @@ type AutoAuthResult =
+   | { status: "failed"; message: string };
+ 
+ function disabledResult(mode: string, serverName: string): ProxyToolResult {
+-  const message = `Server "${serverName}" is disabled. Run /mcp enable ${serverName} and /reload to enable it.`;
++  const message = `Server "${serverName}" is disabled. It can be enabled in the MCP settings page.`;
+   return {
+     content: [{ type: "text" as const, text: message }],
+     details: { mode, error: "server_disabled", server: serverName, message },
+@@ -43,7 +43,7 @@ function disabledResult(mode: string, serverName: string): ProxyToolResult {
+ function getAuthRequiredMessage(
+   state: McpExtensionState,
+   serverName: string,
+-  defaultMessage = `Server "${serverName}" requires OAuth authentication. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL, or /mcp-auth ${serverName} in an interactive local session.`,
++  defaultMessage = `Server "${serverName}" requires OAuth authentication. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL.`,
+ ): string {
+   return formatAuthRequiredMessage(state.config, serverName, defaultMessage);
+ }
+@@ -53,7 +53,7 @@ function getAuthFailedMessage(state: McpExtensionState, serverName: string, mess
+   if (customGuidance) {
+     return `OAuth authentication failed for "${serverName}": ${message}. ${getAuthRequiredMessage(state, serverName)}`;
+   }
+-  return `OAuth authentication failed for "${serverName}": ${message}. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL, or /mcp-auth ${serverName} in an interactive local session.`;
++  return `OAuth authentication failed for "${serverName}": ${message}. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL.`;
+ }
+ 
+ function getRedirectPort(authorizationUrl: string): number | undefined {
+@@ -120,7 +120,7 @@ async function attemptAutoAuth(
+       message: getAuthRequiredMessage(
+         state,
+         serverName,
+-        `Server "${serverName}" requires OAuth authentication. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL, or /mcp-auth ${serverName} in an interactive local session.`,
++        `Server "${serverName}" requires OAuth authentication. Run mcp({ action: "auth-start", server: "${serverName}" }) to get a browser URL.`,
+       ),
+     };
+   }
+@@ -288,7 +288,7 @@ export function executeStatus(state: McpExtensionState): ProxyToolResult {
+   }
+ 
+   if (servers.length > 0) {
+-    text += `\nmcp({ server: "name" }) to list tools, mcp({ search: "..." }) to search`;
++    text += `\nmcp({ server: "name" }) to list tools, mcp({ search: "..." }) to search, mcp({ connect: "name" }) to connect`;
+   }
+ 
+   return {
+@@ -581,12 +581,12 @@ export function executeList(state: McpExtensionState, server: string): ProxyTool
+     }
+     if (metadata !== undefined) {
+       return {
+-        content: [{ type: "text" as const, text: `Server "${server}" has no cached tools (not connected).${instructionsText}` }],
++        content: [{ type: "text" as const, text: `Server "${server}" has no cached tools (not connected). Use mcp({ connect: "${server}" }) to connect and discover its tools.${instructionsText}` }],
+         details: { mode: "list", server, tools: [], count: 0, cached: true, hasInstructions: Boolean(instructions) },
+       };
+     }
+     return {
+-      content: [{ type: "text" as const, text: `Server "${server}" is configured but not connected. Use mcp({ connect: "${server}" }) or /mcp reconnect ${server} to retry.${instructionsText}` }],
++      content: [{ type: "text" as const, text: `Server "${server}" is configured but not connected. Use mcp({ connect: "${server}" }) to connect and refresh.${instructionsText}` }],
+       details: { mode: "list", server, tools: [], count: 0, error: "not_connected", hasInstructions: Boolean(instructions) },
+     };
+   }
+@@ -737,13 +737,13 @@ export async function executeCall(
+   const prefixMode = state.config.settings?.toolPrefix ?? "server";
+   const disabledCallResult = (disabledServer: string, metadata?: ToolMetadata): ProxyToolResult => {
+     if (!metadata) {
+-      const message = `Server "${disabledServer}" is disabled. Run /mcp enable ${disabledServer} and /reload to enable it.`;
++      const message = `Server "${disabledServer}" is disabled. It can be enabled in the MCP settings page.`;
+       return {
+         content: [{ type: "text" as const, text: message }],
+         details: { mode: "call", error: "server_disabled", server: disabledServer, requestedTool: toolName, message },
+       };
+     }
+-    const message = `Server "${disabledServer}" is disabled. Run /mcp enable ${disabledServer} and /reload to enable it.`;
++    const message = `Server "${disabledServer}" is disabled. It can be enabled in the MCP settings page.`;
+     const identity = metadata.resourceUri
+       ? { server: disabledServer, resourceUri: metadata.resourceUri }
+       : { server: disabledServer, tool: metadata.originalName };
+diff --git a/node_modules/pi-mcp-adapter/ui-server.ts b/node_modules/pi-mcp-adapter/ui-server.ts
+index a037095..2073c3b 100644
+--- a/node_modules/pi-mcp-adapter/ui-server.ts
++++ b/node_modules/pi-mcp-adapter/ui-server.ts
+@@ -484,7 +484,7 @@ export async function startUiServer(options: UiServerOptions): Promise<UiServerH
+       sendJson(res, 404, { ok: false, error: "Not found" });
+     } catch (error) {
+       if (error instanceof SessionRecoveryAuthRequiredError) {
+-        const fallback = `Server "${options.serverName}" requires OAuth authentication. Run mcp({ action: "auth-start", server: "${options.serverName}" }) to get a browser URL, or /mcp-auth ${options.serverName} in an interactive local session.`;
++        const fallback = `Server "${options.serverName}" requires OAuth authentication. Run mcp({ action: "auth-start", server: "${options.serverName}" }) to get a browser URL.`;
+         const message = error.authMessage ?? (options.config
+           ? formatAuthRequiredMessage(options.config, options.serverName, fallback)
+           : fallback);

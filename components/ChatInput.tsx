@@ -13,6 +13,9 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useI18n } from "@/hooks/useI18n";
 import { AttachedImagePreviews } from "./chat-input/AttachedImagePreviews";
 import { ModelSelector } from "./chat-input/ModelSelector";
+import { ExtensionStatusText } from "./ExtensionStatusBar";
+import { localizeExtensionStatuses } from "@/lib/extension-status-i18n";
+import type { ExtensionStatusItem } from "@/lib/types";
 import {
   SlashCommandMenu,
   type SlashCommandGroup,
@@ -64,6 +67,8 @@ interface Props {
   draftKey?: string;
   /** Session working directory — enables the @ file autocomplete menu */
   cwd?: string | null;
+  /** Live extension status items (e.g. MCP summary) shown inline next to the model selector */
+  extensionStatuses?: ExtensionStatusItem[];
 }
 
 export interface ChatInputHandle {
@@ -219,6 +224,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   onPromptWithStreamingBehavior,
   draftKey,
   cwd,
+  extensionStatuses,
 }: Props, ref) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
@@ -230,6 +236,10 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     draftKey ? getDraft(draftKey)?.images.map(draftImageToAttachedImage) ?? [] : []
   ));
   const trimmedValue = value.trimStart();
+  // Adapter-emitted status texts are English-only; rewrite known patterns via i18n.
+  const displayExtensionStatuses = extensionStatuses
+    ? localizeExtensionStatuses(extensionStatuses, t)
+    : undefined;
   const bashMode = attachedImages.length === 0 && trimmedValue.startsWith("!");
   const bashExcluded = bashMode && trimmedValue.startsWith("!!");
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
@@ -1446,6 +1456,19 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               isMobile={isMobile}
               closeSignal={controlsMenuOpen}
             />
+            {displayExtensionStatuses && displayExtensionStatuses.length > 0 && (
+              <span style={{
+                display: "inline-flex",
+                alignItems: "center",
+                marginLeft: 6,
+                minWidth: 0,
+                maxWidth: isMobile ? 140 : 260,
+                flexShrink: 1,
+                overflow: "hidden",
+              }}>
+                <ExtensionStatusText statuses={displayExtensionStatuses} />
+              </span>
+            )}
           </div>
 
           {/* spacer */}

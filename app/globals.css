@@ -263,6 +263,23 @@ pre, code {
   color: var(--text) !important;
 }
 
+.directory-picker-entry-row:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text) !important;
+}
+
+.directory-picker-enter:hover,
+.directory-picker-breadcrumb:hover,
+.directory-picker-quick-link:hover,
+.directory-picker-small-btn:hover:not(:disabled) {
+  color: var(--text) !important;
+  background: var(--bg-hover) !important;
+}
+
+.directory-picker-entry-row:hover .directory-picker-enter {
+  color: var(--text-muted) !important;
+}
+
 .directory-picker-action:hover:not(:disabled),
 .directory-picker-back:hover:not(:disabled) {
   filter: brightness(0.98);
@@ -271,6 +288,15 @@ pre, code {
 .directory-picker-path:focus {
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+@media (max-width: 720px) {
+  .directory-picker-panel {
+    width: calc(100vw - 16px) !important;
+  }
+  .directory-picker-sidebar {
+    display: none !important;
+  }
 }
 
 .markdown-custom-message {

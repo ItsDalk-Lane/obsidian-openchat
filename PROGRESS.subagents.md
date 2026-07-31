@@ -1,10 +1,29 @@
 # pi-subagents 实施进度
 
+## 2026-07-31：内置能力精简（只保留核心工具链）
+
+- [x] 已按目标移除默认可见入口：
+ 	- `pi` 清单不再声明 `skills/prompts`。
+ 	- slash 命令总注册调用已删除（含 `/run`、`/chain`、`/parallel`、`/subagents*`、`/prompt-workflow`、`/chain-prompts`）。
+ 	- `/subagents-watchdog` 命令注册已删除，watchdog 事件钩子和渲染器保留。
+ 	- `agents/` 9 个内置角色文件已删除。
+- [x] 已生成并验证补丁：`patches/pi-subagents+0.37.2.patch`。
+- [x] pi-web 侧改动完成：
+ 	- `package.json` 将 `pi-subagents` 版本锁定为 `0.37.2`。
+ 	- `components/SubagentsConfig.tsx` 移除「禁用全部内置 agents」UI 与对应逻辑分支。
+- [x] 反向/正向补丁验证通过：`npx patch-package --reverse && npx patch-package`。
+- [x] 静态检查通过：`node_modules/.bin/tsc --noEmit`、`npm run lint`。
+- [x] 运行态 API 验证通过：
+ 	- `get_tools` 保留 `subagent`、`subagent_wait`、`subagent_supervisor`、`intercom`。
+ 	- `get_commands` 不再包含目标移除命令（`run/chain/parallel/subagents*/prompt-workflow/chain-prompts/subagents-watchdog`）。
+ 	- `subagents catalog` 为空，builtin 分组无条目。
+ 	- 主智能体已完成 `subagent action:list -> action:create -> SINGLE run` 链路，并返回 `TEMP_CORE_OK`；临时 agent 已删除。
+
 ## 约束与恢复点
 
 - 分支：`feat/builtin-subagents`
 - 工作树：`/Users/study_superior/Desktop/Code/pi-web-sa`
-- 只修改任务书白名单；并行 web-access 文件只读不碰。
+- 只修改任务书白名单；并行其他任务文件只读不碰。
 - 规划技能通常要求的 `task_plan.md`、`findings.md`、`progress.md` 与白名单冲突，本文件合并承担计划、发现和进度记录。
 
 ## 计划

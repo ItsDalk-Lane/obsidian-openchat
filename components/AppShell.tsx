@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar } from "./SessionSidebar";
+import { AnimatedDropdown } from "./session-sidebar/SidebarPrimitives";
 import { ChatWorkspaceView } from "./workspace/ChatWorkspaceView";
 import { ArtifactWorkspaceView } from "./workspace/ArtifactWorkspaceView";
 import { TabBar, type Tab } from "./TabBar";
@@ -11,9 +12,9 @@ import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
 import { PluginsConfig } from "./PluginsConfig";
 import { McpConfig } from "./McpConfig";
-import { WebAccessConfig } from "./WebAccessConfig";
 import { SubagentsConfig } from "./SubagentsConfig";
 import { ProjectTrustDialog } from "./ProjectTrustDialog";
+import { WorkspaceConfig } from "./WorkspaceConfig";
 import { BranchNavigator } from "./BranchNavigator";
 import { useTheme } from "@/hooks/useTheme";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -135,8 +136,10 @@ export function AppShell() {
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [pluginsConfigOpen, setPluginsConfigOpen] = useState(false);
   const [mcpConfigOpen, setMcpConfigOpen] = useState(false);
-  const [webAccessConfigOpen, setWebAccessConfigOpen] = useState(false);
   const [subagentsConfigOpen, setSubagentsConfigOpen] = useState(false);
+  const [workspaceConfigOpen, setWorkspaceConfigOpen] = useState(false);
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
   const [projectTrust, setProjectTrust] = useState<ProjectTrustStatus | null>(null);
   const [projectTrustDialogOpen, setProjectTrustDialogOpen] = useState(false);
   const [projectTrustBusy, setProjectTrustBusy] = useState(false);
@@ -151,6 +154,24 @@ export function AppShell() {
   useEffect(() => {
     setMobileSidebarReady(true);
   }, []);
+  // Close the settings menu on outside click or Escape while it is open.
+  useEffect(() => {
+    if (!settingsMenuOpen) return;
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) {
+        setSettingsMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSettingsMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [settingsMenuOpen]);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
   const languageBtnRef = useRef<HTMLButtonElement>(null);
@@ -494,9 +515,12 @@ export function AppShell() {
     setInitialSessionRestored(true);
   }, []);
 
-  const handleSessionDeleted = useCallback((sessionId: string) => {
+  const handleSessionDeleted = useCallback((sessionId: string, deletedIds?: string[]) => {
     setRefreshKey((k) => k + 1);
-    if (selectedSession?.id === sessionId) {
+    // Recursive deletes can remove the open session even when it wasn't the
+    // row the user clicked (e.g. an open fork deleted via its ancestor).
+    const removed = new Set(deletedIds ?? [sessionId]);
+    if (selectedSession && removed.has(selectedSession.id)) {
       const cwd = selectedSession.cwd;
       if (cwd) startNewSession(cwd, selectedSession.projectRoot ?? activeProjectRoot ?? cwd);
       else {
@@ -511,6 +535,28 @@ export function AppShell() {
       router.replace("/", { scroll: false });
     }
   }, [selectedSession, router, activeProjectRoot, setNewSessionCwd, setSelectedSession, startNewSession]);
+
+  const handleProjectDeleted = useCallback((_projectRoot: string, deletedIds: string[]) => {
+    setRefreshKey((k) => k + 1);
+    // Deleting a project removes every session in it; when the open session
+    // was among them, open a fresh draft in the workspace the sidebar has
+    // already switched to (the default directory), or reset to the empty
+    // state when no workspace remains.
+    if (selectedSession && deletedIds.includes(selectedSession.id)) {
+      const { activeCwd: fallbackCwd, activeProjectRoot: fallbackRoot } = useWorkspaceStore.getState();
+      if (fallbackCwd) startNewSession(fallbackCwd, fallbackRoot ?? fallbackCwd);
+      else {
+        setSelectedSession(null);
+        setNewSessionCwd(null);
+      }
+      setSessionKey((k) => k + 1);
+      setBranchTree([]);
+      setBranchActiveLeafId(null);
+      setSystemPrompt(null);
+      setActiveTopPanel(null);
+      router.replace("/", { scroll: false });
+    }
+  }, [selectedSession, router, setNewSessionCwd, setSelectedSession, startNewSession]);
 
   const handleOpenFile = useCallback((
     filePath: string,
@@ -814,13 +860,55 @@ export function AppShell() {
         onInitialRestoreDone={handleInitialRestoreDone}
         refreshKey={refreshKey}
         onSessionDeleted={handleSessionDeleted}
+        onProjectDeleted={handleProjectDeleted}
         onOpenFile={handleOpenFile}
         explorerRefreshKey={explorerRefreshKey}
         onExplorerRefresh={handleExplorerRefresh}
         onAtMention={handleAtMention}
         onAtMentions={handleAtMentions}
       />
-      <div style={{ padding: "8px", flexShrink: 0, display: "flex", justifyContent: "space-between", gap: 4 }}>
+      <div ref={settingsMenuRef} style={{ position: "relative", padding: "8px", flexShrink: 0 }}>
+        <button
+          onClick={() => setSettingsMenuOpen((current) => !current)}
+          title={t("common.settings")}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", gap: 8,
+            height: 32, padding: "0 10px",
+            background: settingsMenuOpen ? "var(--bg-hover)" : "none",
+            border: "none", borderRadius: 9,
+            color: settingsMenuOpen ? "var(--text)" : "var(--text-muted)",
+            cursor: "pointer", fontSize: 12,
+            transition: "background 0.12s, color 0.12s",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; }}
+          onMouseLeave={(e) => { if (!settingsMenuOpen) { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text-muted)"; } }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          <span style={{ flex: 1, textAlign: "left" }}>{t("common.settings")}</span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: settingsMenuOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
+        </button>
+        <AnimatedDropdown
+          open={settingsMenuOpen}
+          from="bottom"
+          style={{
+            position: "absolute",
+            bottom: "calc(100% + 4px)",
+            left: 8,
+            right: 8,
+            zIndex: 100,
+            background: "var(--bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            boxShadow: "0 6px 20px rgba(0,0,0,0.10)",
+            overflow: "hidden",
+            padding: 4,
+          }}
+        >
         {([
           {
             label: t("common.models"),
@@ -876,20 +964,7 @@ export function AppShell() {
             ),
           },
           {
-            label: "联网",
-            onClick: () => setWebAccessConfigOpen(true),
-            disabled: false,
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M3 12h18" />
-                <path d="M12 3a15 15 0 0 1 0 18" />
-                <path d="M12 3a15 15 0 0 0 0 18" />
-              </svg>
-            ),
-          },
-          {
-            label: "Agents",
+            label: t("common.agents"),
             onClick: () => setSubagentsConfigOpen(true),
             disabled: !activeCwd && !selectedSession?.cwd && !newSessionCwd,
             icon: (
@@ -901,26 +976,45 @@ export function AppShell() {
               </svg>
             ),
           },
+          {
+            label: t("common.advanced"),
+            onClick: () => setWorkspaceConfigOpen(true),
+            disabled: false,
+            icon: (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="4" y1="21" x2="4" y2="14" />
+                <line x1="4" y1="10" x2="4" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12" y2="3" />
+                <line x1="20" y1="21" x2="20" y2="16" />
+                <line x1="20" y1="12" x2="20" y2="3" />
+                <line x1="1" y1="14" x2="7" y2="14" />
+                <line x1="9" y1="8" x2="15" y2="8" />
+                <line x1="17" y1="16" x2="23" y2="16" />
+              </svg>
+            ),
+          },
         ] as { label: string; onClick: () => void; disabled: boolean; icon: React.ReactNode }[]).map(({ label, onClick, disabled, icon }) => (
           <button
             key={label}
-            onClick={onClick}
+            onClick={() => { setSettingsMenuOpen(false); onClick(); }}
             disabled={disabled}
             title={label}
             style={{
-              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              height: 32, padding: 0, background: "none", border: "none",
-              borderRadius: 9, color: "var(--text-muted)", cursor: disabled ? "default" : "pointer",
-              fontSize: 12, opacity: disabled ? 0.35 : 1,
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "7px 10px", background: "none", border: "none",
+              borderRadius: 6, color: "var(--text-muted)", cursor: disabled ? "default" : "pointer",
+              fontSize: 12, opacity: disabled ? 0.35 : 1, textAlign: "left",
               transition: "background 0.12s, color 0.12s",
             }}
             onMouseEnter={(e) => { if (!disabled) { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; } }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text-muted)"; }}
           >
-            {icon}
+            <span style={{ flexShrink: 0, display: "flex" }}>{icon}</span>
             {label}
           </button>
         ))}
+        </AnimatedDropdown>
       </div>
     </>
   );
@@ -1917,6 +2011,9 @@ export function AppShell() {
       </svg>
     </button>
     {modelsConfigOpen && <ModelsConfig onClose={() => { setModelsConfigOpen(false); setModelsRefreshKey((k) => k + 1); }} />}
+    {workspaceConfigOpen && (
+      <WorkspaceConfig onClose={() => setWorkspaceConfigOpen(false)} />
+    )}
     {projectTrustDialogOpen && projectTrustCwd && (
       <ProjectTrustDialog
         cwd={projectTrustCwd}
@@ -1944,13 +2041,6 @@ export function AppShell() {
         cwd={projectTrustCwd}
         sessionId={selectedSession?.id ?? null}
         onClose={() => setMcpConfigOpen(false)}
-        onReloaded={() => setSessionKey((k) => k + 1)}
-      />
-    )}
-    {webAccessConfigOpen && (
-      <WebAccessConfig
-        sessionId={selectedSession?.id ?? null}
-        onClose={() => setWebAccessConfigOpen(false)}
         onReloaded={() => setSessionKey((k) => k + 1)}
       />
     )}

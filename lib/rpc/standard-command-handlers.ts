@@ -1,7 +1,7 @@
 import type { SlashCommandInfo } from "@earendil-works/pi-coding-agent";
 import { invalidateModelsCache } from "../models-cache";
 import { invalidateSessionListCache } from "../session-reader";
-import type { McpStatusSnapshot } from "../mcp-extension";
+import type { McpControlAction, McpControlResult, McpStatusSnapshot } from "../mcp-extension";
 import type { AgentSessionLike } from "../pi-types";
 import type { RuntimeCommand } from "../kernel";
 import { parseAgentImages, type PiRuntimeAdapter } from "../adapters/pi";
@@ -15,6 +15,8 @@ type StandardCommandContext = {
   extensionUi: ExtensionUiBridge;
   isPromptRunning: () => boolean;
   getMcpStatus: () => McpStatusSnapshot | null;
+  isMcpControlReady: () => boolean;
+  sendMcpControl: (request: { action: McpControlAction; server?: string }) => Promise<McpControlResult>;
   waitForExtensionsBound: () => Promise<void>;
   setForceEmptySystemPrompt: (force: boolean) => void;
   applyForcedEmptySystemPrompt: () => void;
@@ -169,6 +171,19 @@ const STANDARD_COMMAND_HANDLERS: Partial<Record<RuntimeCommand["type"], Standard
   set_auto_retry: (command, context) => {
     context.inner.setAutoRetryEnabled(expectCommand(command, "set_auto_retry").enabled);
     return null;
+  },
+
+  mcp_action: async (command, context) => {
+    const { action, server } = expectCommand(command, "mcp_action");
+    // The adapter's control listener is installed during extension load, which
+    // finishes before session binding; waiting here covers commands racing the
+    // initial bind.
+    await context.waitForExtensionsBound();
+    if (!context.isMcpControlReady()) {
+      return { ok: false, message: "MCP 控制通道不可用", started: false };
+    }
+    const result = await context.sendMcpControl({ action, ...(server ? { server } : {}) });
+    return { ok: result.ok, ...(result.message ? { message: result.message } : {}), ...(result.started ? { started: result.started } : {}) };
   },
 };
 

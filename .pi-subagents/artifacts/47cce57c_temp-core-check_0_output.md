@@ -1,0 +1,1 @@
+TEMP_CORE_OK

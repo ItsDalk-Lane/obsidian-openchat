@@ -1,0 +1,114 @@
+{
+  "runId": "47cce57c",
+  "agent": "temp-core-check",
+  "task": "只回复 TEMP_CORE_OK",
+  "exitCode": 0,
+  "usage": {
+    "input": 1598,
+    "output": 193,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "cost": 0,
+    "turns": 1
+  },
+  "model": "hs-Agent Plan/ark-code-latest",
+  "attemptedModels": [
+    "hs-Agent Plan/ark-code-latest"
+  ],
+  "modelAttempts": [
+    {
+      "model": "hs-Agent Plan/ark-code-latest",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 1598,
+        "output": 193,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "cost": 0,
+        "turns": 1
+      }
+    }
+  ],
+  "durationMs": 5594,
+  "toolCount": 0,
+  "launchContractDigest": "e839a8fc5db6935bf8526fbc4a9150870fad6c043767c218d340f8f7c6b15831",
+  "acceptance": {
+    "status": "attested",
+    "evidenceStatus": "attested",
+    "explicit": false,
+    "effectiveAcceptance": {
+      "level": "attested",
+      "explicit": false,
+      "inferredReason": [
+        "default lightweight attestation"
+      ],
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "must": "Return a concise result and residual risks when applicable",
+          "evidence": [
+            "manual-notes",
+            "residual-risks"
+          ],
+          "severity": "required"
+        }
+      ],
+      "evidence": [
+        "manual-notes",
+        "residual-risks"
+      ],
+      "verify": [],
+      "stopRules": []
+    },
+    "inferredReason": [
+      "default lightweight attestation"
+    ],
+    "criteria": [
+      {
+        "id": "criterion-1",
+        "must": "Return a concise result and residual risks when applicable",
+        "evidence": [
+          "manual-notes",
+          "residual-risks"
+        ],
+        "severity": "required"
+      }
+    ],
+    "runtimeChecks": [],
+    "verifyRuns": [],
+    "childReport": {
+      "criteriaSatisfied": [
+        {
+          "id": "criterion-1",
+          "status": "satisfied",
+          "evidence": "Returned the required token TEMP_CORE_OK with no residual risks."
+        }
+      ],
+      "changedFiles": [],
+      "testsAddedOrUpdated": [],
+      "commandsRun": [],
+      "validationOutput": [
+        "Task output: TEMP_CORE_OK"
+      ],
+      "residualRisks": [
+        "none"
+      ],
+      "noStagedFiles": true,
+      "diffSummary": "No code changes; response-only task.",
+      "reviewFindings": [
+        "no blockers"
+      ],
+      "manualNotes": ""
+    }
+  },
+  "effects": {
+    "fileMutation": {
+      "status": "not-applicable",
+      "expected": false,
+      "attempted": false
+    }
+  },
+  "transcriptPath": "/Users/study_superior/Desktop/Code/pi-web/.pi-subagents/artifacts/47cce57c_temp-core-check_0_transcript.jsonl",
+  "timestamp": 1785490652468
+}

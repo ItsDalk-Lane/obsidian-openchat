@@ -15,6 +15,47 @@ import type { SettingsManager } from "@earendil-works/pi-coding-agent";
 /** Event-bus channel the adapter publishes read-only status snapshots on. */
 export const MCP_STATUS_EVENT = "pi-mcp-adapter/status/v1";
 
+// ============================================================================
+// pi-web control channel (patched adapter build)
+//
+// The bundled adapter is patched (patches/pi-mcp-adapter+*.patch) to drop its
+// /mcp and /mcp-auth slash commands and instead expose reconnect/OAuth
+// operations through these event-bus channels so the MCP settings UI can drive
+// them. Requests are answered with a result correlated by requestId; progress
+// and user-facing messages (including OAuth authorization URLs) arrive as
+// notices.
+// ============================================================================
+
+/** Emitted by the adapter once its control-channel listener is installed. */
+export const MCP_CONTROL_READY_EVENT = "pi-mcp-adapter/control-ready/v1";
+/** pi-web → adapter: { requestId, action, server? } */
+export const MCP_CONTROL_REQUEST_EVENT = "pi-mcp-adapter/control-request/v1";
+/** adapter → pi-web: { requestId, ok, message?, started? } */
+export const MCP_CONTROL_RESULT_EVENT = "pi-mcp-adapter/control-result/v1";
+/** adapter → pi-web: { requestId, text, level } */
+export const MCP_CONTROL_NOTICE_EVENT = "pi-mcp-adapter/control-notice/v1";
+
+export type McpControlAction = "reconnect" | "auth" | "logout";
+
+export interface McpControlRequest {
+  readonly requestId: string;
+  readonly action: McpControlAction;
+  readonly server?: string;
+}
+
+export interface McpControlResult {
+  readonly requestId: string;
+  readonly ok: boolean;
+  readonly message?: string;
+  readonly started?: boolean;
+}
+
+export interface McpControlNotice {
+  readonly requestId: string;
+  readonly text: string;
+  readonly level: "info" | "warning" | "error";
+}
+
 export type McpServerRuntimeStatus =
   | "connected"
   | "cached"
@@ -89,7 +130,7 @@ function packageSourceMatchesExtension(entry: PackageSourceLike, packageName: st
   const source = typeof entry === "string" ? entry : entry.source;
   const escapedPackageName = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // The trailing boundary group is mandatory: without it, a package named
-  // "pi-web-access-pro" would falsely match a bundled "pi-web-access".
+  // e.g. "pi-mcp-adapter-pro" should not match bundled "pi-mcp-adapter".
   const packagePattern = new RegExp(`(^|[/:@\\\\])${escapedPackageName}(@|$|[/\\\\])`);
   return packagePattern.test(source) || source === packageName;
 }

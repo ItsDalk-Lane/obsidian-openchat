@@ -19,6 +19,35 @@ export function formatExtensionStatusLine(
     .join(" ");
 }
 
+export function ExtensionStatusText({
+  statuses,
+}: {
+  statuses: ExtensionStatusItem[];
+}) {
+  const statusLine = formatExtensionStatusLine(statuses);
+  const plainStatusLine = stripAnsi(statusLine);
+
+  return (
+    <span
+      role="status"
+      aria-label={plainStatusLine}
+      title={plainStatusLine}
+      style={{
+        minWidth: 0,
+        overflow: "hidden",
+        color: "var(--text-muted)",
+        fontSize: 11,
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {parseAnsiLine(statusLine).map((segment, index) => (
+        <span key={index} style={segment.style}>{segment.text}</span>
+      ))}
+    </span>
+  );
+}
+
 export function ExtensionStatusBar({
   statuses,
 }: {
@@ -26,14 +55,8 @@ export function ExtensionStatusBar({
 }) {
   if (statuses.length === 0) return null;
 
-  const statusLine = formatExtensionStatusLine(statuses);
-  const plainStatusLine = stripAnsi(statusLine);
-
   return (
     <div
-      role="status"
-      aria-label={plainStatusLine}
-      title={plainStatusLine}
       style={{
         display: "flex",
         alignItems: "center",
@@ -45,20 +68,7 @@ export function ExtensionStatusBar({
         background: "var(--bg-panel)",
       }}
     >
-      <span
-        style={{
-          minWidth: 0,
-          overflow: "hidden",
-          color: "var(--text-muted)",
-          fontSize: 11,
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {parseAnsiLine(statusLine).map((segment, index) => (
-          <span key={index} style={segment.style}>{segment.text}</span>
-        ))}
-      </span>
+      <ExtensionStatusText statuses={statuses} />
     </div>
   );
 }

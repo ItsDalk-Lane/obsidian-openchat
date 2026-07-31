@@ -25,7 +25,8 @@ export type RuntimeCommand =
   | ExtensionUiInputCommand
   | SetAutoRetryCommand
   | BashCommand
-  | AbortBashCommand;
+  | AbortBashCommand
+  | McpActionCommand;
 
 export type BootstrapCommand = EnsureSessionCommand;
 export type NewSessionCommand = RuntimeCommand | BootstrapCommand;
@@ -66,6 +67,7 @@ export interface ExtensionUiInputCommand { type: "extension_ui_input"; id: strin
 export interface SetAutoRetryCommand { type: "set_auto_retry"; enabled: boolean }
 export interface BashCommand { type: "bash"; command: string; excludeFromContext?: boolean }
 export interface AbortBashCommand { type: "abort_bash" }
+export interface McpActionCommand { type: "mcp_action"; action: "reconnect" | "auth" | "logout"; server?: string }
 export interface EnsureSessionCommand { type: "ensure_session" }
 
 export type RuntimeCommandResultMap = {
@@ -104,6 +106,7 @@ export type RuntimeCommandResultMap = {
   set_auto_retry: null;
   bash: Record<string, unknown> | null;
   abort_bash: null;
+  mcp_action: { ok: boolean; message?: string; started?: boolean };
 };
 
 export type RuntimeCommandResult<C extends RuntimeCommand> = RuntimeCommandResultMap[C["type"]];
@@ -201,6 +204,10 @@ export function parseRuntimeCommand(input: unknown): ParseSuccess<RuntimeCommand
       if (!isString(input.command)) return fail("bash.command is required");
       if (input.excludeFromContext !== undefined && !isBoolean(input.excludeFromContext)) return fail("bash.excludeFromContext must be boolean");
       return { ok: true, value: { type, command: input.command, excludeFromContext: input.excludeFromContext } };
+    case "mcp_action":
+      if (input.action !== "reconnect" && input.action !== "auth" && input.action !== "logout") return fail("mcp_action.action must be reconnect, auth, or logout");
+      if (input.server !== undefined && !isString(input.server)) return fail("mcp_action.server must be a string");
+      return { ok: true, value: { type, action: input.action, server: input.server } };
     default:
       return fail(`Unsupported command: ${type}`);
   }

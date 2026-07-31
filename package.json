@@ -35,10 +35,12 @@
     "!.next/**/*.js.map",
     "public",
     "next.config.ts",
-    "package.json"
+    "package.json",
+    "patches"
   ],
   "main": "electron/main.js",
   "scripts": {
+    "postinstall": "patch-package",
     "dev": "next dev -H 127.0.0.1 -p 30141",
     "dev:lan": "next dev -H 0.0.0.0 -p 30141",
     "build": "next build --webpack",
@@ -119,9 +121,8 @@
     "@earendil-works/pi-tui": "0.82.1",
     "electron-updater": "^6.8.9",
     "next": "16.2.12",
-    "pi-mcp-adapter": "^2.13.0",
-    "pi-subagents": "^0.37.2",
-    "pi-web-access": "^0.15.0",
+    "pi-mcp-adapter": "2.13.0",
+    "pi-subagents": "0.37.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "strip-json-comments": "^5.0.3",
@@ -143,6 +144,7 @@
     "katex": "^0.16.47",
     "mammoth": "^1.12.0",
     "mermaid": "^11.14.0",
+    "patch-package": "^8.0.1",
     "postcss": "^8",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^16.1.1",

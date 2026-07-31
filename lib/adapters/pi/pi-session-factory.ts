@@ -8,7 +8,19 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { bundledExtensionSpecs } from "../../bundled";
-import { MCP_STATUS_EVENT, isExtensionInstalledAsPackage, resolveBundledExtensionDir, type McpStatusSnapshot } from "../../mcp-extension";
+import {
+  MCP_CONTROL_NOTICE_EVENT,
+  MCP_CONTROL_READY_EVENT,
+  MCP_CONTROL_REQUEST_EVENT,
+  MCP_CONTROL_RESULT_EVENT,
+  MCP_STATUS_EVENT,
+  isExtensionInstalledAsPackage,
+  resolveBundledExtensionDir,
+  type McpControlAction,
+  type McpControlNotice,
+  type McpControlResult,
+  type McpStatusSnapshot,
+} from "../../mcp-extension";
 import type { AgentSessionLike } from "../../pi-types";
 import { getProjectTrustStatus, projectTrustReloadOptions } from "../../project-trust";
 
@@ -24,6 +36,12 @@ export interface PiSessionFactoryResult {
   realSessionFile: string | undefined;
   forceEmptySystemPrompt: boolean;
   subscribeMcpStatus: (listener: (snapshot: McpStatusSnapshot) => void) => () => void;
+  /** True once the patched adapter has installed its control-channel listener. */
+  isMcpControlReady: () => boolean;
+  /** Send a reconnect/auth/logout request to the adapter; resolves with the correlated result. */
+  sendMcpControl: (request: { action: McpControlAction; server?: string }) => Promise<McpControlResult>;
+  /** Progress/user-facing messages from control operations (e.g. OAuth URLs). */
+  subscribeMcpControlNotices: (listener: (notice: McpControlNotice) => void) => () => void;
   dispose: () => void;
 }
 
@@ -78,6 +96,40 @@ export async function createPiSession(input: CreatePiSessionInput): Promise<PiSe
     for (const listener of listeners) listener(snapshot);
   });
 
+  // pi-web control channel (patched adapter): ready flag, correlated results,
+  // and forwarded notices. Listeners are registered before the extension loads
+  // so the ready event emitted during factory install is never missed.
+  let mcpControlReady = false;
+  let mcpControlCounter = 0;
+  const controlNoticeListeners = new Set<(notice: McpControlNotice) => void>();
+  const pendingControlRequests = new Map<string, {
+    resolve: (result: McpControlResult) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>();
+  const failPendingControlRequests = (message: string) => {
+    for (const [requestId, pending] of pendingControlRequests) {
+      clearTimeout(pending.timer);
+      pending.resolve({ requestId, ok: false, message });
+    }
+    pendingControlRequests.clear();
+  };
+  const unsubControlReady = mcpEventBus.on(MCP_CONTROL_READY_EVENT, () => {
+    mcpControlReady = true;
+  });
+  const unsubControlResult = mcpEventBus.on(MCP_CONTROL_RESULT_EVENT, (data) => {
+    const result = data as McpControlResult;
+    const pending = pendingControlRequests.get(result.requestId);
+    if (!pending) return;
+    pendingControlRequests.delete(result.requestId);
+    clearTimeout(pending.timer);
+    pending.resolve(result);
+  });
+  const unsubControlNotice = mcpEventBus.on(MCP_CONTROL_NOTICE_EVENT, (data) => {
+    const notice = data as McpControlNotice;
+    if (typeof notice?.text !== "string") return;
+    for (const listener of controlNoticeListeners) listener(notice);
+  });
+
   const services = await createAgentSessionServices({
     cwd: input.cwd,
     agentDir,
@@ -108,9 +160,40 @@ export async function createPiSession(input: CreatePiSessionInput): Promise<PiSe
         listeners.delete(listener);
       };
     },
+    isMcpControlReady: () => mcpControlReady,
+    sendMcpControl: (request) => {
+      if (!mcpControlReady) {
+        return Promise.resolve({ requestId: "", ok: false, message: "MCP control channel unavailable" });
+      }
+      const requestId = `mcpctl-${Date.now().toString(36)}-${++mcpControlCounter}`;
+      return new Promise<McpControlResult>((resolve) => {
+        const timer = setTimeout(() => {
+          pendingControlRequests.delete(requestId);
+          resolve({ requestId, ok: false, message: "MCP control request timed out" });
+        }, 120_000);
+        timer.unref?.();
+        pendingControlRequests.set(requestId, { resolve, timer });
+        mcpEventBus.emit(MCP_CONTROL_REQUEST_EVENT, {
+          requestId,
+          action: request.action,
+          ...(request.server ? { server: request.server } : {}),
+        });
+      });
+    },
+    subscribeMcpControlNotices: (listener) => {
+      controlNoticeListeners.add(listener);
+      return () => {
+        controlNoticeListeners.delete(listener);
+      };
+    },
     dispose: () => {
       listeners.clear();
       unsubMcpStatus();
+      controlNoticeListeners.clear();
+      failPendingControlRequests("MCP control channel closed");
+      unsubControlReady();
+      unsubControlResult();
+      unsubControlNotice();
     },
   };
 }

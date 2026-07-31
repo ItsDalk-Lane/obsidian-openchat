@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { McpScope, McpServerEntry, McpServerInfo, McpServersResponse } from "@/lib/mcp-config";
 import type { McpServerRuntimeStatus, McpStatusSnapshot } from "@/lib/mcp-extension";
+import { parseMcpImport, type ImportedMcpServer } from "@/lib/mcp-import";
 
 function shortenPath(p: string): string {
   return p.replace(/^\/(?:Users|home)\/[^/]+/, "~").replace(/^[A-Za-z]:\\Users\\[^\\]+/, "~");
@@ -92,19 +93,22 @@ function emptyForm(scope: McpScope): ServerFormState {
   return { name: "", scope, transport: "stdio", command: "", args: "", env: "", url: "", headers: "", lifecycle: "" };
 }
 
-function formFromServer(server: McpServerInfo): ServerFormState {
-  const c = server.config;
+function formFromEntry(name: string, scope: McpScope, entry: McpServerEntry): ServerFormState {
   return {
-    name: server.name,
-    scope: server.sourceScope,
-    transport: typeof c.url === "string" ? "http" : "stdio",
-    command: c.command ?? "",
-    args: (c.args ?? []).join("\n"),
-    env: Object.entries(c.env ?? {}).map(([k, v]) => `${k}=${v}`).join("\n"),
-    url: c.url ?? "",
-    headers: Object.entries(c.headers ?? {}).map(([k, v]) => `${k}: ${v}`).join("\n"),
-    lifecycle: (c.lifecycle as ServerFormState["lifecycle"]) ?? "",
+    name,
+    scope,
+    transport: typeof entry.url === "string" ? "http" : "stdio",
+    command: entry.command ?? "",
+    args: (entry.args ?? []).join("\n"),
+    env: Object.entries(entry.env ?? {}).map(([k, v]) => `${k}=${v}`).join("\n"),
+    url: entry.url ?? "",
+    headers: Object.entries(entry.headers ?? {}).map(([k, v]) => `${k}: ${v}`).join("\n"),
+    lifecycle: entry.lifecycle ?? "",
   };
+}
+
+function formFromServer(server: McpServerInfo): ServerFormState {
+  return formFromEntry(server.name, server.sourceScope, server.config);
 }
 
 function parseKeyValueLines(text: string, separator: "=" | ":"): Record<string, string> | undefined {
@@ -160,8 +164,15 @@ export function McpConfig({
   const [statusLive, setStatusLive] = useState(false);
   const [formMode, setFormMode] = useState<"add" | "edit" | null>(null);
   const [form, setForm] = useState<ServerFormState>(emptyForm("project"));
+  const [importText, setImportText] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importNote, setImportNote] = useState<string | null>(null);
+  const [importedBatch, setImportedBatch] = useState<ImportedMcpServer[] | null>(null);
+  const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [opRunning, setOpRunning] = useState<string | null>(null);
+  const [opResult, setOpResult] = useState<{ ok: boolean; text: string; key: string } | null>(null);
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selected;
 
@@ -222,6 +233,42 @@ export function McpConfig({
     return entry?.status ?? "not-connected";
   }, [status]);
 
+  const runMcpAction = useCallback(async (action: "reconnect" | "auth" | "logout", server?: string) => {
+    if (!sessionId) return;
+    const key = `${action}:${server ?? "*"}`;
+    setOpRunning(key);
+    setOpResult(null);
+    setActionError(null);
+    try {
+      const res = await fetch("/api/mcp/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, action, ...(server ? { server } : {}) }),
+      });
+      const d = (await res.json()) as { ok?: boolean; message?: string; started?: boolean; error?: string };
+      if (!res.ok) throw new Error(d.error ?? `HTTP ${res.status}`);
+      if (action === "auth" && d.started) {
+        setOpResult({ ok: true, key, text: "授权页已在浏览器打开；完成授权后状态会自动更新（通知中附有授权链接）。" });
+      } else {
+        setOpResult({ ok: d.ok === true, key, text: d.message ?? (d.ok ? "操作完成" : "操作失败") });
+      }
+    } catch (e) {
+      setOpResult({ ok: false, key, text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setOpRunning(null);
+    }
+  }, [sessionId]);
+
+  // After add/enable, eagerly connect once so tool metadata is cached and the
+  // model can discover the server right away. With the adapter's default lazy
+  // lifecycle, a never-connected server has no cached tools and looks
+  // "not connected" to the model. The /api/mcp route awaits the session reload
+  // before responding, so the control channel is ready again at this point.
+  const autoReconnect = useCallback((name: string) => {
+    if (!sessionId || !statusLive) return;
+    void runMcpAction("reconnect", name);
+  }, [sessionId, statusLive, runMcpAction]);
+
   const toggle = useCallback(async (server: McpServerInfo) => {
     const next = !server.disabled;
     setToggling((s) => new Set(s).add(server.name));
@@ -236,6 +283,7 @@ export function McpConfig({
       if (!res.ok || d.error) throw new Error(d.error ?? `HTTP ${res.status}`);
       await load();
       onReloaded?.();
+      if (!next) autoReconnect(server.name);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -245,7 +293,15 @@ export function McpConfig({
         return n;
       });
     }
-  }, [cwd, sessionId, load, onReloaded]);
+  }, [cwd, sessionId, load, onReloaded, autoReconnect]);
+
+  const resetImport = useCallback(() => {
+    setImportText("");
+    setImportError(null);
+    setImportNote(null);
+    setImportedBatch(null);
+    setImporting(false);
+  }, []);
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -268,15 +324,82 @@ export function McpConfig({
       const d = (await res.json()) as { success?: boolean; error?: string };
       if (!res.ok || d.error) throw new Error(d.error ?? `HTTP ${res.status}`);
       setFormMode(null);
+      resetImport();
       setSelected(form.name.trim());
       await load();
       onReloaded?.();
+      const editingDisabled = formMode === "edit" && data?.servers.find((s) => s.name === selected)?.disabled === true;
+      if (!editingDisabled) autoReconnect(form.name.trim());
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
-  }, [cwd, form, formMode, selected, sessionId, load, onReloaded]);
+  }, [cwd, form, formMode, selected, sessionId, load, onReloaded, data, autoReconnect, resetImport]);
+
+  // 粘贴 JSON 识别：单个服务器直接填充表单（沿用正常保存流程），
+  // 多个服务器进入批量确认面板。
+  const applyImport = useCallback(() => {
+    setImportError(null);
+    setImportNote(null);
+    setImportedBatch(null);
+    try {
+      const { servers, unnamedEntry } = parseMcpImport(importText);
+      if (unnamedEntry) {
+        setForm((f) => formFromEntry(f.name, f.scope, unnamedEntry));
+        setImportNote("已填充表单（粘贴的内容未包含名称，请填写后保存）");
+        return;
+      }
+      if (servers.length === 1) {
+        setForm((f) => formFromEntry(servers[0].name, f.scope, servers[0].entry));
+        setImportNote(`已填充「${servers[0].name}」，确认无误后点击保存`);
+        return;
+      }
+      setImportedBatch(servers);
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : String(e));
+    }
+  }, [importText]);
+
+  const importBatch = useCallback(async () => {
+    if (!importedBatch) return;
+    const conflicts = importedBatch.filter((s) => data?.servers.some((existing) => existing.name === s.name));
+    if (conflicts.length > 0) {
+      const names = conflicts.map((s) => s.name).join("、");
+      if (!window.confirm(`以下名称已存在：${names}\n导入会在所选作用域写入同名配置。继续？`)) return;
+    }
+    setImporting(true);
+    setImportError(null);
+    try {
+      for (const server of importedBatch) {
+        const res = await fetch("/api/mcp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "upsert",
+            cwd,
+            scope: form.scope,
+            name: server.name,
+            config: server.entry,
+            sessionId,
+          }),
+        });
+        const d = (await res.json()) as { success?: boolean; error?: string };
+        if (!res.ok || d.error) throw new Error(`${server.name}: ${d.error ?? `HTTP ${res.status}`}`);
+      }
+      const names = importedBatch.map((s) => s.name);
+      resetImport();
+      setFormMode(null);
+      setSelected(names[0]);
+      await load();
+      onReloaded?.();
+      for (const name of names) autoReconnect(name);
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImporting(false);
+    }
+  }, [importedBatch, data, cwd, form.scope, sessionId, load, onReloaded, autoReconnect, resetImport]);
 
   const remove = useCallback(async (server: McpServerInfo) => {
     if (!window.confirm(`删除 MCP 服务器 "${server.name}"？`)) return;
@@ -373,6 +496,40 @@ export function McpConfig({
                 {statusLive ? "● 会话状态实时" : "○ 会话未加载"}
               </span>
             )}
+            {sessionId && statusLive && (
+              <button
+                onClick={() => void runMcpAction("reconnect")}
+                disabled={opRunning !== null}
+                title="重新连接所有 MCP 服务器"
+                style={{
+                  padding: "3px 10px",
+                  fontSize: 11,
+                  color: "var(--text)",
+                  background: "var(--bg-hover)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 6,
+                  cursor: opRunning ? "wait" : "pointer",
+                  opacity: opRunning ? 0.6 : 1,
+                }}
+              >
+                {opRunning === "reconnect:*" ? "重连中…" : "全部重连"}
+              </button>
+            )}
+            {opResult?.key === "reconnect:*" && (
+              <span
+                title={opResult.text}
+                style={{
+                  fontSize: 10,
+                  color: opResult.ok ? "#22c55e" : "#f87171",
+                  maxWidth: 200,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {opResult.text}
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -439,6 +596,7 @@ export function McpConfig({
                             setSelected(server.name);
                             setFormMode(null);
                             setActionError(null);
+                            setOpResult(null);
                           }}
                           style={{
                             display: "flex",
@@ -495,6 +653,7 @@ export function McpConfig({
                   setFormMode("add");
                   setForm(emptyForm("project"));
                   setActionError(null);
+                  resetImport();
                 }}
                 style={{
                   width: "100%",
@@ -520,6 +679,95 @@ export function McpConfig({
                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
                   {formMode === "add" ? "添加 MCP 服务器" : `编辑 ${selected}`}
                 </div>
+                {formMode === "add" && (
+                  <div style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 6,
+                    padding: 10,
+                    background: "var(--bg-panel)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>
+                      从 JSON 导入（可选）
+                    </div>
+                    <textarea
+                      style={{ ...inputStyle, minHeight: 92, resize: "vertical", fontSize: 11 }}
+                      value={importText}
+                      onChange={(e) => {
+                        setImportText(e.target.value);
+                        setImportError(null);
+                        setImportNote(null);
+                        setImportedBatch(null);
+                      }}
+                      placeholder={'粘贴 {"mcpServers": { "名称": { "command": "...", "args": [...] } }} 配置，点击识别后自动填充'}
+                    />
+                    {importError && <div style={{ fontSize: 11, color: "#f87171" }}>{importError}</div>}
+                    {importNote && <div style={{ fontSize: 11, color: "#4ade80" }}>{importNote}</div>}
+                    {importedBatch ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12, color: "var(--text)" }}>
+                        <div>识别到 {importedBatch.length} 个服务器：{importedBatch.map((s) => s.name).join("、")}</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                          将添加到{form.scope === "project" ? "项目 (.mcp.json)" : "全局 (~/.config/mcp/mcp.json)"}（可在下方「作用域」更改）
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            onClick={() => void importBatch()}
+                            disabled={importing}
+                            style={{
+                              padding: "6px 14px",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "var(--bg)",
+                              background: "var(--accent)",
+                              border: "none",
+                              borderRadius: 6,
+                              cursor: importing ? "wait" : "pointer",
+                              opacity: importing ? 0.6 : 1,
+                            }}
+                          >
+                            {importing ? "添加中…" : `全部添加 ${importedBatch.length} 个`}
+                          </button>
+                          <button
+                            onClick={() => setImportedBatch(null)}
+                            disabled={importing}
+                            style={{
+                              padding: "6px 14px",
+                              fontSize: 12,
+                              color: "var(--text-muted)",
+                              background: "none",
+                              border: "1px solid var(--border)",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                            }}
+                          >
+                            取消
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <button
+                          onClick={applyImport}
+                          disabled={!importText.trim()}
+                          style={{
+                            padding: "6px 14px",
+                            fontSize: 12,
+                            color: "var(--text)",
+                            background: "var(--bg-hover)",
+                            border: "1px solid var(--border)",
+                            borderRadius: 6,
+                            cursor: importText.trim() ? "pointer" : "default",
+                            opacity: importText.trim() ? 1 : 0.5,
+                          }}
+                        >
+                          识别 JSON
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label style={fieldLabelStyle}>名称</label>
                   <input
@@ -655,6 +903,7 @@ export function McpConfig({
                     onClick={() => {
                       setFormMode(null);
                       setActionError(null);
+                      resetImport();
                     }}
                     style={{
                       padding: "7px 16px",
@@ -748,10 +997,81 @@ export function McpConfig({
                       敏感字段（token、环境变量、请求头的值）以 *** 显示；编辑时保留 *** 表示不修改原值。
                     </div>
 
-                    {runtime === "needs-auth" && (
-                      <div style={{ fontSize: 11, color: "#d97706" }}>
-                        该服务器需要认证。请在 pi CLI 中运行 /mcp-auth {server.name} 完成 OAuth 登录。
+                    {sessionId && statusLive && !server.disabled && (
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                        <button
+                          onClick={() => void runMcpAction("reconnect", server.name)}
+                          disabled={opRunning !== null}
+                          style={{
+                            padding: "6px 14px",
+                            fontSize: 12,
+                            color: "var(--text)",
+                            background: "var(--bg-hover)",
+                            border: "1px solid var(--border)",
+                            borderRadius: 6,
+                            cursor: opRunning ? "wait" : "pointer",
+                            opacity: opRunning ? 0.6 : 1,
+                          }}
+                        >
+                          {opRunning === `reconnect:${server.name}` ? "重连中…" : "重新连接"}
+                        </button>
+                        {server.transport === "http" && (
+                          <>
+                            <button
+                              onClick={() => void runMcpAction("auth", server.name)}
+                              disabled={opRunning !== null}
+                              title="发起 OAuth 授权：自动打开系统浏览器，完成后自动重连"
+                              style={{
+                                padding: "6px 14px",
+                                fontSize: 12,
+                                fontWeight: runtime === "needs-auth" ? 600 : 400,
+                                color: runtime === "needs-auth" ? "var(--bg)" : "var(--text)",
+                                background: runtime === "needs-auth" ? "var(--accent)" : "var(--bg-hover)",
+                                border: runtime === "needs-auth" ? "none" : "1px solid var(--border)",
+                                borderRadius: 6,
+                                cursor: opRunning ? "wait" : "pointer",
+                                opacity: opRunning ? 0.6 : 1,
+                              }}
+                            >
+                              {opRunning === `auth:${server.name}` ? "发起授权…" : "OAuth 登录"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (!window.confirm(`清除 "${server.name}" 的 OAuth 登录凭据？`)) return;
+                                void runMcpAction("logout", server.name);
+                              }}
+                              disabled={opRunning !== null}
+                              style={{
+                                padding: "6px 14px",
+                                fontSize: 12,
+                                color: "var(--text)",
+                                background: "none",
+                                border: "1px solid var(--border)",
+                                borderRadius: 6,
+                                cursor: opRunning ? "wait" : "pointer",
+                                opacity: opRunning ? 0.6 : 1,
+                              }}
+                            >
+                              {opRunning === `logout:${server.name}` ? "清除中…" : "清除认证"}
+                            </button>
+                          </>
+                        )}
+                        {runtime === "needs-auth" && (
+                          <span style={{ fontSize: 11, color: "#d97706" }}>
+                            需要 OAuth 认证 — 点击「OAuth 登录」在浏览器中完成授权。
+                          </span>
+                        )}
                       </div>
+                    )}
+
+                    {runtime === "needs-auth" && (!sessionId || !statusLive) && (
+                      <div style={{ fontSize: 11, color: "#d97706" }}>
+                        该服务器需要 OAuth 认证；会话加载后可在此页面直接登录。
+                      </div>
+                    )}
+
+                    {opResult && opResult.key !== "reconnect:*" && (
+                      <div style={{ fontSize: 11, color: opResult.ok ? "#22c55e" : "#f87171" }}>{opResult.text}</div>
                     )}
 
                     {actionError && <div style={{ fontSize: 11, color: "#f87171" }}>{actionError}</div>}
