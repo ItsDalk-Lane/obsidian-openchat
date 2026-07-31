@@ -1,5 +1,12 @@
 # BLOCKED.md（待裁决清单）
 
+## 0. 本次迁移开工时没有任务书所述未提交改动
+
+- 任务书现状称工作树有大量未提交改动，要求开工先原样 `git add -A && git commit` 保住。
+- 实测 `git status --short`、`git diff --stat`、`git diff --cached --stat` 均无输出；起点是 `main@56311cd`，与 `origin/main` 一致。
+- 因没有内容可保护，未制造空提交；直接从该提交创建 `refactor/vite-foundation`。
+- 影响判断：不影响四条基线、67 条路由盘点或后续迁移，可继续全部技术工作；最终提交序列会比任务书少一个“任务 0 保住提交”。
+
 ## 1. 基线行数描述偏差
 
 - 任务书：`lib/mcp-extension.ts` 共 99 行。

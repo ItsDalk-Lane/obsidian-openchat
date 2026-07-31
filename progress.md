@@ -323,3 +323,30 @@ __需求__：手动一项项填表单太慢，要求直接粘贴 `{"mcpServers":
 ### 错误与偏差
 
 - 清理带外删除后，仍打开的模态框列表与状态行保留旧值（模态框列表为组件本地状态、状态行来自 adapter setStatus 的 SSE 推送）：属预期，重开面板/刷新页面后即一致；非数据错误。
+
+## Vite + 独立 Node 后端迁移（2026-08-01）
+
+### 当前理解（任务 0，≤10 行）
+
+1. 目标：让 Web 与 Electron 全部改跑 Vite 前端和独立单进程 Node 服务，Next.js 完全退场，用户行为不变。
+2. 顺序：先锁定基线和 67 条路由 → 完成后端及红绿冒烟 → 迁移前端 → 切换启动/发布 → 删除 `app/`。
+3. 最大风险：动态路由参数、流式连接和 Next.js 请求/响应语义迁移时出现无声偏差。
+4. 防线：先做可机械核对的路由清单，再以真实接口冒烟和故意破坏后的红→绿证明覆盖有效。
+5. 严格边界：`lib/**`、全部 `.test.mjs`、既有 test 脚本只读；组件和 hooks 仅做去 Next.js 化。
+6. 当前分支：`refactor/vite-foundation`；从干净的 `main@56311cd` 创建，未生成空的“保住提交”。
+
+### 任务 0：基线核对
+
+- [x] `node_modules/.bin/tsc --noEmit -p tsconfig.typecheck.json`：退出码 0。
+- [x] `npm run lint`：退出码 0，0 错误、0 警告。
+- [x] `npm run test`：tests 280 / pass 278 / fail 2 / skipped 0；失败仅为任务书具名的两项。
+- [x] `npm run test:pi-adapter`：tests 11 / pass 11 / fail 0 / skipped 0。
+- [x] `find app/api -name route.ts | wc -l`：67；排序清单已写入 `scripts/route-inventory.txt`。
+- [x] 已创建并切换到 `refactor/vite-foundation`，后续不在 `main` 上施工。
+- [!] 任务书所述“大量未提交改动”与实测不符；当前工作树起始即为空，证据与处理写在 `BLOCKED.md` 最上面。
+
+### 阶段计划
+
+- [进行中] 任务 1：独立后端、67 条路由、3 条 SSE、关键接口冒烟和红→绿反向验证。
+- [待开始] 任务 2：Vite 前端、代理/静态资源、深链、构建与 Next.js 引用清零。
+- [待开始] 任务 3：Web/Electron 启动切换、发布配置、先提交再删除 `app/`、最终全量验收。
