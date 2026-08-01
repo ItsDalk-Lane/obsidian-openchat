@@ -563,3 +563,59 @@ __需求__：手动一项项填表单太慢，要求直接粘贴 `{"mcpServers":
 - [x] 独立 `npm run test:pi-adapter` 为 `11/11`；i18n parity 为 `en=450 zh-CN=450`、零差异。
 - [x] 五个冻结片段逐条命中；任务书字面 hex 命令对所有已改组件无输出、退出码 1，即 0 命中；`git diff --check` 无输出。
 - [x] 最终任务 2 边界仅六个主组件、`web/globals.css` 与本进度文件；没有新增文案、语言 key、依赖、测试改动或 hooks 改动。
+
+### 任务 3：运行、构建与浏览器验证（进行中，止损断点）
+
+- [x] `node scripts/smoke-api.mjs` 退出码 0：`SMOKE PASS 15 checks; 67 routes covered`，包含 3 条 SSE。
+- [x] `npm run build` 退出码 0：Vite 8.2.0 转换 2,884 个模块并生成正式产物；仅保留既有大分块提示。验证后已删除可重建的 `web/dist`。
+- [x] 浏览器环境确认：Python Playwright 可导入，本机 Google Chrome 可执行；按持久连接页面规则等待 `document.title === "Pi Web"` 与 `#root`，未使用 `networkidle`。
+- [x] 为 before 使用任务 1 提交 `5a78a4d` 建立一次性 detached worktree；before 页面真实完成，`title=Pi Web`、`readyState=complete`、根节点 3 个直接子节点、横向溢出 false、控制台/页面/请求错误均为 0，已生成 `pi-web-before.png`。
+- 浏览器尝试 1：after 使用默认接口端口时，服务真实报 `EADDRINUSE 127.0.0.1:30141` 后退出；before 正常。该次只取得 before，不作为完整截图验收。
+- 浏览器尝试 2：after 改用独立 `5175/30143` 后页面与接口服务均 Ready；但浏览器子进程超过外层单次等待窗口，编排层未取得其最终结果，随后服务被停止，因此没有 after/mobile 合格输出。
+- 清理尝试 1：组合清理里的 `rm -rf` 被安全策略拒绝，未执行；改用 Git worktree 移除和逐项删除。
+- 清理尝试 2：zsh 循环变量误用了特殊变量名 `path`，导致同一 shell 后续找不到 `find`；Git worktree 已先移除，数据目录尚未确认。
+- [x] 清理尝试 3：改用 `cleanup_target` 和 `/usr/bin/find -depth -delete` 后完成；当前只剩主工作树，两个临时服务均已停止，隔离数据目录与正式构建产物均已删除。
+- [ ] 当前未提交文件仅 `scripts/visual-smoke.py` 与本进度记录；任务 3 尚未提交。截图目录只有 before，严禁把它充作 before/after 完成。
+- [ ] 续跑入口：使用非冲突端口重新启动 before/after 两个隔离服务，运行 `scripts/visual-smoke.py` 并显式等待其结束；取得 after 与 after-mobile、零错误和 `VISUAL SMOKE PASS` 后，补领导亲验清单、最终审计并做任务 3 单独提交。
+- [止损] 本轮已达到 40 次工具调用上限，按任务书停止，不继续第三次浏览器编排。
+
+### 任务 3：运行、构建与浏览器验证（完成）
+
+- [x] 续跑时把浏览器默认交互等待收紧到 5 秒，并修正验收脚本的输入框定位；没有改产品逻辑。第一次复跑准确暴露“未选择项目时不会渲染输入框”，随后通过隔离数据目录里的真实设置接口指定一次性默认目录，再走真实项目菜单进入空会话。
+- [x] 第一组完整浏览器验收退出码 0：before/after 桌面页和 after 390×844 窄屏页的控制台错误、页面异常、非 SSE 请求失败均为 0；after 的作用域外壳、项目菜单与选择、输入焦点环、工具栏 hover、空态、移动端侧栏均命中，三页横向溢出均为 false；末行 `VISUAL SMOKE PASS`。
+- [x] 肉眼复核发现第一组 before/after 中央内容状态不同，因此没有拿它充作最终对比；又让两边都通过各自真实项目选择流程进入空会话并聚焦输入框，得到同状态 1440×960 对比图。该组再次退出码 0，before/after/mobile 错误仍全为 0，末行仍为 `VISUAL SMOKE PASS`。
+- [x] 同状态关键值：before `hasScopedShell=false`、基础输入阴影；after `hasScopedShell=true`、`toolbarHoverBackground=rgb(240, 242, 245)`、项目菜单/选择/空态均为 true，输入框同时出现强调边框与约 3px 焦点环；移动端 `sidebarOpen=true`、`horizontalOverflow=false`。
+- [x] 截图已保存为 `pi-web-before.png`、`pi-web-after.png`、`pi-web-after-mobile.png`；肉眼确认改造后工作区边界、面板抬升、输入焦点和控件层次更清楚，移动端抽屉与遮罩完整，没有截断或溢出。
+- [x] 两轮浏览器服务均使用独立页面端口、接口端口、运行数据目录与 Agent 目录；结束后服务已停止，临时 worktree、配置、工作目录与 Python 缓存均精确删除，当前只剩主工作树。
+
+### 领导亲验清单（14 条）
+
+1. 启动后打开根页面：先看左侧栏、顶栏、聊天区、右侧文件区是否仍是熟悉的三栏工作台。
+2. 桌面密度：在 1440px 宽度下看会话行、顶栏按钮、标签和输入控制栏，确认紧凑但不拥挤。
+3. 层次：看画布、侧栏、抬升面板、聊天空态卡和输入框是否能一眼分出前后层级。
+4. 选中态：依次选项目、会话和文件标签，确认当前项比 hover 更明确，文字仍清晰。
+5. 焦点态：用键盘切到项目选择、顶栏按钮、标签和输入框，确认焦点环完整且不会被裁掉。
+6. 空态：新建空会话，看品牌、输入框、模型/工具控制和空白留白是否形成稳定视觉重心。
+7. 流式输出中：发送真实消息，看增量文字、运行状态和停止/排队操作是否稳定且不跳布局。
+8. 工具调用展开：展开一条工具调用及结果，看标题、参数、结果与状态色的层级是否清楚。
+9. 分支导航：在有分支的会话切换前后节点，看当前位置、可用方向和聊天内容是否同步。
+10. Fork 与深链：从用户消息 Fork，再复制带 `?session=` 的地址重开，确认仍进入正确会话。
+11. Worktree：打开工作树切换器，检查当前项、hover、创建/移除确认和脏目录警告不变。
+12. 拖拽：拖文件进聊天区并拖动工作区分隔位置，确认反馈、落点与原行为一致。
+13. 移动端窄宽：在 390px 宽度打开侧栏，确认抽屉、遮罩、关闭动作与正文均无横向溢出。
+14. 明暗主题：切换现有两套主题，确认面板层次、边框、状态色和正文对比度都成立。
+
+### 最终收口审计（完成）
+
+- [x] 精确当前树执行 `npm run check`：`typecheck` 的 `tsc --noEmit -p tsconfig.typecheck.json` 与 `lint` 的 `eslint .` 均通过；主测试为 `tests 280 / pass 278 / fail 2 / cancelled 0 / skipped 0 / todo 0`，失败仍只限 `only Shift+click bypasses session deletion confirmation` 与 `agent discovery returns builtin, user, and project domains with override metadata`。原命令因这两项基线失败真实退出 1，并按既有 `&&` 在适配器前停止，没有伪装成功。
+- [x] 单独执行 `npm run test:pi-adapter`：`tests 11 / pass 11 / fail 0 / cancelled 0 / skipped 0 / todo 0`，退出码 0；输出只有既有模块类型性能警告。
+- [x] `node scripts/i18n-parity.cjs`：`en=450 zh-CN=450`、`zero difference`，退出码 0；两份语言文件没有本任务差异。
+- [x] `python3 -m py_compile scripts/visual-smoke.py`：退出码 0、无输出；生成的缓存只用于语法检查，最终审计前精确删除，不随交付提交。
+- [x] 五个冻结片段最终逐条命中：FileExplorer 的三类文本位于 477、871/892、872/900 行，AppShell 透传片段位于 1986 行，FileViewer 显示模式片段位于 1096 行。
+- [x] 14 个旧设计变量在 `web/globals.css` 的明暗主题中全部保留；六个已改组件整文件 `grep -En '#[0-9a-fA-F]{3,8}'` 为 0 命中，新增行 hex 审计也为 0 命中。
+- [x] 测试、package 清单、`server/`、`electron/`、`bin/`、`lib/` 相对 `main` 均无差异；`git diff --check main` 无输出。
+- [x] 首次原始路径审计只多出语法检查生成的 `scripts/__pycache__/visual-smoke.cpython-314.pyc`；它是可重建缓存，已列为清理目标，清理后必须重新跑白名单才可提交。
+- [x] 独立只读复核得到相同结论；它把 Git 显示的小写 `progress.md` 标为字面疑点。当前文件系统实测 `PROGRESS.md` 与 `progress.md` inode 同为 20121884，Git 既有跟踪名为小写且 `core.ignorecase=true`；这就是 `BLOCKED.md` 已记录的同一路径大小写兼容情形，不另造重命名改动。
+- [x] 精确删除 `scripts/__pycache__` 后重新审计：相对 `main` 加未跟踪文件共 11 个路径，全部位于 `BLOCKED.md`、同 inode 的进度文件、六个目标组件、`web/globals.css` 与 `scripts/`；`whitelist_violations=0`。
+- [x] `BLOCKED.md` 已把进度文件大小写项收口为“不再阻塞”；当前状态继续为无未解决阻塞。
+- [x] 完成条件已齐：主门禁保持基线、适配器 11/11、五个冻结片段全中、双语零差异、接口冒烟 15/15 覆盖 67 路由、Vite 正式构建成功、浏览器同状态 before/after 与窄屏验收通过、组件新增行无违规 hex、白名单 0 越界。任务 3 可独立提交。

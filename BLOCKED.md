@@ -52,4 +52,4 @@
 - `git ls-tree -r --name-only HEAD` 显示仓库已有受版本控制的 `progress.md`。
 - 当前 macOS 文件系统大小写不敏感，`git config --get core.ignorecase` 输出 `true`；因此任务书要求的新建 `PROGRESS.md` 会覆盖既有 `progress.md`，Git 仍显示小写路径。
 - 已确认任务开始前工作区干净，误覆盖完全由本任务造成；先恢复原文件，再把本任务进度追加到同一逻辑文件，保留历史内容。
-- 待裁决：最终 `git diff main --stat` 会显示 `progress.md`，但在当前文件系统上它与白名单中的 `PROGRESS.md` 是同一路径，无法同时存在。
+- 最终处置：`git diff main --stat` 会沿用仓库既有跟踪名显示 `progress.md`；实测它与白名单中的 `PROGRESS.md` inode 相同，且仓库 `core.ignorecase=true`。本任务按同一逻辑路径处理，不为大小写制造与视觉任务无关的整文件重命名；该项不再阻塞。
