@@ -24,6 +24,9 @@ Lint: `npm run lint`
   - first launch requires right-click → 打开 (or `xattr -dr com.apple.quarantine /Applications/Pi\ Web\ Desktop.app`);
   - **macOS auto-update does not work without a code signature** (Squirrel.Mac requirement) — Mac users update by downloading the new DMG from Releases manually. Windows clients auto-update normally. Enabling Mac auto-update later requires an Apple Developer account ($99/yr) + signing/notarization secrets in CI.
 - The macOS job runs after the Windows job (`needs:`) because concurrent electron-builder publishes to the same Release can create duplicate draft releases.
+- Two release-pipeline traps (both hit by v1.0.0):
+  - The workflow **pre-creates the GitHub Release** (`gh release create --generate-notes`) before electron-builder runs. Without it, electron-builder's per-artifact publishers race to create the release themselves; the loser gets `422 already_exists` and fails the job mid-upload (that's how a release can end up with a `.blockmap` but no `.exe`).
+  - The universal DMG merge requires `mac.x64ArchFiles: "**/*.node"` — dependency `.node` prebuilds are byte-identical in the x64/arm64 app bundles, and `@electron/universal` refuses to merge identical Mach-O files unless this rule covers them. Files with genuinely different per-arch bytes are still lipo'd normally; this rule only matches identical ones.
 
 ---
 
