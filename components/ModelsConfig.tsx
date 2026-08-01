@@ -139,11 +139,11 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete }: {
   }, [provider.api]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 16, border: "1px solid var(--border)", borderRadius: "var(--ui-radius-md)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-subtle)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <SectionTitle>{t("i18n.provider")}</SectionTitle>
-        <button onClick={onDelete}
-          style={{ padding: "3px 8px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, color: "#ef4444", cursor: "pointer", fontSize: 11 }}>
+        <button className="pi-sidebar-action is-danger" onClick={onDelete}
+          style={{ padding: "3px 8px", background: "var(--bg)", border: "1px solid color-mix(in srgb, var(--danger) 36%, var(--border))", borderRadius: "var(--ui-radius-xs)", color: "var(--danger)", cursor: "pointer", fontSize: 11 }}>
           {t("i18n.delete")}
         </button>
       </div>
@@ -151,8 +151,8 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete }: {
       <Field label={t("i18n.providerName")}>
         <TextInput value={editingName} onChange={setEditingName} placeholder="provider-name" mono />
         {editingName !== name && editingName.trim() && (
-          <button onClick={() => onRename(editingName.trim())}
-            style={{ marginTop: 4, padding: "3px 10px", background: "var(--accent)", border: "none", borderRadius: 4, color: "#fff", cursor: "pointer", fontSize: 11, alignSelf: "flex-start" }}>
+          <button className="pi-send-button" onClick={() => onRename(editingName.trim())}
+            style={{ marginTop: 4, padding: "3px 10px", background: "var(--accent)", border: "none", borderRadius: "var(--ui-radius-xs)", color: "var(--text-on-accent)", cursor: "pointer", fontSize: 11, alignSelf: "flex-start" }}>
             {t("i18n.rename")}
           </button>
         )}
@@ -185,12 +185,12 @@ type ThinkingLevel = typeof THINKING_LEVELS[number];
 
 const LEVEL_COLORS: Record<ThinkingLevel, string> = {
   off:     "var(--text-dim)",
-  minimal: "#6b7280",
-  low:     "#60a5fa",
-  medium:  "#a78bfa",
-  high:    "#f472b6",
-  xhigh:   "#fb923c",
-  max:     "#ef4444",
+  minimal: "var(--text-muted)",
+  low:     "var(--accent)",
+  medium:  "var(--accent)",
+  high:    "var(--warning)",
+  xhigh:   "var(--warning)",
+  max:     "var(--danger)",
 };
 
 function ThinkingLevelMapEditor({
@@ -229,17 +229,17 @@ function ThinkingLevelMapEditor({
           fontWeight: 400,
           transition: "background 0.1s, color 0.1s",
           whiteSpace: "nowrap",
-          background: "var(--bg-panel)",
+          background: "var(--bg-elevated)",
           color: "var(--text-dim)",
         };
         const btnActive: React.CSSProperties = {
           background: "var(--accent)",
-          color: "#fff",
+          color: "var(--text-on-accent)",
           fontWeight: 600,
         };
         const btnActiveDisabled: React.CSSProperties = {
-          background: "#ef4444",
-          color: "#fff",
+          background: "var(--danger)",
+          color: "var(--text-on-accent)",
           fontWeight: 600,
         };
 
@@ -251,9 +251,9 @@ function ThinkingLevelMapEditor({
               alignItems: "center",
               gap: 8,
               padding: "5px 4px",
-              borderRadius: 6,
-              background: "transparent",
-              border: "1px solid transparent",
+              borderRadius: "var(--ui-radius-sm)",
+              background: "var(--bg-subtle)",
+              border: "1px solid color-mix(in srgb, var(--border) 72%, transparent)",
             }}
           >
             {/* Level badge */}
@@ -270,7 +270,7 @@ function ThinkingLevelMapEditor({
             </div>
 
             {/* Default + Disabled buttons */}
-            <div style={{ display: "flex", borderRadius: 5, border: "1px solid var(--border)", overflow: "hidden", flexShrink: 0 }}>
+            <div style={{ display: "flex", borderRadius: "var(--ui-radius-sm)", border: "1px solid var(--border)", overflow: "hidden", flexShrink: 0 }}>
               <button
                 onClick={() => setLevel(level, "omit")}
                 style={{ ...btnBase, ...(state === "omit" ? btnActive : {}) }}
@@ -286,7 +286,7 @@ function ThinkingLevelMapEditor({
             </div>
 
             {/* Custom button + input fused */}
-            <div style={{ display: "flex", borderRadius: 5, border: `1px solid ${state === "string" ? "var(--accent)" : "var(--border)"}`, overflow: "hidden", transition: "border-color 0.1s" }}>
+            <div style={{ display: "flex", borderRadius: "var(--ui-radius-sm)", border: `1px solid ${state === "string" ? "var(--accent)" : "var(--border)"}`, overflow: "hidden", transition: "border-color 0.1s" }}>
               <button
                 onClick={() => setLevel(level, strVal || level)}
                 style={{ ...btnBase, ...(state === "string" ? btnActive : {}), borderRight: "1px solid var(--border)", flexShrink: 0 }}
@@ -301,7 +301,7 @@ function ThinkingLevelMapEditor({
                 maxLength={10}
                 style={{
                   width: "12ch",
-                  background: state === "string" ? "var(--bg)" : "var(--bg-panel)",
+                  background: state === "string" ? "var(--bg)" : "var(--bg-elevated)",
                   border: "none",
                   outline: "none",
                   color: state === "string" ? "var(--text)" : "var(--text-dim)",
@@ -343,13 +343,13 @@ function ModelDetail({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 16, border: "1px solid var(--border)", borderRadius: "var(--ui-radius-md)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-subtle)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <SectionTitle>{t("i18n.model")}</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <ModelConnectionTest providerName={providerName} provider={provider} model={model} />
-          <button onClick={onDelete}
-            style={{ height: 24, padding: "0 8px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, color: "#ef4444", cursor: "pointer", fontSize: 11, boxSizing: "border-box" }}>
+          <button className="pi-sidebar-action is-danger" onClick={onDelete}
+            style={{ height: 24, padding: "0 8px", background: "var(--bg)", border: "1px solid color-mix(in srgb, var(--danger) 36%, var(--border))", borderRadius: "var(--ui-radius-xs)", color: "var(--danger)", cursor: "pointer", fontSize: 11, boxSizing: "border-box" }}>
             {t("i18n.remove")}
           </button>
         </div>
@@ -382,8 +382,9 @@ function ModelDetail({
               <SectionTitle>思考级别映射</SectionTitle>
               {model.thinkingLevelMap && (
                 <button
+                  className="pi-toolbar-button"
                   onClick={() => set("thinkingLevelMap", undefined)}
-                  style={{ fontSize: 10, padding: "2px 7px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text-dim)", cursor: "pointer" }}
+                  style={{ fontSize: 10, padding: "2px 7px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--ui-radius-xs)", color: "var(--text-dim)", cursor: "pointer" }}
                 >
                   全部清除
                 </button>
@@ -441,7 +442,7 @@ function ProviderIcon({ id, size }: { id: string; size: number }) {
           width: size,
           height: size,
           border: "1px solid var(--border)",
-          borderRadius: 4,
+          borderRadius: "var(--ui-radius-xs)",
           color: "var(--text-dim)",
           display: "inline-flex",
           alignItems: "center",
@@ -494,15 +495,16 @@ function AddProviderPicker({
   const cardStyle: React.CSSProperties = {
     display: "flex", flexDirection: "row", alignItems: "center", gap: 8,
     padding: "10px 12px",
-    background: "var(--bg-panel)",
+    background: "var(--bg-elevated)",
     border: "1px solid var(--border)",
-    borderRadius: 7,
+    borderRadius: "var(--ui-radius-md)",
     boxSizing: "border-box",
     cursor: "pointer",
     minWidth: 0,
     textAlign: "left",
-    transition: "border-color 0.12s, background 0.12s",
+    transition: "border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast)",
     width: "100%",
+    boxShadow: "var(--shadow-subtle)",
   };
 
 
@@ -512,19 +514,20 @@ function AddProviderPicker({
       style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ width: 820, maxWidth: "calc(100vw - 32px)", maxHeight: "min(72vh, calc(100vh - 32px))", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.22)", overflow: "hidden" }}>
+      <div style={{ width: 820, maxWidth: "calc(100vw - 32px)", maxHeight: "min(72vh, calc(100vh - 32px))", background: "var(--bg)", border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-lg)", display: "flex", flexDirection: "column", boxShadow: "var(--shadow-panel)", overflow: "hidden" }}>
         {/* Search */}
-        <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ padding: "11px 14px", borderBottom: "1px solid var(--border)", background: "var(--bg-elevated)", flexShrink: 0, display: "flex", alignItems: "center", gap: 8, boxShadow: "inset 0 -1px 0 var(--border)" }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-dim)", flexShrink: 0 }}>
             <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <input
+            className="focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-1"
             ref={inputRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
             placeholder={t("i18n.searchProviders")}
-            style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--text)", fontSize: 13, boxSizing: "border-box" }}
+            style={{ flex: 1, background: "transparent", border: "none", borderRadius: "var(--ui-radius-xs)", color: "var(--text)", fontSize: 13, boxSizing: "border-box" }}
           />
         </div>
 
@@ -539,10 +542,11 @@ function AddProviderPicker({
               )}
               {showCustom && (
                 <button
+                  className="focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-1"
                   onClick={() => { onAddCustom(); onClose(); }}
                   style={cardStyle}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-panel)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-elevated)"; }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>OpenAI / Anthropic 兼容</div>
@@ -560,10 +564,10 @@ function AddProviderPicker({
                 <div style={{ gridColumn: "1 / -1", paddingTop: showCustom ? 6 : 0, fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>{t("i18n.subscriptions")}</div>
               )}
               {availableOAuth.map((p) => (
-                <button key={p.id} onClick={() => { onSelectOAuth(p.id); onClose(); }}
+                <button className="focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-1" key={p.id} onClick={() => { onSelectOAuth(p.id); onClose(); }}
                   style={cardStyle}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-panel)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-elevated)"; }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
@@ -577,10 +581,10 @@ function AddProviderPicker({
                 <div style={{ gridColumn: "1 / -1", paddingTop: availableOAuth.length > 0 ? 6 : 0, fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>API 密钥</div>
               )}
               {availableApiKey.map((p) => (
-                <button key={p.id} onClick={() => { onSelectApiKey(p.id); onClose(); }}
+                <button className="focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-1" key={p.id} onClick={() => { onSelectApiKey(p.id); onClose(); }}
                   style={cardStyle}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-panel)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-elevated)"; }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.displayName}</div>
@@ -780,15 +784,15 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
     <>
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ width: isMobile ? "calc(100vw - 16px)" : 860, maxWidth: "calc(100vw - 16px)", height: isMobile ? "calc(100dvh - 16px)" : "78vh", maxHeight: "calc(100dvh - 16px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.18)", overflow: "hidden" }}>
+      <div style={{ width: isMobile ? "calc(100vw - 16px)" : 860, maxWidth: "calc(100vw - 16px)", height: isMobile ? "calc(100dvh - 16px)" : "78vh", maxHeight: "calc(100dvh - 16px)", background: "var(--bg)", border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-lg)", display: "flex", flexDirection: "column", boxShadow: "var(--shadow-panel)", overflow: "hidden" }}>
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 18px", borderBottom: "1px solid var(--border)", background: "var(--bg-elevated)", boxShadow: "inset 0 -1px 0 var(--border)", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>{t("common.models")}</span>
             <code style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>~/.pi/agent/models.json</code>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
+          <button className="pi-toolbar-button" onClick={onClose} style={{ background: "transparent", border: "none", borderRadius: "var(--ui-radius-xs)", color: "var(--text-muted)", cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
         </div>
 
         {/* Body */}
@@ -884,7 +888,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
                             {m.id || t("i18n.newModel")}
                           </span>
                           {m.reasoning && (
-                            <span style={{ fontSize: 9, padding: "1px 4px", background: "rgba(99,102,241,0.12)", color: "rgba(99,102,241,0.8)", borderRadius: 3, flexShrink: 0 }}>T</span>
+                            <span style={{ fontSize: 9, padding: "1px 4px", background: "var(--accent-soft)", color: "var(--accent)", borderRadius: "var(--ui-radius-xs)", flexShrink: 0 }}>T</span>
                           )}
                         </div>
                       );
@@ -906,9 +910,9 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
 
             {/* Add provider */}
             <div style={{ borderTop: "1px solid var(--border)", padding: "8px 6px" }}>
-              <button onClick={() => setPickerOpen(true)} style={{
+              <button className="pi-toolbar-button" onClick={() => setPickerOpen(true)} style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                width: "100%", padding: "6px 0", background: "none", border: "1px dashed var(--border)", borderRadius: 5,
+                width: "100%", padding: "6px 0", background: "var(--bg-elevated)", border: "1px dashed var(--border)", borderRadius: "var(--ui-radius-sm)",
                 color: "var(--text-muted)", cursor: "pointer", fontSize: 12,
               }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
@@ -920,7 +924,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Right: detail */}
-          <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: 20, background: "var(--bg)" }}>
             {loading ? null : detailContent ?? (
               <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13 }}>
                 {t("i18n.selectProviderModel")}
@@ -930,18 +934,18 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Footer */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, padding: "10px 18px", borderTop: "1px solid var(--border)", flexShrink: 0 }}>
-          {saveError && <span style={{ fontSize: 12, color: "#f87171", flex: 1 }}>{saveError}</span>}
-          <button onClick={onClose} style={{ padding: "6px 14px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, padding: "10px 18px", borderTop: "1px solid var(--border)", background: "var(--bg-elevated)", flexShrink: 0 }}>
+          {saveError && <span style={{ padding: "6px 8px", borderRadius: "var(--ui-radius-sm)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 12, flex: 1 }}>{saveError}</span>}
+          <button className="pi-toolbar-button" onClick={onClose} style={{ padding: "6px 14px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--ui-radius-sm)", color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>
             {t("i18n.cancel")}
           </button>
-          <button onClick={handleSave} disabled={saving || savedOk} style={{
+          <button className="pi-send-button" onClick={handleSave} disabled={saving || savedOk} style={{
             position: "relative",
             padding: "6px 16px",
             minWidth: 92,
-            background: savedOk ? "#16a34a" : saving ? "var(--bg-panel)" : "var(--accent)",
-            border: "none", borderRadius: 6,
-            color: savedOk ? "#fff" : saving ? "var(--text-muted)" : "#fff",
+            background: savedOk ? "var(--success)" : saving ? "var(--bg-hover)" : "var(--accent)",
+            border: "none", borderRadius: "var(--ui-radius-sm)",
+            color: savedOk ? "var(--text-on-accent)" : saving ? "var(--text-muted)" : "var(--text-on-accent)",
             cursor: (saving || savedOk) ? "default" : "pointer", fontSize: 13, fontWeight: 600,
             display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
             transition: "background-color 0.2s ease, color 0.2s ease",

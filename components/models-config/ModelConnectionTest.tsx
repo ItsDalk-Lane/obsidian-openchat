@@ -86,10 +86,10 @@ export function ModelConnectionTest({
             maxWidth: 260,
             height: 24,
             padding: "0 8px",
-            border: `1px solid ${testState.phase === "error" ? "#fecaca" : testState.phase === "success" ? "#bbf7d0" : "var(--border)"}`,
-            borderRadius: 4,
-            background: testState.phase === "error" ? "#fee2e2" : testState.phase === "success" ? "#dcfce7" : "#e5e7eb",
-            color: "#111827",
+            border: `1px solid ${testState.phase === "error" ? "var(--danger)" : testState.phase === "success" ? "var(--success)" : "var(--border)"}`,
+            borderRadius: "var(--ui-radius-xs)",
+            background: testState.phase === "error" ? "var(--danger-soft)" : testState.phase === "success" ? "var(--success-soft)" : "var(--bg-hover)",
+            color: testState.phase === "error" ? "var(--danger)" : testState.phase === "success" ? "var(--success)" : "var(--text-muted)",
             fontSize: 11,
             display: "inline-flex",
             alignItems: "center",
@@ -103,16 +103,17 @@ export function ModelConnectionTest({
         </span>
       )}
       <button
+        className="focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-1"
         onClick={handleTest}
         disabled={!model.id.trim() || testState.phase === "testing"}
         title={t("i18n.testConnection")}
         style={{
           height: 24,
           padding: "0 8px",
-          background: testState.phase === "success" ? "#16a34a" : "none",
-          border: `1px solid ${testState.phase === "success" ? "#16a34a" : "var(--border)"}`,
-          borderRadius: 4,
-          color: testState.phase === "success" ? "#fff" : (!model.id.trim() || testState.phase === "testing") ? "var(--text-dim)" : "var(--text-muted)",
+          background: testState.phase === "success" ? "var(--success)" : "var(--bg-elevated)",
+          border: `1px solid ${testState.phase === "success" ? "var(--success)" : "var(--border)"}`,
+          borderRadius: "var(--ui-radius-xs)",
+          color: testState.phase === "success" ? "var(--text-on-accent)" : (!model.id.trim() || testState.phase === "testing") ? "var(--text-dim)" : "var(--text-muted)",
           cursor: (!model.id.trim() || testState.phase === "testing") ? "not-allowed" : "pointer",
           fontSize: 11,
           display: "inline-flex",

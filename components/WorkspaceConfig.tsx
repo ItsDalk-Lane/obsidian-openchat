@@ -102,14 +102,14 @@ export function WorkspaceConfig({
           style={{
             width: 520,
             maxWidth: "100%",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--bg-panel)",
-            boxShadow: "0 12px 36px rgba(0,0,0,0.24)",
+            border: "1px solid var(--border-strong)",
+            borderRadius: "var(--ui-radius-lg)",
+            background: "var(--bg-elevated)",
+            boxShadow: "var(--shadow-panel)",
             overflow: "hidden",
           }}
         >
-          <div style={{ display: "flex", gap: 12, padding: "18px 18px 14px" }}>
+          <div style={{ display: "flex", gap: 12, padding: "20px 20px 16px" }}>
             <div style={{ minWidth: 0, width: "100%" }}>
               <div
                 id="workspace-config-title"
@@ -131,10 +131,11 @@ export function WorkspaceConfig({
               <div
                 style={{
                   marginTop: 12,
-                  padding: "10px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 6,
-                  background: "var(--bg)",
+                  padding: 12,
+                  border: "1px solid var(--border-strong)",
+                  borderRadius: "var(--ui-radius-md)",
+                  background: "var(--bg-panel)",
+                  boxShadow: "var(--shadow-subtle)",
                 }}
               >
                 <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 600 }}>
@@ -156,12 +157,14 @@ export function WorkspaceConfig({
                     width: "100%",
                     height: 32,
                     padding: "0 10px",
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
+                    border: "1px solid var(--border-strong)",
+                    borderRadius: "var(--ui-radius-sm)",
                     outline: "none",
-                    background: "var(--bg-panel)",
+                    background: "var(--bg-elevated)",
                     color: "var(--text)",
                     fontSize: 12,
+                    boxShadow: "var(--shadow-subtle)",
+                    transition: "border-color var(--transition-fast), box-shadow var(--transition-fast)",
                   }}
                 >
                   <option value="daily">{t("workspaceConfig.dailyTitle")}</option>
@@ -181,12 +184,14 @@ export function WorkspaceConfig({
                         flex: 1,
                         height: 32,
                         padding: "0 10px",
-                        border: "1px solid var(--border)",
-                        borderRadius: 6,
+                        border: "1px solid var(--border-strong)",
+                        borderRadius: "var(--ui-radius-sm)",
                         outline: "none",
-                        background: "var(--bg-panel)",
+                        background: "var(--bg-elevated)",
                         color: "var(--text)",
                         fontSize: 12,
+                        boxShadow: "var(--shadow-subtle)",
+                        transition: "border-color var(--transition-fast), box-shadow var(--transition-fast)",
                       }}
                     />
                     <button
@@ -196,13 +201,15 @@ export function WorkspaceConfig({
                       style={{
                         height: 32,
                         padding: "0 10px",
-                        border: "1px solid var(--border)",
-                        borderRadius: 6,
-                        background: "var(--bg-hover)",
+                        border: "1px solid var(--border-strong)",
+                        borderRadius: "var(--ui-radius-sm)",
+                        background: "var(--bg-elevated)",
                         color: "var(--text-muted)",
                         cursor: loading || saving ? "not-allowed" : "pointer",
                         fontSize: 12,
                         opacity: loading || saving ? 0.65 : 1,
+                        boxShadow: "var(--shadow-subtle)",
+                        transition: "background var(--transition-fast), border-color var(--transition-fast)",
                       }}
                     >
                       {t("workspaceConfig.browse")}
@@ -216,7 +223,11 @@ export function WorkspaceConfig({
                   role="alert"
                   style={{
                     marginTop: 10,
-                    color: "#ef4444",
+                    padding: "9px 11px",
+                    border: "1px solid color-mix(in srgb, var(--danger) 28%, var(--border))",
+                    borderRadius: "var(--ui-radius-sm)",
+                    background: "var(--danger-soft)",
+                    color: "var(--danger)",
                     fontSize: 12,
                     lineHeight: 1.5,
                   }}
@@ -231,8 +242,9 @@ export function WorkspaceConfig({
               display: "flex",
               justifyContent: "flex-end",
               gap: 8,
-              padding: "10px 18px",
-              borderTop: "1px solid var(--border)",
+              padding: "11px 20px",
+              borderTop: "1px solid var(--border-strong)",
+              background: "var(--bg-panel)",
             }}
           >
             <button
@@ -242,12 +254,13 @@ export function WorkspaceConfig({
               style={{
                 height: 32,
                 padding: "0 12px",
-                border: "1px solid var(--border)",
-                borderRadius: 5,
-                background: "transparent",
+                border: "1px solid var(--border-strong)",
+                borderRadius: "var(--ui-radius-sm)",
+                background: "var(--bg-elevated)",
                 color: "var(--text-muted)",
                 cursor: saving ? "not-allowed" : "pointer",
                 fontSize: 12,
+                boxShadow: "var(--shadow-subtle)",
               }}
             >
               {t("sidebar.cancel")}
@@ -260,13 +273,14 @@ export function WorkspaceConfig({
                 height: 32,
                 padding: "0 12px",
                 border: "1px solid var(--accent)",
-                borderRadius: 5,
+                borderRadius: "var(--ui-radius-sm)",
                 background: "var(--accent)",
-                color: "white",
+                color: "var(--text-on-accent)",
                 cursor: loading || saving ? "wait" : "pointer",
                 opacity: loading || saving ? 0.7 : 1,
                 fontSize: 12,
                 fontWeight: 600,
+                boxShadow: "var(--shadow-subtle)",
               }}
             >
               {saving ? t("workspaceConfig.saving") : t("workspaceConfig.save")}

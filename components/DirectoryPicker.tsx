@@ -240,13 +240,13 @@ export function DirectoryPicker({
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          background: "var(--bg)",
-          border: "1px solid var(--border)",
-          borderRadius: 10,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+          background: "var(--bg-elevated)",
+          border: "1px solid var(--border-strong)",
+          borderRadius: "var(--ui-radius-lg)",
+          boxShadow: "var(--shadow-panel)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, padding: "12px 18px", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, padding: "12px 18px", borderBottom: "1px solid var(--border)", background: "var(--bg-panel)" }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ color: "var(--text)", fontWeight: 700, fontSize: 15 }}>{t("directoryPicker.selectDirectory")}</div>
           </div>
@@ -263,7 +263,7 @@ export function DirectoryPicker({
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "220px minmax(0,1fr)", minHeight: 0, flex: 1 }}>
-          <aside className="directory-picker-sidebar" style={{ borderRight: "1px solid var(--border)", padding: "10px", overflow: "auto" }}>
+          <aside className="directory-picker-sidebar" style={{ borderRight: "1px solid var(--border)", padding: "10px", overflow: "auto", background: "var(--bg-subtle)" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {quickLinks.places.map((place) => (
                 <button
@@ -330,14 +330,14 @@ export function DirectoryPicker({
               </div>
             )}
             {quickLinksError && (
-              <div style={{ marginTop: 8, color: "#dc2626", fontSize: 11, lineHeight: 1.4 }}>
+              <div style={{ marginTop: 8, padding: "6px 8px", borderRadius: "var(--ui-radius-sm)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 11, lineHeight: 1.4 }}>
                 {quickLinksError}
               </div>
             )}
           </aside>
 
           <section style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--border)", background: "var(--bg-panel)" }}>
               <button
                 className="directory-picker-back"
                 type="button"
@@ -345,7 +345,7 @@ export function DirectoryPicker({
                 disabled={loading || !parentDirectory}
                 title={t("directoryPicker.goToParent")}
                 aria-label={t("directoryPicker.goToParent")}
-                style={{ width: 30, height: 30, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-hover)", color: "var(--text-muted)", cursor: parentDirectory ? "pointer" : "default", opacity: parentDirectory ? 1 : 0.45 }}
+                style={{ width: 30, height: 30, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-sm)", background: "var(--bg-hover)", color: "var(--text-muted)", cursor: parentDirectory ? "pointer" : "default", opacity: parentDirectory ? 1 : 0.45 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="m18 15-6-6-6 6" />
@@ -372,7 +372,7 @@ export function DirectoryPicker({
                         setPathInput(currentPath);
                       }
                     }}
-                    style={{ minWidth: 0, width: "100%", height: 30, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 6, outline: "none", background: "var(--bg-panel)", color: "var(--text)", fontSize: 12 }}
+                    style={{ minWidth: 0, width: "100%", height: 30, padding: "0 10px", border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-sm)", outline: "none", background: "var(--bg)", color: "var(--text)", fontSize: 12 }}
                   />
                 </form>
               ) : (
@@ -413,8 +413,8 @@ export function DirectoryPicker({
                   height: 30,
                   minWidth: 30,
                   padding: "0 7px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 6,
+                  border: "1px solid var(--border-strong)",
+                  borderRadius: "var(--ui-radius-sm)",
                   background: "var(--bg-hover)",
                   color: "var(--text-muted)",
                   cursor: "pointer",
@@ -424,14 +424,14 @@ export function DirectoryPicker({
               </button>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--border)", background: "var(--bg-subtle)" }}>
               <input
                 type="text"
                 value={filterText}
                 onChange={(event) => setFilterText(event.target.value)}
                 placeholder={t("directoryPicker.filterPlaceholder")}
                 className="directory-picker-path"
-                style={{ minWidth: 0, flex: 1, height: 30, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 6, outline: "none", background: "var(--bg-panel)", color: "var(--text)", fontSize: 12 }}
+                style={{ minWidth: 0, flex: 1, height: 30, padding: "0 10px", border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-sm)", outline: "none", background: "var(--bg)", color: "var(--text)", fontSize: 12 }}
               />
               <button
                 type="button"
@@ -440,10 +440,10 @@ export function DirectoryPicker({
                 style={{
                   height: 30,
                   padding: "0 10px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 6,
-                  background: showHidden ? "var(--bg-selected)" : "var(--bg-hover)",
-                  color: "var(--text-muted)",
+                  border: `1px solid ${showHidden ? "var(--focus-ring)" : "var(--border-strong)"}`,
+                  borderRadius: "var(--ui-radius-sm)",
+                  background: showHidden ? "var(--accent-soft)" : "var(--bg-hover)",
+                  color: showHidden ? "var(--accent)" : "var(--text-muted)",
                   cursor: "pointer",
                   fontSize: 12,
                 }}
@@ -462,8 +462,8 @@ export function DirectoryPicker({
                   height: 30,
                   minWidth: 30,
                   padding: "0 8px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 6,
+                  border: "1px solid var(--border-strong)",
+                  borderRadius: "var(--ui-radius-sm)",
                   background: "var(--bg-hover)",
                   color: "var(--text-muted)",
                   cursor: "pointer",
@@ -477,7 +477,7 @@ export function DirectoryPicker({
 
             <div className="directory-picker-list" style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "8px" }}>
               {creatingFolder && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)", marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: "var(--ui-radius-sm)", border: "1px solid var(--border-strong)", background: "var(--bg-subtle)", marginBottom: 8 }}>
                   <FolderIcon />
                   <input
                     ref={createInputRef}
@@ -497,7 +497,7 @@ export function DirectoryPicker({
                     }}
                     placeholder={t("directoryPicker.newFolderPlaceholder")}
                     className="directory-picker-path"
-                    style={{ flex: 1, minWidth: 0, height: 28, padding: "0 8px", border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg-panel)", color: "var(--text)", fontSize: 12 }}
+                    style={{ flex: 1, minWidth: 0, height: 28, padding: "0 8px", border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-sm)", background: "var(--bg)", color: "var(--text)", fontSize: 12 }}
                   />
                   <button
                     type="button"
@@ -506,8 +506,8 @@ export function DirectoryPicker({
                     style={{
                       height: 28,
                       padding: "0 9px",
-                      border: "1px solid var(--border)",
-                      borderRadius: 5,
+                      border: "1px solid var(--border-strong)",
+                      borderRadius: "var(--ui-radius-sm)",
                       background: "var(--bg-hover)",
                       color: "var(--text-muted)",
                       cursor: "pointer",
@@ -535,9 +535,9 @@ export function DirectoryPicker({
                         alignItems: "center",
                         gap: 7,
                         padding: "5px 8px",
-                        borderRadius: 6,
-                        background: active ? "var(--bg-selected)" : "none",
-                        color: "var(--text-muted)",
+                        borderRadius: "var(--ui-radius-sm)",
+                        background: active ? "var(--accent-soft)" : "none",
+                        color: active ? "var(--text)" : "var(--text-muted)",
                         fontSize: 12,
                         cursor: "pointer",
                         border: active ? "1px solid color-mix(in srgb, var(--accent) 28%, var(--border))" : "1px solid transparent",
@@ -575,7 +575,7 @@ export function DirectoryPicker({
               )}
 
               {(loadError || createError || error) && (
-                <div style={{ padding: "8px", color: "#dc2626", fontSize: 11 }}>
+                <div style={{ padding: "8px", borderRadius: "var(--ui-radius-sm)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 11 }}>
                   {loadError ?? createError ?? error}
                 </div>
               )}
@@ -583,12 +583,12 @@ export function DirectoryPicker({
           </section>
         </div>
 
-        <div className="directory-picker-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexShrink: 0, padding: "10px 18px", borderTop: "1px solid var(--border)" }}>
+        <div className="directory-picker-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexShrink: 0, padding: "10px 18px", borderTop: "1px solid var(--border)", background: "var(--bg-panel)" }}>
           <span style={{ minWidth: 0, flex: 1, color: "var(--text-dim)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={selectedPath || currentPath}>
             {displayCwd(selectedPath || currentPath, homeDir)}
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button className="directory-picker-action" type="button" onClick={onCancel} disabled={busy} style={{ padding: "6px 14px", border: "1px solid var(--border)", borderRadius: 6, background: "none", color: "var(--text-muted)", cursor: busy ? "default" : "pointer", fontSize: 13 }}>
+            <button className="directory-picker-action" type="button" onClick={onCancel} disabled={busy} style={{ padding: "6px 14px", border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-sm)", background: "var(--bg-hover)", color: "var(--text-muted)", cursor: busy ? "default" : "pointer", fontSize: 13 }}>
               {t("sidebar.cancel")}
             </button>
             <button
@@ -597,7 +597,7 @@ export function DirectoryPicker({
               onClick={() => onSelect(selectedPath || currentPath)}
               disabled={busy || !currentPath}
               title={t("directoryPicker.selectCurrentDirectory")}
-              style={{ padding: "6px 16px", border: 0, borderRadius: 6, background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, opacity: busy || !currentPath ? 0.6 : 1, cursor: busy || !currentPath ? "default" : "pointer" }}
+              style={{ padding: "6px 16px", border: "1px solid var(--accent)", borderRadius: "var(--ui-radius-sm)", background: "var(--accent)", color: "var(--text-on-accent)", fontSize: 13, fontWeight: 600, opacity: busy || !currentPath ? 0.6 : 1, cursor: busy || !currentPath ? "default" : "pointer" }}
             >
               {busy ? t("sidebar.checking") : selectLabel}
             </button>

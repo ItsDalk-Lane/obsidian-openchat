@@ -41,25 +41,25 @@ export function ProjectTrustDialog({
         style={{
           width: 440,
           maxWidth: "100%",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          background: "var(--bg-panel)",
-          boxShadow: "0 12px 36px rgba(0,0,0,0.24)",
+          border: "1px solid var(--border-strong)",
+          borderRadius: "var(--ui-radius-lg)",
+          background: "var(--bg-elevated)",
+          boxShadow: "var(--shadow-panel)",
           overflow: "hidden",
         }}
       >
-        <div style={{ display: "flex", gap: 12, padding: "18px 18px 14px" }}>
+        <div style={{ display: "flex", gap: 12, padding: "18px 18px 14px", background: "var(--bg-panel)" }}>
           <svg
             width="20"
             height="20"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#f59e0b"
+            stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
             aria-hidden="true"
-            style={{ flexShrink: 0, marginTop: 1 }}
+            style={{ flexShrink: 0, width: 36, height: 36, padding: 8, boxSizing: "border-box", borderRadius: "var(--ui-radius-md)", background: "var(--warning-soft)", color: "var(--warning)" }}
           >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
             <path d="m9 12 2 2 4-4" />
@@ -86,9 +86,9 @@ export function ProjectTrustDialog({
                 display: "block",
                 marginTop: 10,
                 padding: "8px 10px",
-                border: "1px solid var(--border)",
-                borderRadius: 5,
-                background: "var(--bg)",
+                border: "1px solid var(--border-strong)",
+                borderRadius: "var(--ui-radius-sm)",
+                background: "var(--bg-subtle)",
                 color: "var(--text)",
                 fontFamily: "var(--font-mono)",
                 fontSize: 11,
@@ -102,7 +102,11 @@ export function ProjectTrustDialog({
                 role="alert"
                 style={{
                   marginTop: 10,
-                  color: "#ef4444",
+                  padding: "8px 10px",
+                  border: "1px solid color-mix(in srgb, var(--danger) 24%, var(--border))",
+                  borderRadius: "var(--ui-radius-sm)",
+                  background: "var(--danger-soft)",
+                  color: "var(--danger)",
                   fontSize: 12,
                   lineHeight: 1.5,
                 }}
@@ -119,6 +123,7 @@ export function ProjectTrustDialog({
             gap: 8,
             padding: "10px 18px",
             borderTop: "1px solid var(--border)",
+            background: "var(--bg-panel)",
           }}
         >
           <button
@@ -128,9 +133,9 @@ export function ProjectTrustDialog({
             style={{
               height: 32,
               padding: "0 12px",
-              border: "1px solid var(--border)",
-              borderRadius: 5,
-              background: "transparent",
+              border: "1px solid var(--border-strong)",
+              borderRadius: "var(--ui-radius-sm)",
+              background: "var(--bg-hover)",
               color: "var(--text-muted)",
               cursor: busy ? "not-allowed" : "pointer",
               fontSize: 12,
@@ -146,9 +151,9 @@ export function ProjectTrustDialog({
               height: 32,
               padding: "0 12px",
               border: "1px solid var(--accent)",
-              borderRadius: 5,
+              borderRadius: "var(--ui-radius-sm)",
               background: "var(--accent)",
-              color: "white",
+              color: "var(--text-on-accent)",
               cursor: busy ? "wait" : "pointer",
               opacity: busy ? 0.7 : 1,
               fontSize: 12,

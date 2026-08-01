@@ -70,10 +70,10 @@ function findInstalledPackage(
 }
 
 function statusColor(status: PluginPackageInfo["status"]): string {
-  if (status === "loaded") return "var(--accent)";
-  if (status === "installed") return "#f59e0b";
+  if (status === "loaded") return "var(--success)";
+  if (status === "installed") return "var(--warning)";
   if (status === "disabled") return "var(--text-dim)";
-  return "#ef4444";
+  return "var(--danger)";
 }
 
 function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
@@ -171,10 +171,10 @@ function ScopeTag({ scope }: { scope: PluginScope }) {
       style={{
         fontSize: 10,
         padding: "1px 5px",
-        borderRadius: 3,
+        borderRadius: "var(--ui-radius-xs)",
         flexShrink: 0,
-        background: scope === "project" ? "rgba(99,102,241,0.12)" : "rgba(120,120,120,0.12)",
-        color: scope === "project" ? "rgba(99,102,241,0.85)" : "var(--text-dim)",
+        background: scope === "project" ? "var(--accent-soft)" : "var(--bg-subtle)",
+        color: scope === "project" ? "var(--accent)" : "var(--text-muted)",
       }}
     >
       {scope}
@@ -185,13 +185,15 @@ function ScopeTag({ scope }: { scope: PluginScope }) {
 function buttonStyle(disabled?: boolean, danger?: boolean): React.CSSProperties {
   return {
     padding: "6px 12px",
-    background: danger ? "rgba(239,68,68,0.08)" : "none",
-    border: "1px solid var(--border)",
-    borderRadius: 6,
-    color: danger ? "#ef4444" : "var(--text-muted)",
+    background: danger ? "var(--danger-soft)" : "var(--bg-elevated)",
+    border: "1px solid var(--border-strong)",
+    borderRadius: "var(--ui-radius-sm)",
+    color: danger ? "var(--danger)" : "var(--text-muted)",
     cursor: disabled ? "not-allowed" : "pointer",
     fontSize: 12,
     opacity: disabled ? 0.5 : 1,
+    boxShadow: "var(--shadow-subtle)",
+    transition: "background var(--transition-fast), border-color var(--transition-fast)",
   };
 }
 
@@ -222,9 +224,9 @@ function Toggle({
         border: "none",
         padding: 0,
         cursor: loading ? "wait" : "pointer",
-        background: enabled ? "var(--accent)" : "var(--border)",
+        background: enabled ? "var(--accent)" : "var(--border-strong)",
         position: "relative",
-        transition: "background 0.18s",
+        transition: "background var(--transition-base)",
         outline: "none",
         opacity: loading ? 0.65 : 1,
       }}
@@ -237,8 +239,8 @@ function Toggle({
           width: 16,
           height: 16,
           borderRadius: "50%",
-          background: "var(--bg)",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.22)",
+          background: "var(--bg-elevated)",
+          boxShadow: "var(--shadow-subtle)",
           transition: "left 0.18s cubic-bezier(.4,0,.2,1)",
         }}
       />
@@ -260,10 +262,12 @@ function SegmentedScope({
     <div
       style={{
         display: "inline-flex",
-        border: "1px solid var(--border)",
-        borderRadius: 7,
+        border: "1px solid var(--border-strong)",
+        borderRadius: "var(--ui-radius-sm)",
         overflow: "hidden",
         height: 30,
+        background: "var(--bg-panel)",
+        boxShadow: "var(--shadow-subtle)",
       }}
     >
       {(["global", "project"] as PluginScope[]).map((scope) => {
@@ -280,7 +284,7 @@ function SegmentedScope({
             style={{
               width: 76,
               border: "none",
-              borderRight: scope === "global" ? "1px solid var(--border)" : "none",
+              borderRight: scope === "global" ? "1px solid var(--border-strong)" : "none",
               background: active ? "var(--bg-selected)" : "none",
               color: active ? "var(--text)" : "var(--text-muted)",
               cursor: disabled ? "not-allowed" : "pointer",
@@ -337,7 +341,18 @@ function AddPluginPanel({
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 7,
+          padding: 12,
+          border: "1px solid var(--border-strong)",
+          borderRadius: "var(--ui-radius-md)",
+          background: "var(--bg-panel)",
+          boxShadow: "var(--shadow-subtle)",
+        }}
+      >
         <label htmlFor="plugin-source" style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>
           来源
         </label>
@@ -351,20 +366,31 @@ function AddPluginPanel({
             width: "100%",
             height: 36,
             padding: "0 11px",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            background: "var(--bg-panel)",
+            border: "1px solid var(--border-strong)",
+            borderRadius: "var(--ui-radius-sm)",
+            background: "var(--bg-elevated)",
             color: "var(--text)",
             fontFamily: "var(--font-mono)",
             fontSize: 13,
             outline: "none",
+            boxShadow: "var(--shadow-subtle)",
+            transition: "border-color var(--transition-fast), box-shadow var(--transition-fast)",
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && source.trim() && !busy && !warning) onInstall();
           }}
         />
         {warning && (
-          <div style={{ fontSize: 12, color: "#d97706" }}>
+          <div
+            style={{
+              padding: "8px 10px",
+              border: "1px solid color-mix(in srgb, var(--warning) 28%, var(--border))",
+              borderRadius: "var(--ui-radius-sm)",
+              background: "var(--warning-soft)",
+              color: "var(--warning)",
+              fontSize: 12,
+            }}
+          >
             {warning}
           </div>
         )}
@@ -383,7 +409,7 @@ function AddPluginPanel({
           style={{
             ...buttonStyle(busy || !source.trim() || !!warning),
             background: "var(--accent)",
-            color: "white",
+            color: "var(--text-on-accent)",
             borderColor: "var(--accent)",
           }}
         >
@@ -391,7 +417,17 @@ function AddPluginPanel({
         </button>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 7,
+          padding: 12,
+          border: "1px solid var(--border-strong)",
+          borderRadius: "var(--ui-radius-md)",
+          background: "var(--bg-panel)",
+        }}
+      >
         <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>
           示例<span style={{ fontWeight: 400, color: "var(--text-dim)" }}>（点击填入格式模板，需改成真实来源后再安装）</span>
         </div>
@@ -406,20 +442,22 @@ function AddPluginPanel({
                 minHeight: 30,
                 textAlign: "left",
                 padding: "6px 9px",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                background: "var(--bg-panel)",
+                border: "1px solid var(--border-strong)",
+                borderRadius: "var(--ui-radius-sm)",
+                background: "var(--bg-elevated)",
                 color: "var(--text-dim)",
                 cursor: "pointer",
                 fontFamily: "var(--font-mono)",
                 fontSize: 11,
+                boxShadow: "var(--shadow-subtle)",
+                transition: "background var(--transition-fast), color var(--transition-fast)",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "var(--bg-hover)";
                 e.currentTarget.style.color = "var(--text-muted)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "var(--bg-panel)";
+                e.currentTarget.style.background = "var(--bg-elevated)";
                 e.currentTarget.style.color = "var(--text-dim)";
               }}
             >
@@ -430,7 +468,17 @@ function AddPluginPanel({
       </div>
 
       {actionError && (
-        <div style={{ fontSize: 12, color: "#ef4444", whiteSpace: "pre-wrap" }}>
+        <div
+          style={{
+            padding: "9px 11px",
+            border: "1px solid color-mix(in srgb, var(--danger) 28%, var(--border))",
+            borderRadius: "var(--ui-radius-sm)",
+            background: "var(--danger-soft)",
+            color: "var(--danger)",
+            fontSize: 12,
+            whiteSpace: "pre-wrap",
+          }}
+        >
           {actionError}
         </div>
       )}
@@ -465,7 +513,18 @@ function PackageDetail({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 680 }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, minWidth: 0, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+          minWidth: 0,
+          flexWrap: "wrap",
+          paddingBottom: 16,
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 180, flex: 1 }}>
           <Toggle
             enabled={enabled}
@@ -479,9 +538,9 @@ function PackageDetail({
               style={{
                 fontSize: 10,
                 padding: "1px 5px",
-                borderRadius: 3,
-                background: "rgba(120,120,120,0.12)",
-                color: "var(--text-dim)",
+                borderRadius: "var(--ui-radius-xs)",
+                background: "var(--bg-subtle)",
+                color: "var(--text-muted)",
               }}
             >
               {t("i18n.disabled")}
@@ -491,9 +550,9 @@ function PackageDetail({
               style={{
                 fontSize: 10,
                 padding: "1px 5px",
-                borderRadius: 3,
-                background: "rgba(245,158,11,0.12)",
-                color: "#d97706",
+                borderRadius: "var(--ui-radius-xs)",
+                background: "var(--warning-soft)",
+                color: "var(--warning)",
               }}
             >
               {t("i18n.filtered")}
@@ -546,6 +605,11 @@ function PackageDetail({
           gap: "9px 14px",
           fontSize: 12,
           lineHeight: 1.45,
+          padding: 14,
+          border: "1px solid var(--border-strong)",
+          borderRadius: "var(--ui-radius-md)",
+          background: "var(--bg-panel)",
+          boxShadow: "var(--shadow-subtle)",
         }}
       >
         <div style={{ color: "var(--text-dim)" }}>{t("i18n.status")}</div>
@@ -561,7 +625,7 @@ function PackageDetail({
         <div style={{ color: "var(--text-dim)" }}>{t("i18n.installedPath")}</div>
         <div
           style={{
-            color: pkg.installedPath ? "var(--text-muted)" : "#ef4444",
+            color: pkg.installedPath ? "var(--text-muted)" : "var(--danger)",
             fontFamily: "var(--font-mono)",
             overflowWrap: "anywhere",
           }}
@@ -574,7 +638,17 @@ function PackageDetail({
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          padding: 14,
+          border: "1px solid var(--border-strong)",
+          borderRadius: "var(--ui-radius-md)",
+          background: "var(--bg-panel)",
+        }}
+      >
         <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>
           {t("i18n.resolvedResources")}
         </div>
@@ -582,12 +656,31 @@ function PackageDetail({
       </div>
 
       {actionMessage && (
-        <div style={{ fontSize: 12, color: "#16a34a" }}>
+        <div
+          style={{
+            padding: "9px 11px",
+            border: "1px solid color-mix(in srgb, var(--success) 28%, var(--border))",
+            borderRadius: "var(--ui-radius-sm)",
+            background: "var(--success-soft)",
+            color: "var(--success)",
+            fontSize: 12,
+          }}
+        >
           {actionMessage}
         </div>
       )}
       {actionError && (
-        <div style={{ fontSize: 12, color: "#ef4444", whiteSpace: "pre-wrap" }}>
+        <div
+          style={{
+            padding: "9px 11px",
+            border: "1px solid color-mix(in srgb, var(--danger) 28%, var(--border))",
+            borderRadius: "var(--ui-radius-sm)",
+            background: "var(--danger-soft)",
+            color: "var(--danger)",
+            fontSize: 12,
+            whiteSpace: "pre-wrap",
+          }}
+        >
           {actionError}
         </div>
       )}
@@ -756,11 +849,11 @@ export function PluginsConfig({
           height: isMobile ? "calc(100dvh - 16px)" : "76vh",
           maxHeight: "calc(100dvh - 16px)",
           background: "var(--bg)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
+          border: "1px solid var(--border-strong)",
+          borderRadius: "var(--ui-radius-lg)",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+          boxShadow: "var(--shadow-panel)",
           overflow: "hidden",
         }}
       >
@@ -770,7 +863,9 @@ export function PluginsConfig({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "12px 18px",
-            borderBottom: "1px solid var(--border)",
+            borderBottom: "1px solid var(--border-strong)",
+            background: "var(--bg-elevated)",
+            boxShadow: "var(--shadow-subtle)",
             flexShrink: 0,
           }}
         >
@@ -794,13 +889,16 @@ export function PluginsConfig({
           <button
             onClick={onClose}
             style={{
-              background: "none",
-              border: "none",
+              width: 30,
+              height: 30,
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--ui-radius-sm)",
               color: "var(--text-muted)",
               cursor: "pointer",
               fontSize: 20,
               lineHeight: 1,
-              padding: "2px 6px",
+              padding: 0,
             }}
           >
             ×
@@ -812,9 +910,9 @@ export function PluginsConfig({
             role="status"
             style={{
               padding: "8px 18px",
-              borderBottom: "1px solid var(--border)",
-              background: "var(--bg-panel)",
-              color: "var(--text-muted)",
+              borderBottom: "1px solid color-mix(in srgb, var(--warning) 24%, var(--border))",
+              background: "var(--warning-soft)",
+              color: "var(--warning)",
               fontSize: 12,
             }}
           >
@@ -827,8 +925,8 @@ export function PluginsConfig({
             style={{
               width: isMobile ? "100%" : 245,
               maxHeight: isMobile ? "40vh" : undefined,
-              borderRight: isMobile ? "none" : "1px solid var(--border)",
-              borderBottom: isMobile ? "1px solid var(--border)" : "none",
+              borderRight: isMobile ? "none" : "1px solid var(--border-strong)",
+              borderBottom: isMobile ? "1px solid var(--border-strong)" : "none",
               display: "flex",
               flexDirection: "column",
               flexShrink: 0,
@@ -837,11 +935,29 @@ export function PluginsConfig({
           >
             <div style={{ flex: 1, overflowY: "auto", padding: "8px 6px" }}>
               {loading ? (
-                <div style={{ padding: "10px 8px", fontSize: 12, color: "var(--text-muted)" }}>
+                <div
+                  style={{
+                    margin: "4px 2px",
+                    padding: "9px 10px",
+                    borderRadius: "var(--ui-radius-sm)",
+                    background: "var(--bg-subtle)",
+                    color: "var(--text-muted)",
+                    fontSize: 12,
+                  }}
+                >
                   {t("i18n.loading")}
                 </div>
               ) : error ? (
-                <div style={{ padding: "10px 8px", fontSize: 11, color: "#ef4444" }}>
+                <div
+                  style={{
+                    margin: "4px 2px",
+                    padding: "9px 10px",
+                    borderRadius: "var(--ui-radius-sm)",
+                    background: "var(--danger-soft)",
+                    color: "var(--danger)",
+                    fontSize: 11,
+                  }}
+                >
                   {error}
                 </div>
               ) : packages.length === 0 ? (
@@ -879,7 +995,7 @@ export function PluginsConfig({
                             alignItems: "center",
                             gap: 7,
                             padding: "8px 8px",
-                            borderRadius: 5,
+                            borderRadius: "var(--ui-radius-sm)",
                             cursor: "pointer",
                             background: isSelected ? "var(--bg-selected)" : "none",
                           }}
@@ -960,7 +1076,7 @@ export function PluginsConfig({
                   alignItems: "center",
                   gap: 6,
                   padding: "7px 8px",
-                  borderRadius: 5,
+                  borderRadius: "var(--ui-radius-sm)",
                   border: "none",
                   width: "100%",
                   cursor: "pointer",
@@ -993,7 +1109,7 @@ export function PluginsConfig({
             </div>
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: 20, background: "var(--bg)" }}>
             {addMode ? (
               <AddPluginPanel
                 cwd={cwd}
@@ -1042,7 +1158,8 @@ export function PluginsConfig({
             justifyContent: "space-between",
             gap: 12,
             padding: "10px 18px",
-            borderTop: "1px solid var(--border)",
+            borderTop: "1px solid var(--border-strong)",
+            background: "var(--bg-elevated)",
             flexShrink: 0,
           }}
         >
@@ -1050,7 +1167,7 @@ export function PluginsConfig({
             {data?.diagnostics.length ? (
               <span
                 title={data.diagnostics.map((d) => `${d.type}: ${d.source ? `${d.source}: ` : ""}${d.message}`).join("\n")}
-                style={{ color: data.diagnostics.some((d) => d.type === "error") ? "#ef4444" : "#d97706" }}
+                style={{ color: data.diagnostics.some((d) => d.type === "error") ? "var(--danger)" : "var(--warning)" }}
               >
                 {data.diagnostics.length} 条诊断信息
               </span>

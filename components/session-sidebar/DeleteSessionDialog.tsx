@@ -57,25 +57,25 @@ export function DeleteSessionDialog({
         style={{
           width: 440,
           maxWidth: "100%",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          background: "var(--bg-panel)",
-          boxShadow: "0 12px 36px rgba(0,0,0,0.24)",
+          border: "1px solid var(--border-strong)",
+          borderRadius: "var(--ui-radius-lg)",
+          background: "var(--bg-elevated)",
+          boxShadow: "var(--shadow-panel)",
           overflow: "hidden",
         }}
       >
-        <div style={{ display: "flex", gap: 12, padding: "18px 18px 14px" }}>
+        <div style={{ display: "flex", gap: 12, padding: "18px 18px 14px", background: "var(--bg-panel)" }}>
           <svg
             width="20"
             height="20"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#ef4444"
+            stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
             aria-hidden="true"
-            style={{ flexShrink: 0, marginTop: 1 }}
+            style={{ flexShrink: 0, width: 36, height: 36, padding: 8, boxSizing: "border-box", borderRadius: "var(--ui-radius-md)", background: "var(--danger-soft)", color: "var(--danger)" }}
           >
             <polyline points="3 6 5 6 21 6" />
             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -111,6 +111,7 @@ export function DeleteSessionDialog({
             gap: 8,
             padding: "10px 18px",
             borderTop: "1px solid var(--border)",
+            background: "var(--bg-panel)",
           }}
         >
           <button
@@ -120,9 +121,9 @@ export function DeleteSessionDialog({
             style={{
               height: 32,
               padding: "0 12px",
-              border: "1px solid var(--border)",
-              borderRadius: 5,
-              background: "transparent",
+              border: "1px solid var(--border-strong)",
+              borderRadius: "var(--ui-radius-sm)",
+              background: "var(--bg-hover)",
               color: "var(--text-muted)",
               cursor: busy ? "not-allowed" : "pointer",
               fontSize: 12,
@@ -137,9 +138,9 @@ export function DeleteSessionDialog({
             style={{
               height: 32,
               padding: "0 12px",
-              border: "1px solid var(--border)",
-              borderRadius: 5,
-              background: "transparent",
+              border: "1px solid var(--border-strong)",
+              borderRadius: "var(--ui-radius-sm)",
+              background: "var(--bg-subtle)",
               color: "var(--text)",
               cursor: busy ? "wait" : "pointer",
               opacity: busy ? 0.7 : 1,
@@ -156,10 +157,10 @@ export function DeleteSessionDialog({
             style={{
               height: 32,
               padding: "0 12px",
-              border: "1px solid #ef4444",
-              borderRadius: 5,
-              background: "#ef4444",
-              color: "white",
+              border: "1px solid var(--danger)",
+              borderRadius: "var(--ui-radius-sm)",
+              background: "var(--danger)",
+              color: "var(--text-on-accent)",
               cursor: busy ? "wait" : "pointer",
               opacity: busy ? 0.7 : 1,
               fontSize: 12,

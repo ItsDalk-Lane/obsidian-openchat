@@ -1,5 +1,49 @@
 # PROGRESS.md
 
+## 三阶段收尾任务（2026-08-01）
+
+### 理解（任务 0）
+
+- 目标：先统一指定设置弹窗的视觉层次，再补齐 Electron 桌面能力，最后拆入口包并补组件测试；旧行为必须保持。
+- 顺序：任务 0 → 阶段一 → 阶段二 → 阶段三，任何实现和提交都不跨阶段。
+- 最大风险一：视觉改动误伤焦点、关闭、授权、掩码、开关或目录选择等既有链路。
+- 最大风险二：桌面接线泄漏到纯浏览器模式，或破坏更新、主题、目录选择和加载页链路。
+- 最大风险三：拆包改变渲染结果，或为了体积目标删功能、放宽测试。
+- 边界处理：文件化规划仅写本任务白名单内的 `PROGRESS.md` 与 `BLOCKED.md`，不新增规划文件。
+
+### 任务 0 进度
+
+- [x] 开工实测 `main` 工作区干净，但指定分支不存在；证据已记入 `BLOCKED.md`，并从当前 Vite/视觉基线提交重建 `refactor/vite-foundation`。
+- [x] `node_modules/.bin/tsc -p tsconfig.typecheck.json`：退出 0，无输出。首次直接执行 `tsc -p tsconfig.typecheck.json` 因终端没有全局命令而退出 127；改用仓库本地可执行文件后通过，代码基线无偏差。
+- [x] `npm run lint`：退出 0。
+- [x] `npm run test`：退出 1；统计为 280 测 / 278 过 / 2 败 / 0 cancelled / 0 skipped / 0 todo。失败仍仅为 `only Shift+click bypasses session deletion confirmation` 与 `agent discovery returns builtin, user, and project domains with override metadata`。
+- [x] `npm run test:pi-adapter`：11/11 通过，0 失败、0 跳过、0 todo。
+- [x] `node scripts/i18n-parity.cjs`：en=450、zh-CN=450，零差异，退出 0。
+- [x] 现有 `web/dist/assets/index-CpUIh4xf.js` 为 2,157,646 bytes（2.057692 MiB）；组件测试 4 个。
+- [x] 冻结接线仍命中：FileExplorer 的 diff 模式与增删行、AppShell 的初始显示模式、FileViewer 的已删除差异模式均在；针对测试 2/2 通过。
+- [x] 任务 0 完成，所有数字与目标文件一致；开始阶段一。
+
+### 阶段一进度
+
+- [进行中] 纯视觉统一分成三组并行处理；不改字段、按钮语义、请求、关闭条件或授权链路，不新增文案。
+- [x] 验证接线已核源码：`npm run dev` 同时启动页面与接口服务；`scripts/smoke-api.mjs` 会自行占用 30141 启动隔离接口服务。阶段收口时让开发服务使用 5174/30142，API smoke 保留 30141，避免端口冲突并同时满足两项验收。
+- [x] 反向验证选用中英文末尾共有的 `i18n.after`：临时只删中文版键，要求 parity 明确报缺失并退出 1；随后原样恢复并要求 450/450、零差异。
+- [x] 阶段一反向验证实际通过：删键后 `node scripts/i18n-parity.cjs` 退出 1，输出 `en=450 zh-CN=449` 与 `missing in zh-CN (1): i18n.after`；恢复后退出 0，输出 `en=450 zh-CN=450`、`zero difference`，且该文件相对基线无差异。
+- [x] 三组纯视觉修改已合并；统一复跑 `tsc --noEmit -p tsconfig.typecheck.json` 与目标文件 ESLint 均退出 0，`git diff --check` 无输出。
+- [x] 新增行十六进制扫描零命中（`rg` 退出 1 表示未匹配）；当前业务改动仅落在阶段一指定组件目录，另有本轮 `PROGRESS.md`/`BLOCKED.md` 记录。
+- [x] 阶段一全量检查保持基线：`npm run check` 先后完成 typecheck、lint，再得到 280 测 / 278 过 / 仅 2 个既定具名失败 / 0 skipped / 0 todo；因为脚本使用 `&&`，随后单独运行 `npm run test:pi-adapter`，11/11 全过、0 skipped/todo。
+- [x] 收口 parity 仍为 en=450、zh-CN=450、零差异；`git diff --check` 无输出。
+- [x] 隔离开发服务已在页面 5174 / 接口 30142 启动；`node scripts/smoke-api.mjs` 15/15 通过并覆盖 67 条路由。
+- [x] `visual-smoke.py` 对同一 5174 页面执行桌面与移动检查，页面/控制台/请求失败均为 0，末行 `VISUAL SMOKE PASS`；截图保存于本任务可视化目录的 `stage1/`。
+- [x] 独立差异复核发现 MCP 关闭态开关误用了主按钮悬停类，会在悬停时看起来像开启；已改成只提供键盘焦点的样式类，未改点击逻辑。
+- [x] 第二轮独立复核发现文字色混合遮罩在深色主题会发亮、导致层级倒置；10 个遮罩已全部恢复基线的半透明黑色，内部面板仍使用设计 token。复核后白名单越界、新增十六进制、未定义 token、关键行为差异均为 0。
+- [x] 弹窗截图脚本首跑因 Playwright 自带 Chromium 未下载而失败；遵守“不装依赖”，改用系统现有 Chrome 后通过。
+- [x] 浏览器实际打开并截图：模型、插件、技能、MCP、Agents、高级、项目信任共 7 个弹窗；控制台错误、页面错误、HTTP 4xx/5xx 均为 0。项目信任使用一次性含项目资源目录，仅打开后取消，不写信任状态。
+- [待亲验] `DirectoryPicker` 当前无调用方，现有页面无法打开；`DeleteSessionDialog` 需要带分支的一次性会话夹具。两项不伪称浏览器已覆盖，最终弹窗清单明确列出。
+- [止损] 分支删除弹窗夹具连续三次未形成页面可发现的持久会话：临时脚本模块解析失败 → 绝对入口可运行但空会话不落盘 → 重启服务后接口仍返回空列表。已停止该可选验证，不手写用户会话文件；详见 `BLOCKED.md` V2。
+- [x] 阶段一最终复跑：typecheck、lint 通过；主测试仍为 280/278/2（仅两项既定失败）、0 skipped/todo；Pi 适配器 11/11；i18n 450/450；API smoke 15/15、67 路由；最终 visual-smoke 末行 `VISUAL SMOKE PASS`，三类浏览器错误均为 0。
+- [x] 阶段一实现完成：12 个指定组件文件统一现有背景、边框、文字、强调色、焦点与语义状态 token；字段、按钮含义、请求、认证、掩码、开关、关闭和目录选择链路未改。准备阶段提交。
+
 ## 精简内置 pi-subagents（2026-07-31）
 
 - [x] 生成并更新 `patches/pi-subagents+0.37.2.patch`，核心改动 4 处全部包含：

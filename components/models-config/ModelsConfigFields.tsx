@@ -4,21 +4,23 @@ import { useEffect, useState, type CSSProperties, type KeyboardEventHandler, typ
 import { useI18n } from "@/hooks/useI18n";
 
 const inputStyle = {
-  padding: "6px 9px",
-  background: "var(--bg-panel)",
+  padding: "7px 9px",
+  background: "var(--bg-elevated)",
   border: "1px solid var(--border)",
-  borderRadius: 5,
+  borderRadius: "var(--ui-radius-sm)",
   color: "var(--text)",
   fontSize: 12,
-  outline: "none",
   width: "100%",
   boxSizing: "border-box" as const,
+  transition: "border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast)",
 };
+
+const inputClassName = "focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-1";
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <label style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>{label}</label>
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      <label style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>{label}</label>
       {children}
     </div>
   );
@@ -37,6 +39,7 @@ export function TextInput({
 }) {
   return (
     <input
+      className={inputClassName}
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
@@ -74,6 +77,7 @@ export function SecretTextInput({
   return (
     <div style={{ position: "relative", width: "100%", ...style }}>
       <input
+        className={inputClassName}
         type={visible ? "text" : "password"}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -88,6 +92,7 @@ export function SecretTextInput({
         spellCheck={spellCheck}
       />
       <button
+        className="pi-toolbar-button"
         type="button"
         onClick={() => setVisible((current) => !current)}
         aria-label={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
@@ -101,6 +106,7 @@ export function SecretTextInput({
           height: 24,
           padding: 0,
           border: "none",
+          borderRadius: "var(--ui-radius-xs)",
           background: "transparent",
           color: "var(--text-dim)",
           cursor: "pointer",
@@ -138,6 +144,7 @@ export function NumInput({
 }) {
   return (
     <input
+      className={inputClassName}
       type="number"
       value={value}
       onChange={(event) => onChange(event.target.value)}
@@ -161,6 +168,7 @@ export function Select({
   const { t } = useI18n();
   return (
     <select
+      className={inputClassName}
       value={value}
       onChange={(event) => onChange(event.target.value)}
       style={{ ...inputStyle, color: value ? "var(--text)" : "var(--text-dim)" }}
@@ -195,7 +203,7 @@ export function Check({
 
 export function SectionTitle({ children }: { children: ReactNode }) {
   return (
-    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>
+    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>
       {children}
     </div>
   );

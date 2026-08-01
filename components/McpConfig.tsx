@@ -11,17 +11,28 @@ function shortenPath(p: string): string {
 }
 
 const STATUS_META: Record<McpServerRuntimeStatus, { label: string; color: string }> = {
-  connected: { label: "已连接", color: "#22c55e" },
-  cached: { label: "已缓存", color: "#38bdf8" },
-  failed: { label: "失败", color: "#f87171" },
-  "needs-auth": { label: "需要认证", color: "#d97706" },
+  connected: { label: "已连接", color: "var(--success)" },
+  cached: { label: "已缓存", color: "var(--accent)" },
+  failed: { label: "失败", color: "var(--danger)" },
+  "needs-auth": { label: "需要认证", color: "var(--warning)" },
   "not-connected": { label: "未连接", color: "var(--text-dim)" },
-  disabled: { label: "已禁用", color: "var(--border)" },
+  disabled: { label: "已禁用", color: "var(--border-strong)" },
 };
+
+function feedbackStyle(tone: "danger" | "success" | "warning"): React.CSSProperties {
+  return {
+    padding: "6px 8px",
+    borderRadius: "var(--ui-radius-sm)",
+    background: `var(--${tone}-soft)`,
+    color: `var(--${tone})`,
+    fontSize: 11,
+  };
+}
 
 function Toggle({ enabled, loading, onToggle }: { enabled: boolean; loading: boolean; onToggle: () => void }) {
   return (
     <button
+      className="focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-1"
       onClick={onToggle}
       disabled={loading}
       title={enabled ? "已启用 — 点击禁用" : "已禁用 — 点击启用"}
@@ -33,7 +44,7 @@ function Toggle({ enabled, loading, onToggle }: { enabled: boolean; loading: boo
         border: "none",
         padding: 0,
         cursor: loading ? "wait" : "pointer",
-        background: enabled ? "var(--accent)" : "var(--border)",
+        background: enabled ? "var(--accent)" : "var(--border-strong)",
         position: "relative",
         transition: "background 0.18s",
         outline: "none",
@@ -47,8 +58,8 @@ function Toggle({ enabled, loading, onToggle }: { enabled: boolean; loading: boo
           width: 16,
           height: 16,
           borderRadius: "50%",
-          background: "var(--bg)",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.22)",
+          background: "var(--bg-elevated)",
+          boxShadow: "var(--shadow-subtle)",
           transition: "left 0.18s cubic-bezier(.4,0,.2,1)",
         }}
       />
@@ -62,12 +73,14 @@ const inputStyle: React.CSSProperties = {
   padding: "6px 8px",
   fontSize: 12,
   fontFamily: "var(--font-mono)",
-  background: "var(--bg)",
+  background: "var(--bg-elevated)",
   color: "var(--text)",
   border: "1px solid var(--border)",
-  borderRadius: 5,
-  outline: "none",
+  borderRadius: "var(--ui-radius-sm)",
+  transition: "border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast)",
 };
+
+const inputClassName = "focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-1";
 
 const fieldLabelStyle: React.CSSProperties = {
   fontSize: 11,
@@ -457,11 +470,11 @@ export function McpConfig({
           height: isMobile ? "calc(100dvh - 16px)" : "78vh",
           maxHeight: "calc(100dvh - 16px)",
           background: "var(--bg)",
-          border: "1px solid var(--border)",
-          borderRadius: 10,
+          border: "1px solid var(--border-strong)",
+          borderRadius: "var(--ui-radius-lg)",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+          boxShadow: "var(--shadow-panel)",
           overflow: "hidden",
         }}
       >
@@ -471,8 +484,10 @@ export function McpConfig({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "12px 18px",
+            padding: "13px 18px",
             borderBottom: "1px solid var(--border)",
+            background: "var(--bg-elevated)",
+            boxShadow: "inset 0 -1px 0 var(--border)",
             flexShrink: 0,
           }}
         >
@@ -492,12 +507,13 @@ export function McpConfig({
               {shortenPath(cwd)}
             </code>
             {sessionId && (
-              <span style={{ fontSize: 10, color: statusLive ? "#22c55e" : "var(--text-dim)" }}>
+              <span style={{ fontSize: 10, color: statusLive ? "var(--success)" : "var(--text-dim)" }}>
                 {statusLive ? "● 会话状态实时" : "○ 会话未加载"}
               </span>
             )}
             {sessionId && statusLive && (
               <button
+                className="pi-toolbar-button"
                 onClick={() => void runMcpAction("reconnect")}
                 disabled={opRunning !== null}
                 title="重新连接所有 MCP 服务器"
@@ -505,7 +521,7 @@ export function McpConfig({
                   padding: "3px 10px",
                   fontSize: 11,
                   color: "var(--text)",
-                  background: "var(--bg-hover)",
+                  background: "var(--bg)",
                   border: "1px solid var(--border)",
                   borderRadius: 6,
                   cursor: opRunning ? "wait" : "pointer",
@@ -520,7 +536,7 @@ export function McpConfig({
                 title={opResult.text}
                 style={{
                   fontSize: 10,
-                  color: opResult.ok ? "#22c55e" : "#f87171",
+                  color: opResult.ok ? "var(--success)" : "var(--danger)",
                   maxWidth: 200,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -532,10 +548,12 @@ export function McpConfig({
             )}
           </div>
           <button
+            className="pi-toolbar-button"
             onClick={onClose}
             style={{
-              background: "none",
+              background: "transparent",
               border: "none",
+              borderRadius: "var(--ui-radius-xs)",
               color: "var(--text-muted)",
               cursor: "pointer",
               fontSize: 20,
@@ -566,7 +584,7 @@ export function McpConfig({
               {loading ? (
                 <div style={{ padding: "10px 8px", fontSize: 12, color: "var(--text-muted)" }}>加载中…</div>
               ) : error ? (
-                <div style={{ padding: "10px 8px", fontSize: 11, color: "#f87171" }}>{error}</div>
+                <div style={{ margin: "4px 2px", ...feedbackStyle("danger") }}>{error}</div>
               ) : servers.length === 0 ? (
                 <div style={{ padding: "10px 8px", fontSize: 11, color: "var(--text-dim)" }}>
                   未配置 MCP 服务器
@@ -603,7 +621,7 @@ export function McpConfig({
                             alignItems: "center",
                             gap: 7,
                             padding: "8px 8px",
-                            borderRadius: 5,
+                            borderRadius: "var(--ui-radius-sm)",
                             cursor: "pointer",
                             background: isSelected ? "var(--bg-selected)" : "none",
                           }}
@@ -649,6 +667,7 @@ export function McpConfig({
             </div>
             <div style={{ padding: "8px", borderTop: "1px solid var(--border)", flexShrink: 0 }}>
               <button
+                className="pi-toolbar-button"
                 onClick={() => {
                   setFormMode("add");
                   setForm(emptyForm("project"));
@@ -661,9 +680,9 @@ export function McpConfig({
                   fontSize: 12,
                   fontWeight: 600,
                   color: "var(--text)",
-                  background: formMode === "add" ? "var(--bg-selected)" : "var(--bg-hover)",
+                  background: formMode === "add" ? "var(--bg-selected)" : "var(--bg-elevated)",
                   border: "1px solid var(--border)",
-                  borderRadius: 6,
+                  borderRadius: "var(--ui-radius-sm)",
                   cursor: "pointer",
                 }}
               >
@@ -673,18 +692,18 @@ export function McpConfig({
           </div>
 
           {/* Right: detail / form */}
-          <div style={{ flex: 1, overflowY: "auto", padding: 18 }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: 18, background: "var(--bg)" }}>
             {formMode ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 480 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 480, padding: 16, border: "1px solid var(--border)", borderRadius: "var(--ui-radius-md)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-subtle)" }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
                   {formMode === "add" ? "添加 MCP 服务器" : `编辑 ${selected}`}
                 </div>
                 {formMode === "add" && (
                   <div style={{
                     border: "1px solid var(--border)",
-                    borderRadius: 6,
+                    borderRadius: "var(--ui-radius-sm)",
                     padding: 10,
-                    background: "var(--bg-panel)",
+                    background: "var(--bg-subtle)",
                     display: "flex",
                     flexDirection: "column",
                     gap: 8,
@@ -693,6 +712,7 @@ export function McpConfig({
                       从 JSON 导入（可选）
                     </div>
                     <textarea
+                      className={inputClassName}
                       style={{ ...inputStyle, minHeight: 92, resize: "vertical", fontSize: 11 }}
                       value={importText}
                       onChange={(e) => {
@@ -703,8 +723,8 @@ export function McpConfig({
                       }}
                       placeholder={'粘贴 {"mcpServers": { "名称": { "command": "...", "args": [...] } }} 配置，点击识别后自动填充'}
                     />
-                    {importError && <div style={{ fontSize: 11, color: "#f87171" }}>{importError}</div>}
-                    {importNote && <div style={{ fontSize: 11, color: "#4ade80" }}>{importNote}</div>}
+                    {importError && <div style={feedbackStyle("danger")}>{importError}</div>}
+                    {importNote && <div style={feedbackStyle("success")}>{importNote}</div>}
                     {importedBatch ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12, color: "var(--text)" }}>
                         <div>识别到 {importedBatch.length} 个服务器：{importedBatch.map((s) => s.name).join("、")}</div>
@@ -713,16 +733,17 @@ export function McpConfig({
                         </div>
                         <div style={{ display: "flex", gap: 8 }}>
                           <button
+                            className="pi-send-button"
                             onClick={() => void importBatch()}
                             disabled={importing}
                             style={{
                               padding: "6px 14px",
                               fontSize: 12,
                               fontWeight: 600,
-                              color: "var(--bg)",
+                              color: "var(--text-on-accent)",
                               background: "var(--accent)",
                               border: "none",
-                              borderRadius: 6,
+                              borderRadius: "var(--ui-radius-sm)",
                               cursor: importing ? "wait" : "pointer",
                               opacity: importing ? 0.6 : 1,
                             }}
@@ -730,15 +751,16 @@ export function McpConfig({
                             {importing ? "添加中…" : `全部添加 ${importedBatch.length} 个`}
                           </button>
                           <button
+                            className="pi-toolbar-button"
                             onClick={() => setImportedBatch(null)}
                             disabled={importing}
                             style={{
                               padding: "6px 14px",
                               fontSize: 12,
                               color: "var(--text-muted)",
-                              background: "none",
+                              background: "var(--bg)",
                               border: "1px solid var(--border)",
-                              borderRadius: 6,
+                              borderRadius: "var(--ui-radius-sm)",
                               cursor: "pointer",
                             }}
                           >
@@ -749,15 +771,16 @@ export function McpConfig({
                     ) : (
                       <div>
                         <button
+                          className="pi-toolbar-button"
                           onClick={applyImport}
                           disabled={!importText.trim()}
                           style={{
                             padding: "6px 14px",
                             fontSize: 12,
                             color: "var(--text)",
-                            background: "var(--bg-hover)",
+                            background: "var(--bg)",
                             border: "1px solid var(--border)",
-                            borderRadius: 6,
+                            borderRadius: "var(--ui-radius-sm)",
                             cursor: importText.trim() ? "pointer" : "default",
                             opacity: importText.trim() ? 1 : 0.5,
                           }}
@@ -771,6 +794,7 @@ export function McpConfig({
                 <div>
                   <label style={fieldLabelStyle}>名称</label>
                   <input
+                    className={inputClassName}
                     style={inputStyle}
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -790,6 +814,7 @@ export function McpConfig({
                             type="radio"
                             checked={form.scope === value}
                             onChange={() => setForm({ ...form, scope: value })}
+                            style={{ accentColor: "var(--accent)" }}
                           />
                           {label}
                         </label>
@@ -809,6 +834,7 @@ export function McpConfig({
                           type="radio"
                           checked={form.transport === value}
                           onChange={() => setForm({ ...form, transport: value })}
+                          style={{ accentColor: "var(--accent)" }}
                         />
                         {label}
                       </label>
@@ -820,6 +846,7 @@ export function McpConfig({
                     <div>
                       <label style={fieldLabelStyle}>命令</label>
                       <input
+                        className={inputClassName}
                         style={inputStyle}
                         value={form.command}
                         onChange={(e) => setForm({ ...form, command: e.target.value })}
@@ -829,6 +856,7 @@ export function McpConfig({
                     <div>
                       <label style={fieldLabelStyle}>参数（每行一个）</label>
                       <textarea
+                        className={inputClassName}
                         style={{ ...inputStyle, minHeight: 64, resize: "vertical" }}
                         value={form.args}
                         onChange={(e) => setForm({ ...form, args: e.target.value })}
@@ -838,6 +866,7 @@ export function McpConfig({
                     <div>
                       <label style={fieldLabelStyle}>环境变量（每行 KEY=VALUE，可选）</label>
                       <textarea
+                        className={inputClassName}
                         style={{ ...inputStyle, minHeight: 48, resize: "vertical" }}
                         value={form.env}
                         onChange={(e) => setForm({ ...form, env: e.target.value })}
@@ -850,6 +879,7 @@ export function McpConfig({
                     <div>
                       <label style={fieldLabelStyle}>URL</label>
                       <input
+                        className={inputClassName}
                         style={inputStyle}
                         value={form.url}
                         onChange={(e) => setForm({ ...form, url: e.target.value })}
@@ -859,6 +889,7 @@ export function McpConfig({
                     <div>
                       <label style={fieldLabelStyle}>请求头（每行 Key: Value，可选）</label>
                       <textarea
+                        className={inputClassName}
                         style={{ ...inputStyle, minHeight: 48, resize: "vertical" }}
                         value={form.headers}
                         onChange={(e) => setForm({ ...form, headers: e.target.value })}
@@ -870,6 +901,7 @@ export function McpConfig({
                 <div>
                   <label style={fieldLabelStyle}>生命周期（可选）</label>
                   <select
+                    className={inputClassName}
                     style={{ ...inputStyle, cursor: "pointer" }}
                     value={form.lifecycle}
                     onChange={(e) => setForm({ ...form, lifecycle: e.target.value as ServerFormState["lifecycle"] })}
@@ -880,19 +912,20 @@ export function McpConfig({
                     <option value="lazy-keep-alive">lazy-keep-alive</option>
                   </select>
                 </div>
-                {actionError && <div style={{ fontSize: 11, color: "#f87171" }}>{actionError}</div>}
+                {actionError && <div style={feedbackStyle("danger")}>{actionError}</div>}
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
+                    className="pi-send-button"
                     onClick={() => void save()}
                     disabled={saving || !form.name.trim()}
                     style={{
                       padding: "7px 16px",
                       fontSize: 12,
                       fontWeight: 600,
-                      color: "var(--bg)",
+                      color: "var(--text-on-accent)",
                       background: "var(--accent)",
                       border: "none",
-                      borderRadius: 6,
+                      borderRadius: "var(--ui-radius-sm)",
                       cursor: saving ? "wait" : "pointer",
                       opacity: saving || !form.name.trim() ? 0.6 : 1,
                     }}
@@ -900,6 +933,7 @@ export function McpConfig({
                     {saving ? "保存中…" : "保存"}
                   </button>
                   <button
+                    className="pi-toolbar-button"
                     onClick={() => {
                       setFormMode(null);
                       setActionError(null);
@@ -909,9 +943,9 @@ export function McpConfig({
                       padding: "7px 16px",
                       fontSize: 12,
                       color: "var(--text-muted)",
-                      background: "none",
+                      background: "var(--bg)",
                       border: "1px solid var(--border)",
-                      borderRadius: 6,
+                      borderRadius: "var(--ui-radius-sm)",
                       cursor: "pointer",
                     }}
                   >
@@ -925,7 +959,7 @@ export function McpConfig({
                 const runtime = runtimeStatusFor(server);
                 const runtimeEntry = status?.servers.find((s) => s.name === server.name);
                 return (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: 16, border: "1px solid var(--border)", borderRadius: "var(--ui-radius-md)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-subtle)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", fontFamily: "var(--font-mono)" }}>
                         {server.name}
@@ -935,9 +969,10 @@ export function McpConfig({
                           fontSize: 10,
                           fontWeight: 600,
                           padding: "2px 8px",
-                          borderRadius: 9,
+                          borderRadius: 999,
                           color: STATUS_META[runtime].color,
                           border: `1px solid ${STATUS_META[runtime].color}`,
+                          background: `color-mix(in srgb, ${STATUS_META[runtime].color} 10%, transparent)`,
                         }}
                       >
                         {STATUS_META[runtime].label}
@@ -947,9 +982,10 @@ export function McpConfig({
                         style={{
                           fontSize: 10,
                           padding: "2px 8px",
-                          borderRadius: 9,
+                          borderRadius: 999,
                           color: "var(--text-muted)",
                           border: "1px solid var(--border)",
+                          background: "var(--bg)",
                         }}
                       >
                         {server.transport}
@@ -982,9 +1018,9 @@ export function McpConfig({
                         fontSize: 11,
                         fontFamily: "var(--font-mono)",
                         color: "var(--text)",
-                        background: "var(--bg-panel)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 6,
+                        background: "var(--bg)",
+                        border: "1px solid var(--border-strong)",
+                        borderRadius: "var(--ui-radius-sm)",
                         overflowX: "auto",
                         whiteSpace: "pre-wrap",
                         wordBreak: "break-all",
@@ -1000,15 +1036,16 @@ export function McpConfig({
                     {sessionId && statusLive && !server.disabled && (
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                         <button
+                          className="pi-toolbar-button"
                           onClick={() => void runMcpAction("reconnect", server.name)}
                           disabled={opRunning !== null}
                           style={{
                             padding: "6px 14px",
                             fontSize: 12,
                             color: "var(--text)",
-                            background: "var(--bg-hover)",
+                            background: "var(--bg)",
                             border: "1px solid var(--border)",
-                            borderRadius: 6,
+                            borderRadius: "var(--ui-radius-sm)",
                             cursor: opRunning ? "wait" : "pointer",
                             opacity: opRunning ? 0.6 : 1,
                           }}
@@ -1018,6 +1055,7 @@ export function McpConfig({
                         {server.transport === "http" && (
                           <>
                             <button
+                              className={runtime === "needs-auth" ? "pi-send-button" : "pi-toolbar-button"}
                               onClick={() => void runMcpAction("auth", server.name)}
                               disabled={opRunning !== null}
                               title="发起 OAuth 授权：自动打开系统浏览器，完成后自动重连"
@@ -1025,10 +1063,10 @@ export function McpConfig({
                                 padding: "6px 14px",
                                 fontSize: 12,
                                 fontWeight: runtime === "needs-auth" ? 600 : 400,
-                                color: runtime === "needs-auth" ? "var(--bg)" : "var(--text)",
-                                background: runtime === "needs-auth" ? "var(--accent)" : "var(--bg-hover)",
+                                color: runtime === "needs-auth" ? "var(--text-on-accent)" : "var(--text)",
+                                background: runtime === "needs-auth" ? "var(--accent)" : "var(--bg)",
                                 border: runtime === "needs-auth" ? "none" : "1px solid var(--border)",
-                                borderRadius: 6,
+                                borderRadius: "var(--ui-radius-sm)",
                                 cursor: opRunning ? "wait" : "pointer",
                                 opacity: opRunning ? 0.6 : 1,
                               }}
@@ -1036,6 +1074,7 @@ export function McpConfig({
                               {opRunning === `auth:${server.name}` ? "发起授权…" : "OAuth 登录"}
                             </button>
                             <button
+                              className="pi-toolbar-button"
                               onClick={() => {
                                 if (!window.confirm(`清除 "${server.name}" 的 OAuth 登录凭据？`)) return;
                                 void runMcpAction("logout", server.name);
@@ -1045,9 +1084,9 @@ export function McpConfig({
                                 padding: "6px 14px",
                                 fontSize: 12,
                                 color: "var(--text)",
-                                background: "none",
+                                background: "var(--bg)",
                                 border: "1px solid var(--border)",
-                                borderRadius: 6,
+                                borderRadius: "var(--ui-radius-sm)",
                                 cursor: opRunning ? "wait" : "pointer",
                                 opacity: opRunning ? 0.6 : 1,
                               }}
@@ -1057,7 +1096,7 @@ export function McpConfig({
                           </>
                         )}
                         {runtime === "needs-auth" && (
-                          <span style={{ fontSize: 11, color: "#d97706" }}>
+                          <span style={feedbackStyle("warning")}>
                             需要 OAuth 认证 — 点击「OAuth 登录」在浏览器中完成授权。
                           </span>
                         )}
@@ -1065,20 +1104,21 @@ export function McpConfig({
                     )}
 
                     {runtime === "needs-auth" && (!sessionId || !statusLive) && (
-                      <div style={{ fontSize: 11, color: "#d97706" }}>
+                      <div style={feedbackStyle("warning")}>
                         该服务器需要 OAuth 认证；会话加载后可在此页面直接登录。
                       </div>
                     )}
 
                     {opResult && opResult.key !== "reconnect:*" && (
-                      <div style={{ fontSize: 11, color: opResult.ok ? "#22c55e" : "#f87171" }}>{opResult.text}</div>
+                      <div style={feedbackStyle(opResult.ok ? "success" : "danger")}>{opResult.text}</div>
                     )}
 
-                    {actionError && <div style={{ fontSize: 11, color: "#f87171" }}>{actionError}</div>}
+                    {actionError && <div style={feedbackStyle("danger")}>{actionError}</div>}
 
                     {server.editable && (
                       <div style={{ display: "flex", gap: 8 }}>
                         <button
+                          className="pi-toolbar-button"
                           onClick={() => {
                             setFormMode("edit");
                             setForm(formFromServer(server));
@@ -1088,24 +1128,25 @@ export function McpConfig({
                             padding: "6px 14px",
                             fontSize: 12,
                             color: "var(--text)",
-                            background: "var(--bg-hover)",
+                            background: "var(--bg)",
                             border: "1px solid var(--border)",
-                            borderRadius: 6,
+                            borderRadius: "var(--ui-radius-sm)",
                             cursor: "pointer",
                           }}
                         >
                           编辑
                         </button>
                         <button
+                          className="pi-sidebar-action is-danger"
                           onClick={() => void remove(server)}
                           disabled={removing}
                           style={{
                             padding: "6px 14px",
                             fontSize: 12,
-                            color: "#f87171",
-                            background: "none",
-                            border: "1px solid var(--border)",
-                            borderRadius: 6,
+                            color: "var(--danger)",
+                            background: "var(--bg)",
+                            border: "1px solid color-mix(in srgb, var(--danger) 36%, var(--border))",
+                            borderRadius: "var(--ui-radius-sm)",
                             cursor: removing ? "wait" : "pointer",
                           }}
                         >

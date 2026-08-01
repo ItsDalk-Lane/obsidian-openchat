@@ -44,11 +44,13 @@ const inputStyle: React.CSSProperties = {
   padding: "7px 9px",
   fontSize: 12,
   fontFamily: "var(--font-mono)",
-  background: "var(--bg)",
+  background: "var(--bg-elevated)",
   color: "var(--text)",
-  border: "1px solid var(--border)",
-  borderRadius: 6,
+  border: "1px solid var(--border-strong)",
+  borderRadius: "var(--ui-radius-sm)",
   outline: "none",
+  boxShadow: "var(--shadow-subtle)",
+  transition: "border-color var(--transition-fast), box-shadow var(--transition-fast)",
 };
 const labelStyle: React.CSSProperties = {
   display: "block",
@@ -59,12 +61,14 @@ const labelStyle: React.CSSProperties = {
 };
 const buttonStyle: React.CSSProperties = {
   padding: "7px 12px",
-  border: "1px solid var(--border)",
-  borderRadius: 6,
-  background: "var(--bg-hover)",
+  border: "1px solid var(--border-strong)",
+  borderRadius: "var(--ui-radius-sm)",
+  background: "var(--bg-elevated)",
   color: "var(--text)",
   cursor: "pointer",
   fontSize: 12,
+  boxShadow: "var(--shadow-subtle)",
+  transition: "background var(--transition-fast), border-color var(--transition-fast)",
 };
 
 function emptyAgentForm(scope: WritableSubagentScope): AgentForm {
@@ -131,7 +135,7 @@ function Toggle({
         padding: 0,
         border: "none",
         borderRadius: 11,
-        background: enabled ? "var(--accent)" : "var(--border)",
+        background: enabled ? "var(--accent)" : "var(--border-strong)",
         cursor: disabled ? "wait" : "pointer",
         opacity: disabled ? 0.6 : 1,
         position: "relative",
@@ -145,8 +149,9 @@ function Toggle({
           width: 15,
           height: 15,
           borderRadius: "50%",
-          background: "var(--bg)",
-          transition: "left 0.16s",
+          background: "var(--bg-elevated)",
+          boxShadow: "var(--shadow-subtle)",
+          transition: "left var(--transition-fast)",
         }}
       />
     </button>
@@ -403,7 +408,19 @@ export function SubagentsConfig({
   ] as const;
 
   const renderAgentForm = () => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 650 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        maxWidth: 650,
+        padding: 14,
+        border: "1px solid var(--border-strong)",
+        borderRadius: "var(--ui-radius-md)",
+        background: "var(--bg-panel)",
+        boxShadow: "var(--shadow-subtle)",
+      }}
+    >
       <div style={{ fontSize: 14, fontWeight: 700 }}>{formMode === "add" ? "新建 agent" : `编辑 ${form.name}`}</div>
       {formMode === "add" && (
         <div>
@@ -457,7 +474,7 @@ export function SubagentsConfig({
       </Field>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <button style={buttonStyle} disabled={busy} onClick={() => setFormMode(null)}>取消</button>
-        <button style={{ ...buttonStyle, background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }} disabled={busy} onClick={() => void saveAgent()}>
+        <button style={{ ...buttonStyle, background: "var(--accent)", color: "var(--text-on-accent)", borderColor: "var(--accent)" }} disabled={busy} onClick={() => void saveAgent()}>
           {busy ? "保存中…" : "保存"}
         </button>
       </div>
@@ -478,21 +495,21 @@ export function SubagentsConfig({
         maxHeight: "calc(100dvh - 16px)",
         background: "var(--bg)",
         color: "var(--text)",
-        border: "1px solid var(--border)",
-        borderRadius: 10,
+        border: "1px solid var(--border-strong)",
+        borderRadius: "var(--ui-radius-lg)",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+        boxShadow: "var(--shadow-panel)",
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: "1px solid var(--border-strong)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-subtle)" }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700 }}>Subagents 管理</div>
             <div style={{ maxWidth: isMobile ? 240 : 620, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>{cwd}</div>
           </div>
-          <button onClick={onClose} style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 20 }}>×</button>
+          <button onClick={onClose} style={{ width: 30, height: 30, padding: 0, border: "1px solid var(--border)", borderRadius: "var(--ui-radius-sm)", background: "var(--bg-subtle)", color: "var(--text-muted)", cursor: "pointer", fontSize: 20 }}>×</button>
         </div>
-        <div style={{ display: "flex", padding: "0 18px", borderBottom: "1px solid var(--border)", gap: 4 }}>
+        <div style={{ display: "flex", padding: "6px 18px 0", borderBottom: "1px solid var(--border-strong)", gap: 4, background: "var(--bg-panel)" }}>
           {([
             ["agents", "Agents"],
             ["settings", "设置"],
@@ -502,21 +519,22 @@ export function SubagentsConfig({
               padding: "10px 14px",
               border: "none",
               borderBottom: tab === value ? "2px solid var(--accent)" : "2px solid transparent",
-              background: "none",
+              background: tab === value ? "var(--accent-soft)" : "none",
               color: tab === value ? "var(--text)" : "var(--text-muted)",
               cursor: "pointer",
               fontWeight: tab === value ? 700 : 400,
+              borderRadius: "var(--ui-radius-sm) var(--ui-radius-sm) 0 0",
             }}>{label}</button>
           ))}
         </div>
-        {error && <div style={{ padding: "8px 18px", color: "#f87171", fontSize: 11, borderBottom: "1px solid var(--border)" }}>{error}</div>}
+        {error && <div style={{ padding: "9px 18px", color: "var(--danger)", background: "var(--danger-soft)", fontSize: 11, borderBottom: "1px solid color-mix(in srgb, var(--danger) 24%, var(--border))" }}>{error}</div>}
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
           {loading ? (
-            <div style={{ padding: 20, color: "var(--text-muted)", fontSize: 12 }}>加载中…</div>
+            <div style={{ margin: 18, padding: 12, borderRadius: "var(--ui-radius-sm)", background: "var(--bg-subtle)", color: "var(--text-muted)", fontSize: 12 }}>加载中…</div>
           ) : tab === "agents" ? (
             <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "100%" }}>
-              <div style={{ width: isMobile ? "100%" : 260, maxHeight: isMobile ? "40%" : undefined, display: "flex", flexDirection: "column", flexShrink: 0, background: "var(--bg-panel)", borderRight: isMobile ? "none" : "1px solid var(--border)", borderBottom: isMobile ? "1px solid var(--border)" : "none" }}>
-                <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)" }}>
+              <div style={{ width: isMobile ? "100%" : 260, maxHeight: isMobile ? "40%" : undefined, display: "flex", flexDirection: "column", flexShrink: 0, background: "var(--bg-panel)", borderRight: isMobile ? "none" : "1px solid var(--border-strong)", borderBottom: isMobile ? "1px solid var(--border-strong)" : "none" }}>
+                <div style={{ padding: "9px 10px", borderBottom: "1px solid var(--border)", background: "var(--bg-subtle)" }}>
                   <div style={{ marginBottom: 5, fontSize: 10, color: "var(--text-dim)" }}>启停写入范围</div>
                   <ScopePicker value={settingsScope} onChange={setSettingsScope} />
                 </div>
@@ -533,7 +551,7 @@ export function SubagentsConfig({
                             alignItems: "center",
                             gap: 7,
                             padding: "7px 8px",
-                            borderRadius: 6,
+                            borderRadius: "var(--ui-radius-sm)",
                             cursor: "pointer",
                             background: selectedKey === key && !formMode ? "var(--bg-selected)" : "transparent",
                           }}>
@@ -563,7 +581,7 @@ export function SubagentsConfig({
                       {selectedAgent.scope !== "builtin" && (
                         <div style={{ display: "flex", gap: 6 }}>
                           <button style={buttonStyle} onClick={() => { setForm(formFromAgent(selectedAgent)); setFormMode("edit"); }}>编辑</button>
-                          <button style={{ ...buttonStyle, color: "#f87171" }} disabled={busy} onClick={() => void deleteAgent(selectedAgent)}>删除</button>
+                          <button style={{ ...buttonStyle, color: "var(--danger)", background: "var(--danger-soft)" }} disabled={busy} onClick={() => void deleteAgent(selectedAgent)}>删除</button>
                         </div>
                       )}
                     </div>
@@ -579,11 +597,11 @@ export function SubagentsConfig({
                   <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Subagents 设置</div>
                   <ScopePicker value={settingsScope} onChange={setSettingsScope} />
                 </div>
-                <button style={{ ...buttonStyle, background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }} disabled={busy} onClick={() => void saveSettings()}>
+                <button style={{ ...buttonStyle, background: "var(--accent)", color: "var(--text-on-accent)", borderColor: "var(--accent)" }} disabled={busy} onClick={() => void saveSettings()}>
                   {busy ? "保存中…" : "保存设置"}
                 </button>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, maxWidth: 780 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, maxWidth: 780, marginBottom: 18, padding: 12, border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-md)", background: "var(--bg-panel)", boxShadow: "var(--shadow-subtle)" }}>
                 <Field label="默认模型">
                   <ModelSelect value={currentSettings.defaultModel ?? ""} models={modelOptions} onChange={(value) => updateScopedSettings(settingsScope, (current) => ({ ...current, defaultModel: value || undefined }))} />
                 </Field>
@@ -595,7 +613,7 @@ export function SubagentsConfig({
                 </Field>
               </div>
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>按 agent 覆盖</div>
-              <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", maxWidth: 780 }}>
+              <div style={{ border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-md)", overflow: "hidden", maxWidth: 780, background: "var(--bg-panel)", boxShadow: "var(--shadow-subtle)" }}>
                 {uniqueAgents.map((agent) => {
                   const override = currentSettings.agentOverrides[agent.name] ?? {};
                   return (
@@ -615,7 +633,7 @@ export function SubagentsConfig({
             <div style={{ height: "100%", overflowY: "auto", padding: 18 }}>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Chains（只读）</div>
               {chains.length === 0 ? <div style={{ color: "var(--text-dim)", fontSize: 12 }}>尚未发现 user 或 project chains。</div> : chains.map((chain) => (
-                <div key={`${chain.scope}:${chain.filePath}`} style={{ padding: 12, marginBottom: 8, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-panel)" }}>
+                <div key={`${chain.scope}:${chain.filePath}`} style={{ padding: 12, marginBottom: 8, border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-md)", background: "var(--bg-panel)", boxShadow: "var(--shadow-subtle)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <code style={{ fontSize: 12, fontWeight: 700 }}>{chain.name}</code>
                     <span style={{ fontSize: 9, color: "var(--text-dim)" }}>{chain.scope}</span>
@@ -647,7 +665,7 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
 
 function ScopePicker({ value, onChange }: { value: WritableSubagentScope; onChange: (scope: WritableSubagentScope) => void }) {
   return (
-    <div style={{ display: "flex", gap: 12, fontSize: 11 }}>
+    <div style={{ display: "inline-flex", gap: 12, padding: "5px 8px", border: "1px solid var(--border)", borderRadius: "var(--ui-radius-sm)", background: "var(--bg-elevated)", fontSize: 11 }}>
       {([
         ["user", "用户级"],
         ["project", "项目级"],
@@ -706,7 +724,7 @@ function AgentDetails({ agent }: { agent: SubagentAgent }) {
       </div>
       <div style={{ marginTop: 18 }}>
         <div style={labelStyle}>系统提示词正文</div>
-        <pre style={{ margin: 0, padding: 12, whiteSpace: "pre-wrap", wordBreak: "break-word", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 11, fontFamily: "var(--font-mono)" }}>{agent.body || "（空）"}</pre>
+        <pre style={{ margin: 0, padding: 12, whiteSpace: "pre-wrap", wordBreak: "break-word", background: "var(--bg-elevated)", border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-md)", boxShadow: "var(--shadow-subtle)", color: "var(--text)", fontSize: 11, fontFamily: "var(--font-mono)" }}>{agent.body || "（空）"}</pre>
       </div>
       <div style={{ marginTop: 12, color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 9, wordBreak: "break-all" }}>{agent.filePath}</div>
     </>

@@ -159,12 +159,12 @@ export function OAuthDetail({
     || loginState.phase === "select";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 16, border: "1px solid var(--border)", borderRadius: "var(--ui-radius-md)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-subtle)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <SectionTitle>{t("i18n.subscription")}</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.loggedIn ? "#4ade80" : "var(--border)", display: "inline-block" }} />
-          <span style={{ fontSize: 11, color: provider.loggedIn ? "#4ade80" : "var(--text-dim)" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.loggedIn ? "var(--success)" : "var(--border-strong)", display: "inline-block" }} />
+          <span style={{ fontSize: 11, color: provider.loggedIn ? "var(--success)" : "var(--text-dim)" }}>
             {provider.loggedIn ? t("i18n.connected") : t("i18n.notConnected")}
           </span>
         </div>
@@ -187,9 +187,10 @@ export function OAuthDetail({
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {loginState.options.map((option) => (
                 <button
+                  className="pi-toolbar-button"
                   key={option.id}
                   onClick={() => submitSelection(loginState.token, option.id)}
-                  style={{ padding: "6px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", cursor: "pointer", fontSize: 12, textAlign: "left" }}
+                  style={{ padding: "7px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--ui-radius-sm)", color: "var(--text)", cursor: "pointer", fontSize: 12, textAlign: "left" }}
                 >
                   {option.label}
                 </button>
@@ -215,6 +216,7 @@ export function OAuthDetail({
             )}
             <div style={{ display: "flex", gap: 6 }}>
               <input
+                className="focus-visible:outline-2 focus-visible:outline-focus-ring focus-visible:outline-offset-1"
                 ref={inputRef}
                 value={inputValue}
                 onChange={(event) => setInputValue(event.target.value)}
@@ -224,12 +226,13 @@ export function OAuthDetail({
                 placeholder={loginState.phase === "auth"
                   ? "http://localhost:1455/auth/callback?code=…"
                   : (loginState.placeholder ?? "输入值…")}
-                style={{ flex: 1, padding: "6px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box" }}
+                style={{ flex: 1, padding: "7px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--ui-radius-sm)", color: "var(--text)", fontSize: 12, fontFamily: "var(--font-mono)", boxSizing: "border-box" }}
               />
               <button
+                className="pi-send-button"
                 onClick={() => submitCode(loginState.token, inputValue)}
                 disabled={!inputValue.trim()}
-                style={{ padding: "6px 12px", background: inputValue.trim() ? "var(--accent)" : "var(--bg-panel)", border: "none", borderRadius: 5, color: inputValue.trim() ? "#fff" : "var(--text-dim)", cursor: inputValue.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, flexShrink: 0 }}
+                style={{ padding: "6px 12px", background: inputValue.trim() ? "var(--accent)" : "var(--bg-hover)", border: "none", borderRadius: "var(--ui-radius-sm)", color: inputValue.trim() ? "var(--text-on-accent)" : "var(--text-dim)", cursor: inputValue.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, flexShrink: 0 }}
               >
                 {t("i18n.submit")}
               </button>
@@ -241,7 +244,7 @@ export function OAuthDetail({
             <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
               打开验证页面并输入此代码：
             </p>
-            <div style={{ padding: "8px 10px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: 0 }}>
+            <div style={{ padding: "9px 11px", background: "var(--bg)", border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-sm)", color: "var(--text)", fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: 0, boxShadow: "var(--shadow-subtle)" }}>
               {loginState.userCode}
             </div>
             <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
@@ -256,36 +259,39 @@ export function OAuthDetail({
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{loginState.message}</p>
         )}
         {loginState.phase === "success" && (
-          <p style={{ margin: 0, fontSize: 12, color: "#4ade80" }}>{t("i18n.connectedSuccessfully")}</p>
+          <p style={{ margin: 0, padding: "7px 9px", borderRadius: "var(--ui-radius-sm)", background: "var(--success-soft)", color: "var(--success)", fontSize: 12 }}>{t("i18n.connectedSuccessfully")}</p>
         )}
         {loginState.phase === "error" && (
-          <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{loginState.message}</p>
+          <p style={{ margin: 0, padding: "7px 9px", borderRadius: "var(--ui-radius-sm)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 12 }}>{loginState.message}</p>
         )}
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>
         {isWorking ? (
           <button
+            className="pi-toolbar-button"
             onClick={() => {
               eventSourceRef.current?.close();
               setLoginState({ phase: "idle" });
             }}
-            style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
+            style={{ padding: "5px 12px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--ui-radius-sm)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
           >
             {t("i18n.cancel")}
           </button>
         ) : (
           <>
             <button
+              className="pi-send-button"
               onClick={handleLogin}
-              style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+              style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: "var(--ui-radius-sm)", color: "var(--text-on-accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
             >
               {provider.loggedIn ? t("i18n.relogin") : t("i18n.login")}
             </button>
             {provider.loggedIn && (
               <button
+                className="pi-sidebar-action is-danger"
                 onClick={handleLogout}
-                style={{ padding: "5px 12px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 5, color: "#ef4444", cursor: "pointer", fontSize: 12 }}
+                style={{ padding: "5px 12px", background: "var(--bg)", border: "1px solid color-mix(in srgb, var(--danger) 36%, var(--border))", borderRadius: "var(--ui-radius-sm)", color: "var(--danger)", cursor: "pointer", fontSize: 12 }}
               >
                 {t("i18n.disconnect")}
               </button>
@@ -355,12 +361,12 @@ export function ApiKeyDetail({
   }, [provider.id, onRefresh]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 16, border: "1px solid var(--border)", borderRadius: "var(--ui-radius-md)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-subtle)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <SectionTitle>API Key</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.configured ? "#4ade80" : "var(--border)", display: "inline-block" }} />
-          <span style={{ fontSize: 11, color: provider.configured ? "#4ade80" : "var(--text-dim)" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.configured ? "var(--success)" : "var(--border-strong)", display: "inline-block" }} />
+          <span style={{ fontSize: 11, color: provider.configured ? "var(--success)" : "var(--text-dim)" }}>
             {provider.configured ? t("i18n.configured") : t("i18n.notConfigured")}
           </span>
         </div>
@@ -387,14 +393,15 @@ export function ApiKeyDetail({
             mono
           />
           <button
+            className="pi-send-button"
             onClick={handleSave}
             disabled={saving || !apiKey.trim() || savedOk}
             style={{
               padding: "6px 12px",
-              background: savedOk ? "#16a34a" : apiKey.trim() ? "var(--accent)" : "var(--bg-panel)",
+              background: savedOk ? "var(--success)" : apiKey.trim() ? "var(--accent)" : "var(--bg-hover)",
               border: "none",
-              borderRadius: 5,
-              color: (apiKey.trim() || savedOk) ? "#fff" : "var(--text-dim)",
+              borderRadius: "var(--ui-radius-sm)",
+              color: (apiKey.trim() || savedOk) ? "var(--text-on-accent)" : "var(--text-dim)",
               cursor: (saving || !apiKey.trim() || savedOk) ? "not-allowed" : "pointer",
               fontSize: 12,
               fontWeight: 600,
@@ -414,19 +421,20 @@ export function ApiKeyDetail({
         </div>
       </Field>
 
-      {error && <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{error}</p>}
+      {error && <p style={{ margin: 0, padding: "7px 9px", borderRadius: "var(--ui-radius-sm)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 12 }}>{error}</p>}
 
       {provider.configured && (
         <button
+          className="pi-sidebar-action is-danger"
           onClick={handleRemove}
           disabled={removing}
           style={{
             alignSelf: "flex-start",
             padding: "5px 12px",
-            background: "none",
-            border: "1px solid rgba(239,68,68,0.3)",
-            borderRadius: 5,
-            color: "#ef4444",
+            background: "var(--bg)",
+            border: "1px solid color-mix(in srgb, var(--danger) 36%, var(--border))",
+            borderRadius: "var(--ui-radius-sm)",
+            color: "var(--danger)",
             cursor: removing ? "not-allowed" : "pointer",
             fontSize: 12,
           }}
