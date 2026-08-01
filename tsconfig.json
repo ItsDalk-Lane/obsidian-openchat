@@ -25,6 +25,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "server-only": [
+        "./server/server-only.ts"
       ]
     },
     "target": "ES2017"
