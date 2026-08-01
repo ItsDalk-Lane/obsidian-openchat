@@ -1,7 +1,11 @@
 "use client";
 
-import { FileViewer } from "../FileViewer";
+import { lazy, Suspense } from "react";
 import type { Artifact } from "@/lib/kernel";
+
+const ArtifactFileWorkspaceView = lazy(() => import("../artifacts/ArtifactFileWorkspaceView").then((module) => ({
+  default: module.ArtifactFileWorkspaceView,
+})));
 
 interface Props {
   artifact: Artifact;
@@ -16,5 +20,9 @@ interface Props {
 export function ArtifactWorkspaceView({ artifact, ...viewerProps }: Props) {
   const fileRepresentation = artifact.representations.find((item) => item.kind === "file");
   if (!fileRepresentation) return null;
-  return <FileViewer filePath={fileRepresentation.path} {...viewerProps} />;
+  return (
+    <Suspense fallback={<div aria-busy="true" style={{ height: "100%", background: "var(--bg)" }} />}>
+      <ArtifactFileWorkspaceView filePath={fileRepresentation.path} {...viewerProps} />
+    </Suspense>
+  );
 }

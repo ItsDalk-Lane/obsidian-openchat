@@ -87,7 +87,7 @@ function formatRelativeTime(dateStr: string, locale: Locale): string {
  * Return all projects (deduped by projectRoot so worktrees collapse into their
  * main repo) sorted by most recent session activity.
  */
-function getRecentProjects(sessions: SessionInfo[]): string[] {
+export function getRecentProjects(sessions: SessionInfo[]): string[] {
   const latestByRoot = new Map<string, string>(); // projectRoot -> most recent modified
   for (const s of sessions) {
     const root = s.projectRoot ?? s.cwd;
