@@ -36,6 +36,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Pre-create the GitHub Release with auto-generated notes. electron-builder
+      # spawns one GitHub publisher per artifact, and they race to create the
+      # release (both see "doesn't exist", both POST, the loser gets
+      # 422 already_exists and fails the whole job — v1.0.0 lost its .exe this
+      # way). Creating it up front makes that race impossible.
+      - name: Create GitHub release (if missing)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+
       # Builds the Vite frontend, then packages the NSIS installer and publishes it to the
       # GitHub Release for this tag (electron-builder reads the "publish"
       # config in package.json).
