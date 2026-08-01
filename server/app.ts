@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import {
   isApiRequestAllowed,
@@ -9,6 +11,7 @@ import { registerApiRoutes } from "@/server/api-router";
 
 export async function createApp(): Promise<Hono> {
   const app = new Hono();
+  const webDist = resolve(process.env.PI_WEB_STATIC_DIR ?? "web/dist");
 
   app.use("/api/*", async (context, next) => {
     const request = attachNextUrl(context.req.raw);
@@ -23,10 +26,17 @@ export async function createApp(): Promise<Hono> {
 
   await registerApiRoutes(app);
 
+  app.all("/api/*", (context) => context.json({ error: "Not found" }, 404));
+  app.use("*", serveStatic({
+    root: webDist,
+    onFound: (_path, context) => {
+      if (context.req.path === "/") {
+        context.header("Cache-Control", "private, no-cache, max-age=0, must-revalidate");
+      }
+    },
+  }));
+
   app.notFound((context) => {
-    if (context.req.path.startsWith("/api/")) {
-      return context.json({ error: "Not found" }, 404);
-    }
     return context.text("Pi Web frontend has not been built", 404);
   });
 

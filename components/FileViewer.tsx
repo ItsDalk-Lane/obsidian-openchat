@@ -511,7 +511,6 @@ function ImageViewer({ filePath, cwd, sourceSessionId }: Props) {
         {error ? (
           <div style={{ color: "#f87171", fontSize: 13 }}>{error}</div>
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={src}
             alt={filePath}
@@ -1275,7 +1274,6 @@ function TextFileViewer({
                   const imageSrc = imagePath
                     ? getFileApiUrl(imagePath, "read", sourceSessionId)
                     : src;
-                  // eslint-disable-next-line @next/next/no-img-element
                   return <img src={imageSrc} alt={alt ?? ""} loading="lazy" {...props} />;
                 },
               }}

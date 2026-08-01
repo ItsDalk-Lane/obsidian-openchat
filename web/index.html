@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN" translate="no" class="notranslate">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Pi 编码代理的 Web 界面" />
+    <meta name="google" content="notranslate" />
+    <link rel="icon" href="/favicon.ico" />
+    <title>Pi Web</title>
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem("pi-theme");
+          if (theme === "dark") document.documentElement.classList.add("dark");
+          if (window.piDesktop && window.piDesktop.setTheme) {
+            window.piDesktop.setTheme(theme === "dark" ? "dark" : "light");
+          }
+        } catch (_) {}
+      })();
+    </script>
+  </head>
+  <body translate="no" class="notranslate">
+    <div id="root"></div>
+    <script type="module" src="/main.tsx"></script>
+  </body>
+</html>

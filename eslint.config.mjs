@@ -5,8 +5,8 @@ const eslintConfig = [
   ...coreWebVitals,
   ...typescript,
   {
-    // Electron main-process files are plain CommonJS Node scripts, not app code
-    ignores: ["electron/**"],
+    // Electron 主进程脚本与构建产物不属于前端源码检查范围
+    ignores: ["electron/**", "web/dist/**", "dist-electron/**"],
   },
   {
     rules: {

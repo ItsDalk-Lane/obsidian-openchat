@@ -1,6 +1,8 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { serve } from "@hono/node-server";
+import { ensureKernelStartupRecovery } from "@/lib/application/services";
+import { configureHttpDispatcher } from "@/lib/http-dispatcher";
 import { createApp } from "@/server/app";
 
 const DEFAULT_PORT = 30141;
@@ -21,6 +23,8 @@ export async function startServer() {
   const port = readPort();
   process.env.PI_WEB_HOSTNAME = hostname;
 
+  configureHttpDispatcher();
+  ensureKernelStartupRecovery();
   const app = await createApp();
   const server = serve({ fetch: app.fetch, hostname, port }, () => {
     console.log(`Ready - Pi Web server listening on http://${hostname}:${port}`);

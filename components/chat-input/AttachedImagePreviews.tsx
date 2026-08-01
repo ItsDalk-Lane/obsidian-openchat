@@ -15,7 +15,6 @@ export function AttachedImagePreviews({
     <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
       {images.map((image, index) => (
         <div key={index} style={{ position: "relative", flexShrink: 0 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={image.previewUrl}
             alt=""

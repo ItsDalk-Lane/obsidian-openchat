@@ -80,7 +80,6 @@ export function MarkdownBody({ children, className, isStreaming, cwd, onOpenFile
             const imageSrc = filePath
               ? `/api/files/${encodeFilePathForApi(filePath)}?type=read`
               : src;
-            // eslint-disable-next-line @next/next/no-img-element
             return <img src={imageSrc} alt={alt ?? ""} loading="lazy" {...props} />;
           },
           table({ children }) {

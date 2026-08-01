@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar } from "./SessionSidebar";
 import { AnimatedDropdown } from "./session-sidebar/SidebarPrimitives";
@@ -45,6 +44,10 @@ type ResolvedTaskState =
   | { status: "loading"; task: Task | null; run: Run | null; runCount: number; artifactCount: number; error: null }
   | { status: "ready"; task: Task; run: Run | null; runCount: number; artifactCount: number; error: null }
   | { status: "error"; task: null; run: null; runCount: 0; artifactCount: 0; error: string };
+
+function replaceBrowserUrl(url: string): void {
+  window.history.replaceState(window.history.state, "", url);
+}
 
 function parseDraftItems(value: string): string[] {
   return value
@@ -90,9 +93,9 @@ function formatAcceptanceCriteriaDraft(task: Task): string {
 }
 
 export function AppShell() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [initialNavigation] = useState(() => getInitialNavigation(searchParams));
+  const [initialNavigation] = useState(() => getInitialNavigation(
+    new URLSearchParams(window.location.search),
+  ));
   const { isDark, toggleTheme } = useTheme();
   const { locale, setLocale, t, supportedLocales } = useI18n();
   const isMobile = useIsMobile();
@@ -384,8 +387,8 @@ export function AppShell() {
     setFileTabs([]);
     setActiveFileTabId(null);
     setRightPanelOpen(false);
-    router.replace("/", { scroll: false });
-  }, [newSessionCwd, router, selectedSession, setNewSessionCwd, setSelectedSession]);
+    replaceBrowserUrl("/");
+  }, [newSessionCwd, selectedSession, setNewSessionCwd, setSelectedSession]);
 
   useEffect(() => {
     const previous = lastHandledWorkspaceRef.current;
@@ -405,12 +408,11 @@ export function AppShell() {
       // 避免 URL 恢复时工作区同步造成重复重挂载
       suppressCwdBumpRef.current = true;
     }
-    // Skip router.replace when restoring from URL — the param is already correct
-    // and calling replace in production Next.js triggers a Suspense remount loop
+    // 从 URL 恢复时参数已经正确，不再重复改写地址。
     if (!isRestore) {
-      router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
+      replaceBrowserUrl(`?session=${encodeURIComponent(session.id)}`);
     }
-  }, [router, isMobile, selectSession]);
+  }, [isMobile, selectSession]);
 
   const handleNewSession = useCallback((_sessionId: string, cwd: string) => {
     startNewSession(cwd, activeProjectRoot ?? cwd);
@@ -420,8 +422,8 @@ export function AppShell() {
     setSystemPrompt(null);
     setActiveTopPanel(null);
     if (isMobile) setSidebarOpen(false);
-    router.replace("/", { scroll: false });
-  }, [router, isMobile, startNewSession, activeProjectRoot]);
+    replaceBrowserUrl("/");
+  }, [isMobile, startNewSession, activeProjectRoot]);
 
   // Global keyboard shortcuts (handles Esc, Ctrl+Alt+N etc.)
   useGlobalKeyboardShortcuts({
@@ -451,8 +453,8 @@ export function AppShell() {
     selectSession(session);
     setRefreshKey((k) => k + 1);
     hydrateSelectedSession(session.id);
-    router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
-  }, [router, hydrateSelectedSession, selectSession]);
+    replaceBrowserUrl(`?session=${encodeURIComponent(session.id)}`);
+  }, [hydrateSelectedSession, selectSession]);
 
   const handleAgentEnd = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -508,8 +510,8 @@ export function AppShell() {
       id: newSessionId,
     }));
     hydrateSelectedSession(newSessionId);
-    router.replace(`?session=${encodeURIComponent(newSessionId)}`, { scroll: false });
-  }, [router, hydrateSelectedSession, setNewSessionCwd, setSelectedSession]);
+    replaceBrowserUrl(`?session=${encodeURIComponent(newSessionId)}`);
+  }, [hydrateSelectedSession, setNewSessionCwd, setSelectedSession]);
 
   const handleInitialRestoreDone = useCallback(() => {
     setInitialSessionRestored(true);
@@ -532,9 +534,9 @@ export function AppShell() {
       setBranchActiveLeafId(null);
       setSystemPrompt(null);
       setActiveTopPanel(null);
-      router.replace("/", { scroll: false });
+      replaceBrowserUrl("/");
     }
-  }, [selectedSession, router, activeProjectRoot, setNewSessionCwd, setSelectedSession, startNewSession]);
+  }, [selectedSession, activeProjectRoot, setNewSessionCwd, setSelectedSession, startNewSession]);
 
   const handleProjectDeleted = useCallback((_projectRoot: string, deletedIds: string[]) => {
     setRefreshKey((k) => k + 1);
@@ -554,9 +556,9 @@ export function AppShell() {
       setBranchActiveLeafId(null);
       setSystemPrompt(null);
       setActiveTopPanel(null);
-      router.replace("/", { scroll: false });
+      replaceBrowserUrl("/");
     }
-  }, [selectedSession, router, setNewSessionCwd, setSelectedSession, startNewSession]);
+  }, [selectedSession, setNewSessionCwd, setSelectedSession, startNewSession]);
 
   const handleOpenFile = useCallback((
     filePath: string,

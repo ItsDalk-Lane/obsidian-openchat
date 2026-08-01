@@ -382,3 +382,33 @@ __需求__：手动一项项填表单太慢，要求直接粘贴 `{"mcpServers":
 
 - 本轮已达到任务书规定的工具调用止损线，停止继续任务 2；任务 1 已完整提交，可从本节和“阶段计划”直接续跑，不要重做后端。
 - 下次第一步：读取本文件后审计 `app/page.tsx`、`app/layout.tsx`、`app/globals.css` 与 `components/AppShell.tsx`，建立 Vite 入口和原生深链替换。
+
+### 任务 2：断点恢复与前端审计
+
+- [x] 从干净的 `refactor/vite-foundation@edd9e83` 恢复；任务 0/1 不重做，当前工作树无未提交差异。
+- [x] 现有页面入口只是 `Suspense → I18nProvider → AppShell`；布局只负责标题、语言、禁止翻译、主题预加载、KaTeX 样式和全局 CSS，可等价搬进 `web/index.html` 与 `web/main.tsx`。
+- [x] `components/AppShell.tsx` 是 components/hooks 中唯一真正 import Next.js 的文件；只使用查询参数初值和 7 处无滚动 URL 替换，可用 `window.location.search` 与 `history.replaceState` 最小替换。
+- [x] `SessionSidebar`、`ChatWindow` 的版本号由两个 Next 公共环境变量提供；Vite 构建时可沿用同名编译期替换，避免扩大组件改动。
+- [x] 全局样式可原样迁入 `web/globals.css`，现有 Tailwind 4 PostCSS 管线可复用；仓库没有 `public/` 目录，只有 `app/favicon.ico` 需要复制到 `web/`。
+- [x] 5 个组件仍有 Next ESLint 图片规则注释；移除 `eslint-config-next` 时必须同步删除这些失效注释，属于去 Next.js 化的最小清理。
+- [x] 新增 Vite 与官方 React 插件；安装仍只有既有 React peer 覆盖警告和 10 项审计报告，不做无关依赖处理。
+- [x] Hono 静态中间件支持绝对根目录、文件流、HEAD 与 Range；首次按不存在的 `.d.ts/.js` 路径查看失败，随后改读包实际发布的 `.d.mts/.mjs`，未重复错误命令。
+- [x] `web/index.html`、`web/main.tsx`、完整全局样式与 favicon 已落地；补回旧布局的 body 纵向 flex，未改变视觉设计。
+- [x] `AppShell` 已改用 `URLSearchParams(window.location.search)` 和 `history.replaceState`；7 处选择、新建、分叉、删除 URL 行为保持替换而非新增历史记录，也不会触发滚动。
+- [x] 独立服务已补回旧 `instrumentation.ts` 的网络请求配置与重启恢复调用；API 请求防护此前已经迁入统一中间件。
+- [x] `node_modules/.bin/tsc --noEmit -p tsconfig.typecheck.json` 退出码 0；目标目录 `from "next"`、旧路由器调用均为 0 命中。
+- [x] 首次 Vite 构建退出码 0：2,884 个模块完成转换，产出 `web/dist/index.html` 和哈希 `/assets/`；配置后缀改为 `.mts` 消除 CommonJS 未来兼容提示，大包提示如实保留。
+- [x] 新后端实测 `/` 与 `/?session=smoke-session` 均返回 200、含 `/assets/`，资源返回 200；首页 `Cache-Control` 仍为 `private, no-cache, max-age=0, must-revalidate`。
+- [x] 临时服务已关闭；安全层拒绝 `rm -rf` 清理后，改用 Node 文件接口删除两个精确临时目录，未重试被拒命令。
+- [!] 根目录 4 个 Next 专属文件不在可修改白名单；运行行为可迁走，但文件不能合规删除，详见 `BLOCKED.md` 0B。
+- 组件清理尝试 1：批量删除 6 条旧 Next lint 注释时，一处 JSX 上下文不匹配导致补丁整体未应用；读取精确上下文后逐处删除，未改图片行为。
+- 收口尝试 1：类型检查通过；lint 因首次构建留下的 `web/dist` 压缩产物被当成源码扫描而失败（271 个错误均来自生成文件）。已只把 `web/dist/**` 和后续桌面构建目录加入忽略，不修改源码规则或测试标准。
+
+### 任务 2：验收证据
+
+- [x] 类型检查退出码 0；lint 退出码 0。当前 6 条提示只来自尚未移除的 Next 图片规则，任务 3 删除该依赖后再要求回到 0 提示。
+- [x] `vite build` 退出码 0，2,884 个模块完成转换；配置已无 CommonJS 提示，未掩盖 3 个既有大包提示。
+- [x] 独立接口冒烟再次 15/15 全绿，67 条路由清单精确一致，3 条指定 SSE 均取得首帧。
+- [x] 静态审计：`components/`、`hooks/`、`web/`、`server/` 中 Next 导入、Next 图片豁免、旧路由器调用均为 0 命中；构建首页精确引用哈希 `/assets/`。
+- [x] `git diff --check` 无输出；`lib/**` 与全部 `.test.mjs` 相对 `main` 无差异；既有 test 脚本逐项一致。
+- [x] `/?session=smoke-session` 已通过新服务真实返回同一 Vite 首页；查询参数由浏览器入口原样交给页面读取，未改成路径型路由。
