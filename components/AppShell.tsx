@@ -33,6 +33,9 @@ import { useI18n } from "@/hooks/useI18n";
 
 type SessionCopyField = "file" | "id";
 type TopPanel = "branches" | "system" | "session" | "language";
+type DesktopNewSessionBridge = NonNullable<Window["piDesktop"]> & {
+  onNewSession?: (callback: () => void) => () => void;
+};
 type AutoNameStatus =
   | { kind: "idle" }
   | { kind: "naming" }
@@ -430,6 +433,14 @@ export function AppShell() {
     onNewSession: (cwd: string) => handleNewSession(`kb-${Date.now()}`, cwd),
     activeCwd,
   });
+
+  useEffect(() => {
+    const desktopBridge = window.piDesktop as DesktopNewSessionBridge | undefined;
+    if (!desktopBridge?.onNewSession) return;
+    return desktopBridge.onNewSession(() => {
+      if (activeCwd) handleNewSession(`menu-${Date.now()}`, activeCwd);
+    });
+  }, [activeCwd, handleNewSession]);
 
   // Client-built transient SessionInfo (new session / fork) lacks the
   // server-computed projectRoot, which the same-project check in

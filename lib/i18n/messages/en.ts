@@ -268,6 +268,8 @@ export const enLocale: LocalePlugin = {
     "chat.stop": "Stop",
     "chat.disableSound": "Disable completion sound",
     "chat.enableSound": "Enable completion sound",
+    "desktop.agentCompleteTitle": "Agent run complete",
+    "desktop.agentCompleteBody": "The current run has finished.",
     "chat.thinkingUseDefault": "Use pi default",
     "chat.thinkingOff": "Reasoning off",
     "chat.thinkingMinimal": "Minimal reasoning",

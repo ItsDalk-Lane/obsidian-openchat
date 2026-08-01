@@ -1,8 +1,24 @@
-const { app, BrowserWindow, Menu, shell, dialog, ipcMain, nativeTheme } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  Menu,
+  shell,
+  dialog,
+  ipcMain,
+  nativeTheme,
+  screen,
+  Notification,
+} = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
 const fs = require("fs");
+const {
+  DEFAULT_WINDOW_STATE,
+  clampWindowState,
+  readWindowState,
+} = require("./lib/window-state.cjs");
+const { shouldSendCompletionNotification } = require("./lib/notification.cjs");
 
 const PORT = process.env.PI_WEB_PORT || "30141";
 const HOSTNAME = "127.0.0.1";
@@ -10,6 +26,10 @@ const SERVER_URL = `http://${HOSTNAME}:${PORT}`;
 
 let mainWindow = null;
 let serverProcess = null;
+let completionNotification = null;
+
+const WINDOW_STATE_FILE = "window-state.json";
+const WINDOW_STATE_SAVE_DELAY_MS = 300;
 
 // ─── Logging (file only — no stdout, avoids EPIPE in detached mode) ──
 // In packaged builds __dirname lives inside the (read-only) app bundle,
@@ -217,6 +237,18 @@ function checkForUpdates(manual) {
 
 // ─── App menu (Chinese) ─────────────────────────────────────
 
+function sendToMainWindow(channel) {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return;
+  mainWindow.webContents.send(channel);
+}
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+}
+
 function buildAppMenu() {
   const isMac = process.platform === "darwin";
 
@@ -242,6 +274,8 @@ function buildAppMenu() {
     {
       label: "文件",
       submenu: [
+        { label: "新建会话", accelerator: "CmdOrCtrl+N", click: () => sendToMainWindow("menu:new-session") },
+        { type: "separator" },
         isMac ? { label: "关闭窗口", role: "close" } : { label: "退出", role: "quit" },
       ],
     },
@@ -332,6 +366,73 @@ function buildAppMenu() {
 
 // ─── Window management ──────────────────────────────────────
 
+function getWindowStateFilePath() {
+  return path.join(app.getPath("userData"), WINDOW_STATE_FILE);
+}
+
+function intersectionArea(bounds, workArea) {
+  const width = Math.max(
+    0,
+    Math.min(bounds.x + bounds.width, workArea.x + workArea.width) - Math.max(bounds.x, workArea.x),
+  );
+  const height = Math.max(
+    0,
+    Math.min(bounds.y + bounds.height, workArea.y + workArea.height) - Math.max(bounds.y, workArea.y),
+  );
+  return width * height;
+}
+
+function getRestoredWindowState() {
+  const savedState = readWindowState(getWindowStateFilePath(), DEFAULT_WINDOW_STATE);
+  const displays = screen.getAllDisplays();
+  let targetDisplay = null;
+  let largestOverlap = 0;
+
+  for (const display of displays) {
+    const overlap = intersectionArea(savedState, display.workArea);
+    if (overlap > largestOverlap) {
+      largestOverlap = overlap;
+      targetDisplay = display;
+    }
+  }
+
+  // 旧显示器已拔掉时回主屏；合法的负坐标副屏仍会按交叠面积命中。
+  const workArea = (targetDisplay ?? screen.getPrimaryDisplay()).workArea;
+  return clampWindowState(savedState, workArea, DEFAULT_WINDOW_STATE);
+}
+
+function persistWindowState(win) {
+  if (win.isDestroyed()) return;
+  const bounds = win.getNormalBounds();
+  const state = {
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    isMaximized: win.isMaximized(),
+  };
+  const filePath = getWindowStateFilePath();
+  const temporaryPath = `${filePath}.${process.pid}.tmp`;
+
+  try {
+    fs.writeFileSync(temporaryPath, JSON.stringify(state), { encoding: "utf8", mode: 0o600 });
+    fs.renameSync(temporaryPath, filePath);
+  } catch (err) {
+    log(`Failed to persist window state: ${err.message}`);
+    try { fs.unlinkSync(temporaryPath); } catch { /* ignore */ }
+  }
+}
+
+function normalizeNotificationText(value, maxLength) {
+  if (typeof value !== "string") return null;
+  const normalized = Array.from(value, (character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127 ? " " : character;
+  }).join("").replace(/\s+/g, " ").trim();
+  if (normalized.length === 0) return null;
+  return normalized.slice(0, maxLength);
+}
+
 // Renderer reports the in-app theme so the native title bar matches it.
 ipcMain.on("pi-web:set-theme", (_event, theme) => {
   if (theme === "dark" || theme === "light") {
@@ -348,10 +449,50 @@ ipcMain.handle("pi-web:select-directory", async () => {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 });
 
+ipcMain.on("pi-web:notify-agent-complete", (event, payload) => {
+  if (
+    !mainWindow
+    || mainWindow.isDestroyed()
+    || event.sender !== mainWindow.webContents
+    || typeof payload !== "object"
+    || payload === null
+    || Array.isArray(payload)
+  ) {
+    return;
+  }
+
+  const title = normalizeNotificationText(payload.title, 80);
+  const body = normalizeNotificationText(payload.body, 240);
+  if (
+    !title
+    || !body
+    || !Notification.isSupported()
+    || !shouldSendCompletionNotification({
+      isFocused: mainWindow.isFocused(),
+      wasRunning: true,
+      isRunning: false,
+    })
+  ) {
+    return;
+  }
+
+  completionNotification?.close();
+  const notification = new Notification({ title, body });
+  completionNotification = notification;
+  notification.once("click", focusMainWindow);
+  notification.once("close", () => {
+    if (completionNotification === notification) completionNotification = null;
+  });
+  notification.show();
+});
+
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+  const restoredState = getRestoredWindowState();
+  const win = new BrowserWindow({
+    x: restoredState.x,
+    y: restoredState.y,
+    width: restoredState.width,
+    height: restoredState.height,
     minWidth: 900,
     minHeight: 600,
     title: "Pi Web Desktop",
@@ -365,8 +506,24 @@ function createWindow() {
     },
     show: false,
   });
+  mainWindow = win;
 
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  let saveTimer = null;
+  const flushWindowState = () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = null;
+    persistWindowState(win);
+  };
+  const scheduleWindowStateSave = () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushWindowState, WINDOW_STATE_SAVE_DELAY_MS);
+  };
+  for (const eventName of ["move", "resize", "maximize", "unmaximize"]) {
+    win.on(eventName, scheduleWindowStateSave);
+  }
+  win.on("close", flushWindowState);
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("http://") || url.startsWith("https://")) {
       shell.openExternal(url);
       return { action: "deny" };
@@ -374,15 +531,27 @@ function createWindow() {
     return { action: "allow" };
   });
 
-  mainWindow.once("ready-to-show", () => {
-    mainWindow.show();
-    mainWindow.focus();
+  win.once("ready-to-show", () => {
+    win.show();
+    // macOS 会在窗口首次显示时做一次级联摆放；显示后再次落实已校验的边界，
+    // 才能让保存的位置和普通尺寸真正恢复。
+    win.setBounds({
+      x: restoredState.x,
+      y: restoredState.y,
+      width: restoredState.width,
+      height: restoredState.height,
+    });
+    if (restoredState.isMaximized) win.maximize();
+    win.focus();
   });
 
-  mainWindow.on("closed", () => { mainWindow = null; });
+  win.on("closed", () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    if (mainWindow === win) mainWindow = null;
+  });
   // Show a lightweight loading page immediately; the real app URL is loaded
   // once the server answers the health check.
-  mainWindow.loadFile(path.join(__dirname, "loading.html"));
+  win.loadFile(path.join(__dirname, "loading.html"));
 }
 
 function loadAppUrl() {
@@ -453,10 +622,7 @@ if (!gotTheLock) {
 } else {
   app.on("second-instance", () => {
     // Someone tried to run a second instance, focus existing window instead
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
+    focusMainWindow();
   });
 
 app.whenReady().then(() => {

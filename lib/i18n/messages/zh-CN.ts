@@ -268,6 +268,8 @@ export const zhCNLocale: LocalePlugin = {
     "chat.stop": "停止",
     "chat.disableSound": "关闭完成提示音",
     "chat.enableSound": "开启完成提示音",
+    "desktop.agentCompleteTitle": "智能体运行完成",
+    "desktop.agentCompleteBody": "本轮运行已结束。",
     "chat.thinkingUseDefault": "使用 pi 默认设置",
     "chat.thinkingOff": "关闭推理",
     "chat.thinkingMinimal": "最低限度推理",

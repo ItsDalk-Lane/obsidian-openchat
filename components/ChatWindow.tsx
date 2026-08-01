@@ -40,6 +40,10 @@ interface Props {
   onOpenFile?: (filePath: string) => void;
 }
 
+type DesktopNotificationBridge = NonNullable<Window["piDesktop"]> & {
+  notifyAgentComplete?: (payload: { title: string; body: string }) => void;
+};
+
 function phaseLabel(phase: AgentPhase, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (phase?.kind === "running_tools") {
     const names = phase.tools.map((tool) => tool.name);
@@ -192,8 +196,15 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
     if (soundEnabledRef.current) {
       playDoneSoundRef.current();
     }
+    if (document.hidden) {
+      const desktopBridge = window.piDesktop as DesktopNotificationBridge | undefined;
+      desktopBridge?.notifyAgentComplete?.({
+        title: t("desktop.agentCompleteTitle"),
+        body: t("desktop.agentCompleteBody"),
+      });
+    }
     onAgentEnd?.();
-  }, [onAgentEnd]);
+  }, [onAgentEnd, t]);
 
   // 稳定化 onEditContent 引用，配合 React.memo 防止历史消息重渲染
   const handleEditContent = useCallback((content: string) => {
