@@ -176,6 +176,7 @@ function PiWebTitle() {
 
   return (
     <button
+      className="pi-sidebar-brand"
       onClick={handleClick}
       style={{
         background: "none", border: "none", padding: 0, cursor: "default",
@@ -625,19 +626,21 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div className="pi-session-sidebar" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Header */}
       <div
+        className="pi-sidebar-header"
         style={{
           padding: "0 10px 10px",
           borderBottom: "1px solid var(--border)",
           flexShrink: 0,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 36, boxSizing: "border-box", marginBottom: 10 }}>
+        <div className="pi-sidebar-toolbar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 36, boxSizing: "border-box", marginBottom: 10 }}>
           <PiWebTitle />
-          <div style={{ display: "flex", gap: 6 }}>
+          <div className="pi-sidebar-actions" style={{ display: "flex", gap: 6 }}>
             <button
+              className="pi-sidebar-action pi-sidebar-new-session"
               onClick={handleNewSession}
               disabled={!selectedCwd}
               style={{
@@ -661,7 +664,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                 if (!selectedCwd) return;
                 e.currentTarget.style.background = "var(--bg-selected)";
                 e.currentTarget.style.color = "var(--accent)";
-                e.currentTarget.style.borderColor = "rgba(37,99,235,0.35)";
+                e.currentTarget.style.borderColor = "var(--focus-ring)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "var(--bg-hover)";
@@ -676,12 +679,13 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
               {t("sidebar.new")}
             </button>
             <button
+              className={`pi-sidebar-action pi-sidebar-refresh${sessionRefreshDone ? " is-success" : ""}`}
               onClick={() => loadSessions(false)}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
-                background: sessionRefreshDone ? "rgba(74,222,128,0.18)" : "var(--bg-hover)",
-                border: `1px solid ${sessionRefreshDone ? "rgba(74,222,128,0.4)" : "var(--border)"}`,
-                color: sessionRefreshDone ? "#4ade80" : "var(--text-muted)",
+                background: sessionRefreshDone ? "var(--success-soft)" : "var(--bg-hover)",
+                border: `1px solid ${sessionRefreshDone ? "var(--success)" : "var(--border)"}`,
+                color: sessionRefreshDone ? "var(--success)" : "var(--text-muted)",
                 cursor: "pointer",
                 width: 32, height: 32,
                 borderRadius: 7,
@@ -693,7 +697,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                 if (sessionRefreshDone) return;
                 e.currentTarget.style.background = "var(--bg-selected)";
                 e.currentTarget.style.color = "var(--accent)";
-                e.currentTarget.style.borderColor = "rgba(37,99,235,0.35)";
+                e.currentTarget.style.borderColor = "var(--focus-ring)";
               }}
               onMouseLeave={(e) => {
                 if (sessionRefreshDone) return;
@@ -704,7 +708,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
               title={t("sidebar.refresh")}
             >
               {sessionRefreshDone ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               ) : (
@@ -718,8 +722,9 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
         </div>
 
         {/* CWD picker */}
-        <div ref={dropdownRef} style={{ position: "relative" }}>
+        <div className="pi-project-selector-wrap" ref={dropdownRef} style={{ position: "relative" }}>
           <button
+            className={`pi-project-selector${selectedCwd ? " has-selection" : " is-empty"}`}
             onClick={() => setDropdownOpen((v) => !v)}
             title={selectedProject ?? selectedCwd ?? ""}
             style={{
@@ -727,8 +732,8 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
               display: "flex",
               alignItems: "center",
               padding: "6px 10px",
-              background: selectedCwd ? "var(--bg-hover)" : "rgba(37,99,235,0.06)",
-              border: selectedCwd ? "1px solid var(--border)" : "1px solid rgba(37,99,235,0.4)",
+              background: selectedCwd ? "var(--bg-hover)" : "var(--accent-soft)",
+              border: selectedCwd ? "1px solid var(--border)" : "1px solid var(--focus-ring)",
               borderRadius: 7,
               cursor: "pointer",
               fontSize: 12,
@@ -772,16 +777,17 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
               left: 0,
               right: 0,
               zIndex: 100,
-              background: "var(--bg)",
+              background: "var(--bg-elevated)",
               border: "1px solid var(--border)",
-              borderRadius: 8,
-              boxShadow: "0 6px 20px rgba(0,0,0,0.10)",
+              borderRadius: "var(--ui-radius-md)",
+              boxShadow: "var(--shadow-panel)",
               overflow: "hidden",
             }}
           >
               {showProjectFilter && (
                 <div style={{ padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>
                   <input
+                    className="pi-sidebar-filter"
                     value={projectFilter}
                     onChange={(e) => setProjectFilter(e.target.value)}
                     onKeyDown={(e) => {
@@ -831,6 +837,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
 
               {/* Default cwd shortcut */}
               <button
+                className="pi-sidebar-menu-action"
                 onClick={(e) => { e.stopPropagation(); void handleDefaultCwd(); }}
                 style={{
                   display: "flex",
@@ -855,6 +862,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
 
               {/* Custom path directory picker */}
               <button
+                className="pi-sidebar-menu-action"
                 onClick={(e) => {
                   e.stopPropagation();
                   void handleCustomPathClick();
@@ -882,7 +890,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
           </AnimatedDropdown>
         </div>
         {customPathError && (
-          <div style={{ marginTop: 6, fontSize: 11, color: "#ef4444", lineHeight: 1.5 }}>
+          <div className="pi-sidebar-state is-error" style={{ marginTop: 6, fontSize: 11, color: "var(--danger)", lineHeight: 1.5 }}>
             {customPathError}
           </div>
         )}
@@ -900,19 +908,19 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
       </div>
 
       {/* Session list */}
-      <div style={{ flex: explorerOpen && selectedCwd ? "1 1 0" : "1 1 auto", overflowY: "auto", padding: "0", minHeight: 80 }}>
+      <div className="pi-session-list" style={{ flex: explorerOpen && selectedCwd ? "1 1 0" : "1 1 auto", overflowY: "auto", padding: "0", minHeight: 80 }}>
         {loading && (
-          <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
+          <div className="pi-sidebar-state is-loading" style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
             加载中...
           </div>
         )}
         {error && (
-          <div style={{ padding: "12px 14px", color: "#f87171", fontSize: 12 }}>
+          <div className="pi-sidebar-state is-error" style={{ padding: "12px 14px", color: "var(--danger)", fontSize: 12 }}>
             {error}
           </div>
         )}
         {!loading && !error && filteredSessions.length === 0 && (
-          <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
+          <div className="pi-sidebar-state is-empty" style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
             未找到会话
           </div>
         )}
@@ -938,6 +946,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
       {/* File Explorer section */}
       {selectedCwd && (
         <div
+          className="pi-sidebar-explorer"
           style={{
             borderTop: "1px solid var(--border)",
             display: "flex",
@@ -947,8 +956,9 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
             overflow: "hidden",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+          <div className="pi-sidebar-explorer-header" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
             <button
+              className="pi-sidebar-explorer-toggle"
               onClick={() => setExplorerOpen((v) => !v)}
               style={{
                 display: "flex",
@@ -978,6 +988,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
             </button>
             {explorerOpen && changesCount > 0 && (
               <button
+                className={`pi-sidebar-action pi-sidebar-compact-action${changesCollapsed ? "" : " is-active"}`}
                 type="button"
                 onClick={() => setChangesCollapsed((value) => !value)}
                 title={t("sidebar.changedFiles", { count: changesCount })}
@@ -1027,7 +1038,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                     justifyContent: "center",
                     borderRadius: 7,
                     background: "var(--accent)",
-                    color: "var(--bg)",
+                    color: "var(--text-on-accent)",
                     fontSize: 9,
                     fontWeight: 700,
                     lineHeight: 1,
@@ -1039,6 +1050,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
             )}
             {explorerOpen && (
               <button
+                className="pi-sidebar-action pi-sidebar-compact-action"
                 onClick={() => fileExplorerRef.current?.openUploadPicker()}
                 disabled={explorerUploadBusy}
                 title={t("sidebar.uploadFiles")}
@@ -1066,6 +1078,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
               </button>
             )}
             <button
+              className={`pi-sidebar-action pi-sidebar-compact-action${explorerRefreshDone ? " is-success" : ""}`}
               onClick={() => {
                 if (onExplorerRefresh) onExplorerRefresh();
                 else setExplorerKey((k) => k + 1);
@@ -1077,9 +1090,9 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 26, height: 26, padding: 0, marginRight: 6,
-                background: explorerRefreshDone ? "rgba(74,222,128,0.18)" : "none",
+                background: explorerRefreshDone ? "var(--success-soft)" : "none",
                 border: "none",
-                color: explorerRefreshDone ? "#4ade80" : "var(--text-dim)",
+                color: explorerRefreshDone ? "var(--success)" : "var(--text-dim)",
                 cursor: "pointer",
                 borderRadius: 5,
                 flexShrink: 0,
@@ -1089,7 +1102,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
               onMouseLeave={(e) => { if (explorerRefreshDone) return; e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.background = "none"; }}
             >
               {explorerRefreshDone ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               ) : (
@@ -1146,8 +1159,8 @@ function SessionTreeItem({
   const hasChildren = node.children.length > 0;
 
   return (
-    <div>
-      <div style={{ position: "relative" }}>
+    <div className="pi-session-tree-node">
+      <div className="pi-session-tree-row" style={{ position: "relative" }}>
         {/* Indent line for child sessions */}
         {depth > 0 && (
           <div style={{
@@ -1200,6 +1213,7 @@ function RunningSessionIndicator() {
   const { t } = useI18n();
   return (
     <span
+      className="pi-session-running-indicator"
       title={t("sidebar.agentRunning")}
       aria-label={t("sidebar.agentRunning")}
       style={{
@@ -1238,6 +1252,7 @@ function UnreadSessionIndicator() {
   const { t } = useI18n();
   return (
     <span
+      className="pi-session-unread-indicator"
       title={t("sidebar.newActivity")}
       aria-label={t("sidebar.newActivity")}
       style={{
@@ -1247,7 +1262,7 @@ function UnreadSessionIndicator() {
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
-        color: "#0891b2",
+        color: "var(--accent)",
       }}
     >
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{ display: "block" }}>
@@ -1375,28 +1390,29 @@ function SessionItem({
         />
       )}
       <div
-      onClick={confirmDelete || renaming ? undefined : onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); }}
-      style={{
-        height: ITEM_HEIGHT,
-        display: "flex",
-        alignItems: "center",
-        paddingLeft: depth > 0 ? depth * 12 + 14 : 14,
-        paddingRight: 8,
-        cursor: confirmDelete || renaming ? "default" : "pointer",
-        background: confirmDelete
-          ? "rgba(239,68,68,0.06)"
-          : isSelected ? "var(--bg-selected)" : hovered ? "var(--bg-hover)" : "transparent",
-        borderLeft: confirmDelete
-          ? "2px solid #ef4444"
-          : isSelected ? "2px solid var(--accent)" : "2px solid transparent",
-        transition: "background 0.1s",
-        opacity: deleting ? 0.5 : 1,
-        gap: 6,
-        overflow: "hidden",
-      }}
-    >
+        className={`pi-session-item${isSelected ? " is-selected" : ""}${confirmDelete ? " is-confirming" : ""}${isRunning ? " is-running" : ""}${isUnread ? " is-unread" : ""}`}
+        onClick={confirmDelete || renaming ? undefined : onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => { setHovered(false); }}
+        style={{
+          height: ITEM_HEIGHT,
+          display: "flex",
+          alignItems: "center",
+          paddingLeft: depth > 0 ? depth * 12 + 14 : 14,
+          paddingRight: 8,
+          cursor: confirmDelete || renaming ? "default" : "pointer",
+          background: confirmDelete
+            ? "var(--danger-soft)"
+            : isSelected ? "var(--bg-selected)" : hovered ? "var(--bg-hover)" : "transparent",
+          borderLeft: confirmDelete
+            ? "2px solid var(--danger)"
+            : isSelected ? "2px solid var(--accent)" : "2px solid transparent",
+          transition: "background 0.1s",
+          opacity: deleting ? 0.5 : 1,
+          gap: 6,
+          overflow: "hidden",
+        }}
+      >
       {confirmDelete ? (
         /* ── Delete confirmation: same height, two flat buttons ── */
         <>
@@ -1407,12 +1423,13 @@ function SessionItem({
           </div>
           <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
             <button
+              className="pi-sidebar-action is-danger is-solid"
               onClick={handleDeleteConfirm}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
                 height: 30, padding: "0 11px",
-                background: "#ef4444", border: "none",
-                borderRadius: 6, color: "#fff",
+                background: "var(--danger)", border: "none",
+                borderRadius: 6, color: "var(--text-on-accent)",
                 cursor: "pointer", fontSize: 12, fontWeight: 600,
                 whiteSpace: "nowrap",
               }}
@@ -1426,6 +1443,7 @@ function SessionItem({
               {t("sidebar.delete")}
             </button>
             <button
+              className="pi-sidebar-action"
               onClick={handleDeleteCancel}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -1443,6 +1461,7 @@ function SessionItem({
       ) : renaming ? (
         /* ── Rename: input fills the same row ── */
         <input
+          className="pi-session-rename-input"
           ref={inputRef}
           value={renameValue}
           onChange={(e) => setRenameValue(e.target.value)}
@@ -1523,6 +1542,7 @@ function SessionItem({
           {/* Collapse toggle — always visible when has children */}
           {hasChildren && (
             <button
+              className="pi-sidebar-action pi-session-collapse-action"
               onClick={(e) => { e.stopPropagation(); onToggleCollapse?.(); }}
               title={collapsed ? t("sidebar.expandForks") : t("sidebar.collapseForks")}
               style={{
@@ -1544,6 +1564,7 @@ function SessionItem({
           {hovered && (
             <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
               <button
+                className="pi-sidebar-action pi-session-row-action"
                 onClick={startRename}
                 title={t("sidebar.rename")}
                 style={{
@@ -1557,7 +1578,7 @@ function SessionItem({
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "var(--bg-selected)";
                   e.currentTarget.style.color = "var(--accent)";
-                  e.currentTarget.style.borderColor = "rgba(37,99,235,0.35)";
+                  e.currentTarget.style.borderColor = "var(--focus-ring)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "var(--bg-hover)";
@@ -1570,6 +1591,7 @@ function SessionItem({
                 </svg>
               </button>
               <button
+                className="pi-sidebar-action pi-session-row-action is-danger"
                 onClick={handleDeleteClick}
                 title={t("sidebar.deleteWithShiftClick")}
                 style={{
@@ -1581,9 +1603,9 @@ function SessionItem({
                   transition: "background 0.12s, color 0.12s, border-color 0.12s",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(239,68,68,0.08)";
-                  e.currentTarget.style.color = "#ef4444";
-                  e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)";
+                  e.currentTarget.style.background = "var(--danger-soft)";
+                  e.currentTarget.style.color = "var(--danger)";
+                  e.currentTarget.style.borderColor = "var(--danger)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "var(--bg-hover)";

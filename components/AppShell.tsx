@@ -1094,7 +1094,7 @@ export function AppShell() {
         }
       }
     `}</style>
-    <div style={{ display: "flex", height: "100dvh", overflow: "hidden", background: "var(--bg)" }}>
+    <div className="pi-app-shell" style={{ display: "flex", height: "100dvh", overflow: "hidden", background: "var(--bg)" }}>
       {/* Mobile overlay backdrop */}
       <div
         className={`sidebar-overlay-backdrop${mobileSidebarReady ? "" : " sidebar-mobile-pending"}`}
@@ -1126,10 +1126,11 @@ export function AppShell() {
       </div>
 
       {/* Center: chat */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+      <div className="pi-app-workspace" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {/* Top bar with sidebar toggle */}
-        <div ref={topBarRef} style={{ display: "flex", alignItems: "center", flexShrink: 0, borderBottom: "1px solid var(--border)", height: 36, background: "var(--bg-panel)" }}>
+        <div ref={topBarRef} className="pi-app-toolbar" style={{ display: "flex", alignItems: "center", flexShrink: 0, borderBottom: "1px solid var(--border)", height: 36, background: "var(--bg-panel)" }}>
           <button
+            className="pi-toolbar-button"
             onClick={handleSidebarToggle}
             title={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
             aria-label={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
@@ -1153,6 +1154,7 @@ export function AppShell() {
             )}
           </button>
           <button
+            className="pi-toolbar-button"
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               toggleTheme({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
@@ -1184,6 +1186,7 @@ export function AppShell() {
             )}
           </button>
           <button
+            className={`pi-toolbar-button${activeTopPanel === "language" ? " is-active" : ""}`}
             ref={languageBtnRef}
             type="button"
             onClick={() => toggleTopPanel("language")}
@@ -1233,6 +1236,7 @@ export function AppShell() {
           </button>
           {projectTrust?.requiresTrust && !projectTrust.trusted && projectTrustCwd && (
             <button
+              className="pi-toolbar-button is-warning"
               type="button"
               onClick={() => {
                 setProjectTrustError(null);
@@ -1248,8 +1252,8 @@ export function AppShell() {
                 padding: isMobile ? "0 10px" : "0 12px",
                 border: "none",
                 borderRight: "1px solid var(--border)",
-                background: "rgba(245,158,11,0.08)",
-                color: "#d97706",
+                background: "var(--warning-soft)",
+                color: "var(--warning)",
                 cursor: "pointer",
                 flexShrink: 0,
                 fontSize: 11,
@@ -1277,6 +1281,7 @@ export function AppShell() {
           {showChat && (
             <div style={{ display: "flex", alignItems: "stretch", height: "100%" }}>
               <button
+                className="pi-toolbar-button"
                 onClick={handleViewFullHistory}
                 disabled={!selectedSession}
                 title={
@@ -1358,6 +1363,7 @@ export function AppShell() {
 
                 return (
                   <button
+                    className={`pi-toolbar-button${isError ? " is-danger" : isSuccess ? " is-success" : ""}`}
                     type="button"
                     onClick={() => void handleAutoName()}
                     disabled={disabled}
@@ -1369,7 +1375,7 @@ export function AppShell() {
                       background: "none", border: "none",
                       borderTop: "2px solid transparent",
                       borderRight: "1px solid var(--border)",
-                      color: isError ? "#dc2626" : isSuccess ? "var(--accent)" : disabled ? "var(--text-dim)" : "var(--text-muted)",
+                      color: isError ? "var(--danger)" : isSuccess ? "var(--accent)" : disabled ? "var(--text-dim)" : "var(--text-muted)",
                       cursor: disabled ? "not-allowed" : "pointer",
                       opacity: disabled && autoNameStatus.kind !== "naming" ? 0.45 : 1,
                       flexShrink: 0, fontSize: 11, whiteSpace: "nowrap",
@@ -1377,11 +1383,11 @@ export function AppShell() {
                     }}
                     onMouseEnter={(e) => {
                       if (disabled) return;
-                      e.currentTarget.style.color = isError ? "#dc2626" : "var(--text)";
+                      e.currentTarget.style.color = isError ? "var(--danger)" : "var(--text)";
                       e.currentTarget.style.background = "var(--bg-hover)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.color = isError ? "#dc2626" : isSuccess ? "var(--accent)" : disabled ? "var(--text-dim)" : "var(--text-muted)";
+                      e.currentTarget.style.color = isError ? "var(--danger)" : isSuccess ? "var(--accent)" : disabled ? "var(--text-dim)" : "var(--text-muted)";
                       e.currentTarget.style.background = "none";
                     }}
                   >
@@ -1417,6 +1423,7 @@ export function AppShell() {
                 hasSession
               />
               <button
+                className={`pi-toolbar-button${activeTopPanel === "system" ? " is-active" : ""}`}
                 ref={systemBtnRef}
                 onClick={() => toggleTopPanel("system")}
                 title={t("system.prompt")}
@@ -1457,8 +1464,8 @@ export function AppShell() {
             let ctxStr: string | null = null;
             if (contextUsage?.contextWindow) {
               const pct = contextUsage.percent;
-              if (pct !== null && pct > 90) ctxColor = "#ef4444";
-              else if (pct !== null && pct > 70) ctxColor = "rgba(234,179,8,0.95)";
+              if (pct !== null && pct > 90) ctxColor = "var(--danger)";
+              else if (pct !== null && pct > 70) ctxColor = "var(--warning)";
               ctxStr = pct !== null ? `${pct.toFixed(0)}% / ${fmt(contextUsage.contextWindow)}` : `? / ${fmt(contextUsage.contextWindow)}`;
             }
 
@@ -1478,6 +1485,7 @@ export function AppShell() {
 
             return (
               <button
+                className={`pi-toolbar-button${activeTopPanel === "session" ? " is-active" : ""}`}
                 type="button"
                 onClick={() => toggleTopPanel("session")}
                 title={tooltip || t("session.info")}
@@ -1765,7 +1773,7 @@ export function AppShell() {
                         {resolvedTaskState.status === "loading" ? (
                           <div style={{ color: "var(--text-muted)" }}>正在解析持久任务...</div>
                         ) : resolvedTaskState.status === "error" ? (
-                          <div style={{ color: "#dc2626", overflowWrap: "anywhere" }}>{resolvedTaskState.error}</div>
+                          <div style={{ color: "var(--danger)", overflowWrap: "anywhere" }}>{resolvedTaskState.error}</div>
                         ) : resolvedTaskState.status === "ready" ? (
                           <div style={{ display: "grid", gap: 10 }}>
                             <div style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", columnGap: 12, rowGap: 6 }}>
@@ -1834,7 +1842,7 @@ export function AppShell() {
                               />
                             </label>
                             {taskSaveError ? (
-                              <div style={{ color: "#dc2626", overflowWrap: "anywhere" }}>{taskSaveError}</div>
+                              <div style={{ color: "var(--danger)", overflowWrap: "anywhere" }}>{taskSaveError}</div>
                             ) : null}
                             <div style={{ display: "flex", justifyContent: "flex-end" }}>
                               <button
@@ -1916,7 +1924,7 @@ export function AppShell() {
               role="alert"
               style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 24, color: "var(--text-muted)", textAlign: "center" }}
             >
-              <div style={{ fontSize: 14, color: "#dc2626" }}>{t("workspace.unable")}</div>
+              <div style={{ fontSize: 14, color: "var(--danger)" }}>{t("workspace.unable")}</div>
               <div style={{ maxWidth: "min(720px, 100%)", overflowWrap: "anywhere", fontFamily: "var(--font-mono)", fontSize: 12 }}>
                 {initialNavigation.requestedCwd}
               </div>
@@ -1994,6 +2002,7 @@ export function AppShell() {
     </div>
     {/* File panel toggle — always visible at top-right */}
     <button
+      className={`pi-toolbar-button${rightPanelOpen ? " is-active" : ""}`}
       onClick={() => setRightPanelOpen((v) => !v)}
       title={rightPanelOpen ? t("files.hidePanel") : t("files.showPanel")}
       aria-label={rightPanelOpen ? t("files.hidePanel") : t("files.showPanel")}

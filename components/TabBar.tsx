@@ -20,6 +20,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
 
   return (
     <div
+      className="pi-tabbar"
       style={{
         display: "flex",
         alignItems: "flex-end",
@@ -34,6 +35,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
         return (
           <div
             key={tab.id}
+            className={`pi-tab${isActive ? " is-active" : ""}`}
             onClick={() => onSelectTab(tab.id)}
             onMouseDown={(e) => {
               if (e.button === 1) e.preventDefault();
@@ -64,10 +66,11 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               transition: "background 0.1s, color 0.1s",
             }}
           >
-            <span style={{ flexShrink: 0, opacity: isActive ? 1 : 0.7, display: "flex", alignItems: "center" }}>
+            <span className="pi-tab-icon" style={{ flexShrink: 0, opacity: isActive ? 1 : 0.7, display: "flex", alignItems: "center" }}>
               {getFileIcon(tab.label, 13)}
             </span>
             <span
+              className="pi-tab-label"
               style={{
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -81,6 +84,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               {tab.label}
             </span>
             <button
+              className="pi-tab-close"
               onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
               onMouseEnter={() => setHoveredClose(tab.id)}
               onMouseLeave={() => setHoveredClose(null)}

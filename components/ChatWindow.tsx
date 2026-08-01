@@ -391,7 +391,7 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center text-red-400">
+      <div className="flex h-full items-center justify-center text-danger">
         {error}
       </div>
     );
@@ -401,31 +401,31 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
     <div
       data-task-id={task?.id ?? ""}
       data-run-id={run?.id ?? ""}
-      className="relative flex h-full flex-col overflow-hidden"
+      className="pi-chat-window relative flex h-full flex-col overflow-hidden"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {isDragOver && !sessionBusy && (
-        <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] items-center justify-center bg-[rgba(37,99,235,0.06)] backdrop-blur-[1px]">
+        <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] items-center justify-center bg-accent-soft backdrop-blur-[1px]">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             {[0, 0.8, 1.6].map((delay) => (
               <div
                 key={delay}
-                className="absolute h-[720px] w-[720px] rounded-full border-[1.5px] border-solid border-[rgba(37,99,235,0.5)] animate-[drop-ripple_2.4s_ease-out_infinite_backwards]"
-                style={{ transformOrigin: "center", animationDelay: `${delay}s` }}
+                className="absolute h-[720px] w-[720px] rounded-full border-[1.5px] border-solid animate-[drop-ripple_2.4s_ease-out_infinite_backwards]"
+                style={{ borderColor: "color-mix(in srgb, var(--accent) 50%, transparent)", transformOrigin: "center", animationDelay: `${delay}s` }}
               />
             ))}
           </div>
           <svg
             width="280" height="280" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg"
-            className="drop-shadow-[0_6px_18px_rgba(37,99,235,0.18)]"
+            style={{ filter: "drop-shadow(0 6px 18px color-mix(in srgb, var(--accent) 18%, transparent))" }}
           >
-            <rect x="28" y="44" width="84" height="60" rx="8" fill="rgba(37,99,235,0.08)" stroke="rgba(37,99,235,0.50)" strokeWidth="1.8"/>
-            <path d="M36 100 L54 72 L68 88 L80 74 L104 100Z" fill="rgba(37,99,235,0.16)" stroke="rgba(37,99,235,0.40)" strokeWidth="1.4" strokeLinejoin="round"/>
-            <circle cx="96" cy="58" r="8" fill="rgba(37,99,235,0.22)" stroke="rgba(37,99,235,0.55)" strokeWidth="1.6"/>
-            <g stroke="rgba(37,99,235,0.45)" strokeWidth="1.4" strokeLinecap="round">
+            <rect x="28" y="44" width="84" height="60" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" strokeOpacity="0.5" strokeWidth="1.8"/>
+            <path d="M36 100 L54 72 L68 88 L80 74 L104 100Z" fill="var(--accent-soft)" stroke="var(--accent)" strokeOpacity="0.4" strokeWidth="1.4" strokeLinejoin="round"/>
+            <circle cx="96" cy="58" r="8" fill="var(--accent-soft)" stroke="var(--accent)" strokeOpacity="0.55" strokeWidth="1.6"/>
+            <g stroke="var(--accent)" strokeOpacity="0.45" strokeWidth="1.4" strokeLinecap="round">
               <line x1="96" y1="46" x2="96" y2="43"/>
               <line x1="96" y1="70" x2="96" y2="73"/>
               <line x1="84" y1="58" x2="81" y2="58"/>
@@ -454,7 +454,7 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
       )}
 
       {isEmptyNew ? (
-        <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8">
+        <div className="pi-chat-empty flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8">
           <div className="w-full max-w-[820px]">
             <div
               className="mb-3"
@@ -503,9 +503,9 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
             <NoticeShelf notices={notices} floating align="right" />
           </div>
         </div>
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pt-4 [scrollbar-width:none]">
+        <div ref={scrollContainerRef} className="pi-chat-scroll flex-1 overflow-y-auto pt-4 [scrollbar-width:none]">
           <div style={{ padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
-            <div style={{ maxWidth: 820, margin: "0 auto" }}>
+            <div className="pi-chat-column" style={{ maxWidth: 820, margin: "0 auto" }}>
               <ExtensionWidgets widgets={aboveEditorWidgets} />
 
             {(() => {
@@ -733,7 +733,7 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
         )}
       </div>
 
-      <div className="relative">
+      <div className="pi-chat-input-dock relative">
         <div
           style={{
             padding: `0 ${CHAT_COLUMN_PADDING}px`,
@@ -791,16 +791,16 @@ function NoticeShelf({ notices, floating = false, align = "left" }: { notices: N
     >
       {notices.map((notice, index) => {
         const color = notice.type === "error"
-          ? "#ef4444"
+          ? "var(--danger)"
           : notice.type === "warning"
-            ? "#d97706"
+            ? "var(--warning)"
             : notice.type === "success"
-              ? "#10b981"
+              ? "var(--success)"
               : "var(--accent)";
         return (
           <div
             key={notice.id}
-            className="notice-shelf-item"
+            className="pi-notice notice-shelf-item"
             style={{
               display: "flex",
               alignItems: "center",
@@ -999,7 +999,7 @@ function ExtensionDialog({
                 borderRadius: 6,
                 border: "1px solid var(--accent)",
                 background: "var(--accent)",
-                color: "#fff",
+                color: "var(--text-on-accent)",
                 cursor: "pointer",
               }}
             >
@@ -1013,7 +1013,7 @@ function ExtensionDialog({
                 borderRadius: 6,
                 border: "1px solid var(--accent)",
                 background: "var(--accent)",
-                color: "#fff",
+                color: "var(--text-on-accent)",
                 cursor: "pointer",
               }}
             >

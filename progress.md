@@ -540,3 +540,26 @@ __需求__：手动一项项填表单太慢，要求直接粘贴 `{"mcpServers":
 - [x] `npm run check` 保持基线：typecheck、lint 先后通过；主测试 `280/278/2/0`，失败仅为两条指定在途用例，因此原脚本真实退出 1 并在适配器前停止。
 - [x] 随后独立 `npm run test:pi-adapter`：`11/11`、0 失败、0 跳过、0 todo，退出码 0。
 - [x] `git diff --check` 无输出；任务 1 最终改动只在 `web/globals.css`、`scripts/i18n-parity.cjs` 与本进度文件。
+
+### 任务 2：主界面五件套（进行中）
+
+- [x] 从任务 1 的干净提交 `5a78a4d` 恢复，未重跑已完成的任务 0/1。
+- [x] 改动边界暂为六个主组件与 `web/globals.css`：AppShell、SessionSidebar、ChatWindow、MessageView、ChatInput、TabBar；没有触碰设置弹窗、hooks、测试或只读目录。
+- [x] 采用 `pi-*` 作用域类承载 hover、focus、selected、danger/warning/success 等视觉反馈；没有使用会覆盖设置弹窗的全局按钮或输入框选择器。
+- [x] 六个已改组件整文件执行十六进制颜色正则为 0 命中；颜色全部改走设计变量或变量混色。
+- [x] 五个冻结片段仍逐条命中，AppShell 的目标片段现位于 1986 行；其余四处文本原样。
+- [x] 第一次整合审查发现并修正两处纯样式覆盖：阴影从用户消息整行外壳移到气泡；输入框焦点阴影增加必要优先级。同时把 Bash 输入边框从内容背景变量改为强边框变量。
+
+### 任务 2：主界面五件套（完成）
+
+- [x] AppShell：主外壳、工作区、顶栏和顶栏按钮接入作用域样式；面板选中、信任警告、失败和成功状态改走语义变量；深链、移动端抽屉、分支和右侧文件面板逻辑未改。
+- [x] SessionSidebar：头部、项目选择、会话列表、会话行、文件区和操作按钮统一层次、圆角、hover/focus/selected/危险状态；固定 54px 行高、删除确认、worktree、拖拽和运行状态订阅未改。
+- [x] ChatWindow + MessageView：聊天画布、空态、滚动列、通知、用户气泡、助手正文、思考和工具卡层次统一；拖拽、消息分组、流式条件、展开、复制、fork/branch 未改。
+- [x] ChatInput：输入壳、焦点环、状态色、控制栏和发送按钮统一；键盘/输入法、历史与补全选择、运行中两种排队动作未改。
+- [x] TabBar：激活顶线、未激活 hover、关闭按钮焦点和状态过渡统一；普通选择、中键关闭、宽度与滚动行为未改。
+- [x] 冻结反向验证红证据：临时把 AppShell 的透传片段改为 `initialDisplayMode={undefined}` 后，`lib/quick-changes-ui.test.mjs` 为 `2 测/1 过/1 败`，失败明确指出缺少冻结正则，退出码 1。
+- [x] 冻结还原绿证据：恢复 `initialDisplayMode={activeFileTab.initialDisplayMode}` 后，同一测试 `2/2`，0 失败、0 跳过、0 todo，退出码 0。
+- [x] 最终 `npm run check` 保持基线：typecheck、lint 通过；主测试 `280/278/2/0`，仅两条指定在途失败；原脚本真实退出 1并在适配器前停止。
+- [x] 独立 `npm run test:pi-adapter` 为 `11/11`；i18n parity 为 `en=450 zh-CN=450`、零差异。
+- [x] 五个冻结片段逐条命中；任务书字面 hex 命令对所有已改组件无输出、退出码 1，即 0 命中；`git diff --check` 无输出。
+- [x] 最终任务 2 边界仅六个主组件、`web/globals.css` 与本进度文件；没有新增文案、语言 key、依赖、测试改动或 hooks 改动。

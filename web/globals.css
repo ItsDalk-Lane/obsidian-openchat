@@ -778,6 +778,293 @@ pre, code {
   }
 }
 
+/* Main workbench visual hierarchy. Keep these rules scoped so settings dialogs
+   retain their existing presentation until their dedicated redesign. */
+.pi-app-shell {
+  isolation: isolate;
+  background: var(--bg);
+}
+
+.pi-app-toolbar {
+  position: relative;
+  z-index: 3;
+  background: color-mix(in srgb, var(--bg-panel) 94%, var(--bg)) !important;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.pi-toolbar-button,
+.pi-sidebar-action,
+.pi-project-selector,
+.pi-tab,
+.pi-tab-close,
+.pi-send-button {
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.pi-toolbar-button:hover:not(:disabled),
+.pi-sidebar-action:hover:not(:disabled),
+.pi-project-selector:hover:not(:disabled) {
+  border-color: var(--border-strong) !important;
+  background: var(--bg-hover) !important;
+  color: var(--text) !important;
+}
+
+.pi-toolbar-button:active:not(:disabled),
+.pi-sidebar-action:active:not(:disabled),
+.pi-project-selector:active:not(:disabled),
+.pi-send-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.pi-toolbar-button.is-active {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border)) !important;
+  background: var(--accent-soft) !important;
+  color: var(--accent) !important;
+}
+
+.pi-toolbar-button.is-warning {
+  background: var(--warning-soft) !important;
+  color: var(--warning) !important;
+}
+
+.pi-toolbar-button.is-danger,
+.pi-sidebar-action.is-danger {
+  color: var(--danger) !important;
+}
+
+.pi-toolbar-button.is-success,
+.pi-sidebar-action.is-success {
+  color: var(--success) !important;
+}
+
+.pi-sidebar-action.is-danger.is-solid {
+  background: var(--danger) !important;
+  color: var(--text-on-accent) !important;
+}
+
+.pi-toolbar-button:focus-visible,
+.pi-sidebar-action:focus-visible,
+.pi-project-selector:focus-visible,
+.pi-tab:focus-visible,
+.pi-tab-close:focus-visible,
+.pi-send-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.pi-app-workspace {
+  min-width: 0;
+  background: var(--bg);
+}
+
+.pi-tabbar {
+  background: color-mix(in srgb, var(--bg-panel) 96%, var(--bg)) !important;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+.pi-tab {
+  position: relative;
+}
+
+.pi-tab:hover:not(.is-active) {
+  background: var(--bg-hover) !important;
+  color: var(--text) !important;
+}
+
+.pi-tab.is-active {
+  background: var(--bg) !important;
+}
+
+.pi-tab.is-active::after {
+  position: absolute;
+  right: 10px;
+  bottom: 0;
+  left: 10px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--accent);
+  content: "";
+}
+
+.pi-tab-close:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text) !important;
+}
+
+.pi-session-sidebar {
+  background: var(--bg-panel);
+}
+
+.pi-sidebar-header {
+  background: color-mix(in srgb, var(--bg-panel) 96%, var(--bg));
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+.pi-project-selector {
+  border-radius: var(--ui-radius-md) !important;
+  background: var(--bg-elevated) !important;
+  box-shadow: var(--shadow-subtle);
+}
+
+.pi-project-selector.is-empty {
+  border-color: var(--focus-ring) !important;
+  background: var(--accent-soft) !important;
+}
+
+.pi-sidebar-action {
+  border-radius: var(--ui-radius-sm) !important;
+}
+
+.pi-sidebar-menu-action {
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.pi-sidebar-menu-action:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text) !important;
+}
+
+.pi-sidebar-filter:focus,
+.pi-session-rename-input:focus {
+  border-color: var(--accent) !important;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.pi-session-list {
+  padding-block: 5px;
+}
+
+.pi-session-item {
+  border-radius: 0 var(--ui-radius-md) var(--ui-radius-md) 0;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.pi-session-item:hover:not(.is-confirming) {
+  background: var(--bg-hover) !important;
+}
+
+.pi-session-item.is-selected {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
+.pi-session-item.is-confirming {
+  background: var(--danger-soft) !important;
+}
+
+.pi-chat-window {
+  background: var(--bg);
+}
+
+.pi-chat-scroll {
+  scrollbar-gutter: stable;
+  background:
+    linear-gradient(var(--bg), var(--bg)) padding-box,
+    linear-gradient(180deg, var(--bg-subtle), transparent 160px) border-box;
+}
+
+.pi-chat-column {
+  width: min(100%, 860px);
+}
+
+.pi-chat-empty {
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  border-radius: var(--ui-radius-lg);
+  background: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
+  box-shadow: var(--shadow-subtle);
+}
+
+.pi-notice {
+  border-radius: var(--ui-radius-md) !important;
+  box-shadow: var(--shadow-panel);
+}
+
+.pi-user-message-bubble {
+  border-radius: var(--ui-radius-lg) var(--ui-radius-lg) var(--ui-radius-xs) var(--ui-radius-lg) !important;
+  box-shadow: var(--shadow-subtle);
+}
+
+.pi-assistant-message {
+  border-radius: var(--ui-radius-md);
+}
+
+.pi-thinking-card,
+.pi-tool-card {
+  border-radius: var(--ui-radius-md) !important;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.pi-thinking-card:hover,
+.pi-tool-card:hover {
+  border-color: var(--border-strong) !important;
+  box-shadow: var(--shadow-subtle);
+}
+
+.pi-chat-composer {
+  position: relative;
+  background: linear-gradient(180deg, transparent, var(--bg) 24px);
+}
+
+.pi-chat-input-shell {
+  border-radius: var(--ui-radius-lg) !important;
+  background: var(--bg-elevated) !important;
+  box-shadow: var(--shadow-subtle);
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    background var(--transition-base);
+}
+
+.pi-chat-input-shell:hover {
+  border-color: var(--border-strong) !important;
+}
+
+.pi-chat-input-shell:focus-within {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--focus-ring), var(--shadow-subtle) !important;
+}
+
+.pi-chat-textarea::placeholder {
+  color: var(--text-dim);
+}
+
+.pi-chat-controls {
+  border-top-color: color-mix(in srgb, var(--border) 74%, transparent) !important;
+}
+
+.pi-send-button:hover:not(:disabled) {
+  background: var(--accent-hover) !important;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+@media (max-width: 640px) {
+  .pi-chat-column {
+    width: 100%;
+  }
+
+  .pi-chat-empty {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .pi-chat-input-shell {
+    border-radius: var(--ui-radius-md) !important;
+  }
+}
+
 @media (max-width: 380px) {
   .file-viewer-toolbar {
     gap: 6px !important;
