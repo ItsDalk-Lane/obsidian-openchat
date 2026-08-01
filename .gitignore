@@ -13,9 +13,10 @@
 # testing
 /coverage
 
-# next.js
+# build output (Vite + legacy Next.js)
 /.next/
 /out/
+/web/dist/
 
 # production
 /build
