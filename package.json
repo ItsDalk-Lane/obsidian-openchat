@@ -1,6 +1,6 @@
 {
   "name": "@itsdalk-lane/pi-web",
-  "version": "0.8.2",
+  "version": "1.0.0",
   "description": "Fork of Pi Web: a web UI for the pi coding agent",
   "private": true,
   "homepage": "https://github.com/ItsDalk-Lane/pi-web#readme",
