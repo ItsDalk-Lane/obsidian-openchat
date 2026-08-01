@@ -520,3 +520,23 @@ __需求__：手动一项项填表单太慢，要求直接粘贴 `{"mcpServers":
 ### 错误与纠偏
 
 - 为压缩主测试长日志，前两次 `tail`/`rg` 管道只显示了末端程序的退出码 0，未把该值记作测试结论；最终用 `set -o pipefail` 复跑，保留原始退出码 1，并得到 `280/278/2/0` 与两条具名失败的有效证据。
+
+### 任务 1：设计变量盘点（进行中）
+
+- [x] `web/globals.css` 现有 13 个颜色变量全部在 `@theme` 中有 `--color-*` 映射；明暗主题分别位于 `:root` 与 `html.dark`，本轮不新增第三套主题。
+- [x] 旧变量清单：`--bg/--bg-panel/--bg-hover/--bg-selected/--border/--text/--text-muted/--text-dim/--accent/--accent-hover/--user-bg/--assistant-bg/--tool-bg/--bg-subtle`；其中 `--bg-subtle` 也必须保留。
+- [x] 当前缺少统一的层级面、强边框、柔和强调、焦点环、危险/成功语义、圆角和阴影变量；任务 2 多处状态样式正需要这些语义，适合在任务 1 一次稳定下来。
+- [x] `jiti` 实装版本为 2.7.0，CommonJS 入口同时提供默认工厂与 `createJiti`；两份语言包分别导出 `enLocale`、`zhCNLocale`，目标子树都是 `messages`。
+
+### 任务 1：设计变量精修（完成）
+
+- [x] 旧变量全部保留并精修值；浅色改为“浅灰画布 + 白色面板”，深色改为“深画布 + 逐级抬高面板”，没有新增主题。
+- [x] 新增并完成明暗双值与 `--color-*` 映射：`--bg-elevated/--border-strong/--accent-soft/--focus-ring/--text-on-accent/--danger/--danger-soft/--warning/--warning-soft/--success/--success-soft`。
+- [x] 新增主界面专用的 `--ui-radius-*`、两档阴影和两档过渡；没有使用会覆盖 Tailwind 内建圆角的通用变量名，也删除了会波及范围外原生控件的 `color-scheme`。
+- [x] 新增 `scripts/i18n-parity.cjs`：用实装 `jiti@2.7.0` 加载两个命名导出，递归展开 `messages`，双向比较自身键并稳定排序输出。
+- [x] parity 反向验证红证据：临时删除 `zh-CN.ts` 的 `common.ok` 后，输出 `en=450 zh-CN=449`、`missing in zh-CN (1): common.ok`，退出码 1。
+- [x] parity 还原绿证据：恢复同一行后，输出 `en=450 zh-CN=450`、`i18n parity: zero difference`，退出码 0；两份语言文件最终相对提交无差异。
+- [x] 旧变量 grep：14 个旧颜色变量在浅色与深色定义中逐项命中；11 个新增颜色变量的映射与双主题定义逐项命中。
+- [x] `npm run check` 保持基线：typecheck、lint 先后通过；主测试 `280/278/2/0`，失败仅为两条指定在途用例，因此原脚本真实退出 1 并在适配器前停止。
+- [x] 随后独立 `npm run test:pi-adapter`：`11/11`、0 失败、0 跳过、0 todo，退出码 0。
+- [x] `git diff --check` 无输出；任务 1 最终改动只在 `web/globals.css`、`scripts/i18n-parity.cjs` 与本进度文件。
