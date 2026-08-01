@@ -1,5 +1,15 @@
 # BLOCKED.md（偏差与裁决记录）
 
+## 主界面视觉深化（2026-08-01）
+
+当前状态：无未解决阻塞。
+
+### 已处置 V0. 开工分支不存在
+
+- 任务书现状称当前应在 `refactor/vite-foundation`，并要求全部提交留在该分支、不得改动 `main`。
+- 开工实测 `git status --short --branch` 为 `## main...origin/main`，`HEAD` 是 `c245f3d42dcf2bac502a5fbb94e0cd04794f1a07`；`git show-ref --verify refs/heads/refactor/vite-foundation` 报 `not a valid ref`，远端也只有 `origin/main`。
+- 工作树干净，当前提交正是 Vite 地基收口提交。为避免后续改动落入 `main`，已从该提交执行 `git switch -c refactor/vite-foundation`；没有改写 `main`，后续按任务书继续。
+
 当前状态：无未解决阻塞。下列 0A、0B 已由用户在 2026-08-01 明确扩展白名单后解决，其余条目是开工实测与任务书的历史偏差，均未阻止交付。
 
 ## 已解决 0A. `app/` 整体删除与只读测试全绿互相冲突

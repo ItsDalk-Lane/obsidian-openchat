@@ -258,6 +258,7 @@
 - `PROGRESS.md` 与既有 `progress.md` 在大小写不敏感文件系统冲突；详见 `BLOCKED.md`。
 - `npm install` 出现既有 React peer 覆盖警告与审计报告（32 项漏洞），安装成功；不做越界依赖升级或修复。
 - 查阅测试风格时误用了不存在的 `lib/rpc-manager-boundary.test.mjs` 路径（退出码 2）；未重复执行，改从已确认存在的 `lib/project-trust.test.mjs` 获取测试约定。
+
 - 冒烟前读取动态路由时未给方括号路径加引号，zsh 将其当成通配符（退出码 1）；不影响代码，后续使用带引号路径。
 - 首次 `git diff main --stat` 不包含尚未暂存的新文件，这是 Git 的正常行为；最终范围证据须在暂存后重跑，不能拿该次输出充当完整验收。
 
@@ -487,3 +488,35 @@ __需求__：手动一项项填表单太慢，要求直接粘贴 `{"mcpServers":
 - [x] 最终扩展白名单审计通过：相对 `main` 共 114 个变更路径、0 越界；`app/` 的 72 个受控文件全为删除；6 个测试只有 13 条旧→新路由路径替换；11 个冻结脚本（含原始 lint、全部 test 与 check）逐项一致。
 - [x] 最终结构审计通过：服务端路由与冻结清单精确 67/67，67 个文件均导出 HTTP 方法；目标源码 Next import 为 0，旧服务端兼容命名为 0；components/hooks 只有 7 个最小去 Next 文件，hooks 无差异；`git diff --check main` 无输出。
 - [x] `BLOCKED.md` 已同步为“无未解决阻塞”，保留 0A/0B 的历史证据并记录用户授权后的关闭结果。任务 3 和整份迁移目标已具备提交条件。
+
+## 主界面视觉深化（2026-08-01）
+
+### 当前理解（任务 0，≤10 行）
+
+1. 目标：在现有深色专业工具感和变量体系上，重做主界面五件套的层次、密度与状态反馈，所有交互行为保持不变。
+2. 顺序：任务 0 基线 → 任务 1 稳定设计变量 → 任务 2 主界面五件套 → 任务 3 运行、构建、浏览器与范围收口。
+3. 最大风险：源码正则测试会因无意改写固定片段变红；每阶段都复核五个冻结片段。
+4. 第二风险：视觉改动混入硬编码颜色或新文案；新增颜色只走变量，新文案必须中英同步。
+5. 让步顺序：行为不变 > 测试全绿 > 视觉深化幅度；不修已知两条在途失败和旁支缺陷。
+6. 计划技能要求的额外小写计划文件不在白名单内，本轮只用 `PROGRESS.md` 与 `BLOCKED.md` 持久化。
+
+### 任务 0：基线核对（完成）
+
+- [x] 分支预检：开工位于 `main@c245f3d`，目标分支不存在；工作树干净。已在任何源码修改前从同一提交创建并切换到 `refactor/vite-foundation`，证据与判断见 `BLOCKED.md` 的 V0。
+- [x] `node_modules/.bin/tsc --noEmit -p tsconfig.typecheck.json`：退出码 0，无输出。
+- [x] `npm run lint`：退出码 0；输出为 `eslint .`，无错误或警告。
+- [x] `npm run test`：退出码 1；`tests 280 / pass 278 / fail 2 / skipped 0 / todo 0`，仅有任务书指定的两条失败：
+  - `only Shift+click bypasses session deletion confirmation`
+  - `agent discovery returns builtin, user, and project domains with override metadata`
+- [x] `npm run test:pi-adapter`：退出码 0；`tests 11 / pass 11 / fail 0 / skipped 0 / todo 0`。
+- [x] 五个冻结片段逐条命中：
+  - `components/FileExplorer.tsx:477` → `modeHint: "diff"`
+  - `components/FileExplorer.tsx:871,892` → `gitLineStats.additions`
+  - `components/FileExplorer.tsx:872,900` → `gitLineStats.deletions`
+  - `components/AppShell.tsx:1978` → `initialDisplayMode={activeFileTab.initialDisplayMode}`
+  - `components/FileViewer.tsx:1096` → `isDeletedDiff ? "diff" : displayMode`
+- [x] 基线数字与冻结片段均与任务书一致，可以进入任务 1。
+
+### 错误与纠偏
+
+- 为压缩主测试长日志，前两次 `tail`/`rg` 管道只显示了末端程序的退出码 0，未把该值记作测试结论；最终用 `set -o pipefail` 复跑，保留原始退出码 1，并得到 `280/278/2/0` 与两条具名失败的有效证据。
