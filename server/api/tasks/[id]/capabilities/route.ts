@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import type { TaskCapabilityPolicy } from "@/lib/kernel";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { badRequest, enforceSameOrigin, isRunId, isTaskId, notFound } from "../../task-route-helpers";
@@ -28,12 +28,12 @@ export async function GET(
         nativeRuntimeId: run.nativeRuntimeId,
       });
     }
-    return NextResponse.json({
+    return ApiResponse.json({
       capabilities: services.capabilityService.listCapabilities(),
       bindings: services.capabilityService.listTaskBindings(id),
     });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 400 });
+    return ApiResponse.json({ error: String(error) }, { status: 400 });
   }
 }
 
@@ -61,10 +61,10 @@ export async function PUT(
       policy: body.policy,
       config: body.config,
     });
-    return NextResponse.json({ binding });
+    return ApiResponse.json({ binding });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message === "Task not found") return notFound(message);
-    return NextResponse.json({ error: message }, { status: 400 });
+    return ApiResponse.json({ error: message }, { status: 400 });
   }
 }

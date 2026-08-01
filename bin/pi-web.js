@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 "use strict";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { getUnsupportedNodeVersionMessage, isNodeVersionSupported } = require("./node-version");
 
 if (!isNodeVersionSupported(process.versions.node)) {
@@ -9,37 +8,19 @@ if (!isNodeVersionSupported(process.versions.node)) {
   process.exit(1);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { spawn } = require("child_process");
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require("path");
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require("fs");
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { parseLaunchOptions } = require("./pi-web-options");
 
 const pkgDir = path.join(__dirname, "..");
-const nextDir = path.join(pkgDir, ".next");
-
-// Resolve next's CLI entry directly to avoid relying on .bin symlinks (which
-// may not exist when installed via npx).
-let nextBin;
-try {
-  nextBin = require.resolve("next/dist/bin/next", { paths: [pkgDir] });
-} catch {
-  // Fallback: locate next package root and derive the bin path manually.
-  try {
-    const nextPkg = require.resolve("next/package.json", { paths: [pkgDir] });
-    nextBin = path.join(path.dirname(nextPkg), "dist", "bin", "next");
-  } catch {
-    nextBin = path.join(pkgDir, "node_modules", "next", "dist", "bin", "next");
-  }
-}
+const buildIndex = path.join(pkgDir, "web", "dist", "index.html");
+const serverLauncher = path.join(pkgDir, "server", "launcher.cjs");
 
 const { port, hostname, openBrowser } = parseLaunchOptions();
 const loopbackHostnames = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
-if (!fs.existsSync(nextDir)) {
+if (!fs.existsSync(buildIndex)) {
   console.error("Build artifacts not found. Please report this issue.");
   process.exit(1);
 }
@@ -50,15 +31,16 @@ if (!loopbackHostnames.has(hostname)) {
   );
 }
 
-const nextArgs = ["start", "-p", port];
-nextArgs.push("-H", hostname);
-
-// Always run next's JS entry with node directly — avoids .bin symlink issues
-// and path-with-spaces problems on Windows when shell: true is used.
-const child = spawn(process.execPath, [nextBin, ...nextArgs], {
+// 直接用当前 Node 进程启动独立服务，兼容 npx 与含空格路径。
+const child = spawn(process.execPath, [serverLauncher], {
   cwd: pkgDir,
   stdio: ["inherit", "pipe", "inherit"],
-  env: { ...process.env, PI_WEB_HOSTNAME: hostname },
+  env: {
+    ...process.env,
+    PI_WEB_HOSTNAME: hostname,
+    PI_WEB_PORT: port,
+    PI_WEB_NO_OPEN: "1",
+  },
 });
 
 let browserOpened = false;

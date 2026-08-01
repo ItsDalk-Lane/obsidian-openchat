@@ -1,12 +1,21 @@
 {
   "extends": "./tsconfig.json",
   "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx"
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
+    "lib/**/*.ts",
+    "server/**/*.ts",
+    "web/**/*.ts",
+    "web/**/*.tsx",
+    "desktop.d.ts",
+    "tailwind.config.ts",
+    "vite.config.mts"
   ],
   "exclude": [
     "node_modules",
-    ".next"
+    "web/dist",
+    "dist-electron"
   ]
 }

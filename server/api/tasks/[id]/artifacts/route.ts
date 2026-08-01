@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { createFileArtifact } from "@/lib/artifacts";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { getAllowedFileRoots, isExistingFilePathAllowed, isFilePathAllowed } from "@/lib/file-access";
@@ -29,7 +29,7 @@ export async function GET(
   const services = getKernelServices();
   const task = services.taskService.getTask(id);
   if (!task) return notFound("Task not found");
-  return NextResponse.json({
+  return ApiResponse.json({
     artifacts: services.artifactService.listByTask(id),
   });
 }
@@ -56,7 +56,7 @@ export async function POST(
       return badRequest("Invalid RunId");
     }
     if (!(await validateFileAccess(body.filePath, body.sourceSessionId))) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+      return ApiResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     const artifact = createFileArtifact(body.filePath, {
@@ -69,12 +69,12 @@ export async function POST(
       runId: body.runId,
       sourceSessionId: body.sourceSessionId,
     });
-    return NextResponse.json(record, { status: 201 });
+    return ApiResponse.json(record, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message === "Run not found for task") {
-      return NextResponse.json({ error: message }, { status: 404 });
+      return ApiResponse.json({ error: message }, { status: 404 });
     }
-    return NextResponse.json({ error: message }, { status: 400 });
+    return ApiResponse.json({ error: message }, { status: 400 });
   }
 }

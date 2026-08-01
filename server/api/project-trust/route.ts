@@ -1,6 +1,6 @@
 import { stat } from "fs/promises";
 import { resolve } from "path";
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
 import { invalidateModelsCache } from "@/lib/models-cache";
@@ -11,17 +11,17 @@ import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security"
 export const dynamic = "force-dynamic";
 
 async function validateCwd(value: unknown): Promise<
-  { cwd: string } | { response: NextResponse }
+  { cwd: string } | { response: ApiResponse }
 > {
   if (typeof value !== "string" || !value.trim()) {
-    return { response: NextResponse.json({ error: "cwd required" }, { status: 400 }) };
+    return { response: ApiResponse.json({ error: "cwd required" }, { status: 400 }) };
   }
 
   const cwd = resolve(value);
   try {
     if (!(await stat(cwd)).isDirectory()) {
       return {
-        response: NextResponse.json(
+        response: ApiResponse.json(
           { error: "cwd must be a directory" },
           { status: 400 },
         ),
@@ -29,7 +29,7 @@ async function validateCwd(value: unknown): Promise<
     }
   } catch {
     return {
-      response: NextResponse.json(
+      response: ApiResponse.json(
         { error: "Directory does not exist" },
         { status: 400 },
       ),
@@ -38,7 +38,7 @@ async function validateCwd(value: unknown): Promise<
 
   const allowedRoots = await getAllowedFileRoots();
   if (!isExistingFilePathAllowed(cwd, allowedRoots)) {
-    return { response: NextResponse.json({ error: "Access denied" }, { status: 403 }) };
+    return { response: ApiResponse.json({ error: "Access denied" }, { status: 403 }) };
   }
   return { cwd };
 }
@@ -46,15 +46,15 @@ async function validateCwd(value: unknown): Promise<
 export async function GET(req: Request) {
   const result = await validateCwd(new URL(req.url).searchParams.get("cwd"));
   if ("response" in result) return result.response;
-  return NextResponse.json(getProjectTrustStatus(result.cwd, getAgentDir()));
+  return ApiResponse.json(getProjectTrustStatus(result.cwd, getAgentDir()));
 }
 
 export async function POST(req: Request) {
   if (!isApiRequestAllowed(req)) {
-    return NextResponse.json({ error: "Untrusted API request" }, { status: 403 });
+    return ApiResponse.json({ error: "Untrusted API request" }, { status: 403 });
   }
   if (!hasJsonContentType(req)) {
-    return NextResponse.json(
+    return ApiResponse.json(
       { error: "Content-Type must be application/json" },
       { status: 415 },
     );
@@ -68,13 +68,13 @@ export async function POST(req: Request) {
     const agentDir = getAgentDir();
     const current = getProjectTrustStatus(result.cwd, agentDir);
     if (!current.requiresTrust) {
-      return NextResponse.json(
+      return ApiResponse.json(
         { error: "这个项目没有需要确认信任的本地资源" },
         { status: 409 },
       );
     }
     if (hasBusyRpcSessionForCwd(result.cwd)) {
-      return NextResponse.json(
+      return ApiResponse.json(
         { error: "请等当前会话结束后再信任这个项目" },
         { status: 409 },
       );
@@ -83,9 +83,9 @@ export async function POST(req: Request) {
     const status = trustProject(result.cwd, agentDir);
     invalidateModelsCache();
     destroyRpcSessionsForCwd(result.cwd);
-    return NextResponse.json(status);
+    return ApiResponse.json(status);
   } catch (error) {
-    return NextResponse.json(
+    return ApiResponse.json(
       { error: error instanceof Error ? error.message : String(error) },
       { status: 500 },
     );

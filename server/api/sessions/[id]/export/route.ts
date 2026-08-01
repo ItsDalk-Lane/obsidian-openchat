@@ -5,7 +5,7 @@ import { tmpdir } from "os";
 import { basename, dirname, join } from "path";
 import { promisify } from "util";
 import { fileURLToPath, pathToFileURL } from "url";
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { resolveSessionPath } from "@/lib/session-reader";
 
 const execFileAsync = promisify(execFile);
@@ -58,7 +58,7 @@ async function getPiCliPath(): Promise<string | null> {
       candidates.add(join(dirname(fileURLToPath(indexUrl)), "cli.js"));
     }
   } catch {
-    // Next.js production bundles can strip import.meta.resolve.
+    // 某些生产打包器会移除 import.meta.resolve。
   }
 
   candidates.add(
@@ -248,7 +248,7 @@ export async function GET(
   try {
     const filePath = await resolveSessionPath(id);
     if (!filePath) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return ApiResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
     const tempDir = join(tmpdir(), "pi-web-export");
@@ -274,6 +274,6 @@ export async function GET(
       rmSync(outputPath, { force: true });
     }
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

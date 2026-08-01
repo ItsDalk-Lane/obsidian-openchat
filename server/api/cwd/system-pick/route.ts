@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { pickDirectoryViaSystemDialog } from "@/lib/system-directory-picker";
 import { allowFileRoot } from "@/lib/file-access";
 
@@ -8,12 +8,12 @@ export async function POST() {
   try {
     const selected = await pickDirectoryViaSystemDialog();
     if (!selected) {
-      return NextResponse.json({ cancelled: true, cwd: null });
+      return ApiResponse.json({ cancelled: true, cwd: null });
     }
 
     allowFileRoot(selected);
-    return NextResponse.json({ cancelled: false, cwd: selected });
+    return ApiResponse.json({ cancelled: false, cwd: selected });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

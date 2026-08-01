@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
+const apiPort = process.env.PI_WEB_API_PORT ?? "30141";
 
 function readVersion(packagePath: string): string {
   try {
@@ -30,14 +31,14 @@ export default defineConfig({
     },
   },
   define: {
-    "process.env.NEXT_PUBLIC_APP_VERSION": JSON.stringify(appVersion),
-    "process.env.NEXT_PUBLIC_PI_VERSION": JSON.stringify(piVersion),
+    "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),
+    "import.meta.env.VITE_PI_VERSION": JSON.stringify(piVersion),
   },
   server: {
     host: "127.0.0.1",
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:30141",
+        target: `http://127.0.0.1:${apiPort}`,
       },
     },
   },

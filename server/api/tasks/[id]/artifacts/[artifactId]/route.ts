@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { badRequest, enforceSameOrigin, isArtifactStatus, isRunId, isTaskId, notFound } from "../../../task-route-helpers";
 
@@ -34,7 +34,7 @@ export async function PATCH(
       role: body.role,
       runId: body.runId,
     });
-    return NextResponse.json(record);
+    return ApiResponse.json(record);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message === "Artifact not found") return notFound(message);

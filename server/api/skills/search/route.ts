@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { runNpx } from "@/lib/npx";
 import type { SkillSearchResult } from "@/lib/api-types";
 
@@ -91,12 +91,12 @@ function parseInstallCount(installs: string): number {
 export async function POST(req: Request) {
   try {
     const { query, limit: rawLimit } = await req.json() as { query?: string; limit?: unknown };
-    if (!query?.trim()) return NextResponse.json({ error: "query required" }, { status: 400 });
+    if (!query?.trim()) return ApiResponse.json({ error: "query required" }, { status: 400 });
     const limit = parseLimit(rawLimit);
 
     try {
       const results = await searchSkillsApi(query.trim(), limit);
-      return NextResponse.json({ results });
+      return ApiResponse.json({ results });
     } catch {
       const { stdout, stderr } = await runNpx(["skills", "find", query.trim()], {
         timeout: 20000,
@@ -104,13 +104,13 @@ export async function POST(req: Request) {
       });
 
       const results = parseSearchOutput(stdout + stderr).slice(0, limit);
-      return NextResponse.json({ results });
+      return ApiResponse.json({ results });
     }
   } catch (e: unknown) {
     const err = e as { stdout?: string; stderr?: string; message?: string };
     const raw = (err.stdout ?? "") + (err.stderr ?? "");
     const results = raw ? parseSearchOutput(raw) : [];
-    if (results.length > 0) return NextResponse.json({ results });
-    return NextResponse.json({ error: err.message ?? String(e) }, { status: 500 });
+    if (results.length > 0) return ApiResponse.json({ results });
+    return ApiResponse.json({ error: err.message ?? String(e) }, { status: 500 });
   }
 }

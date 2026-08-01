@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
@@ -122,7 +122,7 @@ export async function GET(
   try {
     const filePath = await resolveSessionPath(id);
     if (!filePath) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return ApiResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
     const sm = SessionManager.open(filePath);
@@ -158,7 +158,7 @@ export async function GET(
       parentSessionId,
     } : null;
 
-    return NextResponse.json({
+    return ApiResponse.json({
       sessionId: id,
       filePath,
       info,
@@ -167,7 +167,7 @@ export async function GET(
       context,
     });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }
 
@@ -180,18 +180,18 @@ export async function PATCH(
   try {
     const { name } = await req.json() as { name?: string };
     if (typeof name !== "string") {
-      return NextResponse.json({ error: "name is required" }, { status: 400 });
+      return ApiResponse.json({ error: "name is required" }, { status: 400 });
     }
     const filePath = await resolveSessionPath(id);
     if (!filePath) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return ApiResponse.json({ error: "Session not found" }, { status: 404 });
     }
     const sm = SessionManager.open(filePath);
     sm.appendSessionInfo(name.trim());
     invalidateSessionListCache();
-    return NextResponse.json({ ok: true });
+    return ApiResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }
 
@@ -205,7 +205,7 @@ export async function DELETE(
   try {
     const filePath = await resolveSessionPath(id);
     if (!filePath) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return ApiResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
     const recursive = new URL(req.url).searchParams.get("recursive") === "true";
@@ -248,7 +248,7 @@ export async function DELETE(
         invalidateSessionPathCache(deleteId);
       }
       invalidateSessionListCache();
-      return NextResponse.json({ ok: true, deletedIds });
+      return ApiResponse.json({ ok: true, deletedIds });
     }
 
     // Read only the bounded header before deleting.
@@ -286,8 +286,8 @@ export async function DELETE(
     unlinkSync(filePath);
     invalidateSessionPathCache(id);
     invalidateSessionListCache();
-    return NextResponse.json({ ok: true, deletedIds: [id] });
+    return ApiResponse.json({ ok: true, deletedIds: [id] });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

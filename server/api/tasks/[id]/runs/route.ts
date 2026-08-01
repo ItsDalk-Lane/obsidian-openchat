@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { getRuntimeRegistry } from "@/lib/server/runtime-registry";
 import { badRequest, enforceSameOrigin, isTaskId, notFound } from "../../task-route-helpers";
@@ -14,7 +14,7 @@ export async function GET(
   const services = getKernelServices();
   const task = services.taskService.getTask(id);
   if (!task) return notFound("Task not found");
-  return NextResponse.json({ runs: services.runService.listByTask(id) });
+  return ApiResponse.json({ runs: services.runService.listByTask(id) });
 }
 
 export async function POST(
@@ -61,13 +61,13 @@ export async function POST(
     }
 
     const run = services.runService.listByTask(id).find((item) => item.id === runtimeContext.runId) ?? null;
-    return NextResponse.json({
+    return ApiResponse.json({
       sessionId: runtimeContext.nativeRuntimeId,
       taskId: runtimeContext.taskId,
       runId: runtimeContext.runId,
       run,
     }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+    return ApiResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
   }
 }

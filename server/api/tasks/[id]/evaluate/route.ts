@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import type { RunId } from "@/lib/kernel";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { badRequest, enforceSameOrigin, isRunId, isTaskId, notFound } from "../../task-route-helpers";
@@ -13,7 +13,7 @@ export async function GET(
   if (!isTaskId(id)) return badRequest("Invalid TaskId");
   const services = getKernelServices();
   if (!services.taskService.getTask(id)) return notFound("Task not found");
-  return NextResponse.json({ evaluations: services.evaluationService.listByTask(id) });
+  return ApiResponse.json({ evaluations: services.evaluationService.listByTask(id) });
 }
 
 export async function POST(
@@ -34,8 +34,8 @@ export async function POST(
       runId: body.runId as RunId | undefined,
       evaluatorId: body.evaluatorId,
     });
-    return NextResponse.json({ evaluation });
+    return ApiResponse.json({ evaluation });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 400 });
+    return ApiResponse.json({ error: String(error) }, { status: 400 });
   }
 }

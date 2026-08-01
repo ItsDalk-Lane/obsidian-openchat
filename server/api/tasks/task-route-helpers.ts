@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import type { KernelEvent, Run, RunId, Task, TaskId, TaskStatus } from "@/lib/kernel";
 import { getKernelServices } from "@/lib/server/kernel-services";
 
@@ -56,15 +56,15 @@ export function isKernelEventType(value: string): value is KernelEvent["type"] {
 }
 
 export function badRequest(error: string) {
-  return NextResponse.json({ error }, { status: 400 });
+  return ApiResponse.json({ error }, { status: 400 });
 }
 
 export function notFound(error: string) {
-  return NextResponse.json({ error }, { status: 404 });
+  return ApiResponse.json({ error }, { status: 404 });
 }
 
 export function conflict(error: string) {
-  return NextResponse.json({ error }, { status: 409 });
+  return ApiResponse.json({ error }, { status: 409 });
 }
 
 export function summarizeTask(task: Task) {
@@ -97,10 +97,10 @@ export function enforceSameOrigin(req: Request): Response | null {
     originUrl = new URL(origin);
     requestUrl = new URL(req.url);
   } catch {
-    return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
+    return ApiResponse.json({ error: "Invalid request origin" }, { status: 403 });
   }
   if (originUrl.protocol !== requestUrl.protocol || originUrl.host !== requestUrl.host) {
-    return NextResponse.json({ error: "Cross-origin request blocked" }, { status: 403 });
+    return ApiResponse.json({ error: "Cross-origin request blocked" }, { status: 403 });
   }
   return null;
 }

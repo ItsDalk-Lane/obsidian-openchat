@@ -9,7 +9,7 @@ const HOSTNAME = "127.0.0.1";
 const SERVER_URL = `http://${HOSTNAME}:${PORT}`;
 
 let mainWindow = null;
-let nextServer = null;
+let serverProcess = null;
 
 // ─── Logging (file only — no stdout, avoids EPIPE in detached mode) ──
 // In packaged builds __dirname lives inside the (read-only) app bundle,
@@ -39,8 +39,8 @@ function waitForServer(maxRetries = 120, interval = 500) {
     const check = () => {
       // Stop early when our own server process already died (e.g. the port
       // was taken by a leftover instance) instead of polling a dead server.
-      if (nextServerExited) {
-        reject(new Error("Next.js server process exited before becoming ready"));
+      if (serverProcessExited) {
+        reject(new Error("Server process exited before becoming ready"));
         return;
       }
       // Each attempt must settle exactly once: req.destroy() after a timeout
@@ -75,58 +75,45 @@ function waitForServer(maxRetries = 120, interval = 500) {
   });
 }
 
-function startNextServer() {
+function startServerProcess() {
   const pkgDir = path.join(__dirname, "..");
-  let nextBin;
-  try {
-    nextBin = require.resolve("next/dist/bin/next", { paths: [pkgDir] });
-  } catch {
-    try {
-      const nextPkg = require.resolve("next/package.json", { paths: [pkgDir] });
-      nextBin = path.join(path.dirname(nextPkg), "dist", "bin", "next");
-    } catch {
-      nextBin = path.join(pkgDir, "node_modules", "next", "dist", "bin", "next");
-    }
-  }
+  const serverLauncher = path.join(pkgDir, "server", "launcher.cjs");
 
-  log(`Starting Next.js server on ${HOSTNAME}:${PORT}...`);
+  log(`Starting server on ${HOSTNAME}:${PORT}...`);
 
-  nextServer = spawn(process.execPath, [nextBin, "start", "-p", String(PORT), "-H", HOSTNAME], {
-    // Packaged builds ship with asar=false: Windows cannot create a child
-    // process whose working directory lives inside app.asar, and the Next
-    // server resolves its project (.next) from this cwd.
+  serverProcess = spawn(process.execPath, [serverLauncher], {
+    // 打包产物使用 asar=false，服务端从应用根目录读取静态资源和配置。
     cwd: pkgDir,
     stdio: ["ignore", "pipe", "pipe"],
     env: {
       ...process.env,
-      // In packaged builds process.execPath is the Electron binary, not Node;
-      // this makes the child process run the next CLI as plain Node.js.
+      // 打包后当前可执行文件是 Electron，本开关让子进程按普通 Node 运行。
       ELECTRON_RUN_AS_NODE: "1",
-      PORT: String(PORT),
-      HOSTNAME: HOSTNAME,
+      PI_WEB_PORT: String(PORT),
+      PI_WEB_HOSTNAME: HOSTNAME,
       PI_WEB_NO_OPEN: "1",
     },
     windowsHide: true,
   });
 
-  nextServer.stdout.on("data", (chunk) => { try { logStream.write(`[next] ${chunk}`); } catch {} });
-  nextServer.stderr.on("data", (chunk) => { try { logStream.write(`[next] ${chunk}`); } catch {} });
+  serverProcess.stdout.on("data", (chunk) => { try { logStream.write(`[server] ${chunk}`); } catch {} });
+  serverProcess.stderr.on("data", (chunk) => { try { logStream.write(`[server] ${chunk}`); } catch {} });
   // Spawn itself can fail asynchronously (e.g. bad cwd). Without a listener
   // this becomes an uncaught exception and the window stays on the loading
   // page forever.
-  nextServer.on("error", (err) => {
-    log(`Failed to spawn Next.js server: ${err.message}`);
-    nextServerExited = true;
+  serverProcess.on("error", (err) => {
+    log(`Failed to spawn server: ${err.message}`);
+    serverProcessExited = true;
   });
-  nextServer.on("exit", (code) => {
-    log(`Next.js server exited with code ${code}`);
-    nextServerExited = true;
+  serverProcess.on("exit", (code) => {
+    log(`Server exited with code ${code}`);
+    serverProcessExited = true;
   });
 }
 
 // True once the spawned server process died (or failed to spawn). Used to
 // stop the health-check loop early instead of polling a dead server.
-let nextServerExited = false;
+let serverProcessExited = false;
 
 // ─── Auto updates (electron-updater + GitHub Releases) ─────
 // Packaged builds check GitHub Releases for a newer version, download it in
@@ -394,7 +381,7 @@ function createWindow() {
 
   mainWindow.on("closed", () => { mainWindow = null; });
   // Show a lightweight loading page immediately; the real app URL is loaded
-  // once the Next.js server answers the health check.
+  // once the server answers the health check.
   mainWindow.loadFile(path.join(__dirname, "loading.html"));
 }
 
@@ -415,21 +402,21 @@ function showStartupError(message) {
   }
 }
 
-// Runs the full boot sequence once: spawn the Next.js server, wait for it to
+// Runs the full boot sequence once: spawn the server, wait for it to
 // answer, then load the app. Re-runnable from the error page's retry button.
 let bootInFlight = false;
 async function bootServer() {
   if (bootInFlight) return;
   bootInFlight = true;
   try {
-    nextServerExited = false;
-    startNextServer();
-    log("Waiting for Next.js server...");
+    serverProcessExited = false;
+    startServerProcess();
+    log("Waiting for server...");
     await waitForServer();
     log("Server is ready, loading app...");
     loadAppUrl();
   } catch (err) {
-    if (!nextServerExited) {
+    if (!serverProcessExited) {
       // The health check is stricter than reality: the server has been seen
       // serving requests even after every probe "failed" on a loaded machine.
       // The process is still alive, so try loading the app before giving up.
@@ -480,7 +467,7 @@ app.whenReady().then(() => {
   // path work during startup.
   createWindow();
   bootServer();
-  // Delay the background update check so it doesn't compete with the Next.js
+  // Delay the background update check so it doesn't compete with the
   // server cold start for CPU/disk.
   setTimeout(() => checkForUpdates(false), 15000);
   app.on("activate", () => {
@@ -493,21 +480,19 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  if (nextServer && !nextServerExited) {
-    log("Shutting down Next.js server...");
+  if (serverProcess && !serverProcessExited) {
+    log("Shutting down server...");
     if (process.platform === "win32") {
-      // The next CLI spawns its own node grandchild (start-server.js);
-      // killing only the direct child orphans it and leaves a zombie
-      // holding the port. taskkill /T takes down the whole tree.
+      // Windows 下按进程树关闭，避免子进程残留并继续占用端口。
       try {
-        spawn("taskkill", ["/pid", String(nextServer.pid), "/T", "/F"], { windowsHide: true });
+        spawn("taskkill", ["/pid", String(serverProcess.pid), "/T", "/F"], { windowsHide: true });
       } catch {
-        nextServer.kill("SIGTERM");
+        serverProcess.kill("SIGTERM");
       }
     } else {
-      nextServer.kill("SIGTERM");
+      serverProcess.kill("SIGTERM");
     }
-    nextServer = null;
+    serverProcess = null;
   }
   logStream.end();
 });

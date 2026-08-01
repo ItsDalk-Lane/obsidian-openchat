@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { resolveSessionPath, buildSessionContext } from "@/lib/session-reader";
 
@@ -15,7 +15,7 @@ export async function GET(
   try {
     const filePath = await resolveSessionPath(id);
     if (!filePath) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return ApiResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
     const sm = SessionManager.open(filePath);
@@ -24,8 +24,8 @@ export async function GET(
       deferToolResultImages,
     });
 
-    return NextResponse.json({ context });
+    return ApiResponse.json({ context });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

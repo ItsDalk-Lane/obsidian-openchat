@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { unlinkSync } from "fs";
 import {
   listAllSessions,
@@ -11,9 +11,9 @@ import { invalidateProjectCache } from "@/lib/worktree";
 export async function GET() {
   try {
     const sessions = await listAllSessions();
-    return NextResponse.json({ sessions, runningSessionIds: getRunningRpcSessionIds() });
+    return ApiResponse.json({ sessions, runningSessionIds: getRunningRpcSessionIds() });
   } catch (error) {
-    return NextResponse.json(
+    return ApiResponse.json(
       { error: String(error) },
       { status: 500 }
     );
@@ -28,7 +28,7 @@ export async function DELETE(req: Request) {
   try {
     const projectRoot = new URL(req.url).searchParams.get("projectRoot");
     if (!projectRoot) {
-      return NextResponse.json({ error: "projectRoot is required" }, { status: 400 });
+      return ApiResponse.json({ error: "projectRoot is required" }, { status: 400 });
     }
 
     const sessions = await listAllSessions();
@@ -36,7 +36,7 @@ export async function DELETE(req: Request) {
       (session) => (session.projectRoot ?? session.cwd) === projectRoot,
     );
     if (targets.length === 0) {
-      return NextResponse.json({ error: "No sessions found for this path" }, { status: 404 });
+      return ApiResponse.json({ error: "No sessions found for this path" }, { status: 404 });
     }
 
     const deletedIds: string[] = [];
@@ -50,9 +50,9 @@ export async function DELETE(req: Request) {
     }
     invalidateSessionListCache();
     invalidateProjectCache();
-    return NextResponse.json({ ok: true, deletedIds });
+    return ApiResponse.json({ ok: true, deletedIds });
   } catch (error) {
-    return NextResponse.json(
+    return ApiResponse.json(
       { error: String(error) },
       { status: 500 }
     );

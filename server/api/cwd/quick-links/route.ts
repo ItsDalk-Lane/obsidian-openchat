@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { existsSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
@@ -33,8 +33,8 @@ export async function GET() {
       .map(([root]) => root)
       .slice(0, 6);
 
-    return NextResponse.json({ places, recents });
+    return ApiResponse.json({ places, recents });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

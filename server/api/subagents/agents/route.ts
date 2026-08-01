@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import {
   createSubagentAgent,
   deleteSubagentAgent,
@@ -29,12 +29,12 @@ async function cwdIsAllowed(cwd: string): Promise<boolean> {
 
 export async function GET(req: Request) {
   const cwd = new URL(req.url).searchParams.get("cwd");
-  if (!cwd) return NextResponse.json({ error: "cwd required" }, { status: 400 });
-  if (!await cwdIsAllowed(cwd)) return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  if (!cwd) return ApiResponse.json({ error: "cwd required" }, { status: 400 });
+  if (!await cwdIsAllowed(cwd)) return ApiResponse.json({ error: "Access denied" }, { status: 403 });
   try {
-    return NextResponse.json(listSubagentAgents(cwd));
+    return ApiResponse.json(listSubagentAgents(cwd));
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    return ApiResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
 
@@ -46,16 +46,16 @@ export async function POST(req: Request) {
       agent?: SubagentAgentInput;
       sessionId?: string;
     };
-    if (!body.cwd) return NextResponse.json({ error: "cwd required" }, { status: 400 });
-    if (!await cwdIsAllowed(body.cwd)) return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    if (!body.cwd) return ApiResponse.json({ error: "cwd required" }, { status: 400 });
+    if (!await cwdIsAllowed(body.cwd)) return ApiResponse.json({ error: "Access denied" }, { status: 403 });
     if (!body.agent || typeof body.agent !== "object") {
-      return NextResponse.json({ error: "agent required" }, { status: 400 });
+      return ApiResponse.json({ error: "agent required" }, { status: 400 });
     }
     const agent = createSubagentAgent(body.cwd, parseScope(body.scope), body.agent);
     await reloadActiveSession(body.sessionId);
-    return NextResponse.json({ success: true, agent });
+    return ApiResponse.json({ success: true, agent });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+    return ApiResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
   }
 }
 
@@ -68,17 +68,17 @@ export async function PUT(req: Request) {
       agent?: SubagentAgentInput;
       sessionId?: string;
     };
-    if (!body.cwd) return NextResponse.json({ error: "cwd required" }, { status: 400 });
-    if (!await cwdIsAllowed(body.cwd)) return NextResponse.json({ error: "Access denied" }, { status: 403 });
-    if (!body.name) return NextResponse.json({ error: "name required" }, { status: 400 });
+    if (!body.cwd) return ApiResponse.json({ error: "cwd required" }, { status: 400 });
+    if (!await cwdIsAllowed(body.cwd)) return ApiResponse.json({ error: "Access denied" }, { status: 403 });
+    if (!body.name) return ApiResponse.json({ error: "name required" }, { status: 400 });
     if (!body.agent || typeof body.agent !== "object") {
-      return NextResponse.json({ error: "agent required" }, { status: 400 });
+      return ApiResponse.json({ error: "agent required" }, { status: 400 });
     }
     const agent = updateSubagentAgent(body.cwd, parseScope(body.scope), body.name, body.agent);
     await reloadActiveSession(body.sessionId);
-    return NextResponse.json({ success: true, agent });
+    return ApiResponse.json({ success: true, agent });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+    return ApiResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
   }
 }
 
@@ -90,13 +90,13 @@ export async function DELETE(req: Request) {
       name?: string;
       sessionId?: string;
     };
-    if (!body.cwd) return NextResponse.json({ error: "cwd required" }, { status: 400 });
-    if (!await cwdIsAllowed(body.cwd)) return NextResponse.json({ error: "Access denied" }, { status: 403 });
-    if (!body.name) return NextResponse.json({ error: "name required" }, { status: 400 });
+    if (!body.cwd) return ApiResponse.json({ error: "cwd required" }, { status: 400 });
+    if (!await cwdIsAllowed(body.cwd)) return ApiResponse.json({ error: "Access denied" }, { status: 403 });
+    if (!body.name) return ApiResponse.json({ error: "name required" }, { status: 400 });
     deleteSubagentAgent(body.cwd, parseScope(body.scope), body.name);
     await reloadActiveSession(body.sessionId);
-    return NextResponse.json({ success: true });
+    return ApiResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+    return ApiResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
   }
 }

@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import type { TaskContractAcceptanceCriterion, TaskContractArtifactExpectation } from "@/lib/kernel";
 import { badRequest, conflict, enforceSameOrigin, isTaskId, isTaskStatus, notFound, summarizeTask } from "../task-route-helpers";
@@ -14,9 +14,9 @@ export async function GET(
   try {
     const task = getKernelServices().taskService.getTask(id);
     if (!task) return notFound("Task not found");
-    return NextResponse.json(summarizeTask(task));
+    return ApiResponse.json(summarizeTask(task));
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }
 
@@ -57,7 +57,7 @@ export async function PATCH(
       status: body.status,
       expectedUpdatedAt: body.expectedUpdatedAt,
     });
-    return NextResponse.json(summarizeTask(task));
+    return ApiResponse.json(summarizeTask(task));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("another request")) return conflict(message);

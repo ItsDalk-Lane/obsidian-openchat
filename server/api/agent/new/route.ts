@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { existsSync } from "fs";
 import { randomUUID } from "crypto";
 import { allowFileRoot } from "@/lib/file-access";
@@ -15,17 +15,17 @@ export async function POST(req: Request) {
     const { cwd, taskId, ...command } = body;
 
     if (!cwd || typeof cwd !== "string") {
-      return NextResponse.json({ error: "cwd is required" }, { status: 400 });
+      return ApiResponse.json({ error: "cwd is required" }, { status: 400 });
     }
     if (!existsSync(cwd)) {
-      return NextResponse.json({ error: `Directory does not exist: ${cwd}` }, { status: 400 });
+      return ApiResponse.json({ error: `Directory does not exist: ${cwd}` }, { status: 400 });
     }
 
     // Use a one-time key so startRpcSession's lock doesn't conflict with real session ids
     const { provider, modelId, toolNames, thinkingLevel, ...rawCommand } = command as { provider?: string; modelId?: string; toolNames?: string[]; thinkingLevel?: string; [key: string]: unknown };
     const parsedCommand = parseNewSessionCommand(rawCommand);
     if (!parsedCommand.ok) {
-      return NextResponse.json({ error: parsedCommand.error }, { status: 400 });
+      return ApiResponse.json({ error: parsedCommand.error }, { status: 400 });
     }
     const parsed = parsedCommand.value;
 
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     }
 
     if (parsed.type === "ensure_session") {
-      return NextResponse.json({
+      return ApiResponse.json({
         success: true,
         sessionId: realSessionId,
         taskId: runtimeContext.taskId,
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
 
     const result = await session.send(parsed);
 
-    return NextResponse.json({
+    return ApiResponse.json({
       success: true,
       sessionId: realSessionId,
       taskId: runtimeContext.taskId,
@@ -73,6 +73,6 @@ export async function POST(req: Request) {
       data: result,
     });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

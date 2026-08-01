@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { getKernelSchemaVersion } from "@/lib/persistence";
 import { getRuntimeRegistry } from "@/lib/server/runtime-registry";
@@ -13,7 +13,7 @@ export async function GET() {
       acc[task.status] = (acc[task.status] ?? 0) + 1;
       return acc;
     }, {});
-    return NextResponse.json({
+    return ApiResponse.json({
       ok: true,
       kernelSchemaVersion: getKernelSchemaVersion(),
       runtimeCount: getRuntimeRegistry().list().length,
@@ -23,7 +23,7 @@ export async function GET() {
       ],
     });
   } catch (error) {
-    return NextResponse.json({
+    return ApiResponse.json({
       ok: false,
       error: error instanceof Error ? error.message : String(error),
     }, { status: 500 });

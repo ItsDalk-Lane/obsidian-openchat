@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
@@ -28,7 +28,7 @@ function writeModelsJson(data: Record<string, unknown>): void {
 }
 
 export async function GET() {
-  return NextResponse.json(readModelsJson());
+  return ApiResponse.json(readModelsJson());
 }
 
 export async function PUT(req: Request) {
@@ -36,8 +36,8 @@ export async function PUT(req: Request) {
     const body = await req.json() as Record<string, unknown>;
     writeModelsJson(body);
     invalidateModelsCache();
-    return NextResponse.json({ success: true });
+    return ApiResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

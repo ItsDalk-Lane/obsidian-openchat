@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { badRequest, isRunId, isTaskId, notFound, parsePositiveInt } from "../../task-route-helpers";
 
@@ -21,8 +21,8 @@ export async function GET(
       runId: runId && isRunId(runId) ? runId : undefined,
       budgetChars,
     });
-    return NextResponse.json(compiled);
+    return ApiResponse.json(compiled);
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 400 });
+    return ApiResponse.json({ error: String(error) }, { status: 400 });
   }
 }

@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getSessionCwd, resolveSessionPath } from "@/lib/session-reader";
 import { startRpcSession, getRpcSession } from "@/lib/rpc-manager";
 import { parseRuntimeCommand } from "@/lib/kernel";
@@ -14,7 +14,7 @@ export async function POST(
     const rawBody = await req.json();
     const parsed = parseRuntimeCommand(rawBody);
     if (!parsed.ok) {
-      return NextResponse.json({ error: parsed.error }, { status: 400 });
+      return ApiResponse.json({ error: parsed.error }, { status: 400 });
     }
     const body = parsed.value;
 
@@ -22,12 +22,12 @@ export async function POST(
     const existing = getRpcSession(id);
     if (existing?.isAlive()) {
       const result = await existing.send(body);
-      return NextResponse.json({ success: true, data: result });
+      return ApiResponse.json({ success: true, data: result });
     }
 
     const filePath = await resolveSessionPath(id);
     if (!filePath) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return ApiResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
     const cwd = getSessionCwd(filePath) ?? process.cwd();
@@ -35,9 +35,9 @@ export async function POST(
     const { session } = await startRpcSession(id, filePath, cwd);
     const result = await session.send(body);
 
-    return NextResponse.json({ success: true, data: result });
+    return ApiResponse.json({ success: true, data: result });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }
 
@@ -51,12 +51,12 @@ export async function GET(
   try {
     const session = getRpcSession(id);
     if (!session || !session.isAlive()) {
-      return NextResponse.json({ running: false });
+      return ApiResponse.json({ running: false });
     }
 
     const state = await session.send({ type: "get_state" });
-    return NextResponse.json({ running: true, state });
+    return ApiResponse.json({ running: true, state });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

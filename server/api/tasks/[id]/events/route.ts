@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { badRequest, isKernelEventType, isRunId, isTaskId, notFound, parsePositiveInt } from "../../task-route-helpers";
 
@@ -31,7 +31,7 @@ export async function GET(
   });
   const page = events.slice(0, limit);
   const lastSequence = page.length > 0 ? page[page.length - 1].sequence : after;
-  return NextResponse.json({
+  return ApiResponse.json({
     events: page,
     nextSequence: lastSequence,
     hasMore: events.length > limit,

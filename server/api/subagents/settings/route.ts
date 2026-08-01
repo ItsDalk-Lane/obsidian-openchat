@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import {
   parseScope,
   readSubagentSettings,
@@ -32,11 +32,11 @@ export async function GET(req: Request) {
   try {
     const { cwd, scope } = readQuery(req);
     if (!isExistingFilePathAllowed(cwd, await getAllowedFileRoots())) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+      return ApiResponse.json({ error: "Access denied" }, { status: 403 });
     }
-    return NextResponse.json(readSubagentSettings(cwd, scope));
+    return ApiResponse.json(readSubagentSettings(cwd, scope));
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+    return ApiResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
   }
 }
 
@@ -44,19 +44,19 @@ export async function PUT(req: Request) {
   try {
     const { cwd, scope } = readQuery(req);
     if (!isExistingFilePathAllowed(cwd, await getAllowedFileRoots())) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+      return ApiResponse.json({ error: "Access denied" }, { status: 403 });
     }
     const body = await req.json() as {
       settings?: SubagentSettingsUpdate;
       sessionId?: string;
     };
     if (!body.settings || typeof body.settings !== "object") {
-      return NextResponse.json({ error: "settings required" }, { status: 400 });
+      return ApiResponse.json({ error: "settings required" }, { status: 400 });
     }
     const settings = updateSubagentSettings(cwd, scope, body.settings);
     await reloadActiveSession(body.sessionId);
-    return NextResponse.json({ success: true, settings });
+    return ApiResponse.json({ success: true, settings });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+    return ApiResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
   }
 }

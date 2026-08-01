@@ -6,7 +6,7 @@ import {
   isLanApiTokenAllowed,
   shouldRequireLanApiToken,
 } from "@/lib/request-security";
-import { attachNextUrl } from "@/server/next-compat";
+import { attachRequestUrl } from "@/server/http";
 import { registerApiRoutes } from "@/server/api-router";
 
 export async function createApp(): Promise<Hono> {
@@ -14,7 +14,7 @@ export async function createApp(): Promise<Hono> {
   const webDist = resolve(process.env.PI_WEB_STATIC_DIR ?? "web/dist");
 
   app.use("/api/*", async (context, next) => {
-    const request = attachNextUrl(context.req.raw);
+    const request = attachRequestUrl(context.req.raw);
     if (!isApiRequestAllowed(request)) {
       return context.json({ error: "Untrusted API request" }, 403);
     }

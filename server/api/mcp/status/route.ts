@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getRpcSession } from "@/lib/rpc-manager";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId");
-  if (!sessionId) return NextResponse.json({ error: "sessionId required" }, { status: 400 });
+  if (!sessionId) return ApiResponse.json({ error: "sessionId required" }, { status: 400 });
 
   const wrapper = getRpcSession(sessionId);
-  if (!wrapper?.isAlive()) return NextResponse.json({ status: null, live: false });
-  return NextResponse.json({ status: wrapper.getMcpStatus(), live: true });
+  if (!wrapper?.isAlive()) return ApiResponse.json({ status: null, live: false });
+  return ApiResponse.json({ status: wrapper.getMcpStatus(), live: true });
 }

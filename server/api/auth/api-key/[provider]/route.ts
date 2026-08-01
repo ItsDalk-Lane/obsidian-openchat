@@ -1,5 +1,5 @@
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { invalidateModelsCache } from "@/lib/models-cache";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export async function GET(_req: Request, { params }: Params) {
   const status = modelRuntime.getProviderAuthStatus(provider);
   const displayName = modelRuntime.getProvider(provider)?.name ?? provider;
   const models = modelRuntime.getModels(provider).length;
-  return NextResponse.json({ provider, displayName, configured: status.configured, source: status.source, models });
+  return ApiResponse.json({ provider, displayName, configured: status.configured, source: status.source, models });
 }
 
 // POST /api/auth/api-key/[provider]  body: { apiKey: string }
@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: Params) {
   try {
     const { apiKey } = await req.json() as { apiKey?: string };
     if (!apiKey || typeof apiKey !== "string" || !apiKey.trim()) {
-      return NextResponse.json({ error: "apiKey is required" }, { status: 400 });
+      return ApiResponse.json({ error: "apiKey is required" }, { status: 400 });
     }
     const modelRuntime = await ModelRuntime.create();
     let keySubmitted = false;
@@ -42,9 +42,9 @@ export async function POST(req: Request, { params }: Params) {
       },
     });
     invalidateModelsCache();
-    return NextResponse.json({ success: true });
+    return ApiResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }
 
@@ -55,8 +55,8 @@ export async function DELETE(_req: Request, { params }: Params) {
     const modelRuntime = await ModelRuntime.create();
     await modelRuntime.logout(provider);
     invalidateModelsCache();
-    return NextResponse.json({ success: true });
+    return ApiResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

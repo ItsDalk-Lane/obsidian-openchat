@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getRpcSession } from "@/lib/rpc-manager";
 import { parseRuntimeCommand } from "@/lib/kernel";
 
@@ -16,27 +16,27 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return ApiResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   if (typeof body !== "object" || body === null) {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return ApiResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const { sessionId, ...rest } = body as Record<string, unknown>;
   if (typeof sessionId !== "string" || !sessionId) {
-    return NextResponse.json({ error: "sessionId required" }, { status: 400 });
+    return ApiResponse.json({ error: "sessionId required" }, { status: 400 });
   }
 
   const parsed = parseRuntimeCommand({ type: "mcp_action", ...rest });
   if (!parsed.ok) {
-    return NextResponse.json({ error: parsed.error }, { status: 400 });
+    return ApiResponse.json({ error: parsed.error }, { status: 400 });
   }
 
   const wrapper = getRpcSession(sessionId);
   if (!wrapper?.isAlive()) {
-    return NextResponse.json({ error: "No live session for MCP action" }, { status: 409 });
+    return ApiResponse.json({ error: "No live session for MCP action" }, { status: 409 });
   }
 
   const result = (await wrapper.send(parsed.value)) as { ok: boolean; message?: string; started?: boolean };
-  return NextResponse.json(result);
+  return ApiResponse.json(result);
 }

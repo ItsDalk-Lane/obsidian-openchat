@@ -2,7 +2,7 @@ import { readdir } from "node:fs/promises";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Hono } from "hono";
-import { attachNextUrl } from "@/server/next-compat";
+import { attachRequestUrl } from "@/server/http";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 type HttpMethod = (typeof HTTP_METHODS)[number];
@@ -129,7 +129,7 @@ export async function registerApiRoutes(
       if (!handler) continue;
 
       app.on(method, definition.honoPath, async (context) => {
-        const request = attachNextUrl(context.req.raw);
+        const request = attachRequestUrl(context.req.raw);
         return handler(request, {
           params: Promise.resolve(extractParams(definition, request)),
         });

@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getKernelServices } from "@/lib/server/kernel-services";
 
 export const runtime = "nodejs";
@@ -12,8 +12,8 @@ export async function GET(req: Request) {
       runtimeKind: runtimeKind || undefined,
       invokableOnly,
     });
-    return NextResponse.json({ capabilities });
+    return ApiResponse.json({ capabilities });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

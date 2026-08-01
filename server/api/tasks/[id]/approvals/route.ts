@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { badRequest, isTaskId, notFound } from "../../task-route-helpers";
 
@@ -12,5 +12,5 @@ export async function GET(
   if (!isTaskId(id)) return badRequest("Invalid TaskId");
   const services = getKernelServices();
   if (!services.taskService.getTask(id)) return notFound("Task not found");
-  return NextResponse.json({ approvals: services.capabilityService.listApprovalsByTask(id) });
+  return ApiResponse.json({ approvals: services.capabilityService.listApprovalsByTask(id) });
 }

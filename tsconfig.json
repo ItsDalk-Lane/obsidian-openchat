@@ -17,11 +17,6 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
     "paths": {
       "@/*": [
         "./*"
@@ -33,13 +28,21 @@
     "target": "ES2017"
   },
   "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
+    "lib/**/*.ts",
+    "server/**/*.ts",
+    "web/**/*.ts",
+    "web/**/*.tsx",
+    "desktop.d.ts",
+    "tailwind.config.ts",
+    "vite.config.mts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "web/dist",
+    "dist-electron"
   ]
 }

@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { getRunningRpcSessionIds } from "@/lib/rpc-manager";
 import type { TaskContractAcceptanceCriterion, TaskContractArtifactExpectation } from "@/lib/kernel";
@@ -26,11 +26,11 @@ export async function GET(req: Request) {
       projectRoot: url.searchParams.get("project") ?? undefined,
       includeArchived: url.searchParams.get("includeArchived") === "1",
     });
-    return NextResponse.json({
+    return ApiResponse.json({
       tasks: tasks.map((task) => summarizeTask(task)),
     });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }
 
@@ -62,9 +62,9 @@ export async function POST(req: Request) {
       acceptanceCriteria: body.acceptanceCriteria,
       scope: body.scope,
     });
-    return NextResponse.json(summarizeTask(task), { status: 201 });
+    return ApiResponse.json(summarizeTask(task), { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 400 });
+    return ApiResponse.json({ error: message }, { status: 400 });
   }
 }

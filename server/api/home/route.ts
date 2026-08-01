@@ -1,6 +1,6 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { homedir } from "os";
 
 export async function GET() {
-  return NextResponse.json({ home: homedir() });
+  return ApiResponse.json({ home: homedir() });
 }

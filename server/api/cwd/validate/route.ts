@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { statSync, type Stats } from "fs";
 import { homedir } from "os";
 import { isAbsolute, resolve } from "path";
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     const cwd = typeof body.cwd === "string" ? body.cwd.trim() : "";
 
     if (!cwd) {
-      return NextResponse.json({ error: "Path is required" }, { status: 400 });
+      return ApiResponse.json({ error: "Path is required" }, { status: 400 });
     }
 
     const normalizedCwd = normalizeCwd(cwd);
@@ -26,16 +26,16 @@ export async function POST(req: Request) {
     try {
       stat = statSync(normalizedCwd);
     } catch {
-      return NextResponse.json({ error: `Directory does not exist: ${cwd}` }, { status: 400 });
+      return ApiResponse.json({ error: `Directory does not exist: ${cwd}` }, { status: 400 });
     }
 
     if (!stat.isDirectory()) {
-      return NextResponse.json({ error: `Path is not a directory: ${cwd}` }, { status: 400 });
+      return ApiResponse.json({ error: `Path is not a directory: ${cwd}` }, { status: 400 });
     }
 
     allowFileRoot(normalizedCwd);
-    return NextResponse.json({ success: true, cwd: normalizedCwd });
+    return ApiResponse.json({ success: true, cwd: normalizedCwd });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

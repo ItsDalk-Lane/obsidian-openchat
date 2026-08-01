@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { mkdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
@@ -15,15 +15,15 @@ export async function POST() {
       const configured = normalizeDirectory(settings.defaultCwd);
       mkdirSync(configured, { recursive: true });
       allowFileRoot(configured);
-      return NextResponse.json({ cwd: configured });
+      return ApiResponse.json({ cwd: configured });
     }
 
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const dir = join(homedir(), `pi-cwd-${date}`);
     mkdirSync(dir, { recursive: true });
     allowFileRoot(dir);
-    return NextResponse.json({ cwd: dir });
+    return ApiResponse.json({ cwd: dir });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

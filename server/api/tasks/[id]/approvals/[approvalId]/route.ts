@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { badRequest, enforceSameOrigin, isTaskId, notFound } from "../../../task-route-helpers";
 
@@ -31,9 +31,9 @@ export async function POST(
       decidedBy: body.decidedBy?.trim() || "user",
       note: body.note,
     });
-    return NextResponse.json({ approval });
+    return ApiResponse.json({ approval });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 400 });
+    return ApiResponse.json({ error: message }, { status: 400 });
   }
 }

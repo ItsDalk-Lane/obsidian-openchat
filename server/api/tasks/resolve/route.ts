@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { getKernelServices } from "@/lib/server/kernel-services";
 import { getRuntimeRegistry } from "@/lib/server/runtime-registry";
 import { badRequest, summarizeTask } from "../task-route-helpers";
@@ -22,20 +22,20 @@ export async function GET(req: Request) {
     }
     const context = services.runService.getRuntimeContext(runtimeKind, nativeRuntimeId);
     if (!context) {
-      return NextResponse.json({ error: "Task not found for runtime" }, { status: 404 });
+      return ApiResponse.json({ error: "Task not found for runtime" }, { status: 404 });
     }
     const task = services.taskService.getTask(context.taskId);
     if (!task) {
-      return NextResponse.json({ error: "Task not found for runtime" }, { status: 404 });
+      return ApiResponse.json({ error: "Task not found for runtime" }, { status: 404 });
     }
     const summary = summarizeTask(task);
-    return NextResponse.json({
+    return ApiResponse.json({
       ...summary,
       run: summary.defaultRun?.id === context.runId
         ? summary.defaultRun
         : services.runService.listByTask(task.id).find((item) => item.id === context.runId) ?? null,
     });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return ApiResponse.json({ error: String(error) }, { status: 500 });
   }
 }

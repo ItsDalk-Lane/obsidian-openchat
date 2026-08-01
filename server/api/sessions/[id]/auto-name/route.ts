@@ -1,4 +1,4 @@
-import { NextResponse } from "@/server/next-compat";
+import { ApiResponse } from "@/server/http";
 import { SessionManager, type AgentSession } from "@earendil-works/pi-coding-agent";
 import { generateSessionTitle } from "@/lib/session-title";
 import { getRpcSession, startRpcSession } from "@/lib/rpc-manager";
@@ -13,7 +13,7 @@ export async function POST(
   try {
     const filePath = await resolveSessionPath(id);
     if (!filePath) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return ApiResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
     const cwd = SessionManager.open(filePath).getHeader()?.cwd ?? process.cwd();
@@ -28,7 +28,7 @@ export async function POST(
     const result = await generateSessionTitle(session.inner as unknown as AgentSession);
 
     if (!session.isAlive()) {
-      return NextResponse.json(
+      return ApiResponse.json(
         { error: "The session was closed while its title was being generated. Please try again." },
         { status: 409 },
       );
@@ -36,9 +36,9 @@ export async function POST(
 
     session.inner.setSessionName(result.title);
     invalidateSessionListCache();
-    return NextResponse.json({ title: result.title, usage: result.usage ?? null });
+    return ApiResponse.json({ title: result.title, usage: result.usage ?? null });
   } catch (error) {
-    return NextResponse.json(
+    return ApiResponse.json(
       { error: error instanceof Error ? error.message : String(error) },
       { status: 500 },
     );
