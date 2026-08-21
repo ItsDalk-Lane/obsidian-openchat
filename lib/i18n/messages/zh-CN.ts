@@ -13,7 +13,6 @@ export const zhCNLocale: LocalePlugin = {
     "common.skills": "技能",
     "common.plugins": "插件",
     "common.settings": "设置",
-    "common.agents": "Agents",
     "common.advanced": "高级",
     "common.defaultWorkspaceDirectory": "默认工作目录",
     "sidebar.hide": "隐藏侧边栏",

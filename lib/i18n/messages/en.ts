@@ -13,7 +13,6 @@ export const enLocale: LocalePlugin = {
     "common.skills": "Skills",
     "common.plugins": "Plugins",
     "common.settings": "Settings",
-    "common.agents": "Agents",
     "common.advanced": "Advanced",
     "common.defaultWorkspaceDirectory": "Default workspace directory",
     "sidebar.hide": "Hide sidebar",

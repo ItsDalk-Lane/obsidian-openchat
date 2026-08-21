@@ -45,9 +45,6 @@ app/api/skills/install/route.ts
 app/api/skills/route.ts
 app/api/skills/search/route.ts
 app/api/skills/update/route.ts
-app/api/subagents/agents/route.ts
-app/api/subagents/chains/route.ts
-app/api/subagents/settings/route.ts
 app/api/tasks/[id]/approvals/[approvalId]/route.ts
 app/api/tasks/[id]/approvals/route.ts
 app/api/tasks/[id]/artifacts/[artifactId]/route.ts

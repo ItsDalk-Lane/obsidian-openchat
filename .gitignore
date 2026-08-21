@@ -52,3 +52,6 @@ next-env.d.ts
 
 # zcode session data
 /.zcode/
+
+# transient npm cache (sandbox workaround)
+/.npm-cache/

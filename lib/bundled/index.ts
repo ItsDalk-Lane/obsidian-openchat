@@ -1,5 +1,4 @@
 import { piMcpAdapterSpec } from "./pi-mcp-adapter";
-import { piSubagentsSpec } from "./subagents";
 
 export interface BundledExtensionSpec {
   packageName: string;
@@ -8,5 +7,4 @@ export interface BundledExtensionSpec {
 
 export const bundledExtensionSpecs: readonly BundledExtensionSpec[] = [
   piMcpAdapterSpec,
-  piSubagentsSpec,
 ];
