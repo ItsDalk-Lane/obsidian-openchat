@@ -9,7 +9,7 @@ const jiti = createJiti(import.meta.url, {
   tsconfigPaths: true,
 });
 const { ChatWindow } = await jiti.import("./ChatWindow.tsx");
-const { I18nProvider } = await jiti.import("@/hooks/useI18n.tsx");
+const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 const { useWorkspaceStore } = await jiti.import("@/lib/workspace-store.ts");
 
 // 服务端渲染会读取仓库创建时的快照；把真实快照设成一个零消息的新会话。

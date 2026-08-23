@@ -7,6 +7,7 @@ import type {
   ExtensionWidgetItem,
   SessionInfo,
   SessionTreeNode,
+  UserMessage,
 } from "@/lib/types";
 import { normalizeToolCalls } from "@/lib/normalize";
 import { sendAgentCommand } from "@/lib/agent-client";
@@ -223,6 +224,7 @@ function readCompactResult(result: unknown, reason: string): CompactResultInfo |
 export interface ChatInputHandle {
   insertText: (text: string) => void;
   insertIfEmpty: (content: string) => void;
+  replaceMessage: (message: UserMessage) => void;
   prependText: (text: string) => void;
   addImages: (files: File[]) => void;
 }
@@ -1403,13 +1405,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     });
     return () => controller.abort();
   }, [loadModels, modelsRefreshKey]);
-
-  // Compact error auto-dismiss
-  useEffect(() => {
-    if (!compactError) return;
-    const t = setTimeout(() => setCompactError(null), 3000);
-    return () => clearTimeout(t);
-  }, [compactError]);
 
   useEffect(() => {
     if (!compactResult) return;

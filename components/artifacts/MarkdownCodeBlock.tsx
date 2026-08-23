@@ -12,5 +12,5 @@ export function MarkdownCodeBlock({ code, lang, isStreaming }: Props) {
   if (lang === "mermaid") {
     return <MermaidBlock code={code} isStreaming={isStreaming} />;
   }
-  return <CodeBlock code={code} lang={lang} />;
+  return <CodeBlock code={code} lang={lang} isStreaming={isStreaming} />;
 }

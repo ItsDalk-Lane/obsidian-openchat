@@ -3,6 +3,7 @@
 import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, KeyboardEvent } from "react";
 import type { BuiltinSlashCommandResult, CompactResultInfo, QueuedMessages, SlashCommandInfo } from "@/hooks/useAgentSession";
 import { clearDraft, getDraft, setDraft, type ChatDraftImage } from "@/lib/draft-store";
+import { isBase64ImageWithinLimits } from "@/lib/image-attachments";
 import {
   buildEntriesFromFiles, buildAtInsertText, extractAtQuery, filterFileEntries,
   type AtQueryMatch, type FileIndexEntry,
@@ -22,6 +23,7 @@ import {
   type SlashCommandPaletteItem,
   type SlashCommandSource,
 } from "./chat-input/SlashCommandMenu";
+import type { TextContent, UserMessage } from "@/lib/types";
 
 export interface AttachedImage {
   data: string;   // base64, no prefix
@@ -74,6 +76,7 @@ interface Props {
 export interface ChatInputHandle {
   insertText: (text: string) => void;
   insertIfEmpty: (text: string) => void;
+  replaceMessage: (message: UserMessage) => void;
   prependText: (text: string) => void;
   addImages: (files: File[]) => void;
 }
@@ -127,6 +130,34 @@ function draftImageToAttachedImage(image: ChatDraftImage): AttachedImage {
     ...image,
     previewUrl: `data:${image.mimeType};base64,${image.data}`,
   };
+}
+
+export function canRestoreUserMessage(value: string, attachedImageCount: number): boolean {
+  return !value.trim() && attachedImageCount === 0;
+}
+
+export function getUserMessageText(message: UserMessage): string {
+  if (typeof message.content === "string") return message.content;
+  return message.content
+    .filter((block): block is TextContent => block.type === "text")
+    .map((block) => block.text)
+    .join("\n");
+}
+
+export function getUserMessageDraftImages(message: UserMessage): ChatDraftImage[] {
+  if (typeof message.content === "string") return [];
+  return message.content.flatMap((block) => {
+    if (block.type !== "image") return [];
+
+    // Support both the current nested image format and older flat pi-ai entries.
+    const flat = block as unknown as { data?: unknown; mimeType?: unknown };
+    const data = block.source?.type === "base64" ? block.source.data : flat.data;
+    const mimeType = block.source?.type === "base64" ? block.source.media_type : flat.mimeType;
+    if (typeof data !== "string" || typeof mimeType !== "string") return [];
+
+    const image = { data, mimeType };
+    return isBase64ImageWithinLimits(image) ? [image] : [];
+  });
 }
 
 function revokeImagePreview(image: AttachedImage): void {
@@ -280,6 +311,25 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       if (current.trim()) return;
       setValue(text);
       setAtQuery(null);
+      requestAnimationFrame(() => {
+        if (!ta) return;
+        ta.focus();
+        ta.style.height = "auto";
+        ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+      });
+    },
+    replaceMessage(message: UserMessage) {
+      const ta = textareaRef.current;
+      const current = ta ? ta.value : value;
+      if (!canRestoreUserMessage(current, attachedImagesRef.current.length)) return;
+
+      setValue(getUserMessageText(message));
+      setAtQuery(null);
+      setHistoryMenuOpen(false);
+      setAttachedImages((prev) => {
+        prev.forEach(revokeImagePreview);
+        return getUserMessageDraftImages(message).map(draftImageToAttachedImage);
+      });
       requestAnimationFrame(() => {
         if (!ta) return;
         ta.focus();
@@ -1063,6 +1113,26 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             {compactResultText}
           </div>
         )}
+        {compactError && (
+          <div
+            role="alert"
+            style={{
+              marginBottom: 8,
+              padding: "7px 10px",
+              background: "rgba(239,68,68,0.07)",
+              border: "1px solid rgba(239,68,68,0.3)",
+              borderRadius: 6,
+              color: "#ef4444",
+              fontFamily: "var(--font-mono)",
+              fontSize: 12,
+              lineHeight: 1.5,
+              whiteSpace: "pre-wrap",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {compactError}
+          </div>
+        )}
         <AttachedImagePreviews images={attachedImages} onRemove={removeImage} />
 
         {/* Main input */}
@@ -1720,18 +1790,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             )}
 
             {!isStreaming && onCompact && (
-              <div style={{ position: "relative" }}>
-                {compactError && (
-                  <div style={{
-                    position: "absolute", bottom: "calc(100% + 6px)", right: 0,
-                    background: "var(--tool-bg)", color: "var(--danger)",
-                    fontSize: 11, padding: "4px 8px", borderRadius: 5,
-                    whiteSpace: "nowrap", pointerEvents: "none",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)", zIndex: 50,
-                  }}>
-                    {compactError}
-                  </div>
-                )}
+              <div>
                 <button
                   onClick={isCompacting ? onAbortCompaction : onCompact}
                   disabled={isStreaming && !isCompacting}

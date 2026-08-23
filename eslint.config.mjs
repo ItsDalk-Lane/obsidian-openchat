@@ -15,6 +15,7 @@ const eslintConfig = [
       ".next/**",
       "web/dist/**",
       "dist-electron/**",
+      ".research/**",
     ],
   },
   {

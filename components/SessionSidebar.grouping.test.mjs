@@ -10,7 +10,7 @@ const jiti = createJiti(import.meta.url, {
 });
 const { ProjectRow } = await jiti.import("./session-sidebar/ProjectRow.tsx");
 const { getRecentProjects } = await jiti.import("./SessionSidebar.tsx");
-const { I18nProvider } = await jiti.import("../hooks/useI18n.tsx");
+const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 
 function session(id, cwd, modified, projectRoot) {
   return {

@@ -9,6 +9,8 @@ const jiti = createJiti(import.meta.url, {
   tsconfigPaths: true,
 });
 const { MarkdownBody } = await jiti.import("./MarkdownBody.tsx");
+const ReactMarkdown = (await import("react-markdown")).default;
+const { markdownRemarkPlugins, markdownRehypePlugins } = await jiti.import("../lib/markdown.ts");
 
 function renderMarkdown(markdown) {
   return renderToStaticMarkup(
@@ -18,6 +20,32 @@ function renderMarkdown(markdown) {
     }, markdown),
   );
 }
+
+// MarkdownBody loads its plugin pipeline lazily, so remark-gfm behavior is
+// asserted by rendering react-markdown with the shared plugin arrays directly.
+function renderWithPlugins(markdown) {
+  return renderToStaticMarkup(
+    React.createElement(
+      ReactMarkdown,
+      { remarkPlugins: markdownRemarkPlugins, rehypePlugins: markdownRehypePlugins },
+      markdown,
+    ),
+  );
+}
+
+test("keeps single-tilde CJK numeric ranges literal instead of striking them", () => {
+  const html = renderWithPlugins("5~7U 保证金 × 100~200倍杠杆");
+
+  assert.doesNotMatch(html, /<del>/);
+  assert.match(html, /5~7U/);
+  assert.match(html, /100~200倍/);
+});
+
+test("still renders double-tilde strikethrough", () => {
+  const html = renderWithPlugins("~~gone~~");
+
+  assert.match(html, /<del>gone<\/del>/);
+});
 
 test("opens non-file markdown links in a safe new tab", () => {
   const html = renderMarkdown("[docs](https://example.com/docs)");
