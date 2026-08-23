@@ -8,15 +8,18 @@ const source = await readFile(
 );
 const sessionItemSource = source.slice(source.indexOf("function SessionItem("));
 
-test("only Shift+click bypasses session deletion confirmation", () => {
+test("only Shift or an open confirmation bypasses session deletion confirmation", () => {
   assert.match(
     sessionItemSource,
-    /const handleDeleteClick[\s\S]*?if \(e\.shiftKey\) \{\s*void performDelete\(\);\s*\} else \{\s*setConfirmDelete\(true\);/,
+    /const handleKeyDown[\s\S]*?if \(e\.shiftKey \|\| confirmDelete\) \{\s*void performDelete\(false\);/,
   );
 });
 
-test("does not register row-level session deletion shortcuts", () => {
-  assert.doesNotMatch(sessionItemSource, /const handleKeyDown/);
-  assert.doesNotMatch(sessionItemSource, /onKeyDown=\{handleKeyDown\}/);
-  assert.doesNotMatch(sessionItemSource, /tabIndex=\{0\}/);
+test("registers row-level keyboard deletion with confirmation flow (upstream 47cc7ef)", () => {
+  assert.match(sessionItemSource, /const handleKeyDown/);
+  assert.match(sessionItemSource, /onKeyDown=\{handleKeyDown\}/);
+  assert.match(sessionItemSource, /tabIndex=\{0\}/);
+  // Escape cancels an open confirmation; Enter confirms it.
+  assert.match(sessionItemSource, /e\.key === "Escape"[\s\S]*?setConfirmDelete\(false\)/);
+  assert.match(sessionItemSource, /e\.key === "Enter"[\s\S]*?void performDelete\(false\)/);
 });

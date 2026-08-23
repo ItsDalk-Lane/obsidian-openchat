@@ -7,8 +7,12 @@ const CODING_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"
 class PlainTextTheme extends Theme {
   constructor() {
     super(
-      { thinkingXhigh: "" } as ConstructorParameters<typeof Theme>[0],
-      {} as ConstructorParameters<typeof Theme>[1],
+      // Theme's constructor fills searchMatchText from `text`; every value it
+      // iterates must be a string or fgAnsi() crashes on undefined (0.84.x).
+      { thinkingXhigh: "", text: "" } as ConstructorParameters<typeof Theme>[0],
+      // bgColors likewise: scrollbarThumb/searchMatchBg default from selectedBg,
+      // so the stub must define it as a string.
+      { selectedBg: "" } as ConstructorParameters<typeof Theme>[1],
       "truecolor",
     );
   }
