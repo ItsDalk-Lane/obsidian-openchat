@@ -14,6 +14,8 @@ export function ProjectRow({
   label,
   selected,
   sessionCount,
+  hasRunning,
+  hasUnread,
   onSelect,
   onDelete,
 }: {
@@ -21,6 +23,8 @@ export function ProjectRow({
   label: string;
   selected: boolean;
   sessionCount: number;
+  hasRunning?: boolean;
+  hasUnread?: boolean;
   onSelect: () => void;
   onDelete: () => Promise<void>;
 }) {
@@ -133,6 +137,12 @@ export function ProjectRow({
           <span style={{ width: 10, flexShrink: 0 }} />
         )}
         <PathLabel text={label} style={{ flex: 1 }} />
+        {hasRunning && (
+          <span aria-label={t("sidebar.projectRunning")} title={t("sidebar.projectRunning")} style={{ flexShrink: 0, width: 7, height: 7, borderRadius: "50%", background: "var(--success)", display: "inline-block", animation: "project-pulse 1.6s ease-out infinite" }} />
+        )}
+        {!hasRunning && hasUnread && (
+          <span aria-label={t("sidebar.projectUnread")} title={t("sidebar.projectUnread")} style={{ flexShrink: 0, width: 7, height: 7, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />
+        )}
       </button>
       <button
         type="button"

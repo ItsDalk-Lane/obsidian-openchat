@@ -38,6 +38,8 @@ export interface SessionStatsInfo {
   toolCalls: number;
   toolResults: number;
   totalMessages: number;
+  /** Estimated active time across all entries in the session file. */
+  totalActiveMs?: number;
   tokens: {
     input: number;
     output: number;

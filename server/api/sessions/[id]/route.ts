@@ -13,6 +13,7 @@ import {
 } from "@/lib/session-reader";
 import { sessionPathKey } from "@/lib/session-path";
 import { getRpcSession } from "@/lib/rpc-manager";
+import { computeSessionTotalActiveMs } from "@/lib/session-timing";
 
 // BranchNavigator still traverses recursively, so keep the response tree shallow.
 const MAX_PROJECTED_TREE_DEPTH = 200;
@@ -133,6 +134,7 @@ export async function GET(
     const deferThinking = searchParams.has("deferThinking");
     const deferToolResultImages = searchParams.has("deferMedia");
     const context = buildSessionContext(entries, leafId, { deferThinking, deferToolResultImages });
+    const totalActiveMs = computeSessionTotalActiveMs(entries);
 
     const header = sm.getHeader();
     let modified = header?.timestamp ?? new Date().toISOString();
@@ -165,6 +167,7 @@ export async function GET(
       leafId,
       tree,
       context,
+      totalActiveMs,
     });
   } catch (error) {
     return ApiResponse.json({ error: String(error) }, { status: 500 });

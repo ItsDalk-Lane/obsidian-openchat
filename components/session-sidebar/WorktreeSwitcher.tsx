@@ -50,6 +50,7 @@ export function WorktreeSwitcher({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [wtFilter, setWtFilter] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const newInputRef = useRef<HTMLInputElement>(null);
 
@@ -61,6 +62,7 @@ export function WorktreeSwitcher({
         setNewBranch("");
         setError(null);
         setConfirmRemove(null);
+        setWtFilter("");
       }
     };
     document.addEventListener("mousedown", handleOutsideClick);
@@ -117,6 +119,11 @@ export function WorktreeSwitcher({
   if (active && state) {
     const currentWorktree = state.worktrees.find((worktree) => worktree.path === selectedCwd)
       ?? state.worktrees.find((worktree) => worktree.isMain);
+    const showWtFilter = state.worktrees.length >= 8;
+    const visibleWorktrees = showWtFilter && wtFilter.trim()
+      ? state.worktrees.filter((worktree) =>
+          (worktree.branch ?? displayCwd(worktree.path, homeDir)).toLowerCase().includes(wtFilter.trim().toLowerCase()))
+      : state.worktrees;
 
     return (
       <div ref={dropdownRef} style={{ position: "relative", marginTop: 6 }}>
@@ -181,8 +188,37 @@ export function WorktreeSwitcher({
             overflow: "hidden",
           }}
         >
+          {showWtFilter && (
+            <div style={{ padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>
+              <input
+                value={wtFilter}
+                onChange={(event) => setWtFilter(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setWtFilter("");
+                    setDropdownOpen(false);
+                  }
+                }}
+                placeholder="筛选 worktree…"
+                aria-label="筛选 worktree"
+                autoFocus
+                style={{
+                  width: "100%",
+                  fontSize: 11,
+                  fontFamily: "var(--font-mono)",
+                  padding: "5px 8px",
+                  border: "1px solid var(--border)",
+                  borderRadius: 5,
+                  outline: "none",
+                  background: "var(--bg)",
+                  color: "var(--text)",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+          )}
           <div style={{ maxHeight: "min(40vh, 300px)", overflowY: "auto" }}>
-            {state.worktrees.map((worktree) => {
+            {visibleWorktrees.map((worktree) => {
               const current = worktree.path === selectedCwd
                 || (worktree.isMain && !state.worktrees.some((entry) => entry.path === selectedCwd));
 
@@ -230,6 +266,7 @@ export function WorktreeSwitcher({
                       onSelect(worktree.path);
                       setDropdownOpen(false);
                       setError(null);
+                      setWtFilter("");
                     }}
                     title={worktree.path}
                     style={{
@@ -304,6 +341,9 @@ export function WorktreeSwitcher({
                 </div>
               );
             })}
+            {showWtFilter && visibleWorktrees.length === 0 && wtFilter.trim() && (
+              <div style={{ padding: "8px 10px", fontSize: 11, color: "var(--text-dim)" }}>没有匹配的 worktree</div>
+            )}
           </div>
 
           {!newOpen ? (

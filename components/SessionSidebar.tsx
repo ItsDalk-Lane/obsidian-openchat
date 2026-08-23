@@ -30,7 +30,9 @@ import {
 import { DeleteSessionDialog } from "./session-sidebar/DeleteSessionDialog";
 import { ProjectRow } from "./session-sidebar/ProjectRow";
 import { useWorkspaceStore } from "@/lib/workspace-store";
+import { skillExpansionToCommand } from "@/lib/slash-display";
 import { useI18n } from "@/hooks/useI18n";
+import { loadExplorerOpen, saveExplorerOpen } from "@/lib/file-explorer-state";
 import { formatRelativeTime as formatLocaleRelativeTime } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/types";
 
@@ -52,6 +54,8 @@ interface Props {
   onExplorerRefresh?: () => void;
   onAtMention?: (relativePath: string, isDir: boolean) => void;
   onAtMentions?: (relativePaths: string[]) => void;
+  /** Fires when a session finished running in the background (not the active one). */
+  onBackgroundTaskDone?: () => void;
 }
 
 const UNREAD_SESSIONS_STORAGE_KEY = "pi-web:unread-session-ids";
@@ -191,7 +195,7 @@ function PiWebTitle() {
   );
 }
 
-export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, onProjectDeleted, onOpenFile, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions }: Props) {
+export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, onProjectDeleted, onOpenFile, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone }: Props) {
   const { t } = useI18n();
   const selectedSessionId = useWorkspaceStore((state) => state.selectedSession?.id ?? null);
   const selectedCwd = useWorkspaceStore((state) => state.activeCwd);
@@ -208,6 +212,12 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
   const [worktreeState, setWorktreeState] = useState<WorktreeState | null>(null);
   const [worktreeLoadingCwd, setWorktreeLoadingCwd] = useState<string | null>(null);
   const [explorerOpen, setExplorerOpen] = useState(true);
+
+  // Browser storage is unavailable during server rendering. Restore the panel
+  // preference after hydration so a collapsed explorer stays collapsed on reload.
+  useEffect(() => {
+    setExplorerOpen(loadExplorerOpen());
+  }, []);
   const [explorerKey, setExplorerKey] = useState(0);
   const [explorerUploadBusy, setExplorerUploadBusy] = useState(false);
   const [changesCount, setChangesCount] = useState(0);
@@ -309,12 +319,15 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
     // client, or a brand-new session whose refresh raced this event) — reload
     // so its row appears without waiting for the run to finish.
     const unknownRunning = newlyRunning.filter((id) => !allSessionIdsRef.current.has(id));
+    if (completedInBackground.length > 0) {
+      onBackgroundTaskDone?.();
+    }
     if (completedInBackground.length > 0 || unknownRunning.length > 0) {
       loadSessions(false);
     }
 
     previousRunningSessionIdsRef.current = runningSessionIds;
-  }, [runningSessionIds, selectedSessionId, loadSessions]);
+  }, [runningSessionIds, selectedSessionId, loadSessions, onBackgroundTaskDone]);
 
   useEffect(() => {
     if (!selectedSessionId) return;
@@ -619,9 +632,13 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
 
   // Session count per project, shown in the dropdown delete confirmation.
   const sessionCountByProject = new Map<string, number>();
+  const runningByProject = new Map<string, boolean>();
+  const unreadByProject = new Map<string, boolean>();
   for (const session of allSessions) {
     const key = session.projectRoot ?? session.cwd;
     sessionCountByProject.set(key, (sessionCountByProject.get(key) ?? 0) + 1);
+    if (runningSessionIds.has(session.id)) runningByProject.set(key, true);
+    if (unreadSessionIds.has(session.id)) unreadByProject.set(key, true);
   }
 
   const handleDeleteProject = async (project: string) => {
@@ -848,6 +865,8 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                     label={displayCwd(project, homeDir)}
                     selected={project === selectedProject}
                     sessionCount={sessionCountByProject.get(project) ?? 0}
+                    hasRunning={runningByProject.get(project) ?? false}
+                    hasUnread={unreadByProject.get(project) ?? false}
                     onSelect={() => {
                       setActiveWorkspace(project, project, project);
                       setProjectFilter("");
@@ -986,7 +1005,11 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
           <div className="pi-sidebar-explorer-header" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
             <button
               className="pi-sidebar-explorer-toggle"
-              onClick={() => setExplorerOpen((v) => !v)}
+              onClick={() => setExplorerOpen((open) => {
+                const next = !open;
+                saveExplorerOpen(next);
+                return next;
+              })}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -1339,14 +1362,18 @@ function SessionItem({
   const [deleting, setDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const title = session.name || session.firstMessage.slice(0, 50) || session.id.slice(0, 12);
+  // A stored first message may be an SDK-expanded <skill> block; collapse it
+  // back to the compact /skill:name args command the user typed before using
+  // it as the auto-name fallback, mirroring MessageView's rendering.
+  const displayFirstMessage = skillExpansionToCommand(session.firstMessage) ?? session.firstMessage;
+  const title = session.name || displayFirstMessage.slice(0, 50) || session.id.slice(0, 12);
 
   const startRename = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setRenameValue(session.name ?? "");
+    setRenameValue(session.name || displayFirstMessage.slice(0, 50) || session.id.slice(0, 12));
     setRenaming(true);
     setTimeout(() => inputRef.current?.select(), 0);
-  }, [session.name]);
+  }, [session.name, displayFirstMessage, session.id]);
 
   const commitRename = useCallback(async () => {
     const name = renameValue.trim();
@@ -1401,6 +1428,29 @@ function SessionItem({
     setConfirmDelete(false);
   }, []);
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (renaming) return;
+    if (e.key === "Delete") {
+      e.stopPropagation();
+      e.preventDefault();
+      if (e.shiftKey || confirmDelete) {
+        void performDelete(false);
+      } else if (descendantCount > 0) {
+        setBranchDialogOpen(true);
+      } else {
+        setConfirmDelete(true);
+      }
+    } else if (confirmDelete) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setConfirmDelete(false);
+      } else if (e.key === "Enter") {
+        e.stopPropagation();
+        void performDelete(false);
+      }
+    }
+  }, [renaming, confirmDelete, descendantCount, performDelete]);
+
   // Fixed-height outer wrapper — content swaps in place so the list never reflows
   const ITEM_HEIGHT = 54;
 
@@ -1418,7 +1468,9 @@ function SessionItem({
       )}
       <div
         className={`pi-session-item${isSelected ? " is-selected" : ""}${confirmDelete ? " is-confirming" : ""}${isRunning ? " is-running" : ""}${isUnread ? " is-unread" : ""}`}
+        tabIndex={0}
         onClick={confirmDelete || renaming ? undefined : onClick}
+        onKeyDown={handleKeyDown}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => { setHovered(false); }}
         style={{
@@ -1428,6 +1480,7 @@ function SessionItem({
           paddingLeft: depth > 0 ? depth * 12 + 14 : 14,
           paddingRight: 8,
           cursor: confirmDelete || renaming ? "default" : "pointer",
+          outline: "none",
           background: confirmDelete
             ? "var(--danger-soft)"
             : isSelected ? "var(--bg-selected)" : hovered ? "var(--bg-hover)" : "transparent",

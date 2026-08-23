@@ -5,12 +5,12 @@ import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecuti
 import { normalizeCustomPanelLines, parseAnsiLine } from "@/lib/ansi";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { countToolCallBlocks, getAssistantErrorMessage, getDisplayableAssistantBlocks, splitFinalAssistantBlocks } from "@/lib/message-display";
+import { extractTurnWrittenFiles, type WrittenFile } from "@/lib/turn-written-files";
 import { MessageView } from "./MessageView";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
 import { useI18n } from "@/hooks/useI18n";
 import { useAgentSession, type AgentPhase, type NoticeItem } from "@/hooks/useAgentSession";
-import { useAudio } from "@/hooks/useAudio";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { SessionStatsInfo } from "@/lib/pi-types";
@@ -38,6 +38,12 @@ interface Props {
   onSessionStatsPanelOpen?: () => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   onOpenFile?: (filePath: string) => void;
+  /** Completion sound state + controls, owned by AppShell so tasks finishing in
+   *  a non-active workspace can still ring. */
+  soundEnabled?: boolean;
+  onSoundToggle?: () => void;
+  playDoneSound?: () => void;
+  unlockAudio?: () => void;
 }
 
 type DesktopNotificationBridge = NonNullable<Window["piDesktop"]> & {
@@ -179,13 +185,13 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, children, t }: { mes
   );
 }
 
-export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile }: Props) {
+export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile, soundEnabled, onSoundToggle, playDoneSound, unlockAudio }: Props) {
   const { t } = useI18n();
   const session = useWorkspaceStore((state) => state.selectedSession);
   const storedNewSessionCwd = useWorkspaceStore((state) => state.newSessionCwd);
   const activeCwd = useWorkspaceStore((state) => state.activeCwd);
   const newSessionCwd = storedNewSessionCwd ?? (session === null ? activeCwd : null);
-  const { soundEnabled, onSoundToggle, playDoneSound, unlockAudio } = useAudio();
+
   const isMobile = useIsMobile();
 
   // Wrap onAgentEnd to play the completion sound. This is more reliable than
@@ -198,14 +204,33 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
   soundEnabledRef.current = soundEnabled;
   const wrappedOnAgentEnd = useCallback(() => {
     if (soundEnabledRef.current) {
-      playDoneSoundRef.current();
+      playDoneSoundRef.current?.();
     }
     if (document.hidden) {
       const desktopBridge = window.piDesktop as DesktopNotificationBridge | undefined;
-      desktopBridge?.notifyAgentComplete?.({
-        title: t("desktop.agentCompleteTitle"),
-        body: t("desktop.agentCompleteBody"),
-      });
+      if (desktopBridge?.notifyAgentComplete) {
+        desktopBridge.notifyAgentComplete({
+          title: t("desktop.agentCompleteTitle"),
+          body: t("desktop.agentCompleteBody"),
+        });
+      } else if ("Notification" in window) {
+        // Browser fallback when not running inside the Electron desktop shell.
+        const fire = () => {
+          try {
+            new Notification(t("desktop.agentCompleteTitle"), { body: t("desktop.agentCompleteBody") });
+          } catch {
+            // Notification construction can throw on some platforms; the
+            // sound above already signalled completion.
+          }
+        };
+        if (Notification.permission === "granted") {
+          fire();
+        } else if (Notification.permission === "default") {
+          void Notification.requestPermission().then((permission) => {
+            if (permission === "granted") fire();
+          });
+        }
+      }
     }
     onAgentEnd?.();
   }, [onAgentEnd, t]);
@@ -297,6 +322,7 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
       sessionStats.tokens.cacheWrite,
       sessionStats.tokens.total,
       sessionStats.cost ?? 0,
+      sessionStats.totalActiveMs ?? 0,
     ].join("|")
     : null;
   const sessionStatsRef = useRef(sessionStats);
@@ -378,6 +404,7 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
       modelList={modelList}
       modelError={modelError}
       onModelChange={handleModelChange}
+      modelSwitching={modelSwitching}
       onCompact={session || isNew ? handleCompact : undefined}
       onAbortCompaction={handleAbortCompaction}
       isCompacting={isCompacting}
@@ -564,7 +591,7 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
                 if (idx === lastUserIdx) { (lastUserMsgRef as { current: HTMLDivElement | null }).current = el; }
               };
 
-              const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean } = {}): ReactNode => {
+              const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[] } = {}): ReactNode => {
                 const msg = options.messageOverride ?? messages[idx];
                 const prevAssistantEntryId =
                   msg.role === "user" && idx > 0 && messages[idx - 1].role === "assistant"
@@ -604,6 +631,7 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
                     showTimestamp={showTimestamp}
                     prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
                     sessionId={session?.id ?? sessionIdRef.current ?? undefined}
+                    writtenFiles={options.writtenFiles}
                   />
                 );
                 if (!isVisible || options.attachRef === false || currentRefIdx === undefined) return view;
@@ -689,7 +717,19 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
                 }
 
                 if (finalAnswerMessage) {
-                  rendered.push(renderMessage(finalAssistantIdx, { messageOverride: finalAnswerMessage }));
+                  // Each tool call is stored as its own assistant entry, so the
+                  // final answer alone carries no record of what the turn wrote.
+                  // Gather the turn's assistant blocks and derive the file list
+                  // from the write/edit calls among them.
+                  const turnContent: AssistantContentBlock[] = [];
+                  for (let i = userIdx + 1; i <= finalAssistantIdx; i++) {
+                    const m = messages[i];
+                    if (m?.role === "assistant") {
+                      for (const b of (m as AssistantMessage).content ?? []) turnContent.push(b);
+                    }
+                  }
+                  const writtenFiles = extractTurnWrittenFiles(turnContent, toolResultsMap, messageCwd);
+                  rendered.push(renderMessage(finalAssistantIdx, { messageOverride: finalAnswerMessage, writtenFiles }));
                 }
                 for (let renderIdx = finalAssistantIdx + 1; renderIdx < endIdx; renderIdx++) {
                   rendered.push(renderMessage(renderIdx));

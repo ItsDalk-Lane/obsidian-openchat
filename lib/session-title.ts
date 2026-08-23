@@ -170,7 +170,9 @@ export async function generateSessionTitle(source: AgentSession): Promise<Genera
   await sourceAgent.waitForIdle();
 
   const historyLength = sourceAgent.state.messages.length;
-  if (!sourceAgent.state.messages.some((message) => message.role === "user")) {
+  if (!sourceAgent.state.messages.some(
+    (message) => message.role === "user" || message.role === "compactionSummary",
+  )) {
     throw new Error("The session has no user messages to name");
   }
 

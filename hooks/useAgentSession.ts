@@ -27,6 +27,7 @@ export type { ThinkingLevelOption } from "./useAgentConfiguration";
 export type { NoticeItem, NoticeType } from "./useNoticeQueue";
 
 export interface SessionData {
+  totalActiveMs: number;
   sessionId: string;
   filePath: string;
   tree: SessionTreeNode[];
@@ -337,7 +338,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   });
 
   const sessionStats = useMemo(() => {
-    if (sessionStatsOverride) return sessionStatsOverride;
+    if (sessionStatsOverride) {
+      return { ...sessionStatsOverride, totalActiveMs: data?.totalActiveMs };
+    }
     const tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
     let cost = 0;
     let userMessages = 0;
@@ -371,9 +374,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       totalMessages: messages.length,
       tokens,
       cost,
+      totalActiveMs: data?.totalActiveMs,
       ...(contextUsage ? { contextUsage } : {}),
     } satisfies SessionStatsInfo;
-  }, [messages, sessionStatsOverride, contextUsage, data?.filePath, session?.id, session?.name]);
+  }, [messages, sessionStatsOverride, contextUsage, data?.filePath, data?.totalActiveMs, session?.id, session?.name]);
 
   const loadSession = useCallback(async (sid: string, showLoading = false, includeState = false) => {
     let messagesLoaded = false;
@@ -978,17 +982,20 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
     } catch (e) {
       console.error("Failed to send message:", e);
-      if (e instanceof EventStreamConnectionError) {
-        const optimisticKey = optimisticUserMessageKeyRef.current;
-        if (optimisticKey) {
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            return last?.role === "user" && userMessageKey(last) === optimisticKey
-              ? prev.slice(0, -1)
-              : prev;
-          });
-        }
-        addNotice({ type: "error", message: e.message });
+      // Any failure must drop the optimistic bubble and give the typed text
+      // back to the composer — a rejected prompt should never be lost.
+      const optimisticKey = optimisticUserMessageKeyRef.current;
+      if (optimisticKey) {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          return last?.role === "user" && userMessageKey(last) === optimisticKey
+            ? prev.slice(0, -1)
+            : prev;
+        });
+      }
+      addNotice({ type: "error", message: e instanceof Error ? e.message : String(e) });
+      if (message.trim()) {
+        opts.chatInputRef?.current?.insertIfEmpty(message);
       }
       optimisticUserMessageKeyRef.current = null;
       agentRunningRef.current = false;

@@ -3,6 +3,8 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar } from "./SessionSidebar";
+import { useAudio } from "@/hooks/useAudio";
+import { setLastOpenSession, getLastOpenSession, clearLastOpen, workspaceKeyOf } from "@/lib/workspace-memory";
 import { AnimatedDropdown } from "./session-sidebar/SidebarPrimitives";
 import { ChatWorkspaceView } from "./workspace/ChatWorkspaceView";
 import { ArtifactWorkspaceView } from "./workspace/ArtifactWorkspaceView";
@@ -101,6 +103,19 @@ export function AppShell() {
   const { isDark, toggleTheme } = useTheme();
   const { locale, setLocale, t, supportedLocales } = useI18n();
   const isMobile = useIsMobile();
+  // Audio ownership lives here (not in ChatWindow) so the completion tone can
+  // also fire for tasks finishing in a non-active workspace whose ChatWindow
+  // is not mounted. ChatWindow receives the audio callbacks as props.
+  const {
+    soundEnabled: appSoundEnabled,
+    onSoundToggle: appSoundToggle,
+    playDoneSound: appPlayDoneSound,
+    unlockAudio: appUnlockAudio,
+    soundEnabledRef: appSoundEnabledRef,
+  } = useAudio();
+  const handleBackgroundTaskDone = useCallback(() => {
+    if (appSoundEnabledRef.current) appPlayDoneSound();
+  }, [appPlayDoneSound, appSoundEnabledRef]);
   const selectedSession = useWorkspaceStore((state) => state.selectedSession);
   const newSessionCwd = useWorkspaceStore((state) => state.newSessionCwd);
   const activeCwd = useWorkspaceStore((state) => state.activeCwd);
@@ -348,6 +363,62 @@ export function AppShell() {
     return () => controller.abort();
   }, [initialNavigation, startNewSession]);
 
+  const workspaceRestoreTokenRef = useRef(0);
+  const activeProjectKeyRef = useRef<string | null>(null);
+  activeProjectKeyRef.current = activeProjectKey ?? null;
+  const invalidateWorkspaceRestore = useCallback(() => {
+    workspaceRestoreTokenRef.current += 1;
+  }, []);
+
+  // Persist every active-session transition, including new and forked sessions
+  // that bypass the sidebar selection handler. Transient sessions do not yet
+  // carry projectKey, so use the active project identity until hydration.
+  useEffect(() => {
+    if (!selectedSession) return;
+    const projectKey = selectedSession.projectKey
+      ?? activeProjectKeyRef.current
+      ?? workspaceKeyOf(selectedSession);
+    setLastOpenSession(projectKey, selectedSession.id);
+  }, [selectedSession]);
+
+  // Restore the workspace's last open session after switching to it. Called
+  // from handleWorkspaceChange once the outgoing context has been reset. The
+  // session is looked up against the live list so a deleted or drifted session
+  // falls back to the default welcome page instead of erroring.
+  const restoreWorkspaceContext = useCallback((projectKey: string) => {
+    const token = ++workspaceRestoreTokenRef.current;
+    const lastOpenSessionId = getLastOpenSession(projectKey)?.sessionId;
+    if (!lastOpenSessionId) return;
+    void fetch("/api/sessions")
+      .then((r) => (r.ok ? (r.json() as Promise<{ sessions: SessionInfo[] }>) : null))
+      .then((d) => {
+        if (token !== workspaceRestoreTokenRef.current) return; // stale switch
+        const s = d?.sessions.find((x) => x.id === lastOpenSessionId);
+        if (!s) {
+          // The list loaded but the remembered session is gone — forget it.
+          // When the list itself failed (d === null) keep the memory so a
+          // later switch retries the restore.
+          if (d) clearLastOpen(projectKey);
+          return;
+        }
+        if (workspaceKeyOf(s) !== projectKey) {
+          // Defensive: the remembered session drifted out of this workspace.
+          clearLastOpen(projectKey);
+          return;
+        }
+        // Selecting the session must remount the chat with the session
+        // present: useAgentSession loads content in a mount-only effect, so
+        // the null-session welcome mount from the switch would never load
+        // the restored session's messages.
+        setSelectedSession(s);
+        setSessionKey((k) => k + 1);
+        replaceBrowserUrl(`?session=${encodeURIComponent(s.id)}`);
+      })
+      .catch(() => {
+        // Network hiccup: keep the remembered session for a later retry.
+      });
+  }, [setSelectedSession]);
+
   const handleWorkspaceChange = useCallback((
     cwd: string | null,
     projectRoot?: string | null,
@@ -390,7 +461,9 @@ export function AppShell() {
     setActiveFileTabId(null);
     setRightPanelOpen(false);
     replaceBrowserUrl("/");
-  }, [newSessionCwd, selectedSession, setNewSessionCwd, setSelectedSession]);
+    invalidateWorkspaceRestore();
+    restoreWorkspaceContext(newProject);
+  }, [newSessionCwd, invalidateWorkspaceRestore, restoreWorkspaceContext, selectedSession, setNewSessionCwd, setSelectedSession]);
 
   useEffect(() => {
     const previous = lastHandledWorkspaceRef.current;
@@ -400,6 +473,19 @@ export function AppShell() {
   }, [activeCwd, activeProjectRoot, handleWorkspaceChange]);
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false) => {
+    // Re-clicking the already-open session must not remount the chat and
+    // re-run the full load/positioning cycle. Only skip when the effective
+    // cwd context already matches — otherwise a pending cwd move still needs
+    // the full re-select flow.
+    if (!isRestore && selectedSession) {
+      const sameProject =
+        (selectedSession.projectRoot ?? selectedSession.cwd) ===
+        (session.projectRoot ?? session.cwd);
+      if (selectedSession.id === session.id && sameProject) {
+        if (isMobile) setSidebarOpen(false);
+        return;
+      }
+    }
     selectSession(session);
     setSessionKey((k) => k + 1);
     setSystemPrompt(null);
@@ -414,7 +500,7 @@ export function AppShell() {
     if (!isRestore) {
       replaceBrowserUrl(`?session=${encodeURIComponent(session.id)}`);
     }
-  }, [isMobile, selectSession]);
+  }, [isMobile, selectSession, selectedSession]);
 
   const handleNewSession = useCallback((_sessionId: string, cwd: string) => {
     startNewSession(cwd, activeProjectRoot ?? cwd, activeProjectKey ?? activeProjectRoot ?? cwd);
@@ -886,6 +972,7 @@ export function AppShell() {
         onExplorerRefresh={handleExplorerRefresh}
         onAtMention={handleAtMention}
         onAtMentions={handleAtMentions}
+        onBackgroundTaskDone={handleBackgroundTaskDone}
       />
       <div ref={settingsMenuRef} style={{ position: "relative", padding: "8px", flexShrink: 0 }}>
         <button
@@ -1344,9 +1431,10 @@ export function AppShell() {
                 {!isMobile && <span>{t("history.full")}</span>}
               </button>
               {(() => {
+                // 上下文压缩后当前消息可能不再包含 user 消息，需同时参考会话文件的消息总数。
                 const hasMessages = Boolean(
                   selectedSession
-                  && (sessionStats?.userMessages ?? selectedSession.messageCount) > 0,
+                  && ((sessionStats?.userMessages ?? 0) > 0 || selectedSession.messageCount > 0),
                 );
                 const disabled = !selectedSession || !hasMessages || autoNameStatus.kind === "naming";
                 const isSuccess = autoNameStatus.kind === "success";
@@ -1672,6 +1760,20 @@ export function AppShell() {
                     const ctx = contextUsage ?? sessionStats.contextUsage;
                     const formatCompact = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
                     const extraTokenRows = [
+                      // Cache hit rate = cache reads / (input + cache writes + cache reads) — the denominator covers all input-class tokens.
+                      ...(sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite > 0 && sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite + sessionStats.tokens.input > 0
+                        ? [[t("session.cacheHitRate"), `${(sessionStats.tokens.cacheRead / (sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite + sessionStats.tokens.input) * 100).toFixed(1)}%`]]
+                        : []),
+                      ...(() => {
+                        const ms = sessionStats.totalActiveMs ?? 0;
+                        if (ms <= 0) return [];
+                        const totalSec = Math.floor(ms / 1000);
+                        const h = Math.floor(totalSec / 3600);
+                        const m = Math.floor((totalSec % 3600) / 60);
+                        const s = totalSec % 60;
+                        const text = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+                        return [[t("session.totalActive"), text]];
+                      })(),
                       ...(sessionStats.cost > 0 ? [[t("session.cost"), `$${sessionStats.cost.toFixed(4)}`]] : []),
                       ...(ctx?.contextWindow ? [[t("session.context"), `${ctx.percent !== null ? `${ctx.percent.toFixed(1)}%` : "?"} / ${formatCompact(ctx.contextWindow)}`]] : []),
                     ];
@@ -1913,6 +2015,10 @@ export function AppShell() {
               onSessionStatsPanelOpen={openSessionStatsPanel}
               onContextUsageChange={handleContextUsageChange}
               onOpenFile={handleOpenLinkedFile}
+              soundEnabled={appSoundEnabled}
+              onSoundToggle={appSoundToggle}
+              playDoneSound={appPlayDoneSound}
+              unlockAudio={appUnlockAudio}
             />
           ) : initialCwdStatus === "validating" ? (
             <div
