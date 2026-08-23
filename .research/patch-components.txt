@@ -1,0 +1,688 @@
+﻿=== components/AppShell.tsx (modified) ===
+@@ -28,7 +28,12 @@ import {
+   showBrowserNotification,
+ } from "@/lib/browser-notifications";
+ import { getInitialNavigation } from "@/lib/initial-navigation";
+-import { clearLastOpen, getLastOpenSession, setLastOpenSession } from "@/lib/workspace-memory";
++import {
++  clearLastOpen,
++  getLastOpenSession,
++  setLastOpenSession,
++  workspaceKeyOf,
++} from "@/lib/workspace-memory";
+ import {
+   getDefaultRightPanelWidth,
+   getRightPanelMaxWidth,
+@@ -382,7 +387,7 @@ export function AppShell() {
+ 
+   const initialSessionId = initialNavigation.sessionId;
+   const [activeCwd, setActiveCwd] = useState<string | null>(null);
+-  const activeProjectRootRef = useRef<string | null>(null);
++  const activeProjectKeyRef = useRef<string | null>(null);
+   // True once the initial ?session= URL param has been resolved (or confirmed absent)
+   const [initialSessionRestored, setInitialSessionRestored] = useState<boolean>(() => !initialSessionId);
+   // Suppresses sessionKey bump in handleCwdChange during the initial URL restore
+@@ -397,12 +402,12 @@ export function AppShell() {
+ 
+   // Persist every active-session transition, including new and forked sessions
+   // that bypass the sidebar selection handler. Transient sessions do not yet
+-  // carry projectRoot, so use the active project identity until hydration.
++  // carry projectKey, so use the active project identity until hydration.
+   useEffect(() => {
+     if (!selectedSession) return;
+-    const projectKey = selectedSession.projectRoot
+-      ?? activeProjectRootRef.current
+-      ?? selectedSession.cwd;
++    const projectKey = selectedSession.projectKey
++      ?? activeProjectKeyRef.current
++      ?? workspaceKeyOf(selectedSession);
+     setLastOpenSession(projectKey, selectedSession.id);
+   }, [selectedSession]);
+ 
+@@ -464,7 +469,7 @@ export function AppShell() {
+           if (d) clearLastOpen(projectKey);
+           return;
+         }
+-        if ((s.projectRoot ?? s.cwd) !== projectKey) {
++        if (workspaceKeyOf(s) !== projectKey) {
+           // Defensive: the remembered session drifted out of this workspace.
+           clearLastOpen(projectKey);
+           return;
+@@ -484,23 +489,30 @@ export function AppShell() {
+       });
+   }, [router]);
+ 
+-  const handleCwdChange = useCallback((cwd: string | null, projectRoot?: string | null) => {
++  const handleCwdChange = useCallback((
++    cwd: string | null,
++    projectRoot?: string | null,
++    projectKey?: string | null,
++  ) => {
+     invalidateWorkspaceRestore();
+     const currentFreshCwd = newSessionCwd ?? activeCwd;
+     setActiveCwd(cwd);
+     // Skip if cwd is null (initial mount).
+     if (!cwd) return;
+-    const newProject = projectRoot ?? cwd;
+-    const currentProject = activeProjectRootRef.current
+-      ?? (selectedSession ? (selectedSession.projectRoot ?? selectedSession.cwd) : null);
+-    activeProjectRootRef.current = newProject;
++    const newProject = projectKey ?? projectRoot ?? cwd;
++    const currentProject = activeProjectKeyRef.current
++      ?? (selectedSession ? workspaceKeyOf(selectedSession) : null);
++    activeProjectKeyRef.current = newProject;
+ 
+     // Keep the project identity in sync during the initial URL restore without
+     // remounting the just-created or restored chat.
+     if (suppressCwdBumpRef.current) {
+       suppressCwdBumpRef.current = false;
+       return;
+     }
++    // The server may hydrate a normalized key after a custom cwd is already
++    // active. Updating identity for the exact same cwd is not a user switch.
++    if (currentFreshCwd === cwd && currentProject !== newProject) return;
+     // Existing sessions stay open when the worktree selector moves within the
+     // same project. A fresh composer must remount when its effective cwd moves,
+     // otherwise its already-created runtime would keep sending to the old cwd.
+@@ -550,8 +562,7 @@ export function AppShell() {
+     // the full re-select flow.
+     if (!isRestore && selectedSession) {
+       const sameProject =
+-        (selectedSession.projectRoot ?? selectedSession.cwd) ===
+-        (session.projectRoot ?? session.cwd);
++        workspaceKeyOf(selectedSession) === workspaceKeyOf(session);
+       if (selectedSession.id === session.id && sameProject) {
+         if (isMobile) setSidebarOpen(false);
+         return;
+@@ -601,7 +612,7 @@ export function AppShell() {
+   });
+ 
+   // Client-built transient SessionInfo (new session / fork) lacks the
+-  // server-computed projectRoot, which the same-project check in
++  // server-computed projectKey, which the same-project check in
+   // handleCwdChange relies on. Hydrate it from the session list so switching
+   // worktrees right after creating a session doesn't close the chat.
+   const hydrateSelectedSession = useCallback((sessionId: string) => {
+
+=== components/ChatWindow.tsx (modified) ===
+@@ -53,6 +53,10 @@ interface Props {
+ 
+ function phaseLabel(phase: AgentPhase, t: (key: string, params?: Record<string, string | number>) => string): string | null {
+   if (phase?.kind === "running_tools") {
++    const latest = phase.tools[phase.tools.length - 1];
++    if (latest?.progress) {
++      return `${t("chat.runningNamedTool", { name: latest.name })} ${latest.progress}`;
++    }
+     const names = phase.tools.map((t) => t.name);
+     if (names.length === 0) return t("chat.runningTool");
+     if (names.length === 1) return t("chat.runningNamedTool", { name: names[0] });
+@@ -66,7 +70,6 @@ function phaseLabel(phase: AgentPhase, t: (key: string, params?: Record<string,
+ 
+ const CHAT_MINIMAP_WIDTH = 36;
+ const CHAT_COLUMN_PADDING = 16;
+-const CHAT_INPUT_RIGHT_PADDING = CHAT_COLUMN_PADDING + CHAT_MINIMAP_WIDTH;
+ 
+ function NewSessionUpdateLink({
+   label,
+@@ -643,6 +646,22 @@ export function ChatWindow({ session, sessionRunning, newSessionCwd, newSessionD
+         />
+       )}
+ 
++      <div
++        style={{
++          position: "absolute",
++          top: 12,
++          left: 0,
++          right: isMobile ? 0 : CHAT_MINIMAP_WIDTH,
++          zIndex: 40,
++          display: "flex",
++          justifyContent: "center",
++          padding: `0 ${CHAT_COLUMN_PADDING}px`,
++          pointerEvents: "none",
++        }}
++      >
++        <NoticeShelf notices={notices} floating />
++      </div>
++
+       {isEmptyNew ? (
+         <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8">
+           <div className="w-full max-w-[820px]">
+@@ -672,29 +691,13 @@ export function ChatWindow({ session, sessionRunning, newSessionCwd, newSessionD
+                 </span>
+               </div>
+             </div>
+-            <NoticeShelf notices={notices} align="right" />
+             {chatInputElement}
+             <ExtensionStatusBar statuses={extensionStatuses} widgets={extensionWidgets} />
+           </div>
+         </div>
+       ) : (
+       <>
+       <div className="relative flex min-w-0 flex-1 overflow-hidden">
+-        <div
+-          style={{
+-            position: "absolute",
+-            top: 12,
+-            left: 0,
+-            right: isMobile ? 0 : CHAT_MINIMAP_WIDTH,
+-            zIndex: 40,
+-            padding: `0 ${CHAT_COLUMN_PADDING}px`,
+-            pointerEvents: "none",
+-          }}
+-        >
+-          <div style={{ maxWidth: 820, margin: "0 auto" }}>
+-            <NoticeShelf notices={notices} floating align="right" />
+-          </div>
+-        </div>
+         <div ref={scrollContainerRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-width:none]">
+           <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
+             <div ref={messageContentRef} style={{ width: "100%", minWidth: 0, maxWidth: 820, margin: "0 auto" }}>
+@@ -889,7 +892,7 @@ export function ChatWindow({ session, sessionRunning, newSessionCwd, newSessionD
+             )}
+ 
+             {agentRunning && !hasStreamingContent && agentPhase && (
+-              <div className="py-2 text-[13px] text-text-muted">
++              <div className="break-words py-2 text-[13px] text-text-muted">
+                 <span className="animate-[pulse_1.5s_infinite]">{phaseLabel(agentPhase, t)}</span>
+               </div>
+             )}
+@@ -939,14 +942,14 @@ export function ChatWindow({ session, sessionRunning, newSessionCwd, newSessionD
+   );
+ }
+ 
+-function NoticeShelf({ notices, floating = false, align = "left" }: { notices: NoticeItem[]; floating?: boolean; align?: "left" | "right" }) {
++function NoticeShelf({ notices, floating = false }: { notices: NoticeItem[]; floating?: boolean }) {
+   if (notices.length === 0) return null;
+   return (
+     <div
+       style={{
+         display: "flex",
+         flexDirection: "column",
+-        alignItems: align === "right" ? "flex-end" : "stretch",
++        alignItems: "center",
+         marginBottom: floating ? 0 : 10,
+       }}
+     >
+
+=== components/MessageView.tsx (modified) ===
+@@ -43,10 +43,10 @@ interface TokenEstimateCacheEntry {
+   tokens: number;
+ }
+ 
+-function getTokenEstimateText(block: AssistantContentBlock): string | null {
++export function getTokenEstimateText(block: AssistantContentBlock): string | null {
+   if (block.type === "text") return block.text;
+   if (block.type === "thinking") return block.thinking;
+-  if (block.type === "toolCall") return JSON.stringify(block.input ?? {}) ?? "";
++  if (block.type === "toolCall") return block.rawInput ?? JSON.stringify(block.input ?? {}) ?? "";
+   return null;
+ }
+ 
+@@ -949,8 +949,10 @@ function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex }: {
+ 
+ 
+ function ToolCallBlock({ block, result, duration }: { block: ToolCallContent; result?: ToolResultMessage; duration?: number }) {
++  const { t } = useI18n();
+   const [expanded, setExpanded] = useState(false);
+-  const inputStr = JSON.stringify(block.input, null, 2);
++  const inputStr = getToolCallInputText(block);
++  const isStreamingInput = block.rawInput !== undefined;
+   const isEditTool = isEditToolName(block.toolName);
+   const resultDiff = result && !result.isError ? getResultDiff(result) : null;
+ 
+@@ -993,7 +995,7 @@ function ToolCallBlock({ block, result, duration }: { block: ToolCallContent; re
+           {block.toolName}
+         </span>
+         <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+-          {getToolPreview(block)}
++          {isStreamingInput ? t("chat.generatingToolInput") : getToolPreview(block)}
+         </span>
+         {duration !== undefined && (
+           <span style={{ fontSize: 11, color: "var(--text-dim)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{duration}s</span>
+@@ -1004,7 +1006,7 @@ function ToolCallBlock({ block, result, duration }: { block: ToolCallContent; re
+       </button>
+ 
+       {/* ── Expanded: input args ── */}
+-      {expanded && !isEditTool && (
++      {expanded && (isStreamingInput || !isEditTool) && (
+         <pre
+           style={{
+             margin: 0,
+@@ -1590,6 +1592,10 @@ function safeJson(value: unknown): string {
+   }
+ }
+ 
++export function getToolCallInputText(block: ToolCallContent): string {
++  return block.rawInput ?? JSON.stringify(block.input, null, 2);
++}
++
+ function formatCustomType(type: string): string {
+   return type || "extension";
+ }
+
+=== components/ModelsConfig.tsx (modified) ===
+@@ -1907,14 +1907,18 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
+   const loadOAuthProviders = useCallback(() => {
+     fetch("/api/auth/providers")
+       .then((r) => r.json())
+-      .then((d: { providers: OAuthProvider[] }) => setOauthProviders(d.providers))
++      .then((d: { providers?: OAuthProvider[] }) => {
++        if (Array.isArray(d.providers)) setOauthProviders(d.providers);
++      })
+       .catch(() => {});
+   }, []);
+ 
+   const loadApiKeyProviders = useCallback(() => {
+     fetch("/api/auth/all-providers")
+       .then((r) => r.json())
+-      .then((d: { providers: ApiKeyProvider[] }) => setApiKeyProviders(d.providers))
++      .then((d: { providers?: ApiKeyProvider[] }) => {
++        if (Array.isArray(d.providers)) setApiKeyProviders(d.providers);
++      })
+       .catch(() => {});
+   }, []);
+ 
+
+=== components/SessionSidebar.tsx (modified) ===
+@@ -5,6 +5,8 @@ import type { SessionInfo } from "@/lib/types";
+ import { loadExplorerOpen, saveExplorerOpen } from "@/lib/file-explorer-state";
+ import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
+ import { skillExpansionToCommand } from "@/lib/slash-display";
++import { getProjectActivity, getRecentProjects, sessionsForProject } from "@/lib/project-groups";
++import { workspaceKeyOf } from "@/lib/workspace-memory";
+ import { useI18n } from "@/hooks/useI18n";
+ import { DirectoryPicker } from "./DirectoryPicker";
+ import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
+@@ -86,7 +88,11 @@ interface Props {
+   refreshKey?: number;
+   onSessionDeleted?: (sessionId: string) => void;
+   selectedCwd?: string | null;
+-  onCwdChange?: (cwd: string | null, projectRoot?: string | null) => void;
++  onCwdChange?: (
++    cwd: string | null,
++    projectRoot?: string | null,
++    projectKey?: string | null,
++  ) => void;
+   onOpenFile?: (filePath: string, fileName: string, options?: { sourceSessionId?: string | null; modeHint?: "diff" }) => void;
+   explorerRefreshKey?: number;
+   onExplorerRefresh?: () => void;
+@@ -108,6 +114,8 @@ interface WorktreeState {
+   /** The cwd this data was fetched for — guards against stale responses */
+   forCwd: string;
+   projectRoot: string;
++  /** Stable server-computed identity; never derive OS path semantics here. */
++  projectKey: string;
+   isGit: boolean;
+   /** False when forCwd is a repo subdirectory — the switcher is hidden there
+    *  because subdir sessions keep their own project identity */
+@@ -117,6 +125,17 @@ interface WorktreeState {
+   worktrees: WorktreeEntry[];
+ }
+ 
++interface ProjectSelection {
++  root: string;
++  key: string;
++}
++
++interface ValidatedProject {
++  cwd: string;
++  root: string;
++  key: string;
++}
++
+ const UNREAD_SESSIONS_STORAGE_KEY = "pi-web:unread-session-ids";
+ const RUNNING_SESSIONS_POLL_MS = 2500;
+ 
+@@ -157,25 +176,6 @@ function formatRelativeTime(dateStr: string): string {
+   return date.toLocaleDateString();
+ }
+ 
+-/**
+- * Return all projects (deduped by projectRoot so worktrees collapse into their
+- * main repo) sorted by most recent session activity.
+- */
+-function getRecentProjects(sessions: SessionInfo[]): string[] {
+-  const latestByRoot = new Map<string, string>(); // projectRoot -> most recent modified
+-  for (const s of sessions) {
+-    const root = s.projectRoot ?? s.cwd;
+-    if (!root) continue;
+-    const prev = latestByRoot.get(root);
+-    if (!prev || s.modified > prev) {
+-      latestByRoot.set(root, s.modified);
+-    }
+-  }
+-  return [...latestByRoot.entries()]
+-    .sort((a, b) => b[1].localeCompare(a[1]))
+-    .map(([root]) => root);
+-}
+-
+ /** Substitute the home dir prefix with ~ (no path truncation — see PathLabel) */
+ function displayCwd(cwd: string, homeDir?: string): string {
+   return (homeDir && cwd.startsWith(homeDir)) ? "~" + cwd.slice(homeDir.length) : cwd;
+@@ -406,6 +406,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+   const [customPathValue, setCustomPathValue] = useState("");
+   const [customPathError, setCustomPathError] = useState<string | null>(null);
+   const [customPathValidating, setCustomPathValidating] = useState(false);
++  const [validatedProject, setValidatedProject] = useState<ValidatedProject | null>(null);
+   const dropdownRef = useRef<HTMLDivElement>(null);
+   // Worktree switcher state
+   const [worktreeState, setWorktreeState] = useState<WorktreeState | null>(null);
+@@ -599,25 +600,50 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+ 
+   const restoredRef = useRef(false);
+ 
+-  /** Resolve the project root for a cwd from the freshest data available */
+-  const projectRootFor = useCallback((cwd: string | null): string | null => {
++  const projectSelection = useCallback((root: string, key: string): ProjectSelection => ({
++    root,
++    key,
++  }), []);
++
++  /** Resolve both display root and stable identity from server-provided data. */
++  const projectFor = useCallback((cwd: string | null): ProjectSelection | null => {
+     if (!cwd) return null;
+-    if (worktreeState && worktreeState.forCwd === cwd) return worktreeState.projectRoot;
++    // /api/cwd/validate resolves identity before a custom path becomes active,
++    // preventing one render with a raw path key from looking like a switch.
++    if (validatedProject?.cwd === cwd) {
++      return projectSelection(validatedProject.root, validatedProject.key);
++    }
++    if (worktreeState && worktreeState.forCwd === cwd) {
++      return projectSelection(worktreeState.projectRoot, worktreeState.projectKey);
++    }
+     // Any path in the loaded worktree list belongs to that project — covers
+     // worktrees without sessions, so switching to them keeps the row mounted.
+-    if (worktreeState?.worktrees.some((w) => w.path === cwd)) return worktreeState.projectRoot;
+-    const match = allSessions.find((s) => s.cwd === cwd);
+-    return match?.projectRoot ?? cwd;
+-  }, [worktreeState, allSessions]);
+-
+-  // Notify parent only when the effective cwd actually changes (not when
+-  // projectRootFor identity changes due to session/worktree refreshes).
+-  const lastNotifiedCwdRef = useRef<string | null>(null);
++    if (worktreeState?.worktrees.some((w) => w.path === cwd)) {
++      return projectSelection(worktreeState.projectRoot, worktreeState.projectKey);
++    }
++    const match = allSessions.find((session) => (
++      session.cwd === cwd || (session.projectRoot ?? session.cwd) === cwd
++    ));
++    return match
++      ? projectSelection(match.projectRoot ?? match.cwd, workspaceKeyOf(match))
++      : projectSelection(cwd, cwd);
++  }, [validatedProject, worktreeState, allSessions, projectSelection]);
++
++  // A worktree/session refresh can hydrate the stable key without changing
++  // cwd, so notify when either changes. The parent treats same-cwd key changes
++  // as identity hydration rather than a workspace switch.
++  const lastNotifiedProjectRef = useRef<{ cwd: string | null; key: string | null } | null>(null);
+   useEffect(() => {
+-    if (lastNotifiedCwdRef.current === selectedCwd) return;
+-    lastNotifiedCwdRef.current = selectedCwd;
+-    onCwdChange?.(selectedCwd, projectRootFor(selectedCwd));
+-  }, [selectedCwd, onCwdChange, projectRootFor]);
++    const project = projectFor(selectedCwd);
++    const previous = lastNotifiedProjectRef.current;
++    if (previous?.cwd === selectedCwd && previous.key === (project?.key ?? null)) return;
++    lastNotifiedProjectRef.current = { cwd: selectedCwd, key: project?.key ?? null };
++    onCwdChange?.(
++      selectedCwd,
++      project?.root ?? null,
++      project?.key ?? null,
++    );
++  }, [selectedCwd, onCwdChange, projectFor]);
+ 
+   // Sync the worktree switcher to the selected session's cwd. Sessions of all
+   // worktrees in a project share one list, so clicking a session from another
+@@ -643,7 +669,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+     setWorktreeLoadingCwd(selectedCwd);
+     fetch(`/api/worktrees?cwd=${encodeURIComponent(selectedCwd)}`)
+       .then((r) => r.json())
+-      .then((d: { projectRoot?: string; isGit?: boolean; isTopLevel?: boolean; currentWorktreePath?: string | null; worktrees?: WorktreeEntry[]; error?: string }) => {
++      .then((d: { projectRoot?: string; projectKey?: string; isGit?: boolean; isTopLevel?: boolean; currentWorktreePath?: string | null; worktrees?: WorktreeEntry[]; error?: string }) => {
+         if (cancelled) return;
+         setWorktreeLoadingCwd(null);
+         if (d.error || !d.projectRoot) {
+@@ -653,6 +679,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+         setWorktreeState({
+           forCwd: selectedCwd,
+           projectRoot: d.projectRoot,
++          projectKey: d.projectKey ?? d.projectRoot,
+           isGit: d.isGit ?? false,
+           isTopLevel: d.isTopLevel ?? false,
+           currentWorktreePath: d.currentWorktreePath ?? null,
+@@ -686,7 +713,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+         onInitialRestoreDone?.();
+       }
+       const projects = getRecentProjects(allSessions);
+-      if (projects.length > 0) setSelectedCwd(projects[0]);
++      if (projects.length > 0) setSelectedCwd(projects[0].root);
+     }
+   }, [allSessions, selectedCwd, initialSessionId, skipInitialProjectSelection, onSelectSession, onInitialRestoreDone]);
+ 
+@@ -714,12 +741,22 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ cwd: path }),
+       });
+-      const data = await res.json().catch(() => ({})) as { cwd?: string; error?: string };
+-      if (!res.ok || data.error) {
++      const data = await res.json().catch(() => ({})) as {
++        cwd?: string;
++        projectRoot?: string;
++        projectKey?: string;
++        error?: string;
++      };
++      if (!res.ok || data.error || !data.cwd || !data.projectRoot || !data.projectKey) {
+         setCustomPathError(data.error ?? `HTTP ${res.status}`);
+         return;
+       }
+-      setSelectedCwd(data.cwd ?? path);
++      setValidatedProject({
++        cwd: data.cwd,
++        root: data.projectRoot,
++        key: data.projectKey,
++      });
++      setSelectedCwd(data.cwd);
+       setCustomPathOpen(false);
+       setCustomPathValue("");
+       setDropdownOpen(false);
+@@ -770,7 +807,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+       setWtNewOpen(false);
+       setWtNewBranch("");
+       setWtDropdownOpen(false);
+-      // Optimistically register the new worktree so projectRootFor() resolves
++      // Optimistically register the new worktree so projectFor() resolves
+       // it to the main repo before the refetch lands (keeps AppShell from
+       // treating the new cwd as a different project).
+       setWorktreeState((prev) => prev ? {
+@@ -860,50 +897,41 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+   const recentProjects = getRecentProjects(allSessions);
+   const showProjectFilter = recentProjects.length > 8;
+   const visibleProjects = projectFilter.trim()
+-    ? recentProjects.filter((p) => p.toLowerCase().includes(projectFilter.trim().toLowerCase()))
++    ? recentProjects.filter((project) => project.root.toLowerCase().includes(projectFilter.trim().toLowerCase()))
+     : recentProjects;
+ 
+   // Sessions of every worktree in the selected project are shown together
+-  const selectedProject = projectRootFor(selectedCwd);
++  const selectedProject = projectFor(selectedCwd);
+ 
+   // Per-project activity counts (running / unread) for the workspace selector.
+-  // Keyed the same way as getRecentProjects (projectRoot ?? cwd) so the counts
+-  // line up with each dropdown item. Small data set — cheap to recompute.
+-  const projectActivity = useMemo(() => {
+-    const counts = new Map<string, { running: number; unread: number }>();
+-    for (const s of allSessions) {
+-      const key = s.projectRoot ?? s.cwd;
+-      if (!key) continue;
+-      let entry = counts.get(key);
+-      if (!entry) { entry = { running: 0, unread: 0 }; counts.set(key, entry); }
+-      if (runningSessionIds.has(s.id)) entry.running++;
+-      if (unreadSessionIds.has(s.id)) entry.unread++;
+-    }
+-    return counts;
+-  }, [allSessions, runningSessionIds, unreadSessionIds]);
++  // Uses the same stable server key as the project list and filtering.
++  const projectActivity = useMemo(
++    () => getProjectActivity(allSessions, runningSessionIds, unreadSessionIds),
++    [allSessions, runningSessionIds, unreadSessionIds],
++  );
+ 
+   // Any activity in a project other than the one currently selected — shown as
+   // a dot on the (collapsed) selector button so it is visible without opening
+   // the dropdown.
+   const hasOtherWorkspaceActivity = useMemo(
+     () => [...projectActivity.entries()].some(
+-      ([key, { running, unread }]) => key !== selectedProject && (running > 0 || unread > 0),
++      ([key, { running, unread }]) => key !== selectedProject?.key && (running > 0 || unread > 0),
+     ),
+     [projectActivity, selectedProject],
+   );
+ 
+   const filteredSessions = selectedProject
+-    ? allSessions.filter((s) => (s.projectRoot ?? s.cwd) === selectedProject)
++    ? sessionsForProject(allSessions, selectedProject.key)
+     : allSessions;
+   const showWorktreeSwitcher = Boolean(
+     worktreeState?.isGit
+     && worktreeState.isTopLevel
+     && selectedCwd
+-    && selectedProject === worktreeState.projectRoot
++    && selectedProject?.key === worktreeState.projectKey
+   );
+   const worktreeGuide = selectedCwd
+     && worktreeState
+-    && selectedProject === worktreeState.projectRoot
++    && selectedProject?.key === worktreeState.projectKey
+     && !showWorktreeSwitcher
+     ? (worktreeState.isGit
+         ? {
+@@ -1035,7 +1063,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+         <div ref={dropdownRef} style={{ position: "relative" }}>
+           <button
+             onClick={() => setDropdownOpen((v) => !v)}
+-            title={selectedProject ?? selectedCwd ?? ""}
++            title={selectedProject?.root ?? selectedCwd ?? ""}
+             style={{
+               width: "100%",
+               display: "flex",
+@@ -1053,7 +1081,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+           >
+             {selectedCwd ? (
+               <PathLabel
+-                text={displayCwd(selectedProject ?? selectedCwd, homeDir)}
++                text={displayCwd(selectedProject?.root ?? selectedCwd, homeDir)}
+                 style={{
+                   flex: 1,
+                   fontFamily: "var(--font-mono)",
+@@ -1138,9 +1166,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+               <div style={{ maxHeight: "min(50vh, 380px)", overflowY: "auto" }}>
+                 {visibleProjects.map((project) => (
+                   <button
+-                    key={project}
++                    key={project.key}
+                     onClick={() => {
+-                      setSelectedCwd(project);
++                      setSelectedCwd(project.root);
+                       setProjectFilter("");
+                       setCustomPathOpen(false);
+                       setCustomPathValue("");
+@@ -1156,7 +1184,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+                       background: "var(--bg)",
+                       border: "none",
+                       borderBottom: "1px solid var(--border)",
+-                      color: project === selectedProject ? "var(--text)" : "var(--text-muted)",
++                      color: project.key === selectedProject?.key ? "var(--text)" : "var(--text-muted)",
+                       cursor: "pointer",
+                       textAlign: "left",
+                       fontSize: 11,
+@@ -1165,16 +1193,16 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
+                       textOverflow: "ellipsis",
+                       whiteSpace: "nowrap",
+                     }}
+-                    title={project}
++                    title={project.root}
+                   >
+-                    {project === selectedProject && (
++                    {project.key === selectedProject?.key && (
+                       <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                         <polyline points="1.5 5 4 7.5 8.5 2.5" />
+                       </svg>
+                     )}
+-                    {project !== selectedProject && <span style={{ width: 10, flexShrink: 0 }} />}
+-                    <PathLabel text={displayCwd(project, homeDir)} style={{ flex: 1 }} />
+-                    {showProjectActivity(projectActivity.get(project), t)}
++                    {project.key !== selectedProject?.key && <span style={{ width: 10, flexShrink: 0 }} />}
++                    <PathLabel text={displayCwd(project.root, homeDir)} style={{ flex: 1 }} />
++                    {showProjectActivity(projectActivity.get(project.key), t)}
+                   </button>
+                 ))}
+                 {visibleProjects.length === 0 && projectFilter.trim() && (
+
+=== lib/i18n/messages/en.ts (modified) ===
+@@ -159,6 +159,7 @@ export const enLocale: LocalePlugin = {
+     "files.uploading": "Uploading, {progress}%",
+     "chat.loadingSession": "Loading session...",
+     "chat.runningTool": "Running tool...",
++    "chat.generatingToolInput": "Generating parameters...",
+     "chat.runningNamedTool": "Running {name}...",
+     "chat.runningTools": "Running {names}...",
+     "chat.runningToolsMore": "Running {names} (+{count})...",
+
+=== lib/i18n/messages/zh-CN.ts (modified) ===
+@@ -159,6 +159,7 @@ export const zhCNLocale: LocalePlugin = {
+     "files.uploading": "正在上传，{progress}%",
+     "chat.loadingSession": "正在加载会话...",
+     "chat.runningTool": "正在运行工具...",
++    "chat.generatingToolInput": "正在生成参数...",
+     "chat.runningNamedTool": "正在运行 {name}...",
+     "chat.runningTools": "正在运行 {names}...",
+     "chat.runningToolsMore": "正在运行 {names}（另有 {count} 个）...",
+
+=== lib/session-reader.ts (modified) ===
+@@ -9,6 +9,7 @@ import { normalize as normalizePath } from "path";
+ import type { AgentMessage, SessionEntry, SessionHeader, SessionInfo, SessionContext } from "./types";
+ import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } from "@earendil-works/pi-coding-agent";
+ import { normalizeToolCalls } from "./normalize";
++import { projectIdentityKey } from "./project-identity";
+ import { sessionPathKey } from "./session-path";
+ import { resolveProject, type ProjectInfo } from "./worktree";
+ 
+@@ -23,9 +24,11 @@ export async function attachSessionProjectInfo(sessions: SessionInfo[]): Promise
+ 
+   return sessions.map((session) => {
+     const project = session.cwd ? projectByCwd.get(session.cwd) : undefined;
++    const projectRoot = project?.projectRoot ?? session.cwd;
+     return {
+       ...session,
+-      projectRoot: project?.projectRoot ?? session.cwd,
++      projectRoot,
++      projectKey: projectIdentityKey(projectRoot),
+       ...(project?.isWorktree && project.branch ? { worktreeBranch: project.branch } : {}),
+     };
+   });
+
+=== lib/workspace-memory.ts (modified) ===
+@@ -5,10 +5,9 @@
+  * had open there last, instead of landing on a blank new-session page. Without
+  * this, every workspace switch required re-picking the session by hand.
+  *
+- * The workspace key is the resolved project root when known (sessions carry it
+- * from the server), so all worktrees of one repo share a single memory slot.
+- * It falls back to the raw cwd for non-repo directories, which is its own
+- * project key there.
++ * The workspace key is the server-provided project identity when known, so
++ * Windows path variants and all worktrees of one repo share one memory slot.
++ * Transient and legacy session objects fall back to projectRoot/cwd.
+  *
+  * Stored in localStorage; best-effort (silently ignored when unavailable).
+  */
+@@ -93,6 +92,7 @@ export function clearLastOpen(
+ export function workspaceKeyOf(session: {
+   cwd: string;
+   projectRoot?: string | null;
++  projectKey?: string | null;
+ }): string {
+-  return session.projectRoot ?? session.cwd;
++  return session.projectKey ?? session.projectRoot ?? session.cwd;
+ }
+

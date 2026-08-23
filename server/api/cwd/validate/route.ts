@@ -3,6 +3,8 @@ import { statSync, type Stats } from "fs";
 import { homedir } from "os";
 import { isAbsolute, resolve } from "path";
 import { allowFileRoot } from "@/lib/file-access";
+import { projectIdentityKey } from "@/lib/project-identity";
+import { resolveProject } from "@/lib/worktree";
 
 function normalizeCwd(cwd: string): string {
   if (cwd === "~") return homedir();
@@ -34,7 +36,17 @@ export async function POST(req: Request) {
     }
 
     allowFileRoot(normalizedCwd);
-    return ApiResponse.json({ success: true, cwd: normalizedCwd });
+    // Resolve the project identity before the UI selects the cwd so the
+    // sidebar picks the same key it would see after the first session list
+    // refresh — avoids a transient flicker where a custom path looks like a
+    // brand-new project for one render.
+    const project = await resolveProject(normalizedCwd);
+    return ApiResponse.json({
+      success: true,
+      cwd: normalizedCwd,
+      projectRoot: project.projectRoot,
+      projectKey: projectIdentityKey(project.projectRoot),
+    });
   } catch (error) {
     return ApiResponse.json({ error: String(error) }, { status: 500 });
   }

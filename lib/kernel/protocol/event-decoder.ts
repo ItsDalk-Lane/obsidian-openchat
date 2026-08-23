@@ -44,6 +44,7 @@ function isKnownEventType(value: string): value is KernelEvent["type"] {
     "message.updated",
     "message.completed",
     "capability.execution.started",
+    "capability.execution.progress",
     "capability.execution.completed",
     "queue.updated",
     "retry.started",
@@ -96,6 +97,8 @@ function isValidPayload(type: KernelEvent["type"], payload: unknown): boolean {
       return isAgentMessage(payload.message);
     case "capability.execution.started":
       return isString(payload.executionId) && isString(payload.capabilityName);
+    case "capability.execution.progress":
+      return isString(payload.executionId) && isString(payload.progress);
     case "capability.execution.completed":
       return isString(payload.executionId);
     case "queue.updated":
@@ -180,6 +183,12 @@ export function decodeKernelEvent(input: unknown, options: DecodeKernelEventOpti
       return createKernelEvent("message.completed", options.taskId, options.runId, { message: event.message }, source);
     case "tool_execution_start":
       return createKernelEvent("capability.execution.started", options.taskId, options.runId, { executionId: isString(event.toolCallId) ? event.toolCallId : "", capabilityName: isString(event.toolName) ? event.toolName : "" }, source);
+    case "tool_execution_update": {
+      const executionId = isString(event.toolCallId) ? event.toolCallId : "";
+      const progress = typeof event.progress === "string" ? event.progress : "";
+      if (!executionId || !progress) return null;
+      return createKernelEvent("capability.execution.progress", options.taskId, options.runId, { executionId, progress }, source);
+    }
     case "tool_execution_end":
       return createKernelEvent("capability.execution.completed", options.taskId, options.runId, { executionId: isString(event.toolCallId) ? event.toolCallId : "" }, source);
     case "queue_update":

@@ -105,6 +105,7 @@ export function AppShell() {
   const newSessionCwd = useWorkspaceStore((state) => state.newSessionCwd);
   const activeCwd = useWorkspaceStore((state) => state.activeCwd);
   const activeProjectRoot = useWorkspaceStore((state) => state.activeProjectRoot);
+  const activeProjectKey = useWorkspaceStore((state) => state.activeProjectKey);
   const setSelectedSession = useWorkspaceStore((state) => state.setSelectedSession);
   const setNewSessionCwd = useWorkspaceStore((state) => state.setNewSessionCwd);
   const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
@@ -416,7 +417,7 @@ export function AppShell() {
   }, [isMobile, selectSession]);
 
   const handleNewSession = useCallback((_sessionId: string, cwd: string) => {
-    startNewSession(cwd, activeProjectRoot ?? cwd);
+    startNewSession(cwd, activeProjectRoot ?? cwd, activeProjectKey ?? activeProjectRoot ?? cwd);
     setSessionKey((k) => k + 1);
     setBranchTree([]);
     setBranchActiveLeafId(null);
@@ -452,7 +453,11 @@ export function AppShell() {
         if (!full) return;
         if (useWorkspaceStore.getState().selectedSession?.id !== sessionId) return;
         setSelectedSession((prev) => (prev && prev.id === sessionId && !prev.projectRoot ? full : prev));
-        setActiveWorkspace(full.cwd, full.projectRoot ?? full.cwd);
+        setActiveWorkspace(
+          full.cwd,
+          full.projectRoot ?? full.cwd,
+          full.projectKey ?? full.projectRoot ?? full.cwd,
+        );
       })
       .catch(() => {});
   }, [setActiveWorkspace, setSelectedSession]);
@@ -533,7 +538,11 @@ export function AppShell() {
     const removed = new Set(deletedIds ?? [sessionId]);
     if (selectedSession && removed.has(selectedSession.id)) {
       const cwd = selectedSession.cwd;
-      if (cwd) startNewSession(cwd, selectedSession.projectRoot ?? activeProjectRoot ?? cwd);
+      if (cwd) startNewSession(
+        cwd,
+        selectedSession.projectRoot ?? activeProjectRoot ?? cwd,
+        selectedSession.projectKey ?? activeProjectKey ?? activeProjectRoot ?? cwd,
+      );
       else {
         setSelectedSession(null);
         setNewSessionCwd(null);

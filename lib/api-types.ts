@@ -22,6 +22,8 @@ export interface HomeResponse {
 export interface CwdValidateResponse {
   success: boolean;
   cwd: string;
+  projectRoot: string;
+  projectKey: string;
 }
 
 export interface DefaultCwdResponse {
@@ -59,6 +61,7 @@ export interface WorktreeEntry {
 
 export interface WorktreesResponse {
   projectRoot: string;
+  projectKey: string;
   isGit: boolean;
   isTopLevel: boolean;
   worktrees: WorktreeEntry[];

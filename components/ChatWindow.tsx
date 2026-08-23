@@ -46,6 +46,10 @@ type DesktopNotificationBridge = NonNullable<Window["piDesktop"]> & {
 
 function phaseLabel(phase: AgentPhase, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (phase?.kind === "running_tools") {
+    const latest = phase.tools[phase.tools.length - 1];
+    if (latest?.progress) {
+      return `${t("chat.runningNamedTool", { name: latest.name })} ${latest.progress}`;
+    }
     const names = phase.tools.map((tool) => tool.name);
     if (names.length === 0) return t("chat.runningTool");
     if (names.length === 1) return t("chat.runningNamedTool", { name: names[0] });
@@ -492,7 +496,7 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
                 </span>
               </div>
             </div>
-            <NoticeShelf notices={notices} align="right" />
+            <NoticeShelf notices={notices} align="center" />
             {chatInputElement}
           </div>
         </div>
@@ -511,7 +515,7 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
           }}
         >
           <div style={{ maxWidth: 820, margin: "0 auto" }}>
-            <NoticeShelf notices={notices} floating align="right" />
+            <NoticeShelf notices={notices} floating align="center" />
           </div>
         </div>
         <div ref={scrollContainerRef} className="pi-chat-scroll flex-1 overflow-y-auto pt-4 [scrollbar-width:none]">
@@ -789,14 +793,14 @@ function ExtensionWidgets({ widgets }: { widgets: Array<{ key: string; lines: st
   );
 }
 
-function NoticeShelf({ notices, floating = false, align = "left" }: { notices: NoticeItem[]; floating?: boolean; align?: "left" | "right" }) {
+function NoticeShelf({ notices, floating = false, align = "left" }: { notices: NoticeItem[]; floating?: boolean; align?: "left" | "right" | "center" }) {
   if (notices.length === 0) return null;
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
-        alignItems: align === "right" ? "flex-end" : "stretch",
+        alignItems: align === "center" ? "center" : (align === "right" ? "flex-end" : "stretch"),
         marginBottom: floating ? 0 : 10,
       }}
     >

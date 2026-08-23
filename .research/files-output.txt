@@ -1,0 +1,55 @@
+﻿Total files changed: 49
+---
+By status: { added: 16, modified: 33 }
+Total additions: 2281
+Total deletions: 805
+---
+[added] +17/-0 CONTEXT.md
+[added] +33/-0 app/api/cwd/validate/route.test.mjs
+[modified] +9/-1 app/api/cwd/validate/route.ts
+[modified] +3/-1 app/api/worktrees/route.ts
+[modified] +5/-0 app/globals.css
+[modified] +3/-2 bin/pi-web.js
+[added] +46/-0 bin/process-lifecycle.js
+[modified] +26/-15 components/AppShell.tsx
+[added] +15/-0 components/ChatWindow.notices.test.mjs
+[modified] +23/-20 components/ChatWindow.tsx
+[modified] +18/-0 components/FileViewer.state.test.mjs
+[modified] +30/-3 components/MessageView.test.mjs
+[modified] +11/-5 components/MessageView.tsx
+[modified] +11/-0 components/ModelsConfig.test.mjs
+[modified] +6/-2 components/ModelsConfig.tsx
+[added] +19/-0 components/SessionSidebar.project-identity.test.mjs
+[modified] +99/-71 components/SessionSidebar.tsx
+[added] +3/-0 docs/adr/0001-isolate-project-command-environments.md
+[modified] +12/-0 hooks/useAgentSession.test.mjs
+[modified] +21/-1 hooks/useAgentSession.ts
+[modified] +131/-1 lib/agent-event-wire.test.mjs
+[modified] +51/-3 lib/agent-event-wire.ts
+[modified] +9/-14 lib/http-dispatcher.test.mjs
+[modified] +1/-0 lib/i18n/messages/en.ts
+[modified] +1/-0 lib/i18n/messages/zh-CN.ts
+[modified] +22/-0 lib/model-scope.test.mjs
+[modified] +58/-2 lib/model-scope.ts
+[added] +54/-0 lib/normalize.test.mjs
+[modified] +36/-5 lib/normalize.ts
+[modified] +5/-1 lib/pi-types.ts
+[added] +83/-0 lib/process-lifecycle.test.mjs
+[added] +298/-0 lib/project-command-env.test.mjs
+[added] +129/-0 lib/project-command-env.ts
+[added] +60/-0 lib/project-groups.test.mjs
+[added] +53/-0 lib/project-groups.ts
+[added] +37/-0 lib/project-identity.test.mjs
+[added] +26/-0 lib/project-identity.ts
+[modified] +40/-0 lib/rpc-manager-shutdown.test.mjs
+[modified] +24/-3 lib/rpc-manager.ts
+[modified] +4/-1 lib/session-reader.ts
+[modified] +59/-12 lib/streaming-message.test.mjs
+[modified] +34/-5 lib/streaming-message.ts
+[added] +32/-0 lib/tool-execution-progress.test.mjs
+[added] +29/-0 lib/tool-execution-progress.ts
+[modified] +6/-0 lib/types.ts
+[modified] +5/-1 lib/workspace-memory.test.mjs
+[modified] +5/-5 lib/workspace-memory.ts
+[modified] +569/-621 package-lock.json
+[modified] +10/-10 package.json

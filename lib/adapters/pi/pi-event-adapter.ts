@@ -2,6 +2,7 @@ import type { AgentMessage, ExtensionUiRequest } from "../../types";
 import type { RunId, TaskId } from "../../kernel";
 import { createKernelEvent } from "../../kernel";
 import { normalizePiMessage } from "./pi-message-adapter";
+import { getToolExecutionProgress } from "../../tool-execution-progress";
 
 export interface PiRuntimeEvent {
   type: string;
@@ -46,6 +47,19 @@ export function toKernelEventFromPiEvent(event: PiRuntimeEvent, context: PiEvent
         executionId: typeof event.toolCallId === "string" ? event.toolCallId : "",
         capabilityName: typeof event.toolName === "string" ? event.toolName : "",
       }, source, context.operationId);
+    case "tool_execution_update": {
+      // Pi 0.84+ emits in-flight progress for long-running tools. Surface the
+      // latest text line so the chat can show "Running bash: ..." updates
+      // instead of a frozen header. The capability.execution.started already
+      // added the tool to the running-tools list; we just update progress.
+      const executionId = typeof event.toolCallId === "string" ? event.toolCallId : "";
+      const progress = getToolExecutionProgress(event.partialResult);
+      if (!executionId || !progress) return null;
+      return createKernelEvent("capability.execution.progress", context.taskId, context.runId, {
+        executionId,
+        progress,
+      }, source, context.operationId);
+    }
     case "tool_execution_end":
       return createKernelEvent("capability.execution.completed", context.taskId, context.runId, {
         executionId: typeof event.toolCallId === "string" ? event.toolCallId : "",

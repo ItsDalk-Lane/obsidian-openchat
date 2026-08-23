@@ -1,0 +1,2102 @@
+[
+  {
+    "filename": "AGENTS.md",
+    "status": "modified",
+    "additions": 20,
+    "deletions": 6,
+    "changes": 26
+  },
+  {
+    "filename": "CONTEXT.md",
+    "status": "added",
+    "additions": 17,
+    "deletions": 0,
+    "changes": 17
+  },
+  {
+    "filename": "README.ja.md",
+    "status": "modified",
+    "additions": 68,
+    "deletions": 81,
+    "changes": 149
+  },
+  {
+    "filename": "README.md",
+    "status": "modified",
+    "additions": 91,
+    "deletions": 83,
+    "changes": 174
+  },
+  {
+    "filename": "README.ru.md",
+    "status": "added",
+    "additions": 132,
+    "deletions": 0,
+    "changes": 132
+  },
+  {
+    "filename": "README.zh-CN.md",
+    "status": "modified",
+    "additions": 73,
+    "deletions": 83,
+    "changes": 156
+  },
+  {
+    "filename": "app/api/agent/[id]/events/route.ts",
+    "status": "modified",
+    "additions": 12,
+    "deletions": 44,
+    "changes": 56
+  },
+  {
+    "filename": "app/api/agent/[id]/route.ts",
+    "status": "modified",
+    "additions": 18,
+    "deletions": 6,
+    "changes": 24
+  },
+  {
+    "filename": "app/api/agent/events-route.test.mjs",
+    "status": "added",
+    "additions": 23,
+    "deletions": 0,
+    "changes": 23
+  },
+  {
+    "filename": "app/api/agent/new/route.ts",
+    "status": "modified",
+    "additions": 66,
+    "deletions": 17,
+    "changes": 83
+  },
+  {
+    "filename": "app/api/agent/running/events/route.ts",
+    "status": "modified",
+    "additions": 3,
+    "deletions": 2,
+    "changes": 5
+  },
+  {
+    "filename": "app/api/agent/running/route.ts",
+    "status": "added",
+    "additions": 12,
+    "deletions": 0,
+    "changes": 12
+  },
+  {
+    "filename": "app/api/app-update/route.ts",
+    "status": "added",
+    "additions": 77,
+    "deletions": 0,
+    "changes": 77
+  },
+  {
+    "filename": "app/api/auth/all-providers/route.ts",
+    "status": "modified",
+    "additions": 6,
+    "deletions": 33,
+    "changes": 39
+  },
+  {
+    "filename": "app/api/auth/api-key/[provider]/route.ts",
+    "status": "modified",
+    "additions": 18,
+    "deletions": 3,
+    "changes": 21
+  },
+  {
+    "filename": "app/api/auth/logout/[provider]/route.ts",
+    "status": "modified",
+    "additions": 5,
+    "deletions": 1,
+    "changes": 6
+  },
+  {
+    "filename": "app/api/auth/providers/route.ts",
+    "status": "modified",
+    "additions": 6,
+    "deletions": 26,
+    "changes": 32
+  },
+  {
+    "filename": "app/api/cwd/browse/route.ts",
+    "status": "modified",
+    "additions": 12,
+    "deletions": 1,
+    "changes": 13
+  },
+  {
+    "filename": "app/api/cwd/validate/route.test.mjs",
+    "status": "added",
+    "additions": 33,
+    "deletions": 0,
+    "changes": 33
+  },
+  {
+    "filename": "app/api/cwd/validate/route.ts",
+    "status": "modified",
+    "additions": 9,
+    "deletions": 1,
+    "changes": 10
+  },
+  {
+    "filename": "app/api/files/[...path]/route.ts",
+    "status": "modified",
+    "additions": 49,
+    "deletions": 15,
+    "changes": 64
+  },
+  {
+    "filename": "app/api/files/watch-route.test.mjs",
+    "status": "added",
+    "additions": 31,
+    "deletions": 0,
+    "changes": 31
+  },
+  {
+    "filename": "app/api/git/diff/route.ts",
+    "status": "modified",
+    "additions": 4,
+    "deletions": 1,
+    "changes": 5
+  },
+  {
+    "filename": "app/api/models-config/catalog/route.ts",
+    "status": "added",
+    "additions": 78,
+    "deletions": 0,
+    "changes": 78
+  },
+  {
+    "filename": "app/api/models-config/discover/route.ts",
+    "status": "added",
+    "additions": 88,
+    "deletions": 0,
+    "changes": 88
+  },
+  {
+    "filename": "app/api/models-config/route.ts",
+    "status": "modified",
+    "additions": 3,
+    "deletions": 28,
+    "changes": 31
+  },
+  {
+    "filename": "app/api/models-config/test/route.ts",
+    "status": "modified",
+    "additions": 11,
+    "deletions": 0,
+    "changes": 11
+  },
+  {
+    "filename": "app/api/models/route.ts",
+    "status": "modified",
+    "additions": 45,
+    "deletions": 33,
+    "changes": 78
+  },
+  {
+    "filename": "app/api/plugins/route.ts",
+    "status": "modified",
+    "additions": 37,
+    "deletions": 8,
+    "changes": 45
+  },
+  {
+    "filename": "app/api/project-trust/route.ts",
+    "status": "added",
+    "additions": 66,
+    "deletions": 0,
+    "changes": 66
+  },
+  {
+    "filename": "app/api/sessions/[id]/auto-name/route.ts",
+    "status": "modified",
+    "additions": 2,
+    "deletions": 3,
+    "changes": 5
+  },
+  {
+    "filename": "app/api/sessions/[id]/context/route.ts",
+    "status": "modified",
+    "additions": 6,
+    "deletions": 3,
+    "changes": 9
+  },
+  {
+    "filename": "app/api/sessions/[id]/export/route.ts",
+    "status": "modified",
+    "additions": 3,
+    "deletions": 0,
+    "changes": 3
+  },
+  {
+    "filename": "app/api/sessions/[id]/route.ts",
+    "status": "modified",
+    "additions": 15,
+    "deletions": 107,
+    "changes": 122
+  },
+  {
+    "filename": "app/api/sessions/[id]/state/route.ts",
+    "status": "modified",
+    "additions": 7,
+    "deletions": 6,
+    "changes": 13
+  },
+  {
+    "filename": "app/api/sessions/route.ts",
+    "status": "modified",
+    "additions": 20,
+    "deletions": 6,
+    "changes": 26
+  },
+  {
+    "filename": "app/api/sessions/runtime-route.test.mjs",
+    "status": "added",
+    "additions": 95,
+    "deletions": 0,
+    "changes": 95
+  },
+  {
+    "filename": "app/api/skills/install/route.ts",
+    "status": "modified",
+    "additions": 16,
+    "deletions": 0,
+    "changes": 16
+  },
+  {
+    "filename": "app/api/skills/route.ts",
+    "status": "modified",
+    "additions": 8,
+    "deletions": 0,
+    "changes": 8
+  },
+  {
+    "filename": "app/api/worktrees/route.ts",
+    "status": "modified",
+    "additions": 7,
+    "deletions": 2,
+    "changes": 9
+  },
+  {
+    "filename": "app/globals.css",
+    "status": "modified",
+    "additions": 489,
+    "deletions": 16,
+    "changes": 505
+  },
+  {
+    "filename": "app/layout.tsx",
+    "status": "modified",
+    "additions": 42,
+    "deletions": 3,
+    "changes": 45
+  },
+  {
+    "filename": "app/manifest.ts",
+    "status": "added",
+    "additions": 31,
+    "deletions": 0,
+    "changes": 31
+  },
+  {
+    "filename": "app/page.tsx",
+    "status": "modified",
+    "additions": 4,
+    "deletions": 1,
+    "changes": 5
+  },
+  {
+    "filename": "bin/pi-web-options.js",
+    "status": "modified",
+    "additions": 14,
+    "deletions": 1,
+    "changes": 15
+  },
+  {
+    "filename": "bin/pi-web.js",
+    "status": "modified",
+    "additions": 38,
+    "deletions": 12,
+    "changes": 50
+  },
+  {
+    "filename": "bin/process-lifecycle.js",
+    "status": "added",
+    "additions": 46,
+    "deletions": 0,
+    "changes": 46
+  },
+  {
+    "filename": "bun.lock",
+    "status": "modified",
+    "additions": 66,
+    "deletions": 31,
+    "changes": 97
+  },
+  {
+    "filename": "components/AppShell.auto-name.test.mjs",
+    "status": "added",
+    "additions": 24,
+    "deletions": 0,
+    "changes": 24
+  },
+  {
+    "filename": "components/AppShell.file-viewer-state.test.mjs",
+    "status": "added",
+    "additions": 31,
+    "deletions": 0,
+    "changes": 31
+  },
+  {
+    "filename": "components/AppShell.mobile-toolbar.test.mjs",
+    "status": "added",
+    "additions": 63,
+    "deletions": 0,
+    "changes": 63
+  },
+  {
+    "filename": "components/AppShell.tsx",
+    "status": "modified",
+    "additions": 1383,
+    "deletions": 403,
+    "changes": 1786
+  },
+  {
+    "filename": "components/AppShell.workspace-memory.test.mjs",
+    "status": "added",
+    "additions": 42,
+    "deletions": 0,
+    "changes": 42
+  },
+  {
+    "filename": "components/BranchNavigator.test.mjs",
+    "status": "added",
+    "additions": 106,
+    "deletions": 0,
+    "changes": 106
+  },
+  {
+    "filename": "components/BranchNavigator.tsx",
+    "status": "modified",
+    "additions": 57,
+    "deletions": 27,
+    "changes": 84
+  },
+  {
+    "filename": "components/ChatInput.dormancy.test.mjs",
+    "status": "added",
+    "additions": 41,
+    "deletions": 0,
+    "changes": 41
+  },
+  {
+    "filename": "components/ChatInput.mobile-thinking-menu.test.mjs",
+    "status": "added",
+    "additions": 12,
+    "deletions": 0,
+    "changes": 12
+  },
+  {
+    "filename": "components/ChatInput.test.mjs",
+    "status": "modified",
+    "additions": 238,
+    "deletions": 10,
+    "changes": 248
+  },
+  {
+    "filename": "components/ChatInput.tsx",
+    "status": "modified",
+    "additions": 634,
+    "deletions": 205,
+    "changes": 839
+  },
+  {
+    "filename": "components/ChatMinimap.module.css",
+    "status": "added",
+    "additions": 232,
+    "deletions": 0,
+    "changes": 232
+  },
+  {
+    "filename": "components/ChatMinimap.test.mjs",
+    "status": "added",
+    "additions": 39,
+    "deletions": 0,
+    "changes": 39
+  },
+  {
+    "filename": "components/ChatMinimap.tsx",
+    "status": "modified",
+    "additions": 594,
+    "deletions": 247,
+    "changes": 841
+  },
+  {
+    "filename": "components/ChatWindow.notices.test.mjs",
+    "status": "added",
+    "additions": 15,
+    "deletions": 0,
+    "changes": 15
+  },
+  {
+    "filename": "components/ChatWindow.process-details.test.mjs",
+    "status": "added",
+    "additions": 13,
+    "deletions": 0,
+    "changes": 13
+  },
+  {
+    "filename": "components/ChatWindow.tsx",
+    "status": "modified",
+    "additions": 305,
+    "deletions": 156,
+    "changes": 461
+  },
+  {
+    "filename": "components/DirectoryPicker.tsx",
+    "status": "modified",
+    "additions": 53,
+    "deletions": 13,
+    "changes": 66
+  },
+  {
+    "filename": "components/ExtensionStatusBar.test.mjs",
+    "status": "added",
+    "additions": 80,
+    "deletions": 0,
+    "changes": 80
+  },
+  {
+    "filename": "components/ExtensionStatusBar.tsx",
+    "status": "added",
+    "additions": 54,
+    "deletions": 0,
+    "changes": 54
+  },
+  {
+    "filename": "components/ExtensionWidgets.test.mjs",
+    "status": "added",
+    "additions": 146,
+    "deletions": 0,
+    "changes": 146
+  },
+  {
+    "filename": "components/ExtensionWidgets.tsx",
+    "status": "added",
+    "additions": 207,
+    "deletions": 0,
+    "changes": 207
+  },
+  {
+    "filename": "components/FileExplorer.tsx",
+    "status": "modified",
+    "additions": 198,
+    "deletions": 78,
+    "changes": 276
+  },
+  {
+    "filename": "components/FileIcons.tsx",
+    "status": "modified",
+    "additions": 104,
+    "deletions": 227,
+    "changes": 331
+  },
+  {
+    "filename": "components/FileViewer.state.test.mjs",
+    "status": "added",
+    "additions": 73,
+    "deletions": 0,
+    "changes": 73
+  },
+  {
+    "filename": "components/FileViewer.tsx",
+    "status": "modified",
+    "additions": 463,
+    "deletions": 116,
+    "changes": 579
+  },
+  {
+    "filename": "components/FrontmatterCard.tsx",
+    "status": "added",
+    "additions": 70,
+    "deletions": 0,
+    "changes": 70
+  },
+  {
+    "filename": "components/ImagePreview.test.mjs",
+    "status": "added",
+    "additions": 46,
+    "deletions": 0,
+    "changes": 46
+  },
+  {
+    "filename": "components/ImagePreview.tsx",
+    "status": "added",
+    "additions": 107,
+    "deletions": 0,
+    "changes": 107
+  },
+  {
+    "filename": "components/MarkdownBody.test.mjs",
+    "status": "modified",
+    "additions": 14,
+    "deletions": 0,
+    "changes": 14
+  },
+  {
+    "filename": "components/MarkdownBody.tsx",
+    "status": "modified",
+    "additions": 72,
+    "deletions": 70,
+    "changes": 142
+  },
+  {
+    "filename": "components/MermaidBlock.test.mjs",
+    "status": "modified",
+    "additions": 41,
+    "deletions": 16,
+    "changes": 57
+  },
+  {
+    "filename": "components/MermaidBlock.tsx",
+    "status": "modified",
+    "additions": 66,
+    "deletions": 40,
+    "changes": 106
+  },
+  {
+    "filename": "components/MessageView.test.mjs",
+    "status": "added",
+    "additions": 150,
+    "deletions": 0,
+    "changes": 150
+  },
+  {
+    "filename": "components/MessageView.tsx",
+    "status": "modified",
+    "additions": 369,
+    "deletions": 99,
+    "changes": 468
+  },
+  {
+    "filename": "components/MobilePwaLayout.test.mjs",
+    "status": "added",
+    "additions": 48,
+    "deletions": 0,
+    "changes": 48
+  },
+  {
+    "filename": "components/ModelsConfig.test.mjs",
+    "status": "added",
+    "additions": 177,
+    "deletions": 0,
+    "changes": 177
+  },
+  {
+    "filename": "components/ModelsConfig.tsx",
+    "status": "modified",
+    "additions": 754,
+    "deletions": 106,
+    "changes": 860
+  },
+  {
+    "filename": "components/PluginsConfig.tsx",
+    "status": "modified",
+    "additions": 125,
+    "deletions": 48,
+    "changes": 173
+  },
+  {
+    "filename": "components/ProjectTrustDialog.tsx",
+    "status": "added",
+    "additions": 146,
+    "deletions": 0,
+    "changes": 146
+  },
+  {
+    "filename": "components/PwaRegistration.tsx",
+    "status": "added",
+    "additions": 33,
+    "deletions": 0,
+    "changes": 33
+  },
+  {
+    "filename": "components/SessionSidebar.project-identity.test.mjs",
+    "status": "added",
+    "additions": 19,
+    "deletions": 0,
+    "changes": 19
+  },
+  {
+    "filename": "components/SessionSidebar.test.mjs",
+    "status": "added",
+    "additions": 70,
+    "deletions": 0,
+    "changes": 70
+  },
+  {
+    "filename": "components/SessionSidebar.tsx",
+    "status": "modified",
+    "additions": 516,
+    "deletions": 181,
+    "changes": 697
+  },
+  {
+    "filename": "components/SessionSidebar.worktree.test.mjs",
+    "status": "added",
+    "additions": 15,
+    "deletions": 0,
+    "changes": 15
+  },
+  {
+    "filename": "components/SkillsConfig.tsx",
+    "status": "modified",
+    "additions": 270,
+    "deletions": 157,
+    "changes": 427
+  },
+  {
+    "filename": "components/TabBar.tsx",
+    "status": "modified",
+    "additions": 8,
+    "deletions": 2,
+    "changes": 10
+  },
+  {
+    "filename": "components/TurnWrittenFiles.test.mjs",
+    "status": "added",
+    "additions": 34,
+    "deletions": 0,
+    "changes": 34
+  },
+  {
+    "filename": "components/TurnWrittenFiles.tsx",
+    "status": "added",
+    "additions": 52,
+    "deletions": 0,
+    "changes": 52
+  },
+  {
+    "filename": "components/file-tab-state.test.mjs",
+    "status": "added",
+    "additions": 98,
+    "deletions": 0,
+    "changes": 98
+  },
+  {
+    "filename": "components/file-tab-state.ts",
+    "status": "added",
+    "additions": 69,
+    "deletions": 0,
+    "changes": 69
+  },
+  {
+    "filename": "components/models-config-helpers.ts",
+    "status": "added",
+    "additions": 72,
+    "deletions": 0,
+    "changes": 72
+  },
+  {
+    "filename": "docs/adr/0001-isolate-project-command-environments.md",
+    "status": "added",
+    "additions": 3,
+    "deletions": 0,
+    "changes": 3
+  },
+  {
+    "filename": "docs/i18n.md",
+    "status": "added",
+    "additions": 172,
+    "deletions": 0,
+    "changes": 172
+  },
+  {
+    "filename": "hooks/model-scope-startup.test.mjs",
+    "status": "added",
+    "additions": 50,
+    "deletions": 0,
+    "changes": 50
+  },
+  {
+    "filename": "hooks/model-switching.test.mjs",
+    "status": "added",
+    "additions": 37,
+    "deletions": 0,
+    "changes": 37
+  },
+  {
+    "filename": "hooks/useAgentSession.test.mjs",
+    "status": "added",
+    "additions": 448,
+    "deletions": 0,
+    "changes": 448
+  },
+  {
+    "filename": "hooks/useAgentSession.ts",
+    "status": "modified",
+    "additions": 624,
+    "deletions": 326,
+    "changes": 950
+  },
+  {
+    "filename": "hooks/useI18n.tsx",
+    "status": "added",
+    "additions": 84,
+    "deletions": 0,
+    "changes": 84
+  },
+  {
+    "filename": "hooks/useResizablePanel.ts",
+    "status": "added",
+    "additions": 285,
+    "deletions": 0,
+    "changes": 285
+  },
+  {
+    "filename": "hooks/useTheme.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "hooks/useViewportHeight.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "hooks/useViewportHeight.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/agent-client.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/agent-client.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/agent-event-connection.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/agent-event-connection.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/agent-event-stream.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/agent-event-stream.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/agent-event-wire.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/agent-event-wire.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/allowed-roots.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/api-types.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/app-update.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/app-update.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/atomic-file.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/atomic-file.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/browser-notifications.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/browser-notifications.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/chat-lazy-load.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/chat-lazy-load.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/directory-browser.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/directory-browser.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/draft-store.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/file-access.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/file-access.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/file-explorer-state.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/file-explorer-state.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/file-links.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/file-viewer-state.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/file-viewer-state.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/frontmatter.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/frontmatter.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/git-changes.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/git-types.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/http-dispatcher.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/i18n/format.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/i18n/format.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/i18n/messages/en.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/i18n/messages/zh-CN.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/i18n/registry.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/i18n/registry.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/i18n/types.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/markdown.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/markdown.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/message-display.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/message-display.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/model-catalog.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/model-catalog.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/model-discovery-auth.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/model-discovery.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/model-discovery.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/model-scope.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/model-scope.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/models-cache.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/models-cache.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/models-config-store.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/models-config-store.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/next-config-esm.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/next-config.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/normalize.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/normalize.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/panel-layout.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/panel-layout.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/patch.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/patch.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/path-security.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/paths.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/paths.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/pi-types.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/pi-web-options.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/process-lifecycle.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/project-command-env.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/project-command-env.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/project-groups.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/project-groups.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/project-identity.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/project-identity.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/project-tree.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/project-tree.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/project-trust.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/project-trust.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/prompt-recovery.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/prompt-recovery.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/provider-api-key-route.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/provider-credential-store.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/provider-credential-store.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/provider-listing-runtime.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/provider-listing.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/provider-listing.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/request-security.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/request-security.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/rpc-manager-shutdown.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/rpc-manager-widgets.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/rpc-manager.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/rpc-manager.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/rpc-session-info.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/session-reader.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/session-reader.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/session-row-context-menu.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/session-row-context-menu.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/session-timing.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/session-timing.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/session-title.test.mjs",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/session-title.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/skills-service.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/slash-display.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/slash-display.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/startup-preferences.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/startup-preferences.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/streaming-message.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/streaming-message.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/tool-execution-progress.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/tool-execution-progress.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/tool-names.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/tool-preset-preference.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/tool-preset-preference.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/tool-presets.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/tool-presets.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/turn-written-files.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/turn-written-files.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/types.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/web-auth.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/web-auth.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/workspace-memory.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/workspace-memory.ts",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/worktree.test.mjs",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "lib/worktree.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "next.config.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "package-lock.json",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "package.json",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "proxy.ts",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/apple-touch-icon.png",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/LICENSE",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/README.md",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/_file.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/_folder.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/_folder_open.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/bash.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/bun-lock.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/config.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/css.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/database.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/docker.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/env.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/eslint.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/git.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/go.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/graphql.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/html.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/javascript-react.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/javascript.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/json.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/lock.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/markdown.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/ms-word.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/next.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/npm-lock.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/pdf.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/python.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/rust.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/sass.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/terraform.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/toml.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/typescript-react.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/typescript.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/latte/yaml.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/_file.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/_folder.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/_folder_open.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/bash.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/bun-lock.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/config.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/css.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/database.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/docker.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/env.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/eslint.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/git.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/go.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/graphql.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/html.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/javascript-react.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/javascript.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/json.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/lock.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/markdown.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/ms-word.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/next.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/npm-lock.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/pdf.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  },
+  {
+    "filename": "public/icons/catppuccin/mocha/python.svg",
+    "status": "added",
+    "additions": 0,
+    "deletions": 0,
+    "changes": 0
+  }
+]

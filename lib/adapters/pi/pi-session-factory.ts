@@ -21,6 +21,10 @@ import {
   type McpControlResult,
   type McpStatusSnapshot,
 } from "../../mcp-extension";
+import {
+  createProjectCommandBashExtension,
+  preferUserBashExtension,
+} from "../../project-command-env";
 import type { AgentSessionLike } from "../../pi-types";
 import { getProjectTrustStatus, projectTrustReloadOptions } from "../../project-trust";
 
@@ -133,8 +137,16 @@ export async function createPiSession(input: CreatePiSessionInput): Promise<PiSe
   const services = await createAgentSessionServices({
     cwd: input.cwd,
     agentDir,
+    settingsManager: settingsProbe ?? undefined,
     resourceLoaderOptions: {
       eventBus: mcpEventBus,
+      extensionFactories: [
+        createProjectCommandBashExtension({
+          cwd: input.cwd,
+          settings: settingsProbe ?? SettingsManager.create(input.cwd, agentDir),
+        }),
+      ],
+      extensionsOverride: preferUserBashExtension,
       ...(bundledExtensionPaths.length > 0
         ? { additionalExtensionPaths: bundledExtensionPaths }
         : {}),

@@ -688,8 +688,10 @@ function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex }: {
 
 
 function ToolCallBlock({ block, result, duration }: { block: ToolCallContent; result?: ToolResultMessage; duration?: number }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const inputStr = JSON.stringify(block.input, null, 2);
+  const inputStr = getToolCallInputText(block);
+  const isStreamingInput = block.rawInput !== undefined;
   const isEditTool = isEditToolName(block.toolName);
   const resultDiff = result && !result.isError ? getResultDiff(result) : null;
 
@@ -733,7 +735,7 @@ function ToolCallBlock({ block, result, duration }: { block: ToolCallContent; re
           {block.toolName}
         </span>
         <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
-          {getToolPreview(block)}
+          {isStreamingInput ? t("chat.generatingToolInput") : getToolPreview(block)}
         </span>
         {duration !== undefined && (
           <span style={{ fontSize: 11, color: "var(--text-dim)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{duration}s</span>
@@ -744,7 +746,7 @@ function ToolCallBlock({ block, result, duration }: { block: ToolCallContent; re
       </button>
 
       {/* ── Expanded: input args ── */}
-      {expanded && !isEditTool && (
+      {expanded && (isStreamingInput || !isEditTool) && (
         <pre
           style={{
             margin: 0,
@@ -1336,6 +1338,13 @@ function safeJson(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+/** Renders a tool-call block's input for the expanded view, preferring the
+ *  streaming buffer over the parsed JSON when it is still incomplete. */
+export function getToolCallInputText(block: ToolCallContent): string {
+  if (typeof block.rawInput === "string") return block.rawInput;
+  return safeJson(block.input);
 }
 
 function formatCustomType(type: string, fallback: string): string {

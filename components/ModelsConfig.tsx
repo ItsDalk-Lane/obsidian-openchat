@@ -619,13 +619,19 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
 
   const loadOAuthProviders = useCallback(() => {
     void requestJson<OAuthProvidersResponse>("/api/auth/providers")
-      .then((d) => setOauthProviders(d.providers))
+      .then((d) => {
+        // Guard against a malformed payload that would otherwise wipe the list
+        // and render an empty provider dropdown. Upstream guard: #586d72e.
+        if (Array.isArray(d.providers)) setOauthProviders(d.providers);
+      })
       .catch(() => {});
   }, []);
 
   const loadApiKeyProviders = useCallback(() => {
     void requestJson<ApiKeyProvidersResponse>("/api/auth/all-providers")
-      .then((d) => setApiKeyProviders(d.providers))
+      .then((d) => {
+        if (Array.isArray(d.providers)) setApiKeyProviders(d.providers);
+      })
       .catch(() => {});
   }, []);
 

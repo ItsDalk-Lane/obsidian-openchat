@@ -40,6 +40,7 @@ export type MessageStartedEvent = KernelEventEnvelope<"message.started", { messa
 export type MessageUpdatedEvent = KernelEventEnvelope<"message.updated", { message: Partial<AgentMessage> }>;
 export type MessageCompletedEvent = KernelEventEnvelope<"message.completed", { message: AgentMessage }>;
 export type CapabilityExecutionStartedEvent = KernelEventEnvelope<"capability.execution.started", { executionId: string; capabilityName: string }>;
+export type CapabilityExecutionProgressEvent = KernelEventEnvelope<"capability.execution.progress", { executionId: string; progress: string }>;
 export type CapabilityExecutionCompletedEvent = KernelEventEnvelope<"capability.execution.completed", { executionId: string }>;
 export type QueueUpdatedEvent = KernelEventEnvelope<"queue.updated", { steering: string[]; followUp: string[] }>;
 export type RetryStartedEvent = KernelEventEnvelope<"retry.started", { attempt?: number; maxAttempts?: number; errorMessage?: string }>;
@@ -70,6 +71,7 @@ export type KernelEvent =
   | MessageUpdatedEvent
   | MessageCompletedEvent
   | CapabilityExecutionStartedEvent
+  | CapabilityExecutionProgressEvent
   | CapabilityExecutionCompletedEvent
   | QueueUpdatedEvent
   | RetryStartedEvent

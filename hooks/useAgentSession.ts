@@ -97,7 +97,7 @@ function normalizeQueuedMessages(q?: { steering?: string[]; followUp?: string[] 
 export type AgentPhase =
   | { kind: "waiting_model" }
   | { kind: "running_command" }
-  | { kind: "running_tools"; tools: { id: string; name: string }[] }
+  | { kind: "running_tools"; tools: { id: string; name: string; progress?: string }[] }
   | null;
 
 export interface CompactResultInfo {
@@ -841,6 +841,18 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setAgentPhase((prev) => {
           const tools = prev?.kind === "running_tools" ? [...prev.tools] : [];
           if (!tools.some((t) => t.id === id)) tools.push({ id, name });
+          return { kind: "running_tools", tools };
+        });
+        break;
+      }
+      case "capability.execution.progress": {
+        const id = event.payload.executionId;
+        const progress = event.payload.progress;
+        setAgentPhase((prev) => {
+          if (prev?.kind !== "running_tools") return prev;
+          const tools = prev.tools.map((t) => (
+            t.id === id ? { ...t, progress } : t
+          ));
           return { kind: "running_tools", tools };
         });
         break;

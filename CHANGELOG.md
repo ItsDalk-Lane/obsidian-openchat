@@ -1,5 +1,43 @@
 # Changelog
 
+## 2026-08-15 - 同步上游 v0.8.9
+
+上游基线记录:
+
+- Upstream tag: `v0.8.9`
+- Upstream commit: `2a6e537` (Release v0.8.9)
+- 本 fork 在 `v0.8.9` 之前的工作树已经过 Phase 2 (Kernel) / Phase 3 (持久化运行时) / Vite 迁移等多轮重写,本轮同步在上游 v0.8.9 之上**增量**引入以下修复,并保留 fork 自身的桌面端、Kernel、持久化、adapters/pi 等架构。
+
+### 同步自上游 v0.8.9
+
+- **工具调用流式渲染**:上游 `77e482d` / `b9bb1d9` 将工具调用在参数尚未流完时即显示,并附带执行进度。引入 `lib/tool-execution-progress.ts` 和新的 `lib/agent-event-wire.ts` 事件投影;新增 `lib/streaming-message.ts` 流式 reducer。`ToolCallContent` 增加客户端仅 `rawInput?: string`(`lib/kernel/protocol/interactions.ts`),`normalizeStreamingToolCalls()` 在落盘前剥离。
+- **执行进度事件**:上游 `b9bb1d9` 的 `tool_execution_update` 事件在 fork 侧映射为新的 Kernel 事件 `capability.execution.progress`(`lib/adapters/pi/pi-event-adapter.ts`),`useAgentSession` 增加 `running_tools.tools[].progress` 字段并在 `phaseLabel` 拼接到状态文案。
+- **Markdown 表格源码保留**:`span.token.table { display: inline; }`(`web/globals.css`)避免 Tailwind 的 `display` 工具类与 Prism 表格 token 冲突(#460, `7473ac6`)。
+- **拒绝歧义的裸模型作用域**:新增 `lib/model-scope.ts`(对齐上游 `lib/model-scope.ts`)。`/api/models` 路由改用 `resolveVisibleModels()` 替代原先的精确字符串匹配,使 `my-gateway/*` 这类 glob 与 `:thinking` 后缀按 pi CLI 行为解析(#06522eb)。
+- **模型提供商响应防护**:`ModelsConfig` 加载 OAuth / API key 提供商列表时增加 `Array.isArray(d.providers)` 守卫,避免响应异常时清空下拉框(#`586d72e`)。
+- **Windows 项目标识规范化**:新增 `lib/project-identity.ts`(`projectIdentityKey`)。`session-reader` 在 `SessionInfo` 上写入 `projectKey`,`/api/cwd/validate` 与 `/api/worktrees` 返回 `projectKey`;`workspace-store` 增加 `activeProjectKey` 字段,`SessionSidebar` 与 `AppShell` 透传(#490, `fa32336`)。
+- **项目命令环境隔离**:新增 `lib/project-command-env.ts`(对齐上游 `lib/project-command-env.ts`),从项目 `bash` 环境中剥离宿主侧的 `PORT` / `NODE_ENV` / `NEXT_*`,但保留 SDK 与 extension 的 PATH/PATH 前置与 overrides。`createPiSession()` 通过 `resourceLoaderOptions.extensionFactories` 注入 `pi-web-project-command-environment` 内联扩展,#487。
+- **聊天通知居中与对齐桌面端列宽**:`components/ChatWindow.tsx` 的 `NoticeShelf` 默认 `align="center"`,与桌面端聊天列对齐(#491, `fb8e295`)。
+- **i18n**:`chat.generatingToolInput` 文案(en: "Generating parameters..." / zh-CN: "正在生成参数..."),给流式工具输入占位使用。
+- **Pi SDK 升级**:`@earendil-works/pi-{agent-core,ai,coding-agent,tui}` 从 `0.82.1` 升级到 `0.84.2`(#`febcba5`)。
+- **新增运行时依赖**:`js-yaml`、`remark-frontmatter` 与对应 `@types/js-yaml`(为后续 Markdown frontmatter 渲染预留)。
+- **文档**:`CONTEXT.md` 与 `docs/adr/0001-isolate-project-command-environments.md` 从上游同步,后者增加 fork 备注说明 Hono 服务器下 `NEXT_*` 的语义差异。
+
+### 未同步 / 故意跳过
+
+- `bin/process-lifecycle.js` 与 `lib/process-lifecycle.ts`(fork 不再有 Next.js 父子进程模型,改由 `electron/main.js` + `server/` 处理关闭信号)。
+- `bin/pi-web.js`(fork 的 `bin/pi-web.js` 是 Electron 与 Hono 启动器,与上游 Next.js wrapper 不一致)。
+- `app/**` 全部 Next.js 路由;fork 的 Hono `server/api/**` 已经覆盖。
+- 上游 v0.8.7/v0.8.8 中 PWA、YAML frontmatter 渲染、CJK token 估算、UI 细节等若干改进将在后续小版本按 fork 架构独立评估。
+
+### 本 fork 适配改动
+
+- 保留 fork 的 `lib/kernel/**` / `lib/application/**` / `lib/persistence/**` 体系,新增的 `capability.execution.progress` 事件并入既有 capability 生命周期。
+- 保留 fork 的 `lib/adapters/pi/**` 抽象,工具调用字段归一化仍由 `pi-message-adapter.ts` 完成;`rawInput` 仅在 `normalizeStreamingToolCalls()` 中叠加,不写入 session 文件。
+- `rpc-manager.ts` 与 `pi-session-factory.ts` 通过 `resourceLoaderOptions.extensionFactories` + `extensionsOverride: preferUserBashExtension` 接入 `createProjectCommandBashExtension`,不替换既有 extension pipeline。
+- 保留 fork 的中文 i18n 文案与桌面端 Electron 启动链路。
+- fork 版本号按上游主版本推进为:`1.1.0`(纯 semver,无 `-fork.*` 后缀以避免 electron-updater 通道错误)。
+
 ## 2026-07-27 - 修复桌面端启动慢/长时间无窗口
 
 - 问题:双击 `Pi-Web-Desktop.vbs` 后长时间没有任何窗口出现;日志显示 Next 已 `Ready` 但 Electron 健康检查全部"失败",白等约 19 秒才开窗。

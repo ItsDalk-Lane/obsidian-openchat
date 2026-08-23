@@ -349,9 +349,18 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
     return match?.projectRoot ?? cwd;
   }, [worktreeState, allSessions]);
 
+  /** Resolve the stable server-computed project identity for a cwd. */
+  const projectKeyFor = useCallback((cwd: string | null): string | null => {
+    if (!cwd) return null;
+    if (worktreeState && worktreeState.forCwd === cwd) return worktreeState.projectKey;
+    if (worktreeState?.worktrees.some((w) => w.path === cwd)) return worktreeState.projectKey;
+    const match = allSessions.find((s) => s.cwd === cwd);
+    return match?.projectKey ?? match?.projectRoot ?? cwd;
+  }, [worktreeState, allSessions]);
+
   const selectCwd = useCallback((cwd: string | null) => {
-    setActiveWorkspace(cwd, projectRootFor(cwd));
-  }, [projectRootFor, setActiveWorkspace]);
+    setActiveWorkspace(cwd, projectRootFor(cwd), projectKeyFor(cwd));
+  }, [projectRootFor, projectKeyFor, setActiveWorkspace]);
 
   // Load worktrees for the current effective cwd
   const [wtRefreshKey, setWtRefreshKey] = useState(0);
@@ -374,11 +383,12 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
         setWorktreeState({
           forCwd: selectedCwd,
           projectRoot: d.projectRoot,
+          projectKey: d.projectKey ?? d.projectRoot,
           isGit: d.isGit ?? false,
           isTopLevel: d.isTopLevel ?? false,
           worktrees: d.worktrees ?? [],
         });
-        setActiveWorkspace(selectedCwd, d.projectRoot);
+        setActiveWorkspace(selectedCwd, d.projectRoot, d.projectKey ?? d.projectRoot);
       })
       .catch(() => {
         if (!cancelled) {
@@ -399,7 +409,11 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
         restoredRef.current = true;
         const target = allSessions.find((s) => s.id === initialSessionId);
         if (target) {
-          setActiveWorkspace(target.cwd, target.projectRoot ?? target.cwd);
+          setActiveWorkspace(
+            target.cwd,
+            target.projectRoot ?? target.cwd,
+            target.projectKey ?? target.projectRoot ?? target.cwd,
+          );
           onSelectSession(target, true);
           return;
         }
@@ -422,14 +436,23 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
         method: "POST",
         json: { cwd: path },
       });
-      selectCwd(data.cwd ?? path);
+      // /api/cwd/validate resolves identity before the cwd becomes active, so
+      // pass projectRoot + projectKey directly instead of relying on a fresh
+      // session-list refresh to hydrate them.
+      if (data.cwd) {
+        useWorkspaceStore.getState().setActiveWorkspace(
+          data.cwd,
+          data.projectRoot ?? data.cwd,
+          data.projectKey ?? data.projectRoot ?? data.cwd,
+        );
+      }
       setDropdownOpen(false);
     } catch (e) {
       setCustomPathError(e instanceof Error ? e.message : String(e));
     } finally {
       setCustomPathValidating(false);
     }
-  }, [customPathValidating, selectCwd]);
+  }, [customPathValidating]);
 
   const handleCustomPathClick = useCallback(async () => {
     setCustomPathError(null);
@@ -475,13 +498,13 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
       forCwd: path,
       worktrees: [...current.worktrees, { path, branch, isMain: false }],
     } : current);
-    setActiveWorkspace(path, worktreeState?.projectRoot ?? path);
+    setActiveWorkspace(path, worktreeState?.projectRoot ?? path, worktreeState?.projectKey ?? worktreeState?.projectRoot ?? path);
     setWtRefreshKey((key) => key + 1);
-  }, [setActiveWorkspace, worktreeState?.projectRoot]);
+  }, [setActiveWorkspace, worktreeState?.projectKey, worktreeState?.projectRoot]);
 
   const handleWorktreeRemoved = useCallback((path: string) => {
     if (selectedCwd === path && worktreeState) {
-      setActiveWorkspace(worktreeState.projectRoot, worktreeState.projectRoot);
+      setActiveWorkspace(worktreeState.projectRoot, worktreeState.projectRoot, worktreeState.projectKey);
     }
     setWtRefreshKey((key) => key + 1);
   }, [selectedCwd, setActiveWorkspace, worktreeState]);
@@ -503,7 +526,11 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
   // works when the prop value won't change — e.g. re-clicking the already
   // open session after manually switching worktrees.
   const handleSelectSessionFromList = useCallback((s: SessionInfo) => {
-    if (s.cwd) setActiveWorkspace(s.cwd, s.projectRoot ?? s.cwd);
+    if (s.cwd) setActiveWorkspace(
+      s.cwd,
+      s.projectRoot ?? s.cwd,
+      s.projectKey ?? s.projectRoot ?? s.cwd,
+    );
     onSelectSession(s);
   }, [onSelectSession, setActiveWorkspace]);
 
@@ -822,7 +849,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
                     selected={project === selectedProject}
                     sessionCount={sessionCountByProject.get(project) ?? 0}
                     onSelect={() => {
-                      setActiveWorkspace(project, project);
+                      setActiveWorkspace(project, project, project);
                       setProjectFilter("");
                       setCustomPathError(null);
                       setDropdownOpen(false);

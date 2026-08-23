@@ -1,0 +1,320 @@
+﻿=== app/globals.css (modified) ===
+@@ -1122,6 +1122,11 @@ span.linenumber {
+   font-style: normal !important;
+ }
+ 
++/* Prism's markdown table tokens collide with Tailwind's display utility. */
++span.token.table {
++  display: inline;
++}
++
+ @keyframes drop-zone-in {
+   from { opacity: 0; transform: scale(0.97); }
+   to   { opacity: 1; transform: scale(1); }
+
+=== hooks/useAgentSession.ts (modified) ===
+@@ -20,6 +20,7 @@ import { getToolNamesForPreset, type ToolEntry, type ToolPreset } from "@/lib/to
+ import type { SessionStatsInfo } from "@/lib/pi-types";
+ import { userMessageKey } from "@/lib/prompt-recovery";
+ import { AgentEventConnection } from "@/lib/agent-event-connection";
++import { getToolExecutionProgress } from "@/lib/tool-execution-progress";
+ import {
+   CHAT_SCROLL_REATTACH_TOLERANCE,
+   CHAT_SCROLL_TAIL_TOLERANCE,
+@@ -105,7 +106,7 @@ type NoticeAction =
+ export type AgentPhase =
+   | { kind: "waiting_model" }
+   | { kind: "running_command" }
+-  | { kind: "running_tools"; tools: { id: string; name: string }[] }
++  | { kind: "running_tools"; tools: { id: string; name: string; progress?: string }[] }
+   | null;
+ 
+ export interface CompactResultInfo {
+@@ -1184,6 +1185,25 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
+         });
+         break;
+       }
++      case "tool_execution_update": {
++        const id = event.toolCallId as string;
++        const name = event.toolName as string;
++        const progress = getToolExecutionProgress(event.partialResult);
++        setAgentPhase((prev) => {
++          const tools = prev?.kind === "running_tools" ? [...prev.tools] : [];
++          const existing = tools.find((tool) => tool.id === id);
++          const updated = {
++            id,
++            name: name || existing?.name || "tool",
++            progress: progress ?? existing?.progress,
++          };
++          return {
++            kind: "running_tools",
++            tools: [...tools.filter((tool) => tool.id !== id), updated],
++          };
++        });
++        break;
++      }
+       case "tool_execution_end": {
+         const id = event.toolCallId as string;
+         setAgentPhase((prev) => {
+
+=== lib/agent-event-wire.ts (modified) ===
+@@ -5,17 +5,55 @@ export interface AgentEventLike {
+   [key: string]: unknown;
+ }
+ 
+-export type ClientMessageUpdateEvent = Extract<
++type JsonMessageUpdateEvent = Extract<
+   JsonAgentSessionEvent,
+   { type: "message_update" }
+ >;
+ 
++type JsonAssistantMessageEvent = JsonMessageUpdateEvent["assistantMessageEvent"];
++type JsonToolCallStartEvent = Extract<JsonAssistantMessageEvent, { type: "toolcall_start" }>;
++type JsonToolCallDeltaEvent = Extract<JsonAssistantMessageEvent, { type: "toolcall_delta" }>;
++
++export type ClientAssistantMessageEvent =
++  | Exclude<JsonAssistantMessageEvent, { type: "toolcall_start" | "toolcall_delta" }>
++  | (JsonToolCallStartEvent & { id?: string; toolName?: string })
++  | (JsonToolCallDeltaEvent & { id?: string; toolName?: string });
++
++export type ClientMessageUpdateEvent = Omit<JsonMessageUpdateEvent, "assistantMessageEvent"> & {
++  assistantMessageEvent: ClientAssistantMessageEvent;
++};
++
+ const OMITTED_EVENT_TYPES = new Set([
+   "turn_start",
+   "turn_end",
+-  "tool_execution_update",
+ ]);
+ 
++function isObject(value: unknown): value is Record<string, unknown> {
++  return typeof value === "object" && value !== null && !Array.isArray(value);
++}
++
++function toolCallMetadata(
++  event: Record<string, unknown>,
++): { id: string; toolName: string } | null {
++  if (
++    (event.type !== "toolcall_start" && event.type !== "toolcall_delta")
++    || !isObject(event.partial)
++  ) return null;
++  const content = event.partial.content;
++  const contentIndex = event.contentIndex;
++  if (!Array.isArray(content) || typeof contentIndex !== "number") return null;
++
++  const block = content[contentIndex];
++  if (!isObject(block) || block.type !== "toolCall") return null;
++  const id = typeof block.id === "string"
++    ? block.id
++    : (typeof block.toolCallId === "string" ? block.toolCallId : null);
++  const toolName = typeof block.name === "string"
++    ? block.name
++    : (typeof block.toolName === "string" ? block.toolName : null);
++  return id !== null && toolName !== null ? { id, toolName } : null;
++}
++
+ /** Apply pi-web's event filters plus Pi 0.84's message_update projection. */
+ export function toClientAgentEvent(
+   event: AgentEventLike,
+@@ -37,14 +75,24 @@ export function toClientAgentEvent(
+       } as ClientMessageUpdateEvent;
+     }
+ 
++    const metadata = toolCallMetadata(assistantMessageEvent as Record<string, unknown>);
+     const { partial: _partial, ...deltaEvent } = assistantMessageEvent;
+     void _partial;
+     return {
+       type: "message_update",
+-      assistantMessageEvent: deltaEvent,
++      assistantMessageEvent: metadata ? { ...deltaEvent, ...metadata } : deltaEvent,
+     } as ClientMessageUpdateEvent;
+   }
+ 
++  if (event.type === "tool_execution_update") {
++    return {
++      type: "tool_execution_update",
++      toolCallId: event.toolCallId,
++      toolName: event.toolName,
++      partialResult: event.partialResult,
++    };
++  }
++
+   if (event.type === "agent_end") return { type: "agent_end" };
+   return event;
+ }
+
+=== lib/normalize.ts (modified) ===
+@@ -4,9 +4,27 @@ function isObject(val: unknown): val is Record<string, unknown> {
+   return typeof val === "object" && val !== null && !Array.isArray(val);
+ }
+ 
+-function normalizeToolCallBlock(block: unknown): ToolCallContent | null {
++function streamingRawInput(block: Record<string, unknown>): string | undefined {
++  if (typeof block.rawInput === "string") return block.rawInput;
++  if (typeof block.partialJson === "string") return block.partialJson;
++  if (typeof block.partialArgs === "string") return block.partialArgs;
++
++  const customInput = isObject(block.customInput) ? block.customInput : null;
++  const property = customInput && typeof customInput.property === "string"
++    ? customInput.property
++    : null;
++  const args = isObject(block.arguments) ? block.arguments : null;
++  return property && args && typeof args[property] === "string"
++    ? args[property]
++    : undefined;
++}
++
++function normalizeToolCallBlock(
++  block: unknown,
++  options: { includeStreamingRawInput?: boolean } = {},
++): ToolCallContent | null {
+   if (!isObject(block) || block.type !== "toolCall") return null;
+-  return {
++  const normalized: ToolCallContent = {
+     type: "toolCall",
+     toolCallId: typeof block.toolCallId === "string" ? block.toolCallId : (typeof block.id === "string" ? block.id : ""),
+     toolName: typeof block.toolName === "string" ? block.toolName : (typeof block.name === "string" ? block.name : ""),
+@@ -16,17 +34,30 @@ function normalizeToolCallBlock(block: unknown): ToolCallContent | null {
+         ? block.arguments as Record<string, unknown>
+         : {}),
+   };
++  const rawInput = options.includeStreamingRawInput ? streamingRawInput(block) : undefined;
++  return rawInput === undefined ? normalized : { ...normalized, rawInput };
+ }
+ 
+-export function normalizeToolCalls(msg: AgentMessage): AgentMessage {
++function normalizeAssistantToolCalls(
++  msg: AgentMessage,
++  options: { includeStreamingRawInput?: boolean } = {},
++): AgentMessage {
+   // Non-assistant roles (user, toolResult, bashExecution, custom) are returned
+   // unchanged — only assistant messages go through tool-call field normalization.
+   if (msg.role !== "assistant") return msg;
+   const content = (msg as AssistantMessage).content;
+   if (!Array.isArray(content)) return msg;
+   const normalized = content.map((block) => {
+-    const result = normalizeToolCallBlock(block);
++    const result = normalizeToolCallBlock(block, options);
+     return result ?? block;
+   });
+   return { ...msg, content: normalized } as AgentMessage;
+-}
+\ No newline at end of file
++}
++
++export function normalizeToolCalls(msg: AgentMessage): AgentMessage {
++  return normalizeAssistantToolCalls(msg);
++}
++
++export function normalizeStreamingToolCalls(msg: AgentMessage): AgentMessage {
++  return normalizeAssistantToolCalls(msg, { includeStreamingRawInput: true });
++}
+
+=== lib/pi-types.ts (modified) ===
+@@ -1,5 +1,6 @@
+ import type {
+   AgentSessionEvent,
++  BashOperations,
+   SessionManager,
+   SettingsManager,
+   SlashCommandInfo,
+@@ -153,7 +154,10 @@ export interface AgentSessionLike {
+     preflightResult?: (success: boolean) => void;
+   }): Promise<void>;
+   abort(): Promise<void>;
+-  executeBash(command: string, onChunk?: (chunk: string) => void, options?: { excludeFromContext?: boolean }): Promise<{ output: string; exitCode?: number; cancelled?: boolean; truncated?: boolean; fullOutputPath?: string }>;
++  executeBash(command: string, onChunk?: (chunk: string) => void, options?: {
++    excludeFromContext?: boolean;
++    operations?: BashOperations;
++  }): Promise<{ output: string; exitCode?: number; cancelled?: boolean; truncated?: boolean; fullOutputPath?: string }>;
+   abortBash(): void;
+   readonly isBashRunning: boolean;
+   setModel(model: ModelLike): Promise<void>;
+
+=== lib/rpc-manager.ts (modified) ===
+@@ -1,12 +1,17 @@
+ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+-import { createAgentSessionFromServices, createAgentSessionServices, getAgentDir, initTheme, SessionManager, Theme } from "@earendil-works/pi-coding-agent";
++import { createAgentSessionFromServices, createAgentSessionServices, getAgentDir, initTheme, SessionManager, SettingsManager, Theme } from "@earendil-works/pi-coding-agent";
+ import { KeybindingsManager as TuiKeybindingsManager, TUI_KEYBINDINGS } from "@earendil-works/pi-tui";
+ import { randomUUID } from "crypto";
+ import { existsSync, realpathSync, writeFileSync } from "fs";
+ import { resolve } from "path";
+ import { validateAgentImages } from "./image-attachments";
+ import { invalidateModelsCache } from "./models-cache";
+ import { resolveVisibleModels, selectInitialModelScope } from "./model-scope";
++import {
++  createProjectCommandBashExtension,
++  createProjectCommandBashOperations,
++  preferUserBashExtension,
++} from "./project-command-env";
+ import { cacheSessionPath, invalidateSessionListCache } from "./session-reader";
+ import { getProjectTrustStatus, projectTrustReloadOptions } from "./project-trust";
+ import { persistExplicitStartupPreferences } from "./startup-preferences";
+@@ -115,7 +120,7 @@ const CODING_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"
+ class PlainTextTheme extends Theme {
+   constructor() {
+     super(
+-      { thinkingXhigh: "" } as ConstructorParameters<typeof Theme>[0],
++      { thinkingXhigh: "", searchMatchText: "" } as ConstructorParameters<typeof Theme>[0],
+       { selectedBg: "" } as ConstructorParameters<typeof Theme>[1],
+       "truecolor",
+     );
+@@ -738,7 +743,12 @@ export class AgentSessionWrapper {
+         const execution = this.inner.executeBash(
+           command.command as string,
+           undefined,
+-          { excludeFromContext: command.excludeFromContext as boolean | undefined },
++          {
++            excludeFromContext: command.excludeFromContext as boolean | undefined,
++            operations: createProjectCommandBashOperations({
++              shellPath: this.inner.settingsManager.getShellPath(),
++            }),
++          },
+         );
+         notifyRunningChange();
+         try {
+@@ -1600,9 +1610,20 @@ export async function startRpcSession(
+     // Gate untrusted project extensions so opening a repository does not run
+     // its .pi/extensions code automatically (see lib/project-trust.ts, #236).
+     const trustReloadOptions = projectTrustReloadOptions(sessionCwd, agentDir);
++    const settingsManager = SettingsManager.create(sessionCwd, agentDir);
+     const services = await createAgentSessionServices({
+       cwd: sessionCwd,
+       agentDir,
++      settingsManager,
++      resourceLoaderOptions: {
++        extensionFactories: [
++          createProjectCommandBashExtension({
++            cwd: sessionCwd,
++            settings: settingsManager,
++          }),
++        ],
++        extensionsOverride: preferUserBashExtension,
++      },
+       ...(trustReloadOptions ? { resourceLoaderReloadOptions: trustReloadOptions } : {}),
+     });
+     const scope = await resolveVisibleModels(
+
+=== lib/types.ts (modified) ===
+@@ -43,6 +43,8 @@ export interface ToolCallContent {
+   toolCallId: string;
+   toolName: string;
+   input: Record<string, unknown>;
++  /** Client-only buffer for streamed tool input. Never persisted to session files. */
++  rawInput?: string;
+ }
+ 
+ export type AssistantContentBlock = TextContent | ImageContent | ThinkingContent | ToolCallContent;
+@@ -307,6 +309,10 @@ export interface SessionInfo {
+    *  Always set by the server; optional because the client builds transient
+    *  SessionInfo objects before the first refresh. Fall back to cwd. */
+   projectRoot?: string;
++  /** Stable server-computed project identity for grouping and comparison.
++   *  Unlike projectRoot, Windows keys are case- and separator-insensitive.
++   *  Internal only: use projectRoot/cwd for display and filesystem operations. */
++  projectKey?: string;
+   /** Branch name when cwd is a linked git worktree (not the main checkout) */
+   worktreeBranch?: string;
+   /** True while the runtime session exists only in memory and its JSONL file
+

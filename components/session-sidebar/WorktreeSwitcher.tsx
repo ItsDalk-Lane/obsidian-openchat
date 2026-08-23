@@ -13,6 +13,8 @@ import { AnimatedDropdown, displayCwd, PathLabel } from "./SidebarPrimitives";
 export interface WorktreeState {
   forCwd: string;
   projectRoot: string;
+  /** Stable server-computed identity; never derive OS path semantics here. */
+  projectKey: string;
   isGit: boolean;
   isTopLevel: boolean;
   worktrees: WorktreeEntry[];

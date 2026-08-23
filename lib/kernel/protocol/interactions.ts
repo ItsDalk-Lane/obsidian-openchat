@@ -24,6 +24,13 @@ export interface ToolCallContent {
   toolCallId: string;
   toolName: string;
   input: Record<string, unknown>;
+  /**
+   * Client-only buffer for streamed tool input (raw JSON / partial args).
+   * Never persisted to session files; `normalizeStreamingToolCalls` injects it
+   * while the tool-call block is still streaming, and `normalizeToolCalls`
+   * drops it on the final persisted message.
+   */
+  rawInput?: string;
 }
 
 export type AssistantContentBlock = TextContent | ImageContent | ThinkingContent | ToolCallContent;

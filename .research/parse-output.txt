@@ -1,0 +1,200 @@
+﻿=== 0.8.9 RELEASE BODY (FULL) ===
+## 中文
+
+基于 `v0.8.8..v0.8.9` 的提交整理。
+
+### 修复
+
+- 工具调用参数流式传输期间即可显示工具调用，并补充工具执行进度反馈（`77e482d`、`b9bb1d9`）。
+- 拒绝存在歧义的裸模型作用域，避免错误匹配模型（`06522eb`）。
+- 保持 Markdown 表格源码标记内联，修复表格内容处理问题（`7473ac6`，#460）。
+- 加强模型提供商响应校验，防止异常响应影响配置界面（`586d72e`）。
+- 将包装进程的关闭信号转发给 Next.js 子进程，并限制关闭等待时间（`7152653`，#502）。
+- 统一 Windows 项目标识的路径规范化，修复项目与工作树识别（`fa32336`，#490）。
+- 隔离项目命令环境，清理宿主侧 `PORT`、`NODE_ENV` 和 `NEXT_*` 变量，同时保留 SDK 与扩展覆盖行为（`5d07375`，#487）。
+- 统一聊天通知的居中与桌面聊天列对齐（`fb8e295`，#491）。
+
+### 改进
+
+- 升级存在安全风险的依赖（`af0b592`）。
+- 将 Pi 相关依赖升级至 `0.84.2`（`febcba5`）。
+
+### 内部调整
+
+- 发布 npm 包 `@agegr/pi-web@0.8.9`（`2a6e537`）。
+
+## English
+
+Prepared from commits in `v0.8.8..v0.8.9`.
+
+### Fixed
+
+- Show tool calls while their arguments are streaming, with tool execution progress feedback (`77e482d`, `b9bb1d9`).
+- Reject ambiguous bare model scopes to prevent incorrect model matches (`06522eb`).
+- Keep Markdown table source tokens inline to correct table content handling (`7473ac6`, #460).
+- Guard model provider responses so malformed responses do not disrupt the configuration UI (`586d72e`).
+- Forward wrapper shutdown signals to the Next.js child process and bound the shutdown wait (`7152653`, #502).
+- Normalize Windows project identity paths for correct project and worktree detection (`fa32336`, #490).
+- Isolate project command environments by removing host-only `PORT`, `NODE_ENV`, and `NEXT_*` variables while preserving SDK and extension overrides (`5d07375`, #487).
+- Center chat notices consistently and align them with the desktop chat column (`fb8e295`, #491).
+
+### Improved
+
+- Updated dependencies with known security issues (`af0b592`).
+- Upgraded Pi dependencies to `0.84.2` (`febcba5`).
+
+### Internal
+
+- Published npm package `@agegr/pi-web@0.8.9` (`2a6e537`).
+
+=== COMPARE ===
+Status: ahead
+Ahead by: 13
+Behind by: 0
+Total commits: 13
+Base: undefined
+Merge base: {
+  sha: '0877bffc0c6d75a55802e77125183e3df26e44a7',
+  node_id: 'C_kwDORtpoUNoAKDA4NzdiZmZjMGM2ZDc1YTU1ODAyZTc3MTI1MTgzZTNkZjI2ZTQ0YTc',
+  commit: {
+    author: {
+      name: 'Alex Yang',
+      email: 'agegcn@gmail.com',
+      date: '2026-08-12T14:39:15Z'
+    },
+    committer: {
+      name: 'Alex Yang',
+      email: 'agegcn@gmail.com',
+      date: '2026-08-12T14:39:15Z'
+    },
+    message: 'Release v0.8.8',
+    tree: {
+      sha: '30c98641b4d5f531993295335285c03216a8ad30',
+      url: 'https://api.github.com/repos/agegr/pi-web/git/trees/30c98641b4d5f531993295335285c03216a8ad30'
+    },
+    url: 'https://api.github.com/repos/agegr/pi-web/git/commits/0877bffc0c6d75a55802e77125183e3df26e44a7',
+    comment_count: 0,
+    verification: {
+      verified: false,
+      reason: 'unsigned',
+      signature: null,
+      payload: null,
+      verified_at: null
+    }
+  },
+  url: 'https://api.github.com/repos/agegr/pi-web/commits/0877bffc0c6d75a55802e77125183e3df26e44a7',
+  html_url: 'https://github.com/agegr/pi-web/commit/0877bffc0c6d75a55802e77125183e3df26e44a7',
+  comments_url: 'https://api.github.com/repos/agegr/pi-web/commits/0877bffc0c6d75a55802e77125183e3df26e44a7/comments',
+  author: {
+    login: 'agegr',
+    id: 12794925,
+    node_id: 'MDQ6VXNlcjEyNzk0OTI1',
+    avatar_url: 'https://avatars.githubusercontent.com/u/12794925?v=4',
+    gravatar_id: '',
+    url: 'https://api.github.com/users/agegr',
+    html_url: 'https://github.com/agegr',
+    followers_url: 'https://api.github.com/users/agegr/followers',
+    following_url: 'https://api.github.com/users/agegr/following{/other_user}',
+    gists_url: 'https://api.github.com/users/agegr/gists{/gist_id}',
+    starred_url: 'https://api.github.com/users/agegr/starred{/owner}{/repo}',
+    subscriptions_url: 'https://api.github.com/users/agegr/subscriptions',
+    organizations_url: 'https://api.github.com/users/agegr/orgs',
+    repos_url: 'https://api.github.com/users/agegr/repos',
+    events_url: 'https://api.github.com/users/agegr/events{/privacy}',
+    received_events_url: 'https://api.github.com/users/agegr/received_events',
+    type: 'User',
+    user_view_type: 'public',
+    site_admin: false
+  },
+  committer: {
+    login: 'agegr',
+    id: 12794925,
+    node_id: 'MDQ6VXNlcjEyNzk0OTI1',
+    avatar_url: 'https://avatars.githubusercontent.com/u/12794925?v=4',
+    gravatar_id: '',
+    url: 'https://api.github.com/users/agegr',
+    html_url: 'https://github.com/agegr',
+    followers_url: 'https://api.github.com/users/agegr/followers',
+    following_url: 'https://api.github.com/users/agegr/following{/other_user}',
+    gists_url: 'https://api.github.com/users/agegr/gists{/gist_id}',
+    starred_url: 'https://api.github.com/users/agegr/starred{/owner}{/repo}',
+    subscriptions_url: 'https://api.github.com/users/agegr/subscriptions',
+    organizations_url: 'https://api.github.com/users/agegr/orgs',
+    repos_url: 'https://api.github.com/users/agegr/repos',
+    events_url: 'https://api.github.com/users/agegr/events{/privacy}',
+    received_events_url: 'https://api.github.com/users/agegr/received_events',
+    type: 'User',
+    user_view_type: 'public',
+    site_admin: false
+  },
+  parents: [
+    {
+      sha: '5a53c18ca9328400a3dfb8c48c1e4f343b3e4903',
+      url: 'https://api.github.com/repos/agegr/pi-web/commits/5a53c18ca9328400a3dfb8c48c1e4f343b3e4903',
+      html_url: 'https://github.com/agegr/pi-web/commit/5a53c18ca9328400a3dfb8c48c1e4f343b3e4903'
+    }
+  ]
+}
+Head SHA: undefined
+Files changed: 49
+Commits:
+- 77e482d | 2026-08-14T06:29:10Z | fix(streaming): show tool calls while arguments stream
+- fb8e295 | 2026-08-15T13:50:47Z | fix: center chat notices consistently (#491)
+- 5d07375 | 2026-08-15T13:56:48Z | fix: isolate project command environments (#487)
+- fa32336 | 2026-08-15T14:02:28Z | fix: normalize Windows project identity (#490)
+- 7152653 | 2026-08-15T14:19:03Z | fix: forward wrapper shutdown signals to Next child (#502)
+- 586d72e | 2026-08-15T14:34:54Z | fix: guard model provider responses
+- 7473ac6 | 2026-08-15T14:42:54Z | fix: keep markdown table source tokens inline (#460)
+- 9e46430 | 2026-08-15T15:08:48Z | Merge branch 'main' of https://github.com/agegr/pi-web
+- b9bb1d9 | 2026-08-15T15:09:09Z | fix(streaming): show tool execution progress
+- 06522eb | 2026-08-15T15:09:31Z | fix: reject ambiguous bare model scopes
+- af0b592 | 2026-08-15T15:25:09Z | fix: update vulnerable dependencies
+- febcba5 | 2026-08-15T15:28:12Z | chore: upgrade pi dependencies to 0.84.2
+- 2a6e537 | 2026-08-15T15:30:31Z | Release v0.8.9
+=== PACKAGE.JSON ===
+name: @agegr/pi-web
+version: 0.8.9
+description: Web UI for the pi coding agent
+main: undefined
+repository: git+https://github.com/agegr/pi-web.git
+homepage: https://github.com/agegr/pi-web#readme
+author: undefined
+license: MIT
+engines: {"node":">=22.19.0"}
+Dependencies:
+   @earendil-works/pi-agent-core 0.84.2
+   @earendil-works/pi-ai 0.84.2
+   @earendil-works/pi-coding-agent 0.84.2
+   @earendil-works/pi-tui 0.84.2
+   js-yaml ^5.2.3
+   next 16.3.1
+   proper-lockfile 4.1.2
+   react ^19.2.4
+   react-dom ^19.2.4
+   remark-frontmatter ^5.0.0
+   undici 8.10.0
+DevDependencies:
+   @lobehub/icons ^5.6.0
+   @tailwindcss/postcss ^4.2.2
+   @types/js-yaml ^4.0.9
+   @types/node ^25
+   @types/proper-lockfile 4.1.4
+   @types/react ^19
+   @types/react-dom ^19
+   @types/react-syntax-highlighter ^15.5.13
+   eslint ^9
+   eslint-config-next 16.3.1
+   jiti ^2.7.0
+   katex ^0.16.47
+   mammoth ^1.12.0
+   mermaid ^11.16.1
+   postcss ^8.5.26
+   react-markdown ^10.1.0
+   react-syntax-highlighter ^16.1.1
+   rehype-katex ^7.0.1
+   rehype-raw ^7.0.0
+   rehype-sanitize ^6.0.0
+   remark-gfm ^4.0.1
+   remark-math ^6.0.0
+   tailwindcss ^4.2.2
+   typescript ^5
