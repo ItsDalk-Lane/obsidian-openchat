@@ -74,6 +74,7 @@ npm run dev
 - **数据目录**：默认读取 `~/.pi/agent/sessions` 下的会话文件。可通过环境变量 `PI_CODING_AGENT_DIR` 指定其他 pi agent 目录。
 - **任务运行时数据库**：持久化的 Task/Run/Artifact/Event 状态保存在 `PI_WEB_DATA_DIR` 指向的位置；未设置时默认使用 `<PI_CODING_AGENT_DIR 或 ~/.pi/agent>/pi-web/kernel.sqlite`。
 - **LAN API Token（可选）**：设置 `PI_WEB_LAN_API_TOKEN` 后，非 loopback 的 API 请求必须携带 `Authorization: Bearer <token>` 或 `x-pi-web-token`。
+- **访问密码（可选）**：设置 `PI_WEB_PASSWORD` 后，页面与 API 均要求 HTTP Basic 认证（用户名任意，浏览器会弹出登录框）。
 - **会话文件**：路径形如 `~/.pi/agent/sessions/<编码后的工作目录>/<时间戳>_<uuid>.jsonl`。
 - **模型配置**：Models 面板读写 pi agent 目录下的 `models.json`，模型列表和默认模型由 pi 的配置解析得到。
 - **文件访问**：文件浏览和预览面向当前选择的项目目录，以及会话中已出现过的工作目录。
@@ -118,8 +119,8 @@ npm run check
 
 ## 上游同步基线记录
 
-- 同步的上游标签：`v0.8.1`
-- 上游提交：`678d01243ab4fccf0241280c31d05026efda3b9e`
+- 同步的上游标签：`v0.8.9`
+- 上游提交：`2a6e537`（tag 对象 `8b89627a`；v0.8.2–v0.8.8 积压已于 2026-08-23 补齐）
 
 ## 桌面应用（Electron）
 

@@ -127,3 +127,12 @@
 - dbd583b minimap 导航大改、3a37c04 随屏滚动（fork 有原生实现，若 Wave 1 的 90959d1 移植中发现缺口再补）
 - 776f801 系统外观主题模式（待核 useTheme；若 fork 无 system 跟随则 PORT）
 - a3f6167 侧边栏下游 context-menu hook（fork 删了 subagents，此 hook 为其服务，SKIP）
+
+## 完成记录（2026-08-23）
+
+六波提交全部完成。最终判定汇总：
+- **已回移**：Wave 1 全部（90959d1 除外）；Wave 2 全部；Wave 3 除 d2d7f22（客户端机制按设计保留）与 6ac87ec 服务端部分；Wave 4 除 quick-changes（1a3abc1/6e0b9d1）与 ab0ea58（fork 原生方案）；Wave 5 除 d63b55a/5179734/1e20164/def8fb4；Wave 6 密码认证 + 3d9acf6 核心。
+- **暂缓（DEFER）**：c1f0f04+c3b741e 定价预设/模型发现、1a3abc1/6e0b9d1 快速变更查看器、d63b55a 休眠技能分组、5179734 消息开销、101d08e 启动偏好、6ac87ec 服务端部分。
+- **跳过（SKIP）**：PWA 全家、上游 i18n、Catppuccin 图标、npm 更新通知、hydration、minimap 大改、Next.js 专属项。
+- **fork 原生等价确认**：d67b196/a192ec9、edf4c5d、68223e0、c87a9a4、9716166、58d650e、9e4ca65、8a33ba4 系列等。
+- **额外修复**：jiti 双模块实例导致 I18nProvider 测试全挂（统一测试导入路径）；.research/ eslint 忽略；directory-browser symlink 测试在 Windows 需开发者模式（环境限制，非代码问题）；ChatWindow.empty.test.mjs 的 zustand mock 失效为预存在问题。

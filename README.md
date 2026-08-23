@@ -122,8 +122,8 @@ Avoid running `next build` / `npm run build` during local development. It writes
 
 ## Upstream Sync Reference
 
-- Synced upstream tag: `v0.8.1`
-- Upstream commit: `678d01243ab4fccf0241280c31d05026efda3b9e`
+- Synced upstream tag: `v0.8.9`
+- Upstream commit: `2a6e537` (v0.8.2-v0.8.8 backlog backported 2026-08-23)
 
 ## Desktop App (Electron)
 

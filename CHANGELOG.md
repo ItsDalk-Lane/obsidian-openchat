@@ -1,5 +1,94 @@
 # Changelog
 
+## 2026-08-23 - 同步上游 v0.8.2 - v0.8.8 积压
+
+上游基线记录:
+
+- Upstream tag: `v0.8.9`(本轮补齐 v0.8.1 → v0.8.9 区间中 v0.8.2–v0.8.8 从未同步的积压)
+- Upstream commit: `2a6e537`
+- 逐条判定与跳过清单见 `.research/sync-082-088-gap-matrix.md`。共回移约 70 个实质性条目,分为六波提交。
+
+### 消息渲染与流式 UX
+
+- CJK 字符按 ~1 token 估算流式 TPS,增量 token 估算缓存(`a8ba47e`)
+- 单个波浪线不再误判为删除线,保留 CJK 数字区间写法(`f355928`)
+- `lib/markdown.ts` 对齐上游 v0.8.8 终态:LaTeX `\( \)` / `\[ \]` 定界符归一化(补齐 v0.8.1 遗漏)、列表/附着正文中的 display math 围栏归一化(`dc4c0ec`)
+- diff 解析按 @@ hunk 计数判定 hunk 体内 `---`/`+++` 为内容行而非文件头(`a3a79de`)
+- markdown 预览渲染 YAML frontmatter 元数据卡片(`5ae7152`,新增 `lib/frontmatter` / `FrontmatterCard`)
+- 100KB+ 超大消息点击展开纯文本,避免浏览器卡死(`9ebe18a`)
+- 用户消息气泡高度上限 300px(`d258d8d`)
+- 流式期间代码块跳过 Prism 高亮、CodeBlock memo、toolResults Map 身份稳定(`5d6342a`)
+- 编辑消息时恢复文本与图片(`44e595f`)
+- 聊天图片点击放大预览(`e851d30`)
+- 用户消息中 SDK 技能展开折叠为 `/skill:name` 紧凑命令(`27cd09d`)
+- provider/压缩错误浮出(`556e2ec`)
+
+### 模型配置与认证
+
+- 空白模型行过滤(`83c3757`)、models.json 原子写入(`ac81a96`,新增 `lib/atomic-file`)
+- 会话 reload 失效模型缓存(`0999006`)、模型加载意外失败返回安全错误(`4fc2995`)
+- 模型切换即时响应:乐观更新 + spinner + 失败回滚(`81767f4`)
+- 模型选择器过滤(`894babf`,适配 fork 的 `chat-input/ModelSelector`)
+- 双认证 provider 能力驱动列表(anthropic/copilot 等,`0b0d04c`,新增 `provider-listing(-runtime)` / `provider-credential-store`,proper-lockfile 原子删除)
+- API key 保存不再被模型目录刷新挂起(`e932d97`)
+- Models 面板认证变更同时刷新两个列表(`0b0d04c`)
+
+### 会话、侧边栏与工作区
+
+- 会话统计:平均缓存命中率(`8640559`)、估算活跃耗时(`360667c`/`f3c5aa5`,新增 `lib/session-timing`)
+- 压缩后仍可自动命名(`06bb7ac`);自动命名剥离技能 XML(`3ea687c`);重命名预填标题(`ec3c419`)
+- 键盘 Delete/Shift+Delete 删除会话(`47cc7ef`)
+- 文件浏览器折叠状态持久化(`30faaf7`)
+- 重开当前会话不重载(`f61a3f7`)
+- 切换工作区恢复最后打开的会话(`c8692e4`,`lib/workspace-memory` 接线)
+- 项目行运行中/未读徽标(`776fcb1`)
+- 后台会话完成提示音:音频所有权上移 AppShell(`598c3c6`)
+- 浏览器 Notification 兜底(无 Electron 桥接时,`044af0e` web 路径)
+- Worktree 下拉过滤(`24ccee0`)
+- 发送失败恢复文本回输入框(`6ac87ec` 客户端部分)
+- 每轮写入文件列表 + 点击打开(`51e0510`/`88f7a77`,新增 `turn-written-files` / `tool-names` / `TurnWrittenFiles`)
+
+### 文件查看器与 worktree
+
+- Windows git 路径比较修复(`b3e1eed`):新增 `lib/paths.ts`,`/api/worktrees` 返回服务端解析的 `currentWorktreePath`
+- 查看器统一 @mention 按钮:选区行号引用,无选区回退整文件(`ab614db`)
+- 查看器状态(模式/换行/滚动)跨标签保留(`2e9e0d6` 适配)
+- HTML 默认渲染预览打开
+
+### 输入与杂项
+
+- 侧栏与文件面板拖拽调宽 + 持久化(`9d1721f`,`useResizablePanel`/`panel-layout` 移植)
+- 只读工具预设 + 偏好持久化(`d60c547`)
+- Windows Web 目录选择器驱动器列表(`248aaf4`)
+- 移动端回车换行、Ctrl/Cmd+Enter 发送(`fcfac31`)
+- 扩展对话框提示音(`caa3bb8`)
+- DOCX 预览 Safari 同源修复(`98f09d7`)
+
+### 可选密码认证
+
+- `PI_WEB_PASSWORD` 启用 Basic 认证(`48e8300` 适配:`lib/web-auth` + Hono 全局中间件,页面与 API 统一把关)
+- agent 请求关注且页面隐藏时浏览器通知(`3d9acf6` 核心)
+
+### 未同步 / 故意跳过(本轮)
+
+- PWA 全家(manifest/service worker/iOS 视口/方向,fork 为 Electron 桌面端)
+- 上游 i18n 体系、Catppuccin 图标、npm 更新通知、hydration 修复(Vite SPA 无 SSR)
+- minimap 数学公式/导航大改(fork minimap 为节点式原生实现)
+- 定价预设 + 模型发现(`c1f0f04`/`c3b741e`,需重写 fork 已重构的 ModelsConfig,后续独立评估)
+- explorer 快速变更查看器(`1a3abc1`/`6e0b9d1`)
+- 休眠技能分组(`d63b55a`)、agent 消息开销优化(`5179734`,fork SSE 已重构)
+- 新会话启动偏好持久化(`101d08e`,依赖上游构造期原子应用模型流程)
+- 被拒 prompt 服务端跨重启保留(`6ac87ec` 服务端部分)
+- 瞬态会话服务端列表合并(`d2d7f22`,fork 客户端 hydrate 机制按设计保留)
+- Next.js 专属(`next.config.ts`/`proxy.ts` 不可移植部分/`bin/` 包装器)
+- fork 原生等价已确认:项目信任门控、PATCH 全局技能、扩展状态栏/widget 位置、worktree 文件标签、关闭释放会话、事件流保持
+
+### 基础设施
+
+- 修复 jiti 下 `@/` 别名与相对路径双实例导致 I18nProvider 测试失败(统一测试导入路径)
+- `.research/` 加入 eslint 忽略;新增 `proper-lockfile` 依赖
+
+
 ## 2026-08-15 - 同步上游 v0.8.9
 
 上游基线记录:
