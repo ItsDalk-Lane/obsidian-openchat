@@ -27,6 +27,7 @@ interface BrowseResponse {
   path?: string;
   parentPath?: string | null;
   directories?: DirectoryEntry[];
+  drives?: DirectoryEntry[];
 }
 
 interface Props {
@@ -90,6 +91,11 @@ export function DirectoryPicker({
   const [currentPath, setCurrentPath] = useState("");
   const [parentDirectory, setParentDirectory] = useState<string | null>(null);
   const [directories, setDirectories] = useState<DirectoryEntry[]>([]);
+  const [drives, setDrives] = useState<DirectoryEntry[] | null>(null);
+
+  function isWindowsDriveRoot(directory: string): boolean {
+    return /^[a-zA-Z]:[\/]{0,2}$/.test(directory);
+  }
   const [selectedPath, setSelectedPath] = useState<string>("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -118,6 +124,7 @@ export function DirectoryPicker({
       setCurrentPath(nextPath);
       setParentDirectory(data.parentPath ?? null);
       setDirectories(data.directories ?? []);
+      setDrives(data.drives ?? null);
       setSelectedPath(nextPath);
       setPathInput(nextPath);
     } catch (cause) {
@@ -342,7 +349,7 @@ export function DirectoryPicker({
                 className="directory-picker-back"
                 type="button"
                 onClick={() => parentDirectory && void navigateTo(parentDirectory)}
-                disabled={loading || !parentDirectory}
+                disabled={loading || (!parentDirectory && !isWindowsDriveRoot(currentPath))}
                 title={t("directoryPicker.goToParent")}
                 aria-label={t("directoryPicker.goToParent")}
                 style={{ width: 30, height: 30, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid var(--border-strong)", borderRadius: "var(--ui-radius-sm)", background: "var(--bg-hover)", color: "var(--text-muted)", cursor: parentDirectory ? "pointer" : "default", opacity: parentDirectory ? 1 : 0.45 }}
@@ -521,6 +528,27 @@ export function DirectoryPicker({
 
               {loading ? (
                 <div style={{ padding: 8, color: "var(--text-dim)", fontSize: 12 }}>{t("directoryPicker.loadingDirectories")}</div>
+              ) : drives !== null && drives.length >= 0 && !currentPath ? (
+                drives.length > 0 ? (
+                  drives.map((drive) => (
+                    <button
+                      key={drive.path}
+                      type="button"
+                      onClick={() => void navigateTo(drive.path)}
+                      title={drive.path}
+                      style={{ width: "100%", minHeight: 34, display: "flex", alignItems: "center", gap: 7, padding: "6px 8px", border: 0, borderRadius: "var(--ui-radius-sm)", background: "none", color: "var(--text-muted)", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-mono)", fontSize: 12 }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                        <rect x="2" y="3" width="12" height="10" rx="1.5" />
+                        <path d="M2 9h12" />
+                        <circle cx="11.5" cy="11" r="0.6" fill="currentColor" stroke="none" />
+                      </svg>
+                      <span>{drive.name}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div style={{ padding: 8, color: "var(--text-dim)", fontSize: 12 }}>{t("directoryPicker.noDrives")}</div>
+                )
               ) : visibleDirectories.length > 0 ? (
                 visibleDirectories.map((entry) => {
                   const active = selectedPath === entry.path;

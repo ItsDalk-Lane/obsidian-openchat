@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject, useCallback, useRef, useState } from "react";
+import { type RefObject, useCallback, useLayoutEffect, useRef, useState } from "react";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { requestJson } from "@/lib/api-client";
 import {
@@ -9,6 +9,7 @@ import {
   type ToolEntry,
   type ToolPreset,
 } from "@/lib/tool-presets";
+import { getPreferredToolPreset, setPreferredToolPreset } from "@/lib/tool-preset-preference";
 
 export type ThinkingLevelOption =
   | "auto"
@@ -196,9 +197,15 @@ export function useAgentConfiguration({
     }
   }, [ensuringNewSessionRef, sessionIdRef]);
 
+  useLayoutEffect(() => {
+    if (!isNew || sessionIdRef.current) return;
+    setToolPresetState(getPreferredToolPreset());
+  }, [isNew, sessionIdRef, setToolPresetState]);
+
   const handleToolPresetChange = useCallback(async (preset: ToolPreset) => {
     const toolNames = getToolNamesForPreset(preset);
     setToolPresetState(preset);
+    setPreferredToolPreset(preset);
     const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
     if (!sid) return;
     try {

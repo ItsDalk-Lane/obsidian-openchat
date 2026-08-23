@@ -4,6 +4,8 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar } from "./SessionSidebar";
 import { useAudio } from "@/hooks/useAudio";
+import { useResizablePanel } from "@/hooks/useResizablePanel";
+import { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH } from "@/lib/panel-layout";
 import { setLastOpenSession, getLastOpenSession, clearLastOpen, workspaceKeyOf } from "@/lib/workspace-memory";
 import { AnimatedDropdown } from "./session-sidebar/SidebarPrimitives";
 import { ChatWorkspaceView } from "./workspace/ChatWorkspaceView";
@@ -116,6 +118,43 @@ export function AppShell() {
   const handleBackgroundTaskDone = useCallback(() => {
     if (appSoundEnabledRef.current) appPlayDoneSound();
   }, [appPlayDoneSound, appSoundEnabledRef]);
+  const sidebarWidthRef = useRef(SIDEBAR_DEFAULT_WIDTH);
+  const getResponsiveSidebarMaxWidth = useCallback(
+    () => (isMobile ? SIDEBAR_MAX_WIDTH : Math.min(SIDEBAR_MAX_WIDTH, Math.floor(window.innerWidth * 0.5))),
+    [isMobile],
+  );
+  const rightPanelWidthRef = useRef(0);
+  const getResponsiveRightPanelWidth = useCallback(
+    () => Math.round(window.innerWidth * 0.42),
+    [],
+  );
+  const getResponsiveRightPanelMaxWidth = useCallback(
+    () => Math.min(900, Math.floor(window.innerWidth * 0.8)),
+    [],
+  );
+  const rightPanelResizer = useResizablePanel({
+    ariaLabel: t("layout.resizeFilePanel"),
+    cssVariable: "--right-panel-width",
+    defaultWidth: getResponsiveRightPanelWidth(),
+    getDefaultWidth: getResponsiveRightPanelWidth,
+    getMaxWidth: getResponsiveRightPanelMaxWidth,
+    growthDirection: "left",
+    maxWidth: 900,
+    minWidth: 300,
+    storageKey: "pi-right-panel-width",
+    widthRef: rightPanelWidthRef,
+  });
+  const sidebarResizer = useResizablePanel({
+    ariaLabel: t("layout.resizeSidebar"),
+    cssVariable: "--sidebar-width",
+    defaultWidth: SIDEBAR_DEFAULT_WIDTH,
+    getMaxWidth: getResponsiveSidebarMaxWidth,
+    growthDirection: "right",
+    maxWidth: SIDEBAR_MAX_WIDTH,
+    minWidth: SIDEBAR_MIN_WIDTH,
+    storageKey: "pi-sidebar-width",
+    widthRef: sidebarWidthRef,
+  });
   const selectedSession = useWorkspaceStore((state) => state.selectedSession);
   const newSessionCwd = useWorkspaceStore((state) => state.newSessionCwd);
   const activeCwd = useWorkspaceStore((state) => state.activeCwd);
@@ -1204,18 +1243,30 @@ export function AppShell() {
 
       {/* Left sidebar */}
       <div
-        className={`sidebar-container${sidebarOpen ? " sidebar-open" : " sidebar-closed"}${mobileSidebarReady ? "" : " sidebar-mobile-pending"}`}
+        ref={sidebarResizer.panelRef}
+        id="session-sidebar"
+        className={`sidebar-container${sidebarOpen ? " sidebar-open" : " sidebar-closed"}${mobileSidebarReady ? "" : " sidebar-mobile-pending"}${sidebarResizer.isResizing ? " sidebar-resizing" : ""}`}
         style={{
+          "--sidebar-width": `${sidebarResizer.width}px`,
           background: "var(--bg-panel)",
           borderRight: "1px solid var(--border)",
           display: "flex",
           flexDirection: "column",
           flexShrink: 0,
           zIndex: 200,
-        }}
+        } as React.CSSProperties}
       >
         {sidebarContent}
       </div>
+      {sidebarOpen && !isMobile && (
+        <div
+          {...sidebarResizer.separatorProps}
+          aria-controls="session-sidebar"
+          className="panel-resize-handle sidebar-resize-handle"
+          data-resize-handle="sidebar"
+          title={`${t("layout.resizeSidebar")}: ${t("layout.resizeHint")}`}
+        />
+      )}
 
       {/* Center: chat */}
       <div className="pi-app-workspace" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
@@ -2064,15 +2115,28 @@ export function AppShell() {
         </div>
       </div>
 
+      {rightPanelOpen && !isMobile && (
+        <div
+          {...rightPanelResizer.separatorProps}
+          aria-controls="file-panel"
+          className="panel-resize-handle right-panel-resize-handle"
+          data-resize-handle="file-panel"
+          title={`${t("layout.resizeFilePanel")}: ${t("layout.resizeHint")}`}
+        />
+      )}
+
       {/* Right panel: file viewer — always mounted, width animated via CSS */}
       <div
-        className={`right-panel-container${rightPanelOpen ? " right-panel-open" : " right-panel-closed"}`}
+        ref={rightPanelResizer.panelRef}
+        id="file-panel"
+        className={`right-panel-container${rightPanelOpen ? " right-panel-open" : " right-panel-closed"}${rightPanelResizer.isResizing ? " panel-resizing" : ""}`}
         style={{
+          "--right-panel-width": `${rightPanelResizer.width}px`,
           display: "flex",
           flexDirection: "column",
           borderLeft: "1px solid var(--border)",
           background: "var(--bg)",
-        }}
+        } as React.CSSProperties}
       >
         {/* Right panel tab bar */}
         <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 36 }}>
