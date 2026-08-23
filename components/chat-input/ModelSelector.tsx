@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useI18n } from "@/hooks/useI18n";
 
 interface ModelOption {
   provider: string;
@@ -19,6 +20,19 @@ function compareModelOptions(a: ModelOption, b: ModelOption): number {
     || MODEL_OPTION_COLLATOR.compare(a.modelId, b.modelId);
 }
 
+const MODEL_FILTER_THRESHOLD = 8;
+
+export function filterModelOptions(options: ModelOption[], query: string): ModelOption[] {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) return options;
+
+  return options.filter((option) => (
+    `${option.name} ${option.modelId}`
+      .toLocaleLowerCase()
+      .includes(normalizedQuery)
+  ));
+}
+
 export function ModelSelector({
   model,
   isAutoModelSelection,
@@ -26,6 +40,7 @@ export function ModelSelector({
   modelList,
   modelError,
   onModelChange,
+  modelSwitching,
   isStreaming,
   isMobile,
   closeSignal,
@@ -36,17 +51,23 @@ export function ModelSelector({
   modelList?: { id: string; name: string; provider: string }[];
   modelError?: string | null;
   onModelChange?: (provider: string, modelId: string) => void;
+  modelSwitching?: boolean;
   isStreaming: boolean;
   isMobile: boolean;
   closeSignal: boolean;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const [modelFilter, setModelFilter] = useState("");
   const [triggerRect, setTriggerRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (closeSignal) setOpen(false);
+    if (closeSignal) {
+      setOpen(false);
+      setModelFilter("");
+    }
   }, [closeSignal]);
 
   useEffect(() => {
@@ -58,6 +79,7 @@ export function ModelSelector({
         && !panelRef.current.contains(event.target as Node)
       ) {
         setOpen(false);
+        setModelFilter("");
       }
     };
     document.addEventListener("mousedown", handleOutsideClick);
@@ -76,8 +98,11 @@ export function ModelSelector({
       }))
       .sort(compareModelOptions);
 
+  const filteredModelOptions = filterModelOptions(modelOptions, modelFilter);
+  const showModelFilter = modelOptions.length > MODEL_FILTER_THRESHOLD;
+
   const modelsByProvider: { provider: string; options: ModelOption[] }[] = [];
-  for (const option of modelOptions) {
+  for (const option of filteredModelOptions) {
     const group = modelsByProvider.find((entry) => entry.provider === option.provider);
     if (group) group.options.push(option);
     else modelsByProvider.push({ provider: option.provider, options: [option] });
@@ -99,9 +124,13 @@ export function ModelSelector({
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
           setTriggerRect({ top: rect.top, left: rect.left, width: rect.width });
-          setOpen((current) => !current);
+          setOpen((current) => {
+            if (current) setModelFilter("");
+            return !current;
+          });
         }}
-        disabled={isStreaming}
+        disabled={isStreaming || modelSwitching}
+        aria-busy={modelSwitching || undefined}
         style={{
           display: "flex",
           alignItems: "center",
@@ -116,13 +145,13 @@ export function ModelSelector({
           border: "none",
           borderRadius: 9,
           color: "var(--text-muted)",
-          cursor: isStreaming ? "not-allowed" : "pointer",
+          cursor: isStreaming || modelSwitching ? "not-allowed" : "pointer",
           fontSize: 12,
-          opacity: isStreaming ? 0.5 : 1,
+          opacity: isStreaming || modelSwitching ? 0.5 : 1,
           transition: "background 0.12s, color 0.12s",
         }}
         onMouseEnter={(event) => {
-          if (isStreaming) return;
+          if (isStreaming || modelSwitching) return;
           event.currentTarget.style.background = "var(--bg-hover)";
           event.currentTarget.style.color = "var(--text)";
         }}
@@ -130,22 +159,28 @@ export function ModelSelector({
           event.currentTarget.style.background = open ? "var(--bg-hover)" : "none";
           event.currentTarget.style.color = "var(--text-muted)";
         }}
-        title={modelOptions.length > 0 ? "切换模型" : "无可用模型"}
+        title={modelSwitching ? t("chat.switchingModel") : modelOptions.length > 0 ? t("chat.changeModel") : t("chat.noAvailableModels")}
       >
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="4" y="4" width="16" height="16" rx="2" />
-          <rect x="9" y="9" width="6" height="6" />
-          <line x1="9" y1="1" x2="9" y2="4" />
-          <line x1="15" y1="1" x2="15" y2="4" />
-          <line x1="9" y1="20" x2="9" y2="23" />
-          <line x1="15" y1="20" x2="15" y2="23" />
-          <line x1="20" y1="9" x2="23" y2="9" />
-          <line x1="20" y1="14" x2="23" y2="14" />
-          <line x1="1" y1="9" x2="4" y2="9" />
-          <line x1="1" y1="14" x2="4" y2="14" />
-        </svg>
+        {modelSwitching ? (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" style={{ animation: "spin 0.8s linear infinite", flexShrink: 0 }} aria-hidden="true">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+          </svg>
+        ) : (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <rect x="9" y="9" width="6" height="6" />
+            <line x1="9" y1="1" x2="9" y2="4" />
+            <line x1="15" y1="1" x2="15" y2="4" />
+            <line x1="9" y1="20" x2="9" y2="23" />
+            <line x1="15" y1="20" x2="15" y2="23" />
+            <line x1="20" y1="9" x2="23" y2="9" />
+            <line x1="20" y1="14" x2="23" y2="14" />
+            <line x1="1" y1="9" x2="4" y2="9" />
+            <line x1="1" y1="14" x2="4" y2="14" />
+          </svg>
+        )}
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
-          {currentName ?? (modelOptions.length > 0 ? "选择模型" : "无模型")}
+          {currentName ?? (modelOptions.length > 0 ? t("chat.selectModel") : t("chat.noModels"))}
         </span>
       </button>
       {open && triggerRect && (() => {
@@ -170,12 +205,46 @@ export function ModelSelector({
               boxShadow: "0 -4px 16px rgba(0,0,0,0.10)",
               overflow: "hidden",
               maxHeight,
-              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
+            {showModelFilter && (
+              <div style={{ padding: "6px 8px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+                <input
+                  value={modelFilter}
+                  onChange={(event) => setModelFilter(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      setModelFilter("");
+                      setOpen(false);
+                    }
+                  }}
+                  placeholder={t("chat.filterModels")}
+                  aria-label={t("chat.filterModels")}
+                  autoFocus
+                  autoComplete="off"
+                  spellCheck={false}
+                  style={{
+                    width: "100%",
+                    minWidth: isMobile ? 0 : 220,
+                    fontSize: 11,
+                    fontFamily: "var(--font-mono)",
+                    padding: "5px 8px",
+                    border: "1px solid var(--border)",
+                    borderRadius: 5,
+                    outline: "none",
+                    background: "var(--bg)",
+                    color: "var(--text)",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            )}
+            <div style={{ overflowY: "auto", minHeight: 0 }}>
             {modelsByProvider.length === 0 ? (
               <div style={{ padding: "8px 12px", color: "var(--text-dim)", fontSize: 12, whiteSpace: "nowrap" }}>
-                无可用模型
+                {modelFilter ? t("chat.noMatchingModels") : t("chat.noAvailableModels")}
               </div>
             ) : modelsByProvider.map((group, groupIndex) => (
               <div key={group.provider}>
@@ -240,6 +309,7 @@ export function ModelSelector({
                 })}
               </div>
             ))}
+            </div>
           </div>
         );
       })()}

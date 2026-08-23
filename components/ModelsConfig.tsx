@@ -635,6 +635,15 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
       .catch(() => {});
   }, []);
 
+  // A dual-auth provider moves between the two lists when its credential type
+  // changes, so any auth change has to reload both — refreshing only one leaves
+  // the provider rendered twice, and disconnecting the stale row would delete
+  // the credential that was just created (#309).
+  const refreshAuthProviders = useCallback(() => {
+    loadOAuthProviders();
+    loadApiKeyProviders();
+  }, [loadOAuthProviders, loadApiKeyProviders]);
+
   useEffect(() => {
     void requestJson<ModelsJson>("/api/models-config")
       .then((d) => {
@@ -645,9 +654,8 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
       })
       .catch(() => setConfig({ providers: {} }))
       .finally(() => setLoading(false));
-    loadOAuthProviders();
-    loadApiKeyProviders();
-  }, [loadOAuthProviders, loadApiKeyProviders]);
+    refreshAuthProviders();
+  }, [refreshAuthProviders]);
 
   const addCustomProvider = useCallback(() => {
     let finalName = "new-provider";
@@ -750,12 +758,12 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
     if (selection.type === "oauth") {
       const p = oauthProviders.find((p) => p.id === selection.providerId);
       if (!p) return null;
-      return <OAuthDetailPanel key={p.id} provider={p} onRefresh={loadOAuthProviders} />;
+      return <OAuthDetailPanel key={p.id} provider={p} onRefresh={refreshAuthProviders} />;
     }
     if (selection.type === "apikey") {
       const p = apiKeyProviders.find((p) => p.id === selection.providerId);
       if (!p) return null;
-      return <ApiKeyDetailPanel key={p.id} provider={p} onRefresh={loadApiKeyProviders} />;
+      return <ApiKeyDetailPanel key={p.id} provider={p} onRefresh={refreshAuthProviders} />;
     }
     if (selection.type === "provider") {
       const provider = config.providers?.[selection.name];

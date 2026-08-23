@@ -321,6 +321,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     loadTools,
     loadModels,
     handleModelChange,
+    modelSwitching,
     handleThinkingLevelChange,
     handleToolPresetChange,
     syncThinkingLevel,
@@ -1431,7 +1432,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     sessionIdRef, eventSourceRef, messagesEndRef, scrollContainerRef,
     lastUserMsgRef, pendingScrollToUserRef, initialScrollDoneRef,
     // Actions
-    handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
+    handleSend, handleAbort, handleFork, handleNavigate, handleModelChange, modelSwitching,
     handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
     handleRecallQueue,
     handleBuiltinSlashCommand,

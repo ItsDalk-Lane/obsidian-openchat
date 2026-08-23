@@ -44,6 +44,7 @@ interface Props {
   modelList?: { id: string; name: string; provider: string }[];
   modelError?: string | null;
   onModelChange?: (provider: string, modelId: string) => void;
+  modelSwitching?: boolean;
   onCompact?: () => void;
   onAbortCompaction?: () => void;
   isCompacting?: boolean;
@@ -246,7 +247,7 @@ function ModelErrorBanner({ error }: { error?: string | null }) {
 
 export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   onSend, onAbort, onSteer, onFollowUp, isStreaming, model, isAutoModelSelection, modelNames, modelList, modelError, onModelChange,
-  onCompact, onAbortCompaction, isCompacting, compactError, compactResult, toolPreset, onToolPresetChange,
+  onCompact, onAbortCompaction, isCompacting, compactError, compactResult, toolPreset, onToolPresetChange, modelSwitching,
   thinkingLevel, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
   retryInfo, queuedMessages, inputHistory = [], onRecallQueue,
   slashCommands, slashCommandsLoading, onLoadSlashCommands,
@@ -1526,6 +1527,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               modelList={modelList}
               modelError={modelError}
               onModelChange={onModelChange}
+              modelSwitching={modelSwitching}
               isStreaming={isStreaming}
               isMobile={isMobile}
               closeSignal={controlsMenuOpen}

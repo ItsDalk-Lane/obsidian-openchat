@@ -154,6 +154,7 @@ const STANDARD_COMMAND_HANDLERS: Partial<Record<RuntimeCommand["type"], Standard
       context.inner.extensionRunner.setUIContext?.(context.extensionUi.createContext(), "rpc");
     }
     context.applyForcedEmptySystemPrompt();
+    invalidateModelsCache();
     return { success: true };
   },
 

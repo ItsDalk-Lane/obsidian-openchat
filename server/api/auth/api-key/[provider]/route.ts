@@ -1,6 +1,6 @@
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { ApiResponse } from "@/server/http";
 import { invalidateModelsCache } from "@/lib/models-cache";
+import { removeStoredCredentialIfType, storeProviderCredential } from "@/lib/provider-credential-store";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export async function GET(_req: Request, { params }: Params) {
   const status = modelRuntime.getProviderAuthStatus(provider);
   const displayName = modelRuntime.getProvider(provider)?.name ?? provider;
   const models = modelRuntime.getModels(provider).length;
-  return ApiResponse.json({ provider, displayName, configured: status.configured, source: status.source, models });
+  return Response.json({ provider, displayName, configured: status.configured, source: status.source, models });
 }
 
 // POST /api/auth/api-key/[provider]  body: { apiKey: string }
@@ -22,11 +22,16 @@ export async function POST(req: Request, { params }: Params) {
   try {
     const { apiKey } = await req.json() as { apiKey?: string };
     if (!apiKey || typeof apiKey !== "string" || !apiKey.trim()) {
-      return ApiResponse.json({ error: "apiKey is required" }, { status: 400 });
+      return Response.json({ error: "apiKey is required" }, { status: 400 });
     }
     const modelRuntime = await ModelRuntime.create();
+    const apiKeyAuth = modelRuntime.getProvider(provider)?.auth.apiKey;
+    if (!apiKeyAuth?.login) {
+      throw new Error(`${provider} does not support API key login`);
+    }
     let keySubmitted = false;
-    await modelRuntime.login(provider, "api_key", {
+    const credential = await apiKeyAuth.login({
+      signal: req.signal,
       notify: () => {},
       prompt: async (prompt) => {
         if (prompt.type === "select") {
@@ -41,10 +46,14 @@ export async function POST(req: Request, { params }: Params) {
         throw new Error(`${provider} requires additional authentication settings`);
       },
     });
+    // ModelRuntime.login() persists the credential and then performs an
+    // unbounded network catalog refresh. Store the returned credential
+    // directly so a slow catalog cannot leave the save request hanging.
+    await storeProviderCredential(provider, credential);
     invalidateModelsCache();
-    return ApiResponse.json({ success: true });
+    return Response.json({ success: true });
   } catch (error) {
-    return ApiResponse.json({ error: String(error) }, { status: 500 });
+    return Response.json({ error: String(error) }, { status: 500 });
   }
 }
 
@@ -52,11 +61,16 @@ export async function POST(req: Request, { params }: Params) {
 export async function DELETE(_req: Request, { params }: Params) {
   const { provider } = await params;
   try {
-    const modelRuntime = await ModelRuntime.create();
-    await modelRuntime.logout(provider);
+    const removal = await removeStoredCredentialIfType(provider, "api_key");
+    if (removal.status === "type_mismatch") {
+      return Response.json(
+        { error: `${provider} is authenticated with OAuth, not an API key` },
+        { status: 409 },
+      );
+    }
     invalidateModelsCache();
-    return ApiResponse.json({ success: true });
+    return Response.json({ success: true });
   } catch (error) {
-    return ApiResponse.json({ error: String(error) }, { status: 500 });
+    return Response.json({ error: String(error) }, { status: 500 });
   }
 }

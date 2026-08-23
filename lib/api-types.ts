@@ -157,6 +157,8 @@ export interface OAuthProviderInfo {
   name: string;
   usesCallbackServer: boolean;
   loggedIn: boolean;
+  /** Provider also supports API-key auth, so it appears in both picker sections. */
+  supportsApiKey?: boolean;
 }
 
 export interface ApiKeyProviderInfo {
@@ -165,6 +167,8 @@ export interface ApiKeyProviderInfo {
   configured: boolean;
   source?: string;
   modelCount: number;
+  /** Provider also supports OAuth, so it appears in both picker sections. */
+  supportsOAuth?: boolean;
 }
 
 export interface OAuthProvidersResponse {

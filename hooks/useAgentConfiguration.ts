@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type RefObject } from "react";
+import { type RefObject, useCallback, useRef, useState } from "react";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { requestJson } from "@/lib/api-client";
 import {
@@ -101,6 +101,8 @@ export function useAgentConfiguration({
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevelOption>("auto");
   const [currentModelOverride, setCurrentModelOverride] = useState<SelectedModel | null>(null);
   const [pendingModel, setPendingModel] = useState<SelectedModel | null>(null);
+  const [modelSwitching, setModelSwitching] = useState(false);
+  const modelSwitchPendingRef = useRef(false);
 
   const setToolPresetState = setExternalToolPreset ?? setToolPreset;
   const { currentModel, displayModel } = resolveDisplayModel({
@@ -143,28 +145,44 @@ export function useAgentConfiguration({
   }, [isNew, modelCwd]);
 
   const handleModelChange = useCallback(async (provider: string, modelId: string) => {
+    if (modelSwitchPendingRef.current) return;
     if (isNew) {
       const selectedModel = { provider, modelId };
       setNewSessionModel(selectedModel);
       setPendingModel(selectedModel);
       const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
       if (!sid) return;
+      modelSwitchPendingRef.current = true;
+      setModelSwitching(true);
       try {
         await sendAgentCommand(sid, { type: "set_model", provider, modelId });
       } catch (error) {
         console.error("Failed to set model:", error);
+      } finally {
+        modelSwitchPendingRef.current = false;
+        setModelSwitching(false);
       }
       return;
     }
     const sid = sessionIdRef.current;
     if (!sid) return;
+    const target = { provider, modelId };
+    const previousOverride = currentModelOverride;
+    modelSwitchPendingRef.current = true;
+    setModelSwitching(true);
+    // Optimistic override so the selector reflects the new model immediately;
+    // reverted on failure.
+    setCurrentModelOverride(target);
     try {
       await sendAgentCommand(sid, { type: "set_model", provider, modelId });
-      setCurrentModelOverride({ provider, modelId });
     } catch (error) {
       console.error("Failed to set model:", error);
+      setCurrentModelOverride(previousOverride);
+    } finally {
+      modelSwitchPendingRef.current = false;
+      setModelSwitching(false);
     }
-  }, [ensuringNewSessionRef, isNew, sessionIdRef]);
+  }, [currentModelOverride, ensuringNewSessionRef, isNew, sessionIdRef]);
 
   const handleThinkingLevelChange = useCallback(async (level: ThinkingLevelOption) => {
     setThinkingLevel(level);
@@ -197,6 +215,9 @@ export function useAgentConfiguration({
   }, []);
 
   const resetCurrentModelOverride = useCallback(() => {
+    // A session reload racing an in-flight model switch must not resurrect the
+    // stale model in the selector.
+    if (modelSwitchPendingRef.current) return;
     setCurrentModelOverride(null);
   }, []);
 
@@ -219,6 +240,7 @@ export function useAgentConfiguration({
     loadTools,
     loadModels,
     handleModelChange,
+    modelSwitching,
     handleThinkingLevelChange,
     handleToolPresetChange,
     syncThinkingLevel,

@@ -2,7 +2,12 @@ import { stat } from "fs/promises";
 import { resolve } from "path";
 import { createAgentSessionServices, getAgentDir, type SettingsManager } from "@earendil-works/pi-coding-agent";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
-import { loadModelsWithCache, withModelRuntimeError, type ModelsData } from "@/lib/models-cache";
+import {
+  loadModelsWithCache,
+  withModelRuntimeError,
+  withSafeModelLoadFailure,
+  type ModelsData,
+} from "@/lib/models-cache";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
 import { resolveVisibleModels } from "@/lib/model-scope";
 import { projectTrustReloadOptions } from "@/lib/project-trust";
@@ -33,7 +38,7 @@ async function loadModels(cwd: string): Promise<ModelsData> {
     agentDir,
     resourceLoaderReloadOptions: projectTrustReloadOptions(cwd, agentDir),
   });
-  const available = await services.modelRuntime.getAvailable();
+  await services.modelRuntime.getAvailable();
   const modelError = services.modelRuntime.getError();
   const settings: SettingsManager = services.settingsManager;
   const enabledModels = settings.getEnabledModels();
@@ -95,6 +100,6 @@ export async function GET(req: Request) {
   try {
     return Response.json(await loadModelsWithCache(cwd, () => loadModels(cwd)));
   } catch {
-    return Response.json(EMPTY_MODELS);
+    return Response.json(withSafeModelLoadFailure(EMPTY_MODELS));
   }
 }
