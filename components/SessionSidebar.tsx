@@ -399,6 +399,7 @@ export function SessionSidebar({ onSelectSession, onNewSession, initialSessionId
           projectKey: d.projectKey ?? d.projectRoot,
           isGit: d.isGit ?? false,
           isTopLevel: d.isTopLevel ?? false,
+          currentWorktreePath: d.currentWorktreePath ?? null,
           worktrees: d.worktrees ?? [],
         });
         setActiveWorkspace(selectedCwd, d.projectRoot, d.projectKey ?? d.projectRoot);

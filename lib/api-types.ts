@@ -64,6 +64,8 @@ export interface WorktreesResponse {
   projectKey: string;
   isGit: boolean;
   isTopLevel: boolean;
+  /** Canonical path of the checkout containing cwd, resolved server-side. */
+  currentWorktreePath: string | null;
   worktrees: WorktreeEntry[];
 }
 

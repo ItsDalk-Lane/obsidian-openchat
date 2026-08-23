@@ -14,6 +14,7 @@ interface Props {
   initialDisplayMode?: "diff";
   onOpenFile?: (filePath: string) => void;
   onMentionLines?: (relativePath: string, startLine: number, endLine: number) => void;
+  onAtMention?: (relativePath: string, isDir: boolean) => void;
   gitRefreshKey?: number;
 }
 

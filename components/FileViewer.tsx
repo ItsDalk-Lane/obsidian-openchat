@@ -36,6 +36,8 @@ interface Props {
   sourceSessionId?: string | null;
   onOpenFile?: (filePath: string) => void;
   onMentionLines?: (relativePath: string, startLine: number, endLine: number) => void;
+  /** Insert this file's relative path into the chat input (@ mention). */
+  onAtMention?: (relativePath: string, isDir: boolean) => void;
   gitRefreshKey?: number;
   initialDisplayMode?: DisplayMode;
 }
@@ -783,6 +785,41 @@ function DocumentViewer({ filePath, cwd, sourceSessionId }: Props) {
 
 type FileArtifactContext = Props;
 
+// Viewer state cache keyed by session+path: the tab model remounts FileViewer
+// on every tab switch, so display mode / wrap / scroll are stashed here to be
+// restored when the same file tab is reopened (upstream #451 adaptation).
+interface CachedViewerState {
+  displayMode: DisplayMode;
+  wrapLines: boolean;
+  scrollTop: number;
+}
+const viewerStateCache = new Map<string, CachedViewerState>();
+const VIEWER_STATE_CACHE_LIMIT = 24;
+
+function viewerStateCacheKey(filePath: string, sourceSessionId?: string | null): string {
+  return `${sourceSessionId ?? "no-session"}::${filePath}`;
+}
+
+function readCachedViewerState(filePath: string, sourceSessionId?: string | null): CachedViewerState | undefined {
+  const key = viewerStateCacheKey(filePath, sourceSessionId);
+  const cached = viewerStateCache.get(key);
+  if (cached) {
+    // LRU refresh
+    viewerStateCache.delete(key);
+    viewerStateCache.set(key, cached);
+  }
+  return cached;
+}
+
+function saveCachedViewerState(filePath: string, sourceSessionId: string | null | undefined, state: CachedViewerState): void {
+  const key = viewerStateCacheKey(filePath, sourceSessionId);
+  viewerStateCache.delete(key);
+  viewerStateCache.set(key, state);
+  while (viewerStateCache.size > VIEWER_STATE_CACHE_LIMIT) {
+    viewerStateCache.delete(viewerStateCache.keys().next().value as string);
+  }
+}
+
 const FILE_ARTIFACT_RENDERERS: ArtifactRenderer<FileArtifactContext>[] = [
   {
     id: "image-artifact-renderer",
@@ -835,6 +872,7 @@ export function FileViewer({
   sourceSessionId,
   onOpenFile,
   onMentionLines,
+  onAtMention,
   gitRefreshKey,
   initialDisplayMode,
 }: Props) {
@@ -848,6 +886,7 @@ export function FileViewer({
         sourceSessionId,
         onOpenFile,
         onMentionLines,
+        onAtMention,
         gitRefreshKey,
         initialDisplayMode,
       }}
@@ -859,6 +898,7 @@ export function FileViewer({
           sourceSessionId={context.sourceSessionId}
           onOpenFile={context.onOpenFile}
           onMentionLines={context.onMentionLines}
+          onAtMention={context.onAtMention}
           gitRefreshKey={context.gitRefreshKey}
           initialDisplayMode={context.initialDisplayMode}
         />
@@ -870,6 +910,7 @@ export function FileViewer({
 function TextFileViewer({
   filePath,
   cwd,
+  onAtMention,
   sourceSessionId,
   onOpenFile,
   onMentionLines,
@@ -883,12 +924,33 @@ function TextFileViewer({
   const [gitDiffLoading, setGitDiffLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [displayMode, setDisplayMode] = useState<DisplayMode>("source");
-  const [wrapLines, setWrapLines] = useState(false);
+  const [cachedViewerState] = useState(() => readCachedViewerState(filePath, sourceSessionId));
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(cachedViewerState?.displayMode ?? (initialDisplayMode ?? "source"));
+  const [wrapLines, setWrapLines] = useState(cachedViewerState?.wrapLines ?? false);
   const [watching, setWatching] = useState(false);
   const [selectedLineRange, setSelectedLineRange] = useState<SelectedLineRange | null>(null);
   const esRef = useRef<EventSource | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const viewerStateRef = useRef({ displayMode, wrapLines });
+  viewerStateRef.current = { displayMode, wrapLines };
+
+  const scrollTopRef = useRef(0);
+  useEffect(() => {
+    return () => {
+      saveCachedViewerState(filePath, sourceSessionId, {
+        ...viewerStateRef.current,
+        scrollTop: scrollTopRef.current,
+      });
+    };
+  }, [filePath, sourceSessionId]);
+
+  // Restore the cached scroll position after the content mounts.
+  useEffect(() => {
+    if (cachedViewerState?.scrollTop) {
+      const el = contentRef.current;
+      if (el) requestAnimationFrame(() => { el.scrollTop = cachedViewerState.scrollTop; });
+    }
+  }, [data?.content, cachedViewerState]);
   const gitDiffRequestRef = useRef(0);
 
   const fetchContent = useCallback((filePath: string) => {
@@ -980,7 +1042,10 @@ function TextFileViewer({
   }, [fetchGitDiff, filePath, gitRefreshKey]);
 
   useEffect(() => {
-    if (data?.language === "markdown" && initialDisplayMode !== "diff") {
+    // HTML gets the same rendered-first treatment as markdown: a generated page
+    // is usually more useful viewed than read as source. Both have a preview
+    // mode already; the source tab stays one click away.
+    if ((data?.language === "markdown" || data?.language === "html") && initialDisplayMode !== "diff") {
       setDisplayMode("preview");
     }
   }, [data?.language, initialDisplayMode]);
@@ -1051,8 +1116,14 @@ function TextFileViewer({
   }, [cwd, filePath, onMentionLines]);
 
   const handleMentionSelectedLines = useCallback(() => {
-    mentionLineRange(selectedLineRange);
-  }, [mentionLineRange, selectedLineRange]);
+    // Mention selected lines when a range is active; otherwise fall back to a
+    // whole-file @mention. Same button, behavior follows the selection.
+    if (selectedLineRange) {
+      mentionLineRange(selectedLineRange);
+    } else {
+      onAtMention?.(getRelativeFilePath(filePath, cwd), false);
+    }
+  }, [mentionLineRange, onAtMention, selectedLineRange, filePath, cwd]);
 
   useEffect(() => {
     if (!onMentionLines || displayMode !== "source") return;
@@ -1177,9 +1248,13 @@ function TextFileViewer({
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={handleMentionSelectedLines}
-                  title={t("i18n.mentionSelectedLines")}
+                  title={
+                    selectedLineRange
+                      ? `${t("i18n.mentionSelectedLines")} (L${selectedLineRange.startLine}${selectedLineRange.startLine !== selectedLineRange.endLine ? `-L${selectedLineRange.endLine}` : ""})`
+                      : t("files.insertPath")
+                  }
                   aria-label={t("i18n.mentionSelectedLines")}
-                  disabled={!selectedLineRange}
+                  disabled={!selectedLineRange && !onAtMention}
                   className="file-viewer-icon-button"
                 >
                   <MentionIcon />
@@ -1217,7 +1292,7 @@ function TextFileViewer({
       </div>
 
       {/* Content area */}
-      <div ref={contentRef} className="file-viewer-content" style={{ flex: 1, overflow: "auto", background: "var(--bg)" }}>
+      <div ref={contentRef} className="file-viewer-content" style={{ flex: 1, overflow: "auto", background: "var(--bg)" }} onScroll={(event) => { scrollTopRef.current = event.currentTarget.scrollTop; }}>
         {effectiveDisplayMode === "diff" && hasGitDiff ? (
           <DiffView patch={gitDiff.patch!} />
         ) : isHtml && effectiveDisplayMode === "preview" ? (

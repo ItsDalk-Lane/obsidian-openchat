@@ -2097,6 +2097,7 @@ export function AppShell() {
               initialDisplayMode={activeFileTab.initialDisplayMode}
               gitRefreshKey={explorerRefreshKey}
               onMentionLines={rightPanelOpen ? handleFileLineMention : undefined}
+              onAtMention={rightPanelOpen ? handleAtMention : undefined}
               onOpenFile={(filePath) => handleOpenFile(
                 filePath,
                 getFileName(filePath),

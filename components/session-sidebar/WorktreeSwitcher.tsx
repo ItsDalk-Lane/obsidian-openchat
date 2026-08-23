@@ -17,6 +17,8 @@ export interface WorktreeState {
   projectKey: string;
   isGit: boolean;
   isTopLevel: boolean;
+  /** Canonical path of the checkout containing forCwd, resolved server-side. */
+  currentWorktreePath: string | null;
   worktrees: WorktreeEntry[];
 }
 
@@ -117,7 +119,10 @@ export function WorktreeSwitcher({
   }, [busy, onRemoved, state]);
 
   if (active && state) {
-    const currentWorktree = state.worktrees.find((worktree) => worktree.path === selectedCwd)
+    // Browser code cannot apply Node path rules — the server resolves which
+    // checkout contains the cwd; fall back to the main worktree.
+    const currentIdentity = state.currentWorktreePath ?? selectedCwd;
+    const currentWorktree = state.worktrees.find((worktree) => worktree.path === currentIdentity)
       ?? state.worktrees.find((worktree) => worktree.isMain);
     const showWtFilter = state.worktrees.length >= 8;
     const visibleWorktrees = showWtFilter && wtFilter.trim()
@@ -219,8 +224,8 @@ export function WorktreeSwitcher({
           )}
           <div style={{ maxHeight: "min(40vh, 300px)", overflowY: "auto" }}>
             {visibleWorktrees.map((worktree) => {
-              const current = worktree.path === selectedCwd
-                || (worktree.isMain && !state.worktrees.some((entry) => entry.path === selectedCwd));
+              const current = worktree.path === currentIdentity
+                || (worktree.isMain && !state.worktrees.some((entry) => entry.path === currentIdentity));
 
               if (confirmRemove === worktree.path) {
                 return (
