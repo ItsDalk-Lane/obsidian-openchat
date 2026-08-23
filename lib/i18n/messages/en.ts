@@ -276,6 +276,7 @@ export const enLocale: LocalePlugin = {
     "chat.builtInTools": "{count} built-in tools",
     "chat.allBuiltInTools": "All built-in tools",
     "chat.readOnlyTools": "{count} read-only built-in tools",
+    "i18n.needsAttention": "The agent needs your attention",
     "chat.changeReasoning": "Change reasoning level: {level}",
     "chat.changeReasoningLabel": "Change reasoning level",
     "chat.changeToolPreset": "Change tool preset",

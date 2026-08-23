@@ -266,7 +266,16 @@ export function ChatWindow({ task, run, onAgentEnd, onSessionCreated, onSessionF
     if (!extensionDialog || soundedExtensionDialogIdRef.current === extensionDialog.id) return;
     soundedExtensionDialogIdRef.current = extensionDialog.id;
     playDoneSoundRef.current?.();
-  }, [extensionDialog]);
+    // The agent is asking for attention; surface it when the page is hidden
+    // and no desktop bridge is available (Electron already notifies natively).
+    if (document.hidden && !("notifyAgentComplete" in (window.piDesktop ?? {})) && "Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(t("desktop.agentCompleteTitle"), { body: t("i18n.needsAttention") });
+      } catch {
+        // best-effort only
+      }
+    }
+  }, [extensionDialog, t]);
 
   const sessionBusy = agentRunning || bashRunning;
 

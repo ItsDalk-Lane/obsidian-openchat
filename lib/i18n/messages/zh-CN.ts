@@ -276,6 +276,7 @@ export const zhCNLocale: LocalePlugin = {
     "chat.builtInTools": "{count} 个内置工具",
     "chat.allBuiltInTools": "全部内置工具",
     "chat.readOnlyTools": "{count} 个只读内置工具",
+    "i18n.needsAttention": "Agent 需要你的关注",
     "chat.changeReasoning": "更改推理级别：{level}",
     "chat.changeReasoningLabel": "更改推理级别",
     "chat.changeToolPreset": "更改工具预设",

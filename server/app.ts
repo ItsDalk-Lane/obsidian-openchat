@@ -6,12 +6,29 @@ import {
   isLanApiTokenAllowed,
   shouldRequireLanApiToken,
 } from "@/lib/request-security";
+import { isWebPasswordEnabled, isValidBasicAuthorization } from "@/lib/web-auth";
 import { attachRequestUrl } from "@/server/http";
 import { registerApiRoutes } from "@/server/api-router";
 
 export async function createApp(): Promise<Hono> {
   const app = new Hono();
   const webDist = resolve(process.env.PI_WEB_STATIC_DIR ?? "web/dist");
+
+  // Optional Basic auth (PI_WEB_PASSWORD). Applies to pages and the API alike;
+  // the browser retries with credentials after the 401 + WWW-Authenticate.
+  app.use("*", async (context, next) => {
+    const password = process.env.PI_WEB_PASSWORD;
+    if (
+      isWebPasswordEnabled(password)
+      && !isValidBasicAuthorization(context.req.header("authorization") ?? null, password)
+    ) {
+      return context.text("Authentication required", 401, {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": 'Basic realm="Pi Web", charset="UTF-8"',
+      });
+    }
+    await next();
+  });
 
   app.use("/api/*", async (context, next) => {
     const request = attachRequestUrl(context.req.raw);
