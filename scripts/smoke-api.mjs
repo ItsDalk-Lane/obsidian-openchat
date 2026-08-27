@@ -134,7 +134,7 @@ try {
     const inventory = (await readFile(join(projectRoot, "scripts/route-inventory.txt"), "utf8"))
       .split("\n")
       .filter(Boolean);
-    assert.equal(inventory.length, 67);
+    assert.equal(inventory.length, 69);
     await Promise.all(inventory.map((appPath) => access(join(
       projectRoot,
       appPath.replace(/^app\//, "server/"),

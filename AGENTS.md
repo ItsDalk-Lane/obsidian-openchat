@@ -126,6 +126,7 @@ app/api/
   models/route.ts                 GET { models, modelList, defaultModel }
   models-config/route.ts          GET/PUT — read/write ~/.pi/agent/models.json
   models-config/test/route.ts     POST test a configured model/provider
+  models/enabled/route.ts         GET/PUT — chat model-selector scope (global enabledModels)
   plugins/route.ts                GET/POST package plugin management
   skills/route.ts                 GET/PATCH loaded skills and disable-model-invocation
   skills/install/route.ts         POST install skills through npx skills add
@@ -166,7 +167,7 @@ components/
   ChatMinimap.tsx     scroll minimap alongside the message list
   MarkdownBody.tsx    markdown renderer
   ModelsConfig.tsx    models.json loading, selection, and save orchestration
-  models-config/      model form, connection test, and auth/key panels
+  models-config/      model form, connection test, visibility editor, auth/key panels, provider icons
   PluginsConfig.tsx   modal for installed package plugins
   SkillsConfig.tsx    modal for loaded/search/installable skills
   McpConfig.tsx       modal for MCP servers (list/status/toggle/add/edit/remove)
@@ -286,6 +287,8 @@ Newer pi emits `compaction_start` / `compaction_end`; older versions emitted `au
 - OAuth/device-code/manual-code flows are streamed by `GET /api/auth/login/[provider]`; manual code responses POST back with a short-lived token stored in `globalThis.__piLoginCallbacks`.
 - API-key routes store and remove keys through `AuthStorage`. Status endpoints must never return the raw key.
 - The model test route is `app/api/models-config/test/route.ts`; `app/api/models/test/` is not a real route.
+- Built-in (OAuth / API-key) provider detail pages combine the auth card with `ProviderModelsPanel` (components/models-config/ModelVisibilityPanel.tsx): every model the runtime resolves for that provider is listed with visibility checkboxes, capability chips, and edit/delete affordances for custom entries. Custom models are stored as `providers[<builtinId>].models` — pi's composer upserts them onto the built-in list (new ids append, same ids override; api/baseUrl inherit). Removing a built-in provider's last custom entry must drop the whole record when nothing else remains, and `sanitizeModelsConfig` enforces that server-side — empty entries like `{}` or `{models: []}` make the SDK provider composer throw and poison the whole model load. Never render the generic `ProviderDetail` editor for such entries; its forced `api: "openai-completions"` default would corrupt the merge.
+- Selector visibility is pi's global `enabledModels` setting (`GET/PUT app/api/models/enabled/route.ts`, scratch the models cache after writes). `buildScopePayload()` in ModelVisibilityPanel.tsx rewrites only the edited provider's slice: a fully-checked provider collapses to a `provider/*` glob so future/remote-catalog models appear automatically, partial selections enumerate exact refs, and patterns of other providers survive untouched (`lib/model-scope.ts` resolves them). No patterns = unrestricted. `/api/models` applies the scope only to the UI dropdown; session-side cycling stays unscoped in this fork (upstream v0.8.9 also scopes session startup). POST `/api/models/refresh` force-refreshes remote catalogs into `~/.pi/agent/models-store.json`, optionally scoped via `{ provider }` — built-ins are wrapped with SDK `withRemoteCatalog`, so their lists are not fixed.
 
 ### Completion sound
 - `hooks/useAudio.ts` stores the toggle in `localStorage` as `pi-sound-enabled` and reuses one `AudioContext`.

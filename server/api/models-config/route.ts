@@ -11,19 +11,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Drop blank model rows the editor can emit (no id / whitespace-only id). */
+/**
+ * Drop blank model rows the editor can emit (no id / whitespace-only id), then
+ * drop provider entries left with no meaningful content. A models.json entry
+ * like `{}` or `{ "models": [] }` makes the SDK provider composer throw
+ * ("must specify baseUrl, headers, compat, modelOverrides, or models") and
+ * poisons the whole model load — removing it is always safe.
+ */
 function sanitizeModelsConfig(data: Record<string, unknown>): Record<string, unknown> {
   if (!isRecord(data.providers)) return data;
 
-  const providers = Object.fromEntries(Object.entries(data.providers).map(([providerId, provider]) => {
-    if (!isRecord(provider) || !Array.isArray(provider.models)) return [providerId, provider];
+  const providers: [string, unknown][] = [];
+  for (const [providerId, provider] of Object.entries(data.providers)) {
+    if (!isRecord(provider) || !Array.isArray(provider.models)) {
+      providers.push([providerId, provider]);
+      continue;
+    }
     const models = provider.models.filter((model) => (
       !isRecord(model) || typeof model.id !== "string" || model.id.trim().length > 0
     ));
-    return [providerId, { ...provider, models }];
-  }));
+    const hasContentBeyondModels = Object.keys(provider).some((key) => key !== "models");
+    if (!hasContentBeyondModels && models.length === 0) continue;
+    providers.push([providerId, { ...provider, models }]);
+  }
 
-  return { ...data, providers };
+  return { ...data, providers: Object.fromEntries(providers) };
 }
 
 function getModelsPath(): string {

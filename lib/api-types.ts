@@ -195,6 +195,38 @@ export interface ModelTestResponse {
   responseText?: string;
 }
 
+/** One selectable entry of the chat model-selector scope editor. */
+export interface SelectorModelInfo {
+  provider: string;
+  id: string;
+  name: string;
+  reasoning?: boolean;
+  input?: string[];
+  contextWindow?: number;
+}
+
+export interface EnabledModelsResponse {
+  /** Every currently available model, unscoped — candidates for checkboxes. */
+  allModels: SelectorModelInfo[];
+  /** Raw global `enabledModels`; null means unrestricted (everything visible). */
+  enabledPatterns: string[] | null;
+  warnings?: string[];
+}
+
+export interface EnabledModelsUpdateResponse extends SuccessResponse {
+  warnings?: string[];
+}
+
+/** Response of POST /api/models/refresh (remote catalogs → models-store.json). */
+export interface ModelsRefreshResponse extends SuccessResponse {
+  refreshedAt?: string;
+  /** Available-model count after the refresh. */
+  totalModels?: number;
+  /** Per-provider network/refresh failures; empty when all providers updated. */
+  failed?: { provider: string; message: string }[];
+  runtimeError?: string;
+}
+
 export type PluginScope = "global" | "project";
 export type PluginResourceKind = "extension" | "skill" | "prompt" | "theme";
 

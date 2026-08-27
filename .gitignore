@@ -55,3 +55,6 @@ next-env.d.ts
 
 # transient npm cache (sandbox workaround)
 /.npm-cache/
+
+# Claude Code 本地配置
+/.claude/

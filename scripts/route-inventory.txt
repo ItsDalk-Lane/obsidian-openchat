@@ -29,6 +29,8 @@ app/api/mcp/status/route.ts
 app/api/models-config/route.ts
 app/api/models-config/test/route.ts
 app/api/models/route.ts
+app/api/models/enabled/route.ts
+app/api/models/refresh/route.ts
 app/api/plugins/route.ts
 app/api/project-trust/route.ts
 app/api/runtimes/route.ts
